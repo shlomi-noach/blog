@@ -75,12 +75,12 @@ query=&quot; select clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' '
         fingerprint_query=$(echo $fingerprint_query | tr &quot;.&quot; &quot;__&quot;)<br />
         echo &quot;data.mysql.dml.${fingerprint_cluster}.${fingerprint_query}.count ${fingerprint_count} $unixtime&quot; | nc -w 1 my.graphite.server 2003<br />
     done</p>
-<p>[/code]</p>
+<p></pre>
 </blockquote>
 <p>If you don't need the "clustername stuff", modify the query to read:</p>
 <blockquote>
-<p>[code lang="sql"]<br />
+<pre><br />
 select 'mysql' as clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp) group by fingerprint order by sum(ts_cnt) desc</p>
-<p>[/code]</p>
+<p></pre>
 </blockquote>
 <p>The graphite metric path will look like <strong>data.mysql.dml.oltp.update_my_documents.count</strong>, which makes for a perpefctly valid metric to monitor, graphically visualize and get alerts on.</p>

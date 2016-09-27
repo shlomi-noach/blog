@@ -33,9 +33,9 @@ url: /2010/06/04/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-li
 <h4>Custom monitoring &amp; charts</h4>
 <p>Custom monitoring allows the user to supply with a query, the results of which will be monitored.</p>
 <p>That is, <em>mycheckpoint</em> monitors the status variables, replication status, OS metrics. But it cannot by itself monitor one's <em>application</em>. Which is why a user may supply with such query as:</p>
-<blockquote><p>[sql]<br />
+<blockquote><pre><br />
 SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1<br />
-[/sql]</p></blockquote>
+</pre></blockquote>
 <p>Such a query will tell an online store how many customers are in the midst of shopping. There is no argument that this number is worth monitoring for. Given the above query, <em>mycheckpoint</em> will execute it per sample, and store the query's result along with all sampled data, to be then aggregated by complex views to answer for:</p>
 <ul>
 <li>What was the value per given sample?</li>
@@ -47,24 +47,24 @@ SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1<br />
 <li>How much time did it take to take that sample?</li>
 </ul>
 <p><!--more-->As another example, a query worth testing for rate:</p>
-<blockquote><p>[sql]<br />
+<blockquote><pre><br />
 SELECT MAX(shopping_cart_id) FROM shopping_cart<br />
-[/sql]</p></blockquote>
+</pre></blockquote>
 <p>The above will provide with the last id. Assuming this is <strong>AUTO_INCREMENT</strong>, and assuming we're on <strong>auto_increment_increment=1</strong>, two samples will allow us to get the number of created carts between those samples. Now, here's a metric I'd like to read:</p>
 <ul>
 <li>How many carts are created per second, for each hour of the day?</li>
 </ul>
 <p>We get all these for free with mycheckpoint, which already does this analysis. All we need to provide is the query, and how we would like it to be visualized (visualization is optional, it is not the only way to diagnose monitored data) graphically:</p>
-<blockquote><p>[sql]<br />
+<blockquote><pre><br />
 INSERT INTO<br />
  custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)<br />
  VALUES (0, 1, 'SELECT COUNT(*) FROM store.shopping_cart WHERE is_pending=1', 'Number of pending carts', 'value', 0);</p>
 <p>INSERT INTO<br />
  custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)<br />
  VALUES (1, 1, 'SELECT MAX(shopping_cart_id) FROM store.shopping_cart', 'Created carts rate', 'value_psec', 0);<br />
-[/sql]</p></blockquote>
+</pre></blockquote>
 <p>We can later query for these values, just like we do for normal monitored values:</p>
-<blockquote><p>[sql]<br />
+<blockquote><pre><br />
 mysql&gt; SELECT id, ts, created_tmp_tables_psec, custom_0, custom_1_psec FROM sv_sample WHERE ts &gt;= NOW() - INTERVAL 1 HOUR;<br />
 +-------+---------------------+-------------------------+----------+---------------+<br />
 | id    | ts                  | created_tmp_tables_psec | custom_0 | custom_1_psec |<br />
@@ -82,7 +82,7 @@ mysql&gt; SELECT id, ts, created_tmp_tables_psec, custom_0, custom_1_psec FROM s
 | 50740 | 2010-05-21 19:55:01 |                   15.85 |      177 |          2.28 |<br />
 | 50741 | 2010-05-21 20:00:01 |                   19.04 |        8 |          0.82 |<br />
 +-------+---------------------+-------------------------+----------+---------------+<br />
-[/sql]</p></blockquote>
+</pre></blockquote>
 <p>Of course, it is also possible to harness <em>mycheckpoint</em>'s views power to generate charts:</p>
 <blockquote>
 <pre>mysql&gt; SELECT custom_1_psec FROM sv_report_chart_sample\G

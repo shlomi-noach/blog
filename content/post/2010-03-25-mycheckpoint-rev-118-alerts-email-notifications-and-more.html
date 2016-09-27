@@ -42,14 +42,14 @@ url: /2010/03/25/mycheckpoint-rev-118-alerts-email-notifications-and-more/
 <h4>Conditional alerts</h4>
 <p><em>mycheckpoint</em> is <em>SQL oriented</em>. As such, it allows for creation of alert conditions, which are nothing more than SQL conditions.</p>
 <p><!--more-->For example, we wish to raise an alerts when the slave stops replicating (just ping us with an email one this happens):</p>
-<blockquote><p>[sql]INSERT INTO alert_condition (condition_eval, description, alert_delay_minutes)<br />
-  VALUES ('seconds_behind_master IS NULL', 'Slave not replicating', 0);[/sql]</p></blockquote>
+<blockquote><pre>INSERT INTO alert_condition (condition_eval, description, alert_delay_minutes)<br />
+  VALUES ('seconds_behind_master IS NULL', 'Slave not replicating', 0);</pre></blockquote>
 <p>Or is too far behind (but since we do maintenance work during the night, it's OK on those hours). We only want to be notified if this goes on for <strong>10</strong> minutes:</p>
-<blockquote><p>[sql]INSERT INTO alert_condition (condition_eval, description, alert_delay_minutes)<br />
-  VALUES ('(seconds_behind_master &gt; 60) AND (HOUR(ts) NOT BETWEEN 2 AND 4)', 'Slave lags too far behind', 10);[/sql]</p></blockquote>
+<blockquote><pre>INSERT INTO alert_condition (condition_eval, description, alert_delay_minutes)<br />
+  VALUES ('(seconds_behind_master &gt; 60) AND (HOUR(ts) NOT BETWEEN 2 AND 4)', 'Slave lags too far behind', 10);</pre></blockquote>
 <p>We want to be notified when the <strong>datadir</strong> mount point disk quota exceeds 95% usage. Oh, and please keep nagging us about this, as long as it is unresolved:</p>
-<blockquote><p>[sql]INSERT INTO alert_condition (condition_eval, description, repetitive_alert)<br />
-  VALUES ('os_datadir_mountpoint_usage_percent &gt; 95', 'datadir mount point is over 95%', 1);[/sql]</p></blockquote>
+<blockquote><pre>INSERT INTO alert_condition (condition_eval, description, repetitive_alert)<br />
+  VALUES ('os_datadir_mountpoint_usage_percent &gt; 95', 'datadir mount point is over 95%', 1);</pre></blockquote>
 <p>There's much more to alert conditions. You can generate a pending alerts report, get a textual presentation of raised and pending alerts, view the query which determines what alerts are currently raised, and more.</p>
 <p>Read more on the <a href="http://code.openark.org/forge/mycheckpoint/documentation/alerts">alerts documentation page</a>.</p>
 <h4>Email notifications</h4>
