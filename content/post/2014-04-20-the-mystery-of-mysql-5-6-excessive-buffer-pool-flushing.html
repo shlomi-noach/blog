@@ -28,12 +28,12 @@ url: /2014/04/20/the-mystery-of-mysql-5-6-excessive-buffer-pool-flushing/
 <p>We have upgraded <strong>6</strong> servers from all datacenters to <strong>5.6</strong>, both on SSD and spindle disks, and are experiencing the following phenomena:<!--more--></p>
 <ul>
 <li>A substantial increase in disk I/O utilization. See a <strong>10</strong> day breakdown (upgrade is visible on <strong>04/14</strong>) this goes on like this many days later:<br />
-<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/04/5.5-to-5.6-disk-utilization-10-days.png"><img class="alignnone wp-image-6845 size-full" src="{{ site.baseurl }}/assets/5.5-to-5.6-disk-utilization-10-days.png" alt="5.5-to-5.6-disk-utilization-10-days" width="700" height="400" /></a></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/04/5.5-to-5.6-disk-utilization-10-days.png"><img class="alignnone wp-image-6845 size-full" src="/blog/assets/5.5-to-5.6-disk-utilization-10-days.png" alt="5.5-to-5.6-disk-utilization-10-days" width="700" height="400" /></a></blockquote>
 </li>
 </ul>
 <ul>
 <li>A substantial increase in InnoDB buffer pool pages flush: Mr. Blue is our newly upgraded server; it joins Mr. Green upgraded a couple weeks ago. Mr. Red is still <strong>5.5</strong>. This is the only MySQL graph that I could directly relate to the increase in I/O:<br />
-<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/04/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png"><img class="alignnone size-full wp-image-6848" src="{{ site.baseurl }}/assets/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png" alt="5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed" width="700" height="350" /></a></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/04/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png"><img class="alignnone size-full wp-image-6848" src="/blog/assets/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png" alt="5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed" width="700" height="350" /></a></blockquote>
 </li>
 <li>No change in workload (it takes some 60 minutes for caches to warm up, so measuring after that time). Same equal share of serving as dictated by HAProxy. Same amount of queries. Same amount of everything.</li>
 <li>Faster replication speed, on single thread - that's the good part! We see <strong>30%</strong> and more improvement in replication speed. Tested by stopping <strong>SLAVE SQL_THREAD</strong> for a number of pre-defined minutes, then measuring time it took for slave to catch up, up to 10 seconds lag. The results vary depending on the time of day and serving workload on slaves, but it is <em>consistently far faster</em> with <strong>5.6</strong>.</li>
