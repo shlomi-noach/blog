@@ -43,19 +43,18 @@ url: /2015/11/13/sql-mini-hack-of-the-day-inverted-in-clause/
 <p>To avoid SQL injection you would create a prepared statement, but you don't want to copy+paste everything, and so you build your query dynamically based on the value of <strong>clusterName</strong>. You want to end up with either:</p>
 <blockquote>
 <pre>SELECT hostname FROM database_instance WHERE slave_lag_seconds &gt; ?</pre>
-<p><strong>, acceptableLag</strong></p></blockquote>
+<p><strong>, acceptableLag</strong></blockquote>
 <p>or</p>
 <blockquote>
 <pre>SELECT hostname FROM database_instance WHERE cluster_name = ? AND slave_lag_seconds &gt; ?</pre>
-<p><strong>, clusterName, acceptableLag</strong></p></blockquote>
+<p><strong>, clusterName, acceptableLag</strong></blockquote>
 <p>Dynamic query building is good practice, but a little pain (BTW I'm designing a new, simple &amp; non intrusive query builder for golang). Is there a way to just get away with one query that has it all?</p>
 <p>This is one option:</p>
 <blockquote>
 <pre>SELECT hostname FROM database_instance WHERE (cluster_name = ? OR ? = '') AND slave_lag_seconds &gt; ?</pre>
-<p><strong>,clusterName, clusterName, acceptableLag</strong></p></blockquote>
+<p><strong>,clusterName, clusterName, acceptableLag</strong></blockquote>
 <p>and it is somewhat painful to list clusterName twice in the arguments list. This is where the inverted <strong>IN</strong> clause kicks in. It will negate usage of an index, and may look strange at first glance, but as you get used to it it just becomes another pattern:</p>
 <blockquote>
 <pre>SELECT hostname FROM database_instance WHERE ? IN (cluster_name, '') AND slave_lag_seconds &gt; ?</pre>
-<p><strong>, clusterName, acceptableLag</strong></p></blockquote>
+<p><strong>, clusterName, acceptableLag</strong></blockquote>
 <p>So when <strong>clusterName</strong> is empty, all rows where <strong>slave_lag_seconds &gt; acceptableLag</strong> are fetched; when non empty, only those where <strong>cluster_name</strong> equals our value.</p>
-

@@ -34,11 +34,11 @@ url: /2015/07/25/what-makes-a-mysql-server-failurerecovery-case/
 </ul>
 <p>Bummer. Let's review a simplified topology with a few failure scenarios. Some of these scenarios you will find familiar. Some others may be caused by setups you're not using. I would love to say <em>I've seen it all</em> but the more I see the more I know how strange things can become.<!--more--></p>
 <p>We will consider the simplified case of a master with three replicas: we have <strong>M</strong> as master, <strong>A</strong>, <strong>B</strong>, <strong>C</strong> as slaves.</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures.png"><img class="alignnone size-full wp-image-7280" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures.png" alt="mysql-topologies-failures" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures.png"><img class="alignnone size-full wp-image-7280" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures.png" alt="mysql-topologies-failures" width="192" height="108" /></a></blockquote>
 <p>&nbsp;</p>
 <p>A common monitoring scheme is to monitor each machine's IP, availability of MySQL port (<strong>3306</strong>) and responsiveness to some simple query (e.g. <strong>"SELECT 1"</strong>). Some of these checks may run local to the machine, others remote.</p>
 <p>Now consider your monitoring tool fails to connect to your master.</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-1.png"><img class="alignnone size-full wp-image-7281" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-1.png" alt="mysql-topologies-failures (1)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-1.png"><img class="alignnone size-full wp-image-7281" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-1.png" alt="mysql-topologies-failures (1)" width="192" height="108" /></a></blockquote>
 <p>I've marked the slaves with question marks as the common monitoring schema does not associate the master's monitoring result to the slaves'.  Can you safely conclude your master is dead? Are your feeling comfortable with initiating a failover process? How about:</p>
 <ul>
 <li>Temporary network partitioning; it just so happens that your monitoring tool cannot access the master, though everyone else can.</li>
@@ -46,7 +46,7 @@ url: /2015/07/25/what-makes-a-mysql-server-failurerecovery-case/
 <li>MySQL connection rejection. This could be due to a serious "Too many connections" problem on the master, or due to accidental network noise.</li>
 </ul>
 <p>Now consider the following case: a first tier slave is failing to connect to the master:</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-2.png"><img class="alignnone size-full wp-image-7282" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-2.png" alt="mysql-topologies-failures (2)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-2.png"><img class="alignnone size-full wp-image-7282" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-2.png" alt="mysql-topologies-failures (2)" width="192" height="108" /></a></blockquote>
 <p>The slave's IO thread is broken; do we have a problem here? Is the slave failing to connect because the master is dead, or because the slave itself suffers from a network partitioning glitch?</p>
 <h3>A holistic diagnosis</h3>
 <p>In the holistic approach we couple the master's monitoring with that of its direct slaves. Before I continue to describe some logic, the previous statement is something we must reflect upon.</p>
@@ -56,7 +56,7 @@ url: /2015/07/25/what-makes-a-mysql-server-failurerecovery-case/
 <p>We will further only require MySQL client protocol connection to our database servers.</p>
 <h3>Dead master</h3>
 <p>A "real" dead master is perhaps the clearest failure. MySQL has crashed (signal 11); or the kernel panicked; or the disks failed; or power went off. The server is <em>really not serving</em>. This is observed as:</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-3.png"><img class="alignnone size-full wp-image-7284" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-3.png" alt="mysql-topologies-failures (3)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-3.png"><img class="alignnone size-full wp-image-7284" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-3.png" alt="mysql-topologies-failures (3)" width="192" height="108" /></a></blockquote>
 <p>In the holistic approach, we observe that:</p>
 <ul>
 <li>We cannot reach the master (our MySQL client connection fails).</li>
@@ -67,7 +67,7 @@ url: /2015/07/25/what-makes-a-mysql-server-failurerecovery-case/
 <p>And yet our entire replication topology is broken. Replication is not there for beauty; it serves our application code. And it's turning stale. Even if by some chance things are still operating on the master, this still makes for a valid failover scenario.</p>
 <h3>Unreachable master</h3>
 <p>Compare the above with:</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-4.png"><img class="alignnone size-full wp-image-7285" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-4.png" alt="mysql-topologies-failures (4)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-4.png"><img class="alignnone size-full wp-image-7285" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-4.png" alt="mysql-topologies-failures (4)" width="192" height="108" /></a></blockquote>
 <p>Our monitoring scheme cannot reach our master. But it can reach the slaves, an they're all saying: <em>"I'm happy!"</em></p>
 <p>This gives us suspicion enough to avoid failing over. We may not actually have a problem: it's just <em>us</em> that are unable to connect to the master.</p>
 <p><em>Right?</em></p>
@@ -77,20 +77,20 @@ url: /2015/07/25/what-makes-a-mysql-server-failurerecovery-case/
 <p>Understanding the topology gives you greater insight into your failure case; you have increasing leevels of confidentiality in your analysis. Strike that: in your <em>automated</em> analysis.</p>
 <h3>Dead master and slaves</h3>
 <p>They're all <em>gone</em>!</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-5.png"><img class="alignnone size-full wp-image-7287" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-5.png" alt="mysql-topologies-failures (5)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-5.png"><img class="alignnone size-full wp-image-7287" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-5.png" alt="mysql-topologies-failures (5)" width="192" height="108" /></a></blockquote>
 <p>You cannot reach the master <em>and</em> you cannot reach any of its slaves. Once you are able to associate your master and slaves you can conclude you either have a complete DC power failure problem (or is this cross DC?) or you are having a network partitioning problem. Your application may or may not be affected -- but at least you know where to start. Compare with:</p>
 <h3>Failed DC</h3>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-6.png"><img class="alignnone size-full wp-image-7289" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-6.png" alt="mysql-topologies-failures (6)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-6.png"><img class="alignnone size-full wp-image-7289" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-6.png" alt="mysql-topologies-failures (6)" width="192" height="108" /></a></blockquote>
 <p>I'm stretching it now, because when a DC fails all the red lights start flashing. Nonetheless, if M, A, B are all in one DC and C is on another, you have yet another diagnosis.</p>
 <h3>Dead master and some slaves</h3>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-7.png"><img class="alignnone size-full wp-image-7290" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-7.png" alt="mysql-topologies-failures (7)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-7.png"><img class="alignnone size-full wp-image-7290" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-7.png" alt="mysql-topologies-failures (7)" width="192" height="108" /></a></blockquote>
 <p>Things start getting complicated when you're unable to get an authorized answer from everyone. What happens if the master is dead as well as one of its slaves? We previously expected all slaves to say "we cannot replicate". For us, master being unreachable, some slaves being dead and all other complaining on IO thread is good enough indication that the master is dead.</p>
 <h3>All first tier slaves not replicating</h3>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-9.png"><img class="alignnone size-full wp-image-7293" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-9.png" alt="mysql-topologies-failures (9)" width="192" height="108" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/mysql-topologies-failures-9.png"><img class="alignnone size-full wp-image-7293" src="{{ .Site.BaseURL }}/assets/mysql-topologies-failures-9.png" alt="mysql-topologies-failures (9)" width="192" height="108" /></a></blockquote>
 <p>Not a failover case, but certainly needs to ring the bells. All master's direct slaves are failing replication on some SQL error or are just stopped. Our topology is turning stale.</p>
 <h3>Intermediate masters</h3>
 <p>With intermediate master the situation is not all that different. In the below:</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/Untitled-presentation.png"><img class="alignnone size-full wp-image-7294" src="{{ .Site.BaseURL }}/assets/Untitled-presentation.png" alt="Untitled presentation" width="480" height="270" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2015/07/Untitled-presentation.png"><img class="alignnone size-full wp-image-7294" src="{{ .Site.BaseURL }}/assets/Untitled-presentation.png" alt="Untitled presentation" width="480" height="270" /></a></blockquote>
 <p>The servers <strong>E</strong>, <strong>F</strong>, <strong>G</strong> replicating from <strong>C</strong> provide us with the holistic view on <strong>C</strong>. <strong>D</strong> provides the holistic view on <strong>A</strong>.</p>
 <h3>Reducing noise</h3>
 <p>Intermediate master failover is a much simpler operation than master failover. Changing masters require name resolve changes (of some sort), whereas moving slaves around the topology affects no one.</p>
@@ -112,4 +112,3 @@ url: /2015/07/25/what-makes-a-mysql-server-failurerecovery-case/
 <h3>How to fail over</h3>
 <p>Different story. Some other time. But failing over makes for complex decisions, based on who the replicating slaves are; with/out log-slave-updates; with-out GTID; with/out Pseudo-GTID; are binlog servers available; which slaves are available in which data centers. Or you may be using Galera (we're not) which answers most of the above.</p>
 <p>Anyway we use <em>orchestrator</em> for that; it knows our topologies, knows how they should look like, understands how to heal them, knows MySQL replication rules, and invokes external processes to do the stuff it doesn't understand.</p>
-

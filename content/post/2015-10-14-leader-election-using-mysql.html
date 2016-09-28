@@ -55,30 +55,30 @@ url: /2015/10/14/leader-election-using-mysql/
 <p>Whichever solution you pick, make sure it is human readable, such that it is easy to tell <em>which service is the leader</em>. This helps operations. We note this as <strong>service_id</strong></p>
 <h4>Table</h4>
 <p>The following table will have a single row; the <strong>service_id</strong> in that row is the active leader.</p>
-<blockquote><p>
-<pre><br />
-CREATE TABLE service_election (<br />
-  anchor tinyint(3) unsigned NOT NULL,<br />
-  service_id varchar(128) NOT NULL,<br />
-  last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,<br />
-  PRIMARY KEY (anchor)<br />
-) ENGINE=InnoDB<br />
+<blockquote>
+<pre>
+CREATE TABLE service_election (
+  anchor tinyint(3) unsigned NOT NULL,
+  service_id varchar(128) NOT NULL,
+  last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (anchor)
+) ENGINE=InnoDB
 </pre>
-</p></blockquote>
+</blockquote>
 <h4>Attempt election</h4>
 <p><!--more--></p>
 <p>All services issue the following, periodically. Say every service issues this once per second:</p>
-<blockquote><p>
-<pre>insert ignore into service_election (<br />
-	anchor, service_id, last_seen_active<br />
-) values (<br />
-	1, 'my_service_number_7', now()<br />
-) on duplicate key update<br />
-	service_id = if(last_seen_active &amp;lt; now() - interval 20 second, values(service_id), service_id),<br />
-	last_seen_active = if(service_id = values(service_id), values(last_seen_active), last_seen_active)<br />
-;<br />
+<blockquote>
+<pre>insert ignore into service_election (
+	anchor, service_id, last_seen_active
+) values (
+	1, 'my_service_number_7', now()
+) on duplicate key update
+	service_id = if(last_seen_active &amp;lt; now() - interval 20 second, values(service_id), service_id),
+	last_seen_active = if(service_id = values(service_id), values(last_seen_active), last_seen_active)
+;
 </pre>
-</p></blockquote>
+</blockquote>
 <p><em>Replace <strong>'my_service_number_7'</strong> with specific <strong>service_id</strong> per service.</em></p>
 <p>The above is the most complex query in our solution; breakdown:</p>
 <ul>
@@ -94,35 +94,35 @@ CREATE TABLE service_election (<br />
 </ul>
 <h4>Forcibly assume leadership</h4>
 <p>Make a certain service the leader:</p>
-<blockquote><p>
-<pre>replace into service_election (<br />
-        anchor, service_id, last_seen_active<br />
-    ) values (<br />
-        1, 'my_service_number_12', now()<br />
-    )<br />
+<blockquote>
+<pre>replace into service_election (
+        anchor, service_id, last_seen_active
+    ) values (
+        1, 'my_service_number_12', now()
+    )
 </pre>
-</p></blockquote>
+</blockquote>
 <p>The next time <strong>my_service_number_12</strong> attempts to register its own leadership, it finds out it's <em>already</em> the leader and updates <strong>last_seen_active</strong>.</p>
 <h4>Force re-elections</h4>
 <p>The next service to attempt election will succeed after this:</p>
-<blockquote><p>
+<blockquote>
 <pre>delete from service_election;</pre>
-</p></blockquote>
+</blockquote>
 <h4>Am I the leader?</h4>
 <p>A service can query as follows:</p>
-<blockquote><p>
+<blockquote>
 <pre>select count(*) as is_leader from service_election where anchor=1 and service_id='my_service_number_7';</pre>
-</p></blockquote>
+</blockquote>
 <h4>Who is the leader?</h4>
 <p>This is of course very simple:</p>
-<blockquote><p>
+<blockquote>
 <pre>select max(service_id) as leader from service_election where anchor=1;</pre>
-</p></blockquote>
+</blockquote>
 <h3>What of GET_LOCK()?</h3>
 <p><a href="https://dev.mysql.com/doc/refman/5.6/en/miscellaneous-functions.html#function_get-lock">GET_LOCK()</a> allows one to acquire a helper-lock of arbitrary name; this lock is reserved as long as the connection that acquired it lives. No other connection can acquire lock of same name.</p>
-<blockquote><p>
+<blockquote>
 <pre>SELECT GET_LOCK(&quot;my_service_leadership&quot;, 0)</pre><br />
-Returns <strong>1</strong> on success, <strong>0</strong> on failure to obtain lock.</p></blockquote>
+Returns <strong>1</strong> on success, <strong>0</strong> on failure to obtain lock.</blockquote>
 <p>This supposedly makes a much simpler leader election mechanism. However I don't like it for the following reasons:</p>
 <ul>
 <li>You must allocate a dedicated connection that lives for the duration of your service
@@ -133,4 +133,3 @@ Returns <strong>1</strong> on success, <strong>0</strong> on failure to obtain
 <li>There is no visibility (&lt; MySQL 5.7) into <em>who</em> is holding the lock. You only know that it's being held.</li>
 <li>If your service hangs (but does not die), the lock is still being held. There is no "keepalive" requirement on the lock's side.</li>
 </ul>
-

@@ -26,7 +26,7 @@ url: /2013/10/14/converting-an-olap-database-to-tokudb-part-3-operational-stuff/
 <p>Quick recap: we've altered one of out DWH slaves to TokuDB, with the goal of migrating most of out servers, including the master, to TokuDB.</p>
 <h4>Adding an index</h4>
 <p>Shortly after migrating our server to TokuDB we noticed an unreasonably disproportionate slave lag on our TokuDB slave (red line in chart below) as compared to other slaves.</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2013/09/tokudb-slave-lag.png"><img alt="tokudb-slave-lag" src="{{ site.baseurl }}/assets/tokudb-slave-lag.png" width="700" height="329" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2013/09/tokudb-slave-lag.png"><img alt="tokudb-slave-lag" src="{{ site.baseurl }}/assets/tokudb-slave-lag.png" width="700" height="329" /></a></blockquote>
 <p>Quick investigation led to the fact that, coincidentally, a manual heavy-duty operation was just taking place, which updated some year's worth of data retroactively. OK, but why so slow on TokuDB? Another quick investigation led to an apples vs. oranges problem: as depicted in <a href="http://code.openark.org/blog/mysql/converting-an-olap-database-to-tokudb-part-1">part 1</a>, our original setup included MONTHly partitioning on our larger tables, whereas we could not do the same in TokuDB, where we settled for YEARly partitioning.</p>
 <p>The heavy-duty operation included a query that was relying on the MONTHly partitioning to do reasonable pruning: a <strong>WHERE</strong> condition on a date column did the right partition pruning; but where on InnoDB that would filter <strong>1</strong> month's worth of data, on TokuDB it would filter <strong>1</strong> <em>year</em>.</p>
 <p>Wasn't it suggested that TokuDB has online table operations? I decided to give it a shot, and add a proper index on our date column (I actually created a compound index, but irrelevant).</p>
@@ -66,4 +66,3 @@ DROP TABLE my_table_Old;</pre>
 <p>The <strong>INSERT INTO ... SELECT</strong> operation does use the bulk loader when you do it on an empty table. It completed within merely <strong>30</strong> hours. Hurrah!</p>
 <h4>DROPping a TABLE</h4>
 <p>It was an immediate operation to drop our "Old" table -- subsecond. Nothing like your InnoDB DROP.</p>
-

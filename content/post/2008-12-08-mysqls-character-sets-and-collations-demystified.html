@@ -38,7 +38,7 @@ url: /2008/12/08/mysqls-character-sets-and-collations-demystified/
 <p>What's important to me is that I can define <strong><code>Name VARCHAR(30) CHARSET utf8</code></strong> for my columns, and Voila! Any name can be represented in my database.</p>
 <h4>So why not define everything as utf8 and get done with it?</h4>
 <p>Well, it just so happens that Unicode comes with a price. See, for example, the following column definition:<strong></strong></p>
-<blockquote><p><code>CountryCode CHAR(3) CHARSET utf8</code></p></blockquote>
+<blockquote><code>CountryCode CHAR(3) CHARSET utf8</code></blockquote>
 <p>We are asking for a column with 3 characters exactly. The required storage for this column will be such that any 3-letter name must fit in. This means (3 characters) times (3 bytes per character) = 9 bytes of storage. So <strong><code>CHAR</code></strong> and <strong><code>utf8</code></strong> together may be less than ideal.<strong><code> VARCHAR</code></strong> behaves better: it only requires as many bytes per character as described above. So the text "abc" will only require 3 bytes (plus <strong><code>VARCHAR</code></strong>'s leading 1 or 2 bytes).</p>
 <h4>Why don't we drop the 'CHAR' altogether, then, and use only 'VARCHAR'?</h4>
 <p>Because some values are simply better represented with <strong><code>CHAR</code></strong>: consider a "password" column, encoded with MD5. The <strong><code>MD5()</code></strong> function returns a 32 characters long text. It's always 32 characters, and, moreover, it's always in ASCII. The best data type and character set definition would be <strong><code>password CHAR(32) CHARSET ascii</code></strong>. We thus ensure exactly 32 bytes are allocated to this column. A <strong><code>VARCHAR</code></strong> will acquire an additional byte or two, depending on its defined length, which will indicate the length of the text.</p>
@@ -64,7 +64,7 @@ INSERT INTO my_users (name, password) VALUES ('David', 'mypass');</pre>
 );</pre>
 </blockquote>
 <p>The <strong><code>ascii_bin</code></strong> collation is a case sensitive collation for <strong><code>ascii</code></strong>. The following will not find anything:</p>
-<blockquote><p><code>SELECT * FROM my_users WHERE name='david' AND plainPassword='MYPASS';</code></p></blockquote>
+<blockquote><code>SELECT * FROM my_users WHERE name='david' AND plainPassword='MYPASS';</code></blockquote>
 <p>Holding a plain text password in your database is not a best practice, but apparently it's common.</p>
 <p>Collations also deal with text ordering. For any two strings, the collation determines which is larger, or if they are equal. Probably the most common situation you see collations in action is when you <strong>ORDER BY</strong> a text column.</p>
 <h4>Also keep in mind</h4>
@@ -75,4 +75,3 @@ INSERT INTO my_users (name, password) VALUES ('David', 'mypass');</pre>
 <li>An <strong><code>ALTER TABLE <em>&lt;some table&gt;</em> CONVERT TO <em>&lt;some charset&gt;</em></code></strong> will change the character set not only for the table itself, but also for all existing textual columns.</li>
 </ul>
 <p>See the following post: <a title="Useful database analysis queries with INFORMATION_SCHEMA" href="http://code.openark.org/blog/mysql/useful-database-analysis-queries-with-information_schema">Useful database analysis queries with INFORMATION_SCHEMA</a> for queries which diagnose your databases character sets.</p>
-

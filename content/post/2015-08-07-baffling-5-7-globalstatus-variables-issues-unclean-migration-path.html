@@ -57,7 +57,7 @@ ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for ta
 <p>How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.</p>
 <p>This should not be any different for <strong>5.7</strong>. We would like to provision a <strong>5.7</strong> slave in our topologies and just see that everything works. Well, we have, and things don't just work. Our Nagios stops working for that <strong>5.7</strong> slave. <em>Orchestrator</em> started complaining (by this time I've <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.4.291">already fixed it</a> to be more tolerant for the <strong>5.7</strong> problems so no crashes here).</p>
 <p>I hope you see the problem by now.</p>
-<blockquote><p>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO '...'</strong> on your <strong>5.6</strong> master.</p></blockquote>
+<blockquote>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO '...'</strong> on your <strong>5.6</strong> master.</blockquote>
 <p>The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your <strong>5.7</strong> slave, which means you will not be able to <strong>SHOW GLOBAL VARIABLES</strong> on your slave, which means everything remains broken.</p>
 <p>Yes, you can issue this directly on your <strong>5.7</strong> slaves. It's <em>doable</em>, but <em>undesired</em>. It's ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It's unfriendly to GTID (make sure to <strong>SET SQL_LOG_BIN=0</strong> before that).</p>
 <h3>WHY in the first place?</h3>
@@ -143,4 +143,3 @@ mysql&gt; select @@version;
 <p>Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?</p>
 <h3>[UPDATE 2015-08-19]</h3>
 <p>Please <a href="http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html">see this followup</a> by Morgan Tocker of Oracle.</p>
-

@@ -46,7 +46,7 @@ Query OK, 0 rows affected (0.00 sec)</pre>
 </blockquote>
 <p>Why would the <strong>RENAME</strong> fail where the <strong>ALTER</strong> works?</p>
 <p>Small thing, but critical to the operation of the online-schema-change. From the <a href="https://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932/">Facebook OSC documentation</a>:</p>
-<blockquote><p>Since alter table causes an implicit commit in innodb, innodb locks get released after the first alter table. So any transaction that sneaks in after the first alter table and before the second alter table gets a 'table not found' error. The second alter table is expected to be very fast though because copytable is not visible to other transactions and so there is no need to wait.</p></blockquote>
+<blockquote>Since alter table causes an implicit commit in innodb, innodb locks get released after the first alter table. So any transaction that sneaks in after the first alter table and before the second alter table gets a 'table not found' error. The second alter table is expected to be very fast though because copytable is not visible to other transactions and so there is no need to wait.</blockquote>
 <h3>What the FB solution means</h3>
 <p>It means for a very brief duration, the table is <em>not there</em>. Your app will get errors.</p>
 <p>Of course, we <em>should</em> be able to handle errors anytime, aywhere. But the honest truth is: we (as in <em>the world</em>) do not. Many apps will fail ungracefully should they get a <em>table not found</em> error.</p>
@@ -114,4 +114,3 @@ The atomic swap is complete.</li>
 <p>Yeah. That's what the Facebook people said. "Hey, we can just fix this".</p>
 <h3>Update: caveat</h3>
 <p>Should connection #1 or connection #2 die unexpectedly before we are satisfied the events have all been applied, the `RENAME` gets unblocked due to the collapse of locks, and we end up with a premature swap of the tables, potentially before we have applied the latest entries from the changelog table. This was noted by my colleague Gillian Gunson, and we keep looking into this.</p>
-

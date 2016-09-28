@@ -27,7 +27,7 @@ url: /2014/05/27/from-percona-server-to-mysql-and-back-to-percona-server-beware-
 <p>With crash safe replication this also means the transactional relay log position. Recap: crash safe replication writes, per transaction, the relay log status into <strong>ibdata1</strong> file. So the relay log info in <strong>ibdata1</strong> is in perfect alignment with your committed transactions. Upon server startup, Percona Server reads the info from <strong>ibdata1</strong> and overwrites <strong>relay-log.info</strong> file (it completely disregards whatever was in that file prior to startup).</p>
 <p>Can you guess what could get wrong here? Here's the scenario we had; the same problem can unfold in different scenarios.</p>
 <p>Take a look at the following topology:</p>
-<blockquote><p><a href="http://code.openark.org/blog/wp-content/uploads/2014/05/simple-topology.png"><img class="alignnone size-full wp-image-6869" src="{{ site.baseurl }}/assets/simple-topology.png" alt="simple topology" width="701" height="297" /></a></p></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/05/simple-topology.png"><img class="alignnone size-full wp-image-6869" src="{{ site.baseurl }}/assets/simple-topology.png" alt="simple topology" width="701" height="297" /></a></blockquote>
 <p>(this image is an actual online visualization of a replication topology; for purposes of this blog it's a sandbox topology on my laptop. Please stand by for some very cool open source release announcement shortly)</p>
 <p><!--more-->We copied <strong>srv-2</strong> (Percona Server) into <strong>srv-3</strong> (MySQL). They both run well. <em>A few days later</em> we added <strong>srv-4</strong> as Percona Server and (I'm cutting the story short here) reseeded it from <strong>srv-3</strong>. We started <strong>srv-4</strong>. Bam! Won't replicate since it can't find the required master logs.</p>
 <p>Why? It was reseeded from <strong>srv-3</strong> which was well replicating. It took less than 24 hours to complete the process and the master has 4 days of binary logs retention. Why would the new <strong>srv-4</strong> fail to find the required logs on the master?</p>
@@ -41,4 +41,3 @@ url: /2014/05/27/from-percona-server-to-mysql-and-back-to-percona-server-beware-
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-
