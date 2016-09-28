@@ -33,8 +33,8 @@ url: /2010/06/04/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-li
 <h4>Custom monitoring &amp; charts</h4>
 <p>Custom monitoring allows the user to supply with a query, the results of which will be monitored.</p>
 <p>That is, <em>mycheckpoint</em> monitors the status variables, replication status, OS metrics. But it cannot by itself monitor one's <em>application</em>. Which is why a user may supply with such query as:</p>
-<blockquote><pre><br />
-SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1<br />
+<blockquote><pre>
+SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1
 </pre></blockquote>
 <p>Such a query will tell an online store how many customers are in the midst of shopping. There is no argument that this number is worth monitoring for. Given the above query, <em>mycheckpoint</em> will execute it per sample, and store the query's result along with all sampled data, to be then aggregated by complex views to answer for:</p>
 <ul>
@@ -47,64 +47,64 @@ SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1<br />
 <li>How much time did it take to take that sample?</li>
 </ul>
 <p><!--more-->As another example, a query worth testing for rate:</p>
-<blockquote><pre><br />
-SELECT MAX(shopping_cart_id) FROM shopping_cart<br />
+<blockquote><pre>
+SELECT MAX(shopping_cart_id) FROM shopping_cart
 </pre></blockquote>
 <p>The above will provide with the last id. Assuming this is <strong>AUTO_INCREMENT</strong>, and assuming we're on <strong>auto_increment_increment=1</strong>, two samples will allow us to get the number of created carts between those samples. Now, here's a metric I'd like to read:</p>
 <ul>
 <li>How many carts are created per second, for each hour of the day?</li>
 </ul>
 <p>We get all these for free with mycheckpoint, which already does this analysis. All we need to provide is the query, and how we would like it to be visualized (visualization is optional, it is not the only way to diagnose monitored data) graphically:</p>
-<blockquote><pre><br />
-INSERT INTO<br />
- custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)<br />
- VALUES (0, 1, 'SELECT COUNT(*) FROM store.shopping_cart WHERE is_pending=1', 'Number of pending carts', 'value', 0);</p>
-<p>INSERT INTO<br />
- custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)<br />
- VALUES (1, 1, 'SELECT MAX(shopping_cart_id) FROM store.shopping_cart', 'Created carts rate', 'value_psec', 0);<br />
+<blockquote><pre>
+INSERT INTO
+ custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)
+ VALUES (0, 1, 'SELECT COUNT(*) FROM store.shopping_cart WHERE is_pending=1', 'Number of pending carts', 'value', 0);
+INSERT INTO
+ custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)
+ VALUES (1, 1, 'SELECT MAX(shopping_cart_id) FROM store.shopping_cart', 'Created carts rate', 'value_psec', 0);
 </pre></blockquote>
 <p>We can later query for these values, just like we do for normal monitored values:</p>
-<blockquote><pre><br />
-mysql&gt; SELECT id, ts, created_tmp_tables_psec, custom_0, custom_1_psec FROM sv_sample WHERE ts &gt;= NOW() - INTERVAL 1 HOUR;<br />
-+-------+---------------------+-------------------------+----------+---------------+<br />
-| id    | ts                  | created_tmp_tables_psec | custom_0 | custom_1_psec |<br />
-+-------+---------------------+-------------------------+----------+---------------+<br />
-| 50730 | 2010-05-21 19:05:01 |                   16.64 |      448 |          3.02 |<br />
-| 50731 | 2010-05-21 19:10:02 |                   20.97 |       89 |          1.73 |<br />
-| 50732 | 2010-05-21 19:15:01 |                   15.70 |      367 |          3.56 |<br />
-| 50733 | 2010-05-21 19:20:01 |                   18.32 |       54 |          1.43 |<br />
-| 50734 | 2010-05-21 19:25:01 |                   16.42 |       91 |          1.96 |<br />
-| 50735 | 2010-05-21 19:30:02 |                   21.93 |      233 |          2.11 |<br />
-| 50736 | 2010-05-21 19:35:02 |                   14.58 |      176 |          1.91 |<br />
-| 50737 | 2010-05-21 19:40:01 |                   21.61 |      168 |          1.93 |<br />
-| 50738 | 2010-05-21 19:45:01 |                   16.05 |      241 |          2.44 |<br />
-| 50739 | 2010-05-21 19:50:01 |                   19.70 |       46 |          1.19 |<br />
-| 50740 | 2010-05-21 19:55:01 |                   15.85 |      177 |          2.28 |<br />
-| 50741 | 2010-05-21 20:00:01 |                   19.04 |        8 |          0.82 |<br />
-+-------+---------------------+-------------------------+----------+---------------+<br />
+<blockquote><pre>
+mysql&gt; SELECT id, ts, created_tmp_tables_psec, custom_0, custom_1_psec FROM sv_sample WHERE ts &gt;= NOW() - INTERVAL 1 HOUR;
++-------+---------------------+-------------------------+----------+---------------+
+| id    | ts                  | created_tmp_tables_psec | custom_0 | custom_1_psec |
++-------+---------------------+-------------------------+----------+---------------+
+| 50730 | 2010-05-21 19:05:01 |                   16.64 |      448 |          3.02 |
+| 50731 | 2010-05-21 19:10:02 |                   20.97 |       89 |          1.73 |
+| 50732 | 2010-05-21 19:15:01 |                   15.70 |      367 |          3.56 |
+| 50733 | 2010-05-21 19:20:01 |                   18.32 |       54 |          1.43 |
+| 50734 | 2010-05-21 19:25:01 |                   16.42 |       91 |          1.96 |
+| 50735 | 2010-05-21 19:30:02 |                   21.93 |      233 |          2.11 |
+| 50736 | 2010-05-21 19:35:02 |                   14.58 |      176 |          1.91 |
+| 50737 | 2010-05-21 19:40:01 |                   21.61 |      168 |          1.93 |
+| 50738 | 2010-05-21 19:45:01 |                   16.05 |      241 |          2.44 |
+| 50739 | 2010-05-21 19:50:01 |                   19.70 |       46 |          1.19 |
+| 50740 | 2010-05-21 19:55:01 |                   15.85 |      177 |          2.28 |
+| 50741 | 2010-05-21 20:00:01 |                   19.04 |        8 |          0.82 |
++-------+---------------------+-------------------------+----------+---------------+
 </pre></blockquote>
 <p>Of course, it is also possible to harness <em>mycheckpoint</em>'s views power to generate charts:</p>
 <blockquote>
 <pre>mysql&gt; SELECT custom_1_psec FROM sv_report_chart_sample\G
 </pre>
-<p><img class="alignnone" title="custom_1_psec" src="{{ site.baseurl }}/assets/chart?cht=lc&amp;chs=400x200&amp;chts=303030,12&amp;chtt=Latest+24+hours:+May+19,+20:10++-++May+20,+20:10&amp;chf=c,s,ffffff&amp;chdl=custom_1_psec&amp;chdlp=b&amp;chco=ff8c00&amp;chd=s:QfXQmZQhXTmWVkWRobPpWUtQPVROaOOUMJPOKdJHQJFJEDJJEGCAIEFJHFFEGGDQHGJGMJPPMNZNRWR_ZUWfR_nSjuUcaXa3OgxRl4UivWZ5UhtWX4VgnUTYktiVW9WanUVxVYlgXwVdicXpb&amp;chxt=x,y&amp;chxr=1,0,5.120000&amp;chxl=0:||+||00:00||+||04:00||+||08:00||+||12:00||+||16:00||+||20:00|&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,3.47,0&amp;chxp=0,3.47,7.64,11.81,15.98,20.15,24.32,28.49,32.66,36.83,41.00,45.17,49.34,53.51,57.68,61.85,66.02,70.19,74.36,78.53,82.70,86.87,91.04,95.21,99.38" alt="" width="400" height="200" /></p>
+<img class="alignnone" title="custom_1_psec" src="{{ site.baseurl }}/assets/chart?cht=lc&amp;chs=400x200&amp;chts=303030,12&amp;chtt=Latest+24+hours:+May+19,+20:10++-++May+20,+20:10&amp;chf=c,s,ffffff&amp;chdl=custom_1_psec&amp;chdlp=b&amp;chco=ff8c00&amp;chd=s:QfXQmZQhXTmWVkWRobPpWUtQPVROaOOUMJPOKdJHQJFJEDJJEGCAIEFJHFFEGGDQHGJGMJPPMNZNRWR_ZUWfR_nSjuUcaXa3OgxRl4UivWZ5UhtWX4VgnUTYktiVW9WanUVxVYlgXwVdicXpb&amp;chxt=x,y&amp;chxr=1,0,5.120000&amp;chxl=0:||+||00:00||+||04:00||+||08:00||+||12:00||+||16:00||+||20:00|&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,3.47,0&amp;chxp=0,3.47,7.64,11.81,15.98,20.15,24.32,28.49,32.66,36.83,41.00,45.17,49.34,53.51,57.68,61.85,66.02,70.19,74.36,78.53,82.70,86.87,91.04,95.21,99.38" alt="" width="400" height="200" />
 </blockquote>
-<p>The rules are:</p>
+The rules are:
 <ul>
 <li>There can (currently) only be 18 custom queries.</li>
 <li>The <strong>custom_query_id</strong> must range 0-17 (to be lifted soon).</li>
 <li>A custom query must return with <em>exactly</em> one row, with <em>exactly</em> one column, which is a kind of <em>integer</em>.</li>
 </ul>
-<p>Please read <a href="http://code.openark.org/blog/mysql/things-to-monitor-on-mysql-the-users-perspective">my earlier post</a> on custom monitoring to get more background.</p>
+Please read <a href="http://code.openark.org/blog/mysql/things-to-monitor-on-mysql-the-users-perspective">my earlier post</a> on custom monitoring to get more background.
 <h4>Custom monitoring HTML reports</h4>
-<p>Custom monitoring comes with a HTML reports, featuring requested charts. See a <a href="http://code.openark.org/blog/wp-content/uploads/2010/05/mcp_custom_report-128.html">sample custom report</a>.</p>
-<p>In this sample report, a few queries are monitored for value (pending rentals, pending downloads) and a few for rates (downloads per second, emails per second etc.).</p>
-<p>Custom HTML reports come in two flavors:</p>
+Custom monitoring comes with a HTML reports, featuring requested charts. See a <a href="http://code.openark.org/blog/wp-content/uploads/2010/05/mcp_custom_report-128.html">sample custom report</a>.
+In this sample report, a few queries are monitored for value (pending rentals, pending downloads) and a few for rates (downloads per second, emails per second etc.).
+Custom HTML reports come in two flavors:
 <ul>
 <li>Brief reports, featuring last 24 hours, as in the example above. These are handled by the <strong>sv_custom_html_brief</strong> view.</li>
 <li>Full reports, featuring last 24 hours, last 10 days, known history. These take longer to generate, and are handled by the <strong>sv_custom_html</strong> view.</li>
 </ul>
-<p>The sample report was generated by issuing:</p>
+The sample report was generated by issuing:
 <blockquote>
 <pre>SELECT html FROM sv_custom_html_brief;</pre>
 </blockquote>

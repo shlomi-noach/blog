@@ -46,92 +46,93 @@ url: /2014/04/18/anemomaster-dml-visibility-your-must-do-for-tomorrow/
 <p><!--more--></p>
 <p>One server could be the master, and this can indeed be done: just <strong>FLUSH MASTER LOGS</strong>, parse the binary logs with <em>pt-query-digest</em>, and you're done. But like others, we tend to look at our masters as tender babies. We care for them, and do not wish to overload them unnecessarily. We chose to get the binlog entries from our slaves, instead. We also chose to get the entries from the relay logs, since these are unaffected by slave performance and as long as network is good, we can expect the relay logs to be <em>very</em> up to date. At any given time we have two slaves that take this role (this is automated and verified). On a <strong>10</strong> minute period we would flush the relay logs on these servers, and analyse whatever relay logs we have not analysed as yet.</p>
 <p>The script below is a slightly modified version of our own, and should work for the standard installation. Modify to fit your own data (in particular, it assumes relay logs are named <strong>mysqld-relay-bin</strong>; <strong>datadir</strong> is specified in <strong>/etc/my.cnf</strong>, and please don't ask me how to do this on Windows):</p>
-<blockquote><p>[code lang="bash"]<br />
-#!/bin/bash</p>
-<p>#<br />
-# Digest latest relay logs file, write results to &quot;anemomaster&quot;<br />
-#<br />
-# This script can run from any machine; it only needs to execute on a single machine per mysql cluster, but for<br />
-# analysis availability it should execute on at least two hosts per cluster.<br />
-#</p>
-<p>DATADIR=`grep datadir /etc/my.cnf|awk -F= '{print $2}'`<br />
-TMPDIR=/tmp<br />
-DIGESTED_RELAY_LOGS_FILE=${DATADIR}/digested_relay_logs.txt</p>
-<p>touch $DIGESTED_RELAY_LOGS_FILE<br />
-chown mysql:mysql $DIGESTED_RELAY_LOGS_FILE</p>
-<p>hostname=$(hostname)</p>
-<p>echo &quot;deleting old relay logs from ${TMPDIR}&quot;<br />
-rm ${TMPDIR}/mysqld-relay-bin.[0-9]*</p>
-<p>echo &quot;Getting current relay log files&quot;<br />
-existing_relay_log_files=$(ls -tr ${DATADIR}/mysqld-relay-bin.[0-9]* | head -n -1)<br />
-for existing_relay_log_file in $existing_relay_log_files<br />
-do<br />
-    cp -u $existing_relay_log_file $TMPDIR<br />
-done<br />
-echo &quot;flushing relay logs&quot;<br />
-/usr/bin/mysql -umyself -psecret -e 'flush relay logs\G;' 2&gt;/dev/null<br />
-# sleep because the log file takes some time to disappear<br />
-sleep 1</p>
-<p>echo &quot;Getting current relay log files&quot;<br />
-existing_relay_log_files=$(ls -tr ${DATADIR}/mysqld-relay-bin.[0-9]* | head -n -1)<br />
-for existing_relay_log_file in $existing_relay_log_files<br />
-do<br />
-    cp -u $existing_relay_log_file $TMPDIR<br />
-done</p>
-<p>cd $TMPDIR<br />
-for relay_log_file in mysqld-relay-bin.[0-9]*<br />
-do<br />
-    # Filter this relay log file, since it's already been digested<br />
-    grep $relay_log_file $DIGESTED_RELAY_LOGS_FILE &amp;&amp; rm $relay_log_file<br />
-done</p>
-<p>for relay_log_file in mysqld-relay-bin.[0-9]*<br />
-do<br />
-    echo &quot;digesting $relay_log_file&quot;<br />
-    mysqlbinlog $relay_log_file | /usr/bin/pt-query-digest \<br />
-      --type binlog --order-by Query_time:cnt --group-by fingerprint --limit 100 \<br />
-      --review  P=3306,u=anemomaster,p=secret,h=anemomaster_host,D=anemomaster,t=global_query_review \<br />
-      --history P=3306,u=anemomaster,p=secret,h=anemomaster_host,D=anemomaster,t=global_query_review_history \<br />
-      --filter=&quot; \$event-&gt;{Bytes} = length(\$event-&gt;{arg}) and \$event-&gt;{hostname}=\&quot;$(hostname)\&quot; &quot; \<br />
-      --no-report<br />
-    echo &quot;$relay_log_file&quot; &gt;&gt; $DIGESTED_RELAY_LOGS_FILE<br />
-    rm $relay_log_file<br />
-done<br />
-# make sure the file does not bloat. 20 entries is more than enough.<br />
-tail -n 20 $DIGESTED_RELAY_LOGS_FILE &gt; ${TMPDIR}/DIGESTED_RELAY_LOGS_FILE<br />
-cat ${TMPDIR}/DIGESTED_RELAY_LOGS_FILE &gt; $DIGESTED_RELAY_LOGS_FILE<br />
-echo &quot;done&quot;<br />
+<blockquote><pre>
+#!/bin/bash
+#
+# Digest latest relay logs file, write results to &quot;anemomaster&quot;
+#
+# This script can run from any machine; it only needs to execute on a single machine per mysql cluster, but for
+# analysis availability it should execute on at least two hosts per cluster.
+#
+DATADIR=`grep datadir /etc/my.cnf|awk -F= '{print $2}'`
+TMPDIR=/tmp
+DIGESTED_RELAY_LOGS_FILE=${DATADIR}/digested_relay_logs.txt
+touch $DIGESTED_RELAY_LOGS_FILE
+chown mysql:mysql $DIGESTED_RELAY_LOGS_FILE
+hostname=$(hostname)
+echo &quot;deleting old relay logs from ${TMPDIR}&quot;
+rm ${TMPDIR}/mysqld-relay-bin.[0-9]*
+echo &quot;Getting current relay log files&quot;
+existing_relay_log_files=$(ls -tr ${DATADIR}/mysqld-relay-bin.[0-9]* | head -n -1)
+for existing_relay_log_file in $existing_relay_log_files
+do
+    cp -u $existing_relay_log_file $TMPDIR
+done
+echo &quot;flushing relay logs&quot;
+/usr/bin/mysql -umyself -psecret -e 'flush relay logs\G;' 2&gt;/dev/null
+# sleep because the log file takes some time to disappear
+sleep 1
+echo &quot;Getting current relay log files&quot;
+existing_relay_log_files=$(ls -tr ${DATADIR}/mysqld-relay-bin.[0-9]* | head -n -1)
+for existing_relay_log_file in $existing_relay_log_files
+do
+    cp -u $existing_relay_log_file $TMPDIR
+done
+cd $TMPDIR
+for relay_log_file in mysqld-relay-bin.[0-9]*
+do
+    # Filter this relay log file, since it's already been digested
+    grep $relay_log_file $DIGESTED_RELAY_LOGS_FILE &amp;&amp; rm $relay_log_file
+done
+for relay_log_file in mysqld-relay-bin.[0-9]*
+do
+    echo &quot;digesting $relay_log_file&quot;
+    mysqlbinlog $relay_log_file | /usr/bin/pt-query-digest \
+      --type binlog --order-by Query_time:cnt --group-by fingerprint --limit 100 \
+      --review  P=3306,u=anemomaster,p=secret,h=anemomaster_host,D=anemomaster,t=global_query_review \
+      --history P=3306,u=anemomaster,p=secret,h=anemomaster_host,D=anemomaster,t=global_query_review_history \
+      --filter=&quot; \$event-&gt;{Bytes} = length(\$event-&gt;{arg}) and \$event-&gt;{hostname}=\&quot;$(hostname)\&quot; &quot; \
+      --no-report
+    echo &quot;$relay_log_file&quot; &gt;&gt; $DIGESTED_RELAY_LOGS_FILE
+    rm $relay_log_file
+done
+# make sure the file does not bloat. 20 entries is more than enough.
+tail -n 20 $DIGESTED_RELAY_LOGS_FILE &gt; ${TMPDIR}/DIGESTED_RELAY_LOGS_FILE
+cat ${TMPDIR}/DIGESTED_RELAY_LOGS_FILE &gt; $DIGESTED_RELAY_LOGS_FILE
+echo &quot;done&quot;
 </pre></blockquote>
 <p>As for Anemometer, we patched it to support multiple environments ("clusters") -- but irrelevant to the DML change. If you just want to make it visualize DMLs, here's the major configuration changes to <strong>config.inc.php</strong> (marked with <strong>bold</strong>):</p>
-<blockquote><p>[code lang="php"]<br />
-$conf['history_defaults'] = array(<br />
-	'output'		=&gt; 'table',<br />
-	'fact-group'	=&gt; 'date',<br />
-	'fact-order'	=&gt; 'date DESC',<br />
-	'fact-limit' =&gt; '90',<br />
-	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-90 day')),<br />
-	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),<br />
-	'table_fields' =&gt; array('date', 'query_time_avg','ts_cnt','Query_time_sum')<br />
-);</p>
-<p>$conf['report_defaults'] = array(<br />
-	'fact-group'	=&gt; 'checksum',<br />
-	'fact-order'	=&gt; 'ts_cnt DESC',<br />
-	'fact-limit' =&gt; '20',<br />
-	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-1 day')),<br />
-	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),<br />
-	'table_fields' =&gt; array('checksum','snippet', 'query_time_avg','ts_cnt','Query_time_sum'),<br />
-	'dimension-pivot-hostname_max' =&gt; null,<br />
-	'dimension-pivot-clustername_max' =&gt; null<br />
-);</p>
-<p>$conf['graph_defaults'] = array(<br />
-	'fact-group'	=&gt; 'minute_ts',<br />
-	'fact-order'	=&gt; 'minute_ts',<br />
-	'fact-limit' =&gt; '',<br />
-	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-7 day')),<br />
-	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),<br />
-	'table_fields' =&gt; array('minute_ts'),<br />
-	// hack ... fix is to make query builder select the group and order fields,<br />
-	// then table fields only has to contain the plot_field<br />
-	'plot_field' =&gt; 'ts_cnt',<br />
-);<br />
+<blockquote><pre>
+$conf['history_defaults'] = array(
+	'output'		=&gt; 'table',
+	'fact-group'	=&gt; 'date',
+	'fact-order'	=&gt; 'date DESC',
+	'fact-limit' =&gt; '90',
+	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-90 day')),
+	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),
+	'table_fields' =&gt; array('date', 'query_time_avg','ts_cnt','Query_time_sum')
+);
+$conf['report_defaults'] = array(
+	'fact-group'	=&gt; 'checksum',
+	'fact-order'	=&gt; 'ts_cnt DESC',
+	'fact-limit' =&gt; '20',
+	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-1 day')),
+	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),
+	'table_fields' =&gt; array('checksum','snippet', 'query_time_avg','ts_cnt','Query_time_sum'),
+	'dimension-pivot-hostname_max' =&gt; null,
+	'dimension-pivot-clustername_max' =&gt; null
+);
+$conf['graph_defaults'] = array(
+	'fact-group'	=&gt; 'minute_ts',
+	'fact-order'	=&gt; 'minute_ts',
+	'fact-limit' =&gt; '',
+	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-7 day')),
+	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),
+	'table_fields' =&gt; array('minute_ts'),
+	// hack ... fix is to make query builder select the group and order fields,
+	// then table fields only has to contain the plot_field
+	'plot_field' =&gt; 'ts_cnt',
+);
 </pre></blockquote>
 <p>With a <strong>10</strong> minute rotation &amp; digestion, we are able to analyze near real-time what's been done on our masters. If we see a spike in <strong>com_insert/com_update/com_delete</strong>, or just see slave lags, we turn to <em>Anemomaster </em>and within a couple minutes know exactly what service is guilty of abusing our database. We are also working to protect our database against abuse, but that's for another discussion.</p>
+

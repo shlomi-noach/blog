@@ -28,18 +28,18 @@ url: /2010/05/20/views-better-performance-with-condition-pushdown/
 <p>The customer was using nested views structure, up to depth of some 8-9 views. There were a lot of aggregations along the way, and even the simplest query resulted with a LOT of subqueries, temporary tables, and vast amounts of data, even if only to return with a couple of rows.</p>
 <p>While we worked to solve this, a developer showed me his own trick. His trick is now impossible to implement, but there's a hack around this.</p>
 <p>Let's use the world database to illustrate. Look at the following view definition:<!--more--></p>
-<blockquote><pre><br />
-CREATE<br />
-  ALGORITHM=TEMPTABLE<br />
-VIEW country_languages AS<br />
-  SELECT<br />
-    Country.CODE, Country.Name AS country,<br />
-    GROUP_CONCAT(CountryLanguage.Language) AS languages<br />
-  FROM<br />
-    world.Country<br />
-    JOIN world.CountryLanguage ON (Country.CODE = CountryLanguage.CountryCode)<br />
-  GROUP BY<br />
-    Country.CODE;<br />
+<blockquote><pre>
+CREATE
+  ALGORITHM=TEMPTABLE
+VIEW country_languages AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON (Country.CODE = CountryLanguage.CountryCode)
+  GROUP BY
+    Country.CODE;
 </pre></blockquote>
 <p>The view presents with a list of spoken languages per country. The execution plan for querying this view looks like this:</p>
 <blockquote>
@@ -68,20 +68,20 @@ VIEW country_languages AS<br />
 <p>So, we need to scan the entire country_language and country tables in order to return results for just one row.</p>
 <h4>A non-working solution</h4>
 <p>The solution offered by the developer was this:</p>
-<blockquote><pre><br />
-CREATE<br />
-  ALGORITHM=MERGE<br />
-  VIEW country_languages_non_working AS<br />
-  SELECT<br />
-    Country.CODE, Country.Name AS country,<br />
-    GROUP_CONCAT(CountryLanguage.Language) AS languages<br />
-  FROM<br />
-    world.Country<br />
-    JOIN world.CountryLanguage ON<br />
-      (Country.CODE = CountryLanguage.CountryCode)<br />
-  WHERE<br />
-    Country.CODE = @country_code<br />
-  GROUP BY Country.CODE;<br />
+<blockquote><pre>
+CREATE
+  ALGORITHM=MERGE
+  VIEW country_languages_non_working AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON
+      (Country.CODE = CountryLanguage.CountryCode)
+  WHERE
+    Country.CODE = @country_code
+  GROUP BY Country.CODE;
 </pre></blockquote>
 <p>And follow by:</p>
 <blockquote>
@@ -100,28 +100,28 @@ mysql&gt; SELECT * FROM country_languages_2;
 <p>This doesn't work. It used to work a couple years back; but today you cannot create a view which uses session variables or parameters. It is a restriction imposed by views.</p>
 <h4>A workaround</h4>
 <p>Justin showed a workaround using an additional table. There is another workaround which does not involve tables, but rather stored routines. Now, this is a patch, and an ugly one. It may not work in future versions of MySQL for all I know. But, here it goes:</p>
-<blockquote><pre><br />
-DELIMITER $$<br />
-CREATE DEFINER=`root`@`localhost` FUNCTION `get_session_country`() RETURNS CHAR(3)<br />
-    NO SQL<br />
-    DETERMINISTIC<br />
-BEGIN<br />
-  RETURN @country_code;<br />
-END $$<br />
-DELIMITER ;</p>
-<p>CREATE<br />
-  ALGORITHM=MERGE<br />
-  VIEW country_languages_2 AS<br />
-  SELECT<br />
-    Country.CODE, Country.Name AS country,<br />
-    GROUP_CONCAT(CountryLanguage.Language) AS languages<br />
-  FROM<br />
-    world.Country<br />
-    JOIN world.CountryLanguage ON<br />
-      (Country.CODE = CountryLanguage.CountryCode)<br />
-  WHERE<br />
-    Country.CODE = get_session_country()<br />
-  GROUP BY Country.CODE;<br />
+<blockquote><pre>
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` FUNCTION `get_session_country`() RETURNS CHAR(3)
+    NO SQL
+    DETERMINISTIC
+BEGIN
+  RETURN @country_code;
+END $$
+DELIMITER ;
+CREATE
+  ALGORITHM=MERGE
+  VIEW country_languages_2 AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON
+      (Country.CODE = CountryLanguage.CountryCode)
+  WHERE
+    Country.CODE = get_session_country()
+  GROUP BY Country.CODE;
 </pre></blockquote>
 <p>And now:</p>
 <blockquote>

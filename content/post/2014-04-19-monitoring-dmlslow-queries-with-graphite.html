@@ -39,48 +39,49 @@ url: /2014/04/19/monitoring-dmlslow-queries-with-graphite/
 <p>Thankfully the <em>pt-query-digest</em> report tables are already timestamp based, and are already aggregated by query "fingerprints". This makes writing this data to graphite just a matter of text normalizing. The following script is a slightly modified version of what we use. Do note that we have the notion of "clustername" which is the name of the replication topology we're looking at. We have many topologies, like OLTP, OLAP, Metadata, etc. etc. We support this notion by adding a <strong>clustername_max</strong> column to the report tables and instructing <em>pt-query-digest</em> fill in this value.</p>
 <p>We run the following shell script by cron every 10 minutes (based on the 10 minute interval of analysing our masters' DML):</p>
 <blockquote>
-<p>[code lang="bash"]<br />
-#!/bin/bash</p>
-<p>#<br />
-# This script should run on the anemomaster machine every 10 minutes, shortly after<br />
-# binary logs / relay logs are analyzed via pt-query-digest.<br />
-#</p>
-<p>unixtime=$(date +%s)</p>
-<p># Get stats for the last round 10 minutes<br />
-# The query only takes one representative from each cluster<br />
-query=&quot; select clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp group by clustername_max) group by clustername_max, fingerprint order by sum(ts_cnt) desc &quot;</p>
-<p>mysql -umyself -psecret anemomaster --silent --silent --raw -e &quot;$query&quot; | while IFS=$'\t' read -r -a result_values<br />
-    do<br />
-        fingerprint_cluster=${result_values[0]} ;<br />
-        fingerprint_count=${result_values[1]} ;<br />
-        fingerprint_query=${result_values[2]} ;<br />
-        fingerprint_query=$(echo $fingerprint_query | sed -r -e &quot;s/^(-- .*)]//g&quot;)<br />
-        fingerprint_query=$(echo $fingerprint_query | tr '\n' ' ' | tr '\r' ' ' | tr '\t' ' ')<br />
-        fingerprint_query=${fingerprint_query%%(*}<br />
-        fingerprint_query=${fingerprint_query%%,*}<br />
-        fingerprint_query=${fingerprint_query%% set *}<br />
-        fingerprint_query=${fingerprint_query%% SET *}<br />
-        fingerprint_query=${fingerprint_query%% where *}<br />
-        fingerprint_query=${fingerprint_query%% WHERE *}<br />
-        fingerprint_query=${fingerprint_query%% join *}<br />
-        fingerprint_query=${fingerprint_query%% JOIN *}<br />
-        fingerprint_query=${fingerprint_query%% using *}<br />
-        fingerprint_query=${fingerprint_query%% USING *}<br />
-        fingerprint_query=${fingerprint_query%% select *}<br />
-        fingerprint_query=${fingerprint_query%% SELECT *}<br />
-        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;\`&quot;)<br />
-        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;*&quot;)<br />
-        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;?&quot;)<br />
-        fingerprint_query=$(echo $fingerprint_query | tr &quot; &quot; &quot;_&quot;)<br />
-        fingerprint_query=$(echo $fingerprint_query | tr &quot;.&quot; &quot;__&quot;)<br />
-        echo &quot;data.mysql.dml.${fingerprint_cluster}.${fingerprint_query}.count ${fingerprint_count} $unixtime&quot; | nc -w 1 my.graphite.server 2003<br />
-    done</p>
-<p></pre>
+<pre>
+#!/bin/bash
+#
+# This script should run on the anemomaster machine every 10 minutes, shortly after
+# binary logs / relay logs are analyzed via pt-query-digest.
+#
+unixtime=$(date +%s)
+# Get stats for the last round 10 minutes
+# The query only takes one representative from each cluster
+query=&quot; select clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp group by clustername_max) group by clustername_max, fingerprint order by sum(ts_cnt) desc &quot;
+mysql -umyself -psecret anemomaster --silent --silent --raw -e &quot;$query&quot; | while IFS=$'\t' read -r -a result_values
+    do
+        fingerprint_cluster=${result_values[0]} ;
+        fingerprint_count=${result_values[1]} ;
+        fingerprint_query=${result_values[2]} ;
+        fingerprint_query=$(echo $fingerprint_query | sed -r -e &quot;s/^(-- .*)]//g&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr '\n' ' ' | tr '\r' ' ' | tr '\t' ' ')
+        fingerprint_query=${fingerprint_query%%(*}
+        fingerprint_query=${fingerprint_query%%,*}
+        fingerprint_query=${fingerprint_query%% set *}
+        fingerprint_query=${fingerprint_query%% SET *}
+        fingerprint_query=${fingerprint_query%% where *}
+        fingerprint_query=${fingerprint_query%% WHERE *}
+        fingerprint_query=${fingerprint_query%% join *}
+        fingerprint_query=${fingerprint_query%% JOIN *}
+        fingerprint_query=${fingerprint_query%% using *}
+        fingerprint_query=${fingerprint_query%% USING *}
+        fingerprint_query=${fingerprint_query%% select *}
+        fingerprint_query=${fingerprint_query%% SELECT *}
+        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;\`&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;*&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;?&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr &quot; &quot; &quot;_&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr &quot;.&quot; &quot;__&quot;)
+        echo &quot;data.mysql.dml.${fingerprint_cluster}.${fingerprint_query}.count ${fingerprint_count} $unixtime&quot; | nc -w 1 my.graphite.server 2003
+    done
+</pre>
 </blockquote>
 <p>If you don't need the "clustername stuff", modify the query to read:</p>
 <blockquote>
-<pre><br />
-select 'mysql' as clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp) group by fingerprint order by sum(ts_cnt) desc</p>
-<p></pre>
+<pre>
+select 'mysql' as clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp) group by fingerprint order by sum(ts_cnt) desc
+</pre>
 </blockquote>
 <p>The graphite metric path will look like <strong>data.mysql.dml.oltp.update_my_documents.count</strong>, which makes for a perpefctly valid metric to monitor, graphically visualize and get alerts on.</p>
+

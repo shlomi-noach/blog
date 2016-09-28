@@ -33,68 +33,68 @@ url: /2010/07/07/implicit-casting-you-dont-want-to-see-around/
 <p>In <a href="http://code.openark.org/blog/mysql/beware-of-implicit-casting">Beware of implicit casting</a>, I have outlined the dangers of implicit casting. Here's a few more real-world examples I have tackled:</p>
 <h4>Number-String comparisons</h4>
 <p>Much like in programming languages, implicit casting is made to numbers when at least one of the arguments is a number. Thus:</p>
-<blockquote><pre><br />
-mysql&gt; SELECT 3 = '3.0';<br />
-+-----------+<br />
-| 3 = '3.0' |<br />
-+-----------+<br />
-|         1 |<br />
-+-----------+<br />
-1 row in set (0.00 sec)</p>
-<p>mysql&gt; SELECT '3' = '3.0';<br />
-+-------------+<br />
-| '3' = '3.0' |<br />
-+-------------+<br />
-|           0 |<br />
-+-------------+<br />
+<blockquote><pre>
+mysql&gt; SELECT 3 = '3.0';
++-----------+
+| 3 = '3.0' |
++-----------+
+|         1 |
++-----------+
+1 row in set (0.00 sec)
+mysql&gt; SELECT '3' = '3.0';
++-------------+
+| '3' = '3.0' |
++-------------+
+|           0 |
++-------------+
 </pre></blockquote>
 <p>The second query consists of pure strings comparison. It has no way to determine that number comparison should be made.</p>
 <h4>Direct DATE arithmetics</h4>
 <p>The first query <em>seems</em> to work, but is completely incorrect. The second explains why. The third is a total mess.<!--more--></p>
-<blockquote><pre><br />
-mysql&gt; SELECT DATE('2010-01-01')+3;<br />
-+----------------------+<br />
-| DATE('2010-01-01')+3 |<br />
-+----------------------+<br />
-|             20100104 |<br />
-+----------------------+<br />
-1 row in set (0.00 sec)</p>
-<p>mysql&gt; SELECT DATE('2010-01-01')-3;<br />
-+----------------------+<br />
-| DATE('2010-01-01')-3 |<br />
-+----------------------+<br />
-|             20100098 |<br />
-+----------------------+<br />
-1 row in set (0.00 sec)</p>
-<p>mysql&gt; SELECT '2010-01-01' - 3;<br />
-+------------------+<br />
-| '2010-01-01' - 3 |<br />
-+------------------+<br />
-|             2007 |<br />
-+------------------+<br />
-1 row in set, 1 warning (0.00 sec)<br />
+<blockquote><pre>
+mysql&gt; SELECT DATE('2010-01-01')+3;
++----------------------+
+| DATE('2010-01-01')+3 |
++----------------------+
+|             20100104 |
++----------------------+
+1 row in set (0.00 sec)
+mysql&gt; SELECT DATE('2010-01-01')-3;
++----------------------+
+| DATE('2010-01-01')-3 |
++----------------------+
+|             20100098 |
++----------------------+
+1 row in set (0.00 sec)
+mysql&gt; SELECT '2010-01-01' - 3;
++------------------+
+| '2010-01-01' - 3 |
++------------------+
+|             2007 |
++------------------+
+1 row in set, 1 warning (0.00 sec)
 </pre></blockquote>
 <h4>Number-String comparisons, big integers</h4>
 <p>Look at the following crazy comparisons:</p>
-<blockquote><pre><br />
-mysql&gt; SELECT 1234 = '1234';<br />
-+---------------+<br />
-| 1234 = '1234' |<br />
-+---------------+<br />
-|             1 |<br />
-+---------------+</p>
-<p>mysql&gt; SELECT 123456789012345678 = '123456789012345678';<br />
-+-------------------------------------------+<br />
-| 123456789012345678 = '123456789012345678' |<br />
-+-------------------------------------------+<br />
-|                                         0 |<br />
-+-------------------------------------------+</p>
-<p>mysql&gt; SELECT 123456789012345678 = '123456789012345677';<br />
-+-------------------------------------------+<br />
-| 123456789012345678 = '123456789012345677' |<br />
-+-------------------------------------------+<br />
-|                                         1 |<br />
-+-------------------------------------------+<br />
+<blockquote><pre>
+mysql&gt; SELECT 1234 = '1234';
++---------------+
+| 1234 = '1234' |
++---------------+
+|             1 |
++---------------+
+mysql&gt; SELECT 123456789012345678 = '123456789012345678';
++-------------------------------------------+
+| 123456789012345678 = '123456789012345678' |
++-------------------------------------------+
+|                                         0 |
++-------------------------------------------+
+mysql&gt; SELECT 123456789012345678 = '123456789012345677';
++-------------------------------------------+
+| 123456789012345678 = '123456789012345677' |
++-------------------------------------------+
+|                                         1 |
++-------------------------------------------+
 </pre></blockquote>
 <p>The amazing result of the last two comparisons may strike as odd. Actually, it may strike as a bug, and indeed when a customer approached me with this behavior I was at loss for words. But this is <a href="http://dev.mysql.com/doc/refman/5.0/en/type-conversion.html">documented</a>. The manual describes the cases for casting, then states: "... In all other cases, the arguments are compared <em>as             floating-point (real) numbers</em>. ..."</p>
 <h4>Lessons learned:</h4>
@@ -108,3 +108,4 @@ mysql&gt; SELECT 1234 = '1234';<br />
 <ul>
 <li>Use the proper data types for your data's representation. When dealing with numbers, use numbers. When dealing with temporal values, use temporal types.</li>
 </ul>
+
