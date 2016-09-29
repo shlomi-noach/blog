@@ -1,0 +1,1253 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Analysis on code.openark.org</title>
+    <link>/blog/tag/analysis/</link>
+    <description>Recent content in Analysis on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Mon, 26 Jan 2015 17:50:46 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/analysis/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Reading RBR binary logs with pt-query-digest</title>
+      <link>/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest/</link>
+      <pubDate>Mon, 26 Jan 2015 17:50:46 +0000</pubDate>
+      
+      <guid>/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest/</guid>
+      <description>&lt;p&gt;For purposes of auditing anything that goes on our servers we&#39;re looking to parse the binary logs of all servers (masters), as with &#34;&lt;a href=&#34;http://code.openark.org/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow&#34;&gt;Anemomaster&lt;/a&gt;&#34;. With Row Based Replication this is problematic since &lt;strong&gt;pt-query-digest&lt;/strong&gt; &lt;a href=&#34;https://bugs.launchpad.net/percona-toolkit/+bug/1377887&#34;&gt;does not support parsing RBR binary logs&lt;/a&gt; (true for &lt;strong&gt;2.2.12&lt;/strong&gt;, latest at this time).&lt;/p&gt;
+&lt;p&gt;I&#39;ve written a simple script that translates RBR logs to SBR-like logs, with a little bit of cheating. My interest is that &lt;strong&gt;pt-query-digest&lt;/strong&gt; is able to capture and count the queries, nothing else. By doing some minimal text manipulation on the binary log I&#39;m able to now feed it to &lt;strong&gt;pt-query-digest&lt;/strong&gt; which seems to be happy.&lt;/p&gt;
+&lt;p&gt;The script of course does not parse the binary log directly; furthermore, it requires the binary log to be extracted via:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysqlbinlog --verbose --base64-output=DECODE-ROWS your-mysql-binlog-filemame.000001&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above adds the interpretation of the RBR entires in the form of (unconventional) statements, commented, and strips out the cryptic RBR text. All that is left is to do a little manipulation on entry headers and uncomment the interpreted queries.&lt;/p&gt;
+&lt;p&gt;The script can be found in &lt;a href=&#34;https://gist.github.com/shlomi-noach/cc243fd690403e7617e3&#34;&gt;my gist repositories&lt;/a&gt;. Current version is as follows:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;[code lang=&#34;python&#34;]&lt;br /&gt;
+#!/usr/bin/python&lt;br /&gt;
+#&lt;br /&gt;
+# Convert a Row-Based-Replication binary log to Statement-Based-Replication format, cheating a little.&lt;br /&gt;
+# This script exists since Percona Toolkit&#39;s pt-query-digest cannot digest RBR format. The script&lt;br /&gt;
+# generates enough for it to work with.&lt;br /&gt;
+# Expecting standard input&lt;br /&gt;
+# Expected input is the output of &amp;quot;mysqlbinlog --verbose --base64-output=DECODE-ROWS &amp;lt;binlog_file_name&amp;gt;&amp;quot;&lt;br /&gt;
+# For example:&lt;br /&gt;
+# $ mysqlbinlog --verbose --base64-output=DECODE-ROWS mysql-bin.000006 | python binlog-rbr-to-sbr.py | pt-query-digest --type=binlog --order-by Query_time:cnt --group-by fingerprint&lt;br /&gt;
+#&lt;/p&gt;
+&lt;p&gt;import fileinput&lt;/p&gt;
+&lt;p&gt;def convert_rbr_to_pseudo_sbr():&lt;br /&gt;
+    inside_rbr_statement = False&lt;br /&gt;
+    for line in fileinput.input():&lt;br /&gt;
+        line = line.strip()&lt;br /&gt;
+        if line.startswith(&amp;quot;#&amp;quot;) and &amp;quot;end_log_pos&amp;quot; in line:&lt;br /&gt;
+            for rbr_token in [&amp;quot;Update_rows:&amp;quot;, &amp;quot;Write_rows:&amp;quot;, &amp;quot;Delete_rows:&amp;quot;, &amp;quot;Rows_query:&amp;quot;, &amp;quot;Table_map:&amp;quot;,]:&lt;br /&gt;
+                if rbr_token in line:&lt;br /&gt;
+                    line = &amp;quot;%s%s&amp;quot; % (line.split(rbr_token)[0], &amp;quot;Query\tthread_id=1\texec_time=0\terror_code=0&amp;quot;)&lt;br /&gt;
+        if line.startswith(&amp;quot;### &amp;quot;):&lt;br /&gt;
+            inside_rbr_statement = True&lt;br /&gt;
+            # The &amp;quot;### &amp;quot; commented rows are the pseudo-statement interpreted by mysqlbinlog&#39;s &amp;quot;--verbose&amp;quot;,&lt;br /&gt;
+            # and which we will feed into pt-query-digest&lt;br /&gt;
+            line = line[4:]&lt;br /&gt;
+        else:&lt;br /&gt;
+            if inside_rbr_statement:&lt;br /&gt;
+                print(&amp;quot;/*!*/;&amp;quot;)&lt;br /&gt;
+            inside_rbr_statement = False&lt;br /&gt;
+        print(line) &lt;/p&gt;
+&lt;p&gt;convert_rbr_to_pseudo_sbr()&lt;br /&gt;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Bash script: report largest InnoDB files</title>
+      <link>/blog/mysql/bash-script-report-largest-innodb-files/</link>
+      <pubDate>Thu, 19 Dec 2013 10:58:17 +0000</pubDate>
+      
+      <guid>/blog/mysql/bash-script-report-largest-innodb-files/</guid>
+      <description>&lt;p&gt;The following script will report the largest InnoDB tables under the data directory: schema, table &amp;amp; length in bytes. The tables could be non-partitioned, in which case this is simply the size of the corresponding &lt;strong&gt;.ibd&lt;/strong&gt; file, or they can be partitioned, in which case the reported size is the sum of all partition files. It is assumed tables reside in their own tablespace files, i.e. created with &lt;strong&gt;innodb_file_per_table=1&lt;/strong&gt;.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;(
+    mysql_datadir=$(grep datadir /etc/my.cnf | cut -d &#34;=&#34; -f 2)
+    cd $mysql_datadir
+    for frm_file in $(find . -name &#34;*.frm&#34;)
+    do
+        tbl_file=${frm_file//.frm/.ibd}
+        table_schema=$(echo $frm_file | cut -d &#34;/&#34; -f 2)
+        table_name=$(echo $frm_file | cut -d &#34;/&#34; -f 3 | cut -d &#34;.&#34; -f 1)
+        if [ -f $tbl_file ]
+        then
+            # unpartitioned table
+            file_size=$(du -cb $tbl_file 2&amp;gt; /dev/null | tail -n 1) 
+        else
+            # attempt partitioned innodb table
+            tbl_file_partitioned=${frm_file//.frm/#*.ibd}
+            file_size=$(du -cb $tbl_file_partitioned 2&amp;gt; /dev/null | tail -n 1)
+        fi
+        file_size=${file_size//total/}
+        # Replace the below with whatever action you want to take,
+        # for example, push the values into graphite.
+        echo $file_size $table_schema $table_name
+    done
+) | sort -k 1 -nr | head -n 20&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We use this to push table statistics to our graphite service; we keep an eye on table growth (we actually do not limit to top &lt;strong&gt;20&lt;/strong&gt; but just monitor them all). File size does not report the real table data size (this can be smaller due to tablespace fragmentation). It does give the correct information if you&#39;re concerned about disk space. For table data we also monitor &lt;strong&gt;SHOW TABLE STATUS&lt;/strong&gt; / &lt;strong&gt;INFORMATION_SCHEMA.TABLES&lt;/strong&gt;, themselves being inaccurate. Gotta go by something.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema 1.1 released: split(), try-catch, killall(), profiling</title>
+      <link>/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling/</link>
+      <pubDate>Tue, 04 Sep 2012 08:15:25 +0000</pubDate>
+      
+      <guid>/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling/</guid>
+      <description>&lt;p&gt;I&#39;m very happy to announce the release of &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt;, version &lt;strong&gt;1.1&lt;/strong&gt; (revision &lt;strong&gt;300&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;This version boasts with compelling new features: innovative QueryScript syntax, libraries, views which add to your skills as a DBA, making some maintenance and management tasks a breeze.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;QueryScript, &lt;strong&gt;split&lt;/strong&gt; statement: automagically break long queries into smaller chunks, avoid long locks and reduce query/transaction overhead&lt;/li&gt;
+&lt;li&gt;QueryScript, &lt;strong&gt;try-catch&lt;/strong&gt; statement: just &lt;strong&gt;try { something; } catch { act_on_error; }&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;killall()&lt;/strong&gt;: quickly kill connections based on grantee/user/host information.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;profiling&lt;/strong&gt;/&lt;strong&gt;profiling_last&lt;/strong&gt;: utility views to assist in query profiling diagnostics&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;1 size fits all&lt;/strong&gt;: a single installer which auto-recognizes available server features and enables respective &lt;em&gt;common_schema&lt;/em&gt; features accordingly.&lt;/li&gt;
+&lt;li&gt;QueryScript performance boost&lt;/li&gt;
+&lt;li&gt;much much more...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Not familiar with &lt;em&gt;common_schema&lt;/em&gt;? It allows you to do stuff on server side, by selecting from views, calling upon useful routines or writing &lt;em&gt;easy-to-manage&lt;/em&gt; scripts.&lt;/p&gt;
+&lt;p&gt;I&#39;m suggesting that &lt;em&gt;common_schema&lt;/em&gt; should be a &lt;em&gt;really-should-have&lt;/em&gt; tool to accompany your MySQL install. Did I say &#34;tool&#34;? It&#39;s merely a &lt;em&gt;schema&lt;/em&gt;. But it makes for a great framework:&lt;/p&gt;
+&lt;p&gt;In &lt;a href=&#34;http://www.amazon.com/High-Performance-MySQL-Optimization-Replication/dp/1449314287/ref=dp_ob_title_bk&#34;&gt;High Performance MySQL, 3rd edition&lt;/a&gt;, Baron Schwartz describes &lt;em&gt;common_schema&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;The &lt;em&gt;common_schema&lt;/em&gt; is to MySQL as jQuery is to javaScript&lt;/blockquote&gt;
+&lt;p&gt;Reviewing highlights for version &lt;strong&gt;1.1&lt;/strong&gt;:&lt;/p&gt;
+&lt;h4&gt;QueryScript&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt; is a scripting language. It sees some major improvements here. I&#39;ve made some speed boosts by &lt;a href=&#34;http://code.openark.org/blog/mysql/on-stored-routines-and-dynamic-statements&#34;&gt;avoiding using temporary tables&lt;/a&gt;, and by using string parsing instead.&lt;/p&gt;
+&lt;p&gt;Without doubt the two most handy statements added to &lt;em&gt;QueryScript&lt;/em&gt; are:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt;: automagically break a long query into smaller, distinct chunks, and execute those iteratively. Just write your query; &lt;em&gt;split&lt;/em&gt; will parse it, analyze it, rewrite it, break your table into parts, iterate your table and apply query for each chunk of rows. You can reduce lock time, avoid huge transactions and give your server room to breathe on operations such as massive updates of rows, transferring of rows between tables, massive purging of rows etc. Consider: the following query will execute &lt;strong&gt;1,000&lt;/strong&gt; rows at a time, and the script will throttle execution so as to sleep in between chunks. And you need know nothing about how it works internally (though it&#39;s quite interesting):&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;create table world.City_dup like world.City;
+split (insert into world.City_dup select * from world.City)
+{
+  throttle 2;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_try_catch.html&#34;&gt;&lt;strong&gt;try-catch&lt;/strong&gt;&lt;/a&gt;: if, like me, you are frustrated with stored routines way of handling errors, QueryScript now offers you familiar (yet enhanced) form of &lt;strong&gt;try something catch do_something_on_error&lt;/strong&gt;. It is limited in that you cant have a catch for particular error codes - MySQL &lt;a href=&#34;http://code.openark.org/blog/mysql/mysql-error-handling-on-server-side-a-no-go&#34;&gt;does not provide such info on server side&lt;/a&gt;. Nevertheless, consider:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;while (true)
+{
+  try
+  {
+    -- Attempt query which is expected to abort on deadlock:
+    UPDATE some_table SET some_column = 1 WHERE some_condition;
+    -- Got here? This means query is successful! We can leave now.
+    break;
+  }
+  catch
+  {
+    -- Apparently there was a deadlock. Rest, then loop again until succeeds
+    sleep 1;
+  }
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;QueryScript also adds:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_eval.html&#34;&gt;&lt;strong&gt;eval&lt;/strong&gt;&lt;/a&gt;: evaluate SQL statements on the fly. I&#39;ve got some very cool use cases already in production.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_sleep.html&#34;&gt;&lt;strong&gt;sleep&lt;/strong&gt;&lt;/a&gt;: just... sleep.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_pass.html&#34;&gt;&lt;strong&gt;pass&lt;/strong&gt;&lt;/a&gt;: similar to Python&#39;s pass statement, this statement does nothing and makes for a placeholder.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;QueryScript &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_variables.html&#34;&gt;variables&lt;/a&gt; now support:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Declare &amp;amp; assign syntax: &lt;strong&gt;var $sum := 0&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;New expansion syntax: &lt;strong&gt;DELETE FROM t LIMIT :${number_of_rows},&lt;/strong&gt; or&lt;strong&gt; CREATE TABLE customer_:${shard_number}_details&lt;br /&gt;
+&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Support for expanded variables in expressions, &lt;em&gt;throttle&lt;/em&gt;, &lt;em&gt;sleep&lt;/em&gt;, &lt;em&gt;throw&lt;/em&gt; statements.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Routines:&lt;/h4&gt;
+&lt;p&gt;Plenty of new routines. Most notable:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/killall.html&#34;&gt;&lt;strong&gt;killall()&lt;/strong&gt;&lt;/a&gt;: much like Unix &lt;em&gt;killall&lt;/em&gt; command, this routine kills connections based on names, rather than process IDs. Names are &lt;em&gt;grantee name&lt;/em&gt;, or just the &lt;em&gt;user&lt;/em&gt; part, or just the &lt;em&gt;host&lt;/em&gt; part. Which allows for quick killing of all connections coming from a specific user or host:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CALL killall(&#39;host3.analytics.mycompany.com&#39;);
+CALL killall(&#39;reporting_user&#39;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_exists.html&#34;&gt;&lt;strong&gt;table_exists()&lt;/strong&gt;&lt;/a&gt;: test for (isn&#39;t it clear?) table existence. This uses INFORMATION_SCHEMA optimizations: it&#39;s a lightweight query.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT table_exists(&#39;sakila&#39;, &#39;rental&#39;) AS does_it_exist;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We also have text manipulation routines: &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/encode_xml.html&#34;&gt;&lt;strong&gt;encode_xml()&lt;/strong&gt;&lt;/a&gt; and &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/decode_xml.html&#34;&gt;&lt;strong&gt;decode_xml()&lt;/strong&gt;&lt;/a&gt;, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/strip_urls.html&#34;&gt;&lt;strong&gt;strip_urls()&lt;/strong&gt;&lt;/a&gt;, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/prettify_message.html&#34;&gt;&lt;strong&gt;prettify_message()&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h4&gt;Views&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;Profiling views, inspired by &lt;a href=&#34;http://www.mysqlperformanceblog.com/2012/02/20/how-to-convert-show-profiles-into-a-real-profile/&#34;&gt;How to convert MySQL’s SHOW PROFILES into a real profile&lt;/a&gt;: &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_profiling.html&#34;&gt;&lt;strong&gt;query_profiling&lt;/strong&gt;&lt;/a&gt; &amp;amp; &lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/last_query_profiling.html&#34;&gt;last_query_profiling&lt;/a&gt;:&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SET PROFILING := 1;
+
+mysql&amp;gt; SELECT COUNT(*) FROM sakila.nicer_but_slower_film_list INTO @dummy;
+
+mysql&amp;gt; SELECT * FROM last_query_profiling;
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+
+| QUERY_ID | STATE                | state_calls | state_sum_duration | state_duration_per_call | state_duration_pct | state_seqs |
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+
+|       41 | checking permissions |           5 |           0.000320 |            0.0000640000 |               0.33 | 5,6,7,8,9  |
+|       41 | cleaning up          |           1 |           0.000007 |            0.0000070000 |               0.01 | 31         |
+|       41 | closing tables       |           1 |           0.000016 |            0.0000160000 |               0.02 | 29         |
+|       41 | Copying to tmp table |           1 |           0.042363 |            0.0423630000 |              44.34 | 15         |
+|       41 | Creating tmp table   |           1 |           0.000123 |            0.0001230000 |               0.13 | 13         |
+|       41 | end                  |           1 |           0.000004 |            0.0000040000 |               0.00 | 23         |
+|       41 | executing            |           2 |           0.000014 |            0.0000070000 |               0.01 | 14,22      |
+|       41 | freeing items        |           2 |           0.000216 |            0.0001080000 |               0.23 | 25,27      |
+|       41 | init                 |           1 |           0.000012 |            0.0000120000 |               0.01 | 20         |
+|       41 | logging slow query   |           1 |           0.000004 |            0.0000040000 |               0.00 | 30         |
+|       41 | Opening tables       |           1 |           0.028909 |            0.0289090000 |              30.26 | 2          |
+|       41 | optimizing           |           2 |           0.000026 |            0.0000130000 |               0.03 | 10,21      |
+|       41 | preparing            |           1 |           0.000018 |            0.0000180000 |               0.02 | 12         |
+|       41 | query end            |           1 |           0.000004 |            0.0000040000 |               0.00 | 24         |
+|       41 | removing tmp table   |           3 |           0.000130 |            0.0000433333 |               0.14 | 18,26,28   |
+|       41 | Sending data         |           2 |           0.016823 |            0.0084115000 |              17.61 | 17,19      |
+|       41 | Sorting result       |           1 |           0.006302 |            0.0063020000 |               6.60 | 16         |
+|       41 | starting             |           1 |           0.000163 |            0.0001630000 |               0.17 | 1          |
+|       41 | statistics           |           1 |           0.000048 |            0.0000480000 |               0.05 | 11         |
+|       41 | System lock          |           1 |           0.000017 |            0.0000170000 |               0.02 | 3          |
+|       41 | Table lock           |           1 |           0.000018 |            0.0000180000 |               0.02 | 4          |
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; meta info is in the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/status.html&#34;&gt;&lt;strong&gt;status&lt;/strong&gt;&lt;/a&gt; view, which can be used, for example, in bug reports. It indicated version, revision, time and status of installation process.&lt;/p&gt;
+&lt;h4&gt;Installer&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; comes with an invisible installer. It&#39;s just a SQL file, imported via &lt;strong&gt;SOURCE&lt;/strong&gt; command or your favorite import method. But, once base components are installed, it activates itself to spawn a smart-mode install phase, where it checks upon existing MySQL server features, and adding respective &lt;em&gt;common_schema&lt;/em&gt; features. So, if InnoDB plugin is present, you get the InnoDB plugin views in &lt;em&gt;common_schema&lt;/em&gt;. If this is a Percona Server, you also get those related views. This makes for a single distribution file, as opposed to &lt;strong&gt;3&lt;/strong&gt; different distributions in previous versions.&lt;/p&gt;
+&lt;h4&gt;Documentation&lt;/h4&gt;
+&lt;p&gt;There are no compromises here. Documenting &lt;em&gt;common_schema&lt;/em&gt; takes more time than writing &amp;amp; testing it. But everything is well documented. You can read the documentation online, or &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;download&lt;/a&gt; a bundle, or call for &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/help.html&#34;&gt;&lt;strong&gt;help()&lt;/strong&gt;&lt;/a&gt; from within &lt;em&gt;common_schema&lt;/em&gt;: the documentation is internal, too.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;root@mysql-5.1.51&amp;gt; CALL help(&#39;try&#39;);
++--------------------------------------------------------------------------------+
+| help                                                                           |
++--------------------------------------------------------------------------------+
+| QueryScript Flow Control: try-catch statement                                  |
+|                                                                                |
+| SYNOPSIS                                                                       |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|        try                                                                     |
+|          statement;                                                            |
+|        catch                                                                   |
+|          statement;                                                            |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+| DESCRIPTION                                                                    |
+|                                                                                |
+| try-catch is an error handling flow control structure. Flow is determined      |
+| based on the appearance or non-appearance of execution errors.                 |
+| The try statement (or block of statements) is executed. If no error occurs, it |
+| completes, and the catch statement is never executed.                          |
+| If an error is detected within execution of the try statement, the try         |
+| statement is aborted at the point of error (i.e. all statements following the  |
+| point of error are discarded), and the catch statement (or block of            |
+| statements) is executed.                                                       |
+...
++--------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Tests&lt;/h4&gt;
+&lt;p&gt;With over &lt;strong&gt;350&lt;/strong&gt; tests and counting, &lt;em&gt;common_schema&lt;/em&gt; and &lt;em&gt;QueryScript&lt;/em&gt; are well tested. There are still tests to write, the cover is not complete, and I&#39;m working on it.&lt;/p&gt;
+&lt;h4&gt;Bugfixes&lt;/h4&gt;
+&lt;p&gt;Changed view definitions affected by &lt;a href=&#34;http://bugs.mysql.com/65388&#34;&gt;MySQL bug #65388&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Download&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;Download common_schema&lt;/a&gt;. You will find it is rich and smart.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema, rev. 178: foreach(), repeat_exec(), Roland Bouman, query analysis</title>
+      <link>/blog/mysql/common_schema-rev-178-foreach-repeat_exec-roland-bouman-query-analysis/</link>
+      <pubDate>Thu, 01 Dec 2011 11:33:01 +0000</pubDate>
+      
+      <guid>/blog/mysql/common_schema-rev-178-foreach-repeat_exec-roland-bouman-query-analysis/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema/&#34; rel=&#34;nofollow&#34;&gt;common_schema&lt;/a&gt;, revision &lt;strong&gt;178&lt;/strong&gt; is now released, with major additions. This revision turns &lt;em&gt;common_schema&lt;/em&gt; into a &lt;em&gt;framework&lt;/em&gt;, rather than a set of views and functions.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; provides with query scripting, analysis &amp;amp; informational views, and a function library, allowing for easier administration and diagnostics for MySQL. It introduces SQL based tools which simplify otherwise complex shell and client scripts, allowing the DBA to be independent of operating system, installed packages and dependencies.&lt;/p&gt;
+&lt;p&gt;There&#39;s no Perl nor Python, and no dependencies to install. It&#39;s just a &lt;em&gt;schema&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Some highlights for the new revision:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;foreach()&lt;/strong&gt;, aka &lt;strong&gt;$()&lt;/strong&gt;: loop through a collection, execute callback commands per element.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;repeat_exec()&lt;/strong&gt;: a repeat-until device: execute queries until some condition holds.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;exec_file()&lt;/strong&gt;: execute files a-la SOURCE, but on server side&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Query analysis&lt;/strong&gt;: analyze query text, view or routine definitions to detect dependency objects.&lt;/li&gt;
+&lt;li&gt;Improvements to views and routines, new routines introduced.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let&#39;s take a closer look:&lt;/p&gt;
+&lt;h4&gt;rpbouman&lt;/h4&gt;
+&lt;p&gt;I&#39;m very happy to have &lt;a href=&#34;http://rpbouman.blogspot.com/&#34;&gt;Roland Bouman&lt;/a&gt; working on this project. He introduced some sophisticated code without which some functionality could not take place. I&#39;m sure I don&#39;t need to introduce his great capabilities; I&#39;ll just pass the note that it is very good working with him!&lt;/p&gt;
+&lt;h4&gt;foreach()&lt;/h4&gt;
+&lt;p&gt;Introducing a looping device which can iterate a collection and execute callback commands.&lt;/p&gt;
+&lt;p&gt;What&#39;s a collection? A range of numbers; a set of constants; the result set of a &lt;strong&gt;SELECT&lt;/strong&gt; query; tables in your database and more.&lt;/p&gt;
+&lt;p&gt;What is a callback? A query or set of queries to invoke on the specific elements in the collection. For example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;call &lt;strong&gt;foreach&lt;/strong&gt;(&lt;span style=&#34;color: #808000;&#34;&gt;&#39;table in sakila&#39;&lt;/span&gt;, &lt;span style=&#34;color: #000080;&#34;&gt;&#39;ALTER TABLE ${schema}.${table} ENGINE=InnoDB ROW_FORMAT=COMPRESSED&#39;&lt;/span&gt;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I&#39;ll publish dedicated posts on &lt;em&gt;foreach()&lt;/em&gt;, aka &lt;em&gt;$()&lt;/em&gt;, following this post. Official documentation is &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/foreach.html&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;repeat_exec()&lt;/h4&gt;
+&lt;p&gt;Repeat executing queries in a given interval, until some condition holds.&lt;/p&gt;
+&lt;p&gt;What kind of condition? You can loop forever, or until a given time has passed, a given number of iteration has passed.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;You can iterate until no rows are affected by your commands (your callbacks), or until some dynamic condition holds (a query evaluates to &lt;strong&gt;true&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;For example: purge rows from a table until no more rows are affected; in interval of &lt;strong&gt;3&lt;/strong&gt; second:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;call &lt;strong&gt;repeat_exec&lt;/strong&gt;(3, &#39;DELETE FROM test.event WHERE ts &amp;lt; CURDATE() ORDER BY id LIMIT 1000&#39;, 0);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Official documentation is &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/repeat_exec.html&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;exec_file()&lt;/h4&gt;
+&lt;p&gt;If you need to execute commands from a file, you usually invoke SOURCE:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SOURCE &#39;/tmp/somefile.sql&#39;;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Or you invoke mysql client and redirect its input to read from file:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;bash$ mysql some_db &amp;lt; /tmp/somefile.sql&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;SOURCE&lt;/strong&gt; is a MySQL client command. The file must reside on your client. Running the &lt;strong&gt;mysql&lt;/strong&gt; client is great, but you need to work it out from &lt;em&gt;outside&lt;/em&gt; the server.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;call_exec()&lt;/em&gt; will let you import a file &lt;em&gt;on server side&lt;/em&gt;, from &lt;em&gt;within the server&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;call &lt;strong&gt;exec_file&lt;/strong&gt;(&#39;/tmp/some_file.sql&#39;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;You will need to have the file readable; it is limited to 64K at this moment; it may not use DELIMITER, and it may not include dynamic SQL. These are the limitations.&lt;/p&gt;
+&lt;p&gt;Official documentation is &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/exec_file.html&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;exec() / exec_single()&lt;/h4&gt;
+&lt;p&gt;All of the above rely on the &lt;em&gt;exec()&lt;/em&gt; / &lt;em&gt;exec_single()&lt;/em&gt; routines, which dynamically execute a set of queries. One one hand, it&#39;s no big deal: they only have to use prepared statements in order to invoke the queries. But then, they knows how to parse multiple queries (find the &#34;;&#34; delimiter correctly), plus they allow for configuration: if you set &lt;strong&gt;@common_schema_dryrun&lt;/strong&gt;, queries are not actually executes; just printed out. If you set &lt;strong&gt;@common_schema_verbose&lt;/strong&gt;, queries are verbosed in addition to being executed. Since all execution routines rely on these,we get a standardized pattern.&lt;/p&gt;
+&lt;p&gt;Official documentation &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/exec_single.html&#34;&gt;is&lt;/a&gt; &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/exec.html&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Query analysis&lt;/h4&gt;
+&lt;p&gt;Query parsing routines allow for detection of dependencies within queries. While not full-blown SQL parser, these allow one to realize on which tables or routines a view depends on; or a routines depends on; or an event; or just any query.&lt;/p&gt;
+&lt;p&gt;These routines can analyze the text of not only a &lt;strong&gt;SELECT&lt;/strong&gt; query, but also &lt;strong&gt;UPDATE&lt;/strong&gt;, &lt;strong&gt;DELETE&lt;/strong&gt;, &lt;strong&gt;CREATE&lt;/strong&gt;, etc. They can read the code of a stored routines, including queries and control flow constructs; thus, they are also able to analyze events and triggers.&lt;/p&gt;
+&lt;p&gt;At this stage forward-dependencies resolution is supported. This can eventually lead to dependency graphs or to reverse-dependency resolution (i.e. &#34;which view, routine, trigger or event depend on table &lt;strong&gt;t&lt;/strong&gt;?&#34;)&lt;/p&gt;
+&lt;p&gt;Example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;get_view_dependencies&lt;/strong&gt;(&#39;sakila&#39;, &#39;actor_info&#39;);
++-------------+---------------+-------------+--------+
+| schema_name | object_name   | object_type | action |
++-------------+---------------+-------------+--------+
+| sakila      | actor         | table       | select |
+| sakila      | category      | table       | select |
+| sakila      | film          | table       | select |
+| sakila      | film_actor    | table       | select |
+| sakila      | film_category | table       | select |
++-------------+---------------+-------------+--------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The query analysis routines are in BETA stage.&lt;/p&gt;
+&lt;p&gt;Official documentation is &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_analysis_routines.html&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Test quite&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is now tested. Not all code is as yet under tests; all new code is, and some of the older code. Work is in progress to add more and more tests.&lt;/p&gt;
+&lt;h4&gt;Further changes:&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;candidate_keys&lt;/strong&gt; does not give higher score for &lt;strong&gt;PRIMARY KEY&lt;/strong&gt;s any longer. It ranks all unique keys according to its own heuristic; it also provides with the  &lt;strong&gt;is_primary&lt;/strong&gt; and &lt;strong&gt;is_nullable&lt;/strong&gt; columns.&lt;/li&gt;
+&lt;li&gt;Added &lt;strong&gt;candidate_keys_recommended&lt;/strong&gt; view, recommending best candidate key per table (while noting whether it qualifies as &lt;strong&gt;PRIMARY KEY&lt;/strong&gt; in terms of &lt;strong&gt;NULL&lt;/strong&gt;able columns).&lt;/li&gt;
+&lt;li&gt;Added many text parsing and text manipulation routines, such as better trim, tokenizing, etc. Improved existing code significantly.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Get it&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;available for downloaded&lt;/a&gt;. It is released under the &lt;strong&gt;BSD&lt;/strong&gt; license, and is free.&lt;/p&gt;
+&lt;p&gt;I&#39;ve put very hard work into &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html&#34;&gt;common_schema&#39;s documentation&lt;/a&gt;. It is very thorough and provides with clear examples. The documentation is also available for download.&lt;/p&gt;
+&lt;p&gt;If you encounter problems, &lt;a href=&#34;http://code.google.com/p/common-schema/issues/list&#34;&gt;please report on the issues page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is meant to be downloaded &amp;amp; installed on any MySQL server. It provides with general and essential functionality. Spread the word!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>MySQL Global status difference using single query</title>
+      <link>/blog/mysql/mysql-global-status-difference-using-single-query/</link>
+      <pubDate>Fri, 12 Aug 2011 18:31:12 +0000</pubDate>
+      
+      <guid>/blog/mysql/mysql-global-status-difference-using-single-query/</guid>
+      <description>&lt;p&gt;Have just read &lt;a href=&#34;http://karlssonondatabases.blogspot.com/2011/08/mysql-global-status-difference-using_12.html&#34;&gt;MySQL Global status difference using MySQL procedures / functions&lt;/a&gt;, by Andres Karlsson. Have commented, but realized I did not provide with a direct answer. In the comment, I suggested checking out &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/global_status_diff.html&#34;&gt;a solution based on views&lt;/a&gt;, found in &lt;a href=&#34;http://code.google.com/p/common-schema/&#34; rel=&#34;nofollow&#34;&gt;common_schema&lt;/a&gt;. But the solution in &lt;em&gt;common_schema&lt;/em&gt; is split into two views, due to the fact views cannot handle derived tables subqueries.&lt;/p&gt;
+&lt;p&gt;Well, here&#39;s a single query to do that: it checks &lt;strong&gt;GLOBAL_STATUS&lt;/strong&gt; twice, &lt;strong&gt;10&lt;/strong&gt; seconds apart in the following sample. It uses &lt;strong&gt;SLEEP()&lt;/strong&gt; to actually wait between the two reads. Yes, you can do that with a query.&lt;/p&gt;
+&lt;p&gt;The following query shows all &lt;strong&gt;GLOBAL_STATUS&lt;/strong&gt; values that have changed during the sample period.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;[UPDATE]&lt;/strong&gt; query updated to work with MySQL &lt;strong&gt;5.6&lt;/strong&gt; optimizer&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT STRAIGHT_JOIN
+   LOWER(gs0.VARIABLE_NAME) AS variable_name,
+   gs0.VARIABLE_VALUE AS variable_value_0,
+   gs1.VARIABLE_VALUE AS variable_value_1,
+   (gs1.VARIABLE_VALUE - gs0.VARIABLE_VALUE) AS variable_value_diff,
+   (gs1.VARIABLE_VALUE - gs0.VARIABLE_VALUE) / 10 AS variable_value_psec,
+   (gs1.VARIABLE_VALUE - gs0.VARIABLE_VALUE) * 60 / 10 AS
+variable_value_pminute
+FROM
+   (
+     SELECT
+       VARIABLE_NAME,
+       VARIABLE_VALUE
+     FROM
+       INFORMATION_SCHEMA.GLOBAL_STATUS
+     UNION ALL
+     SELECT
+       &#39;&#39;,
+       SLEEP(10)
+     FROM DUAL
+   ) AS gs0
+   JOIN (
+     SELECT 
+       VARIABLE_NAME,
+       VARIABLE_VALUE
+     FROM 
+       INFORMATION_SCHEMA.GLOBAL_STATUS
+   ) gs1 USING (VARIABLE_NAME)
+WHERE
+   gs1.VARIABLE_VALUE != gs0.VARIABLE_VALUE
+;
++-----------------------------------+------------------+------------------+---------------------+---------------------+------------------------+
+| variable_name                     | variable_value_0 | variable_value_1 | variable_value_diff | variable_value_psec | variable_value_pminute |
++-----------------------------------+------------------+------------------+---------------------+---------------------+------------------------+
+| aborted_clients                   | 2210669          | 2210686          |                  17 |                 1.7 |                    102 |
+| bytes_received                    | 53259933210      | 53260211104      |              277894 |             27789.4 |                1667364 |
+| bytes_sent                        | 351130988015     | 351132884956     |             1896941 |            189694.1 |               11381646 |
+| com_change_db                     | 3760546          | 3760584          |                  38 |                 3.8 |                    228 |
+| com_delete                        | 6774784          | 6774801          |                  17 |                 1.7 |                    102 |
+| com_insert                        | 52743750         | 52744012         |                 262 |                26.2 |                   1572 |
+| com_insert_select                 | 13362650         | 13362740         |                  90 |                   9 |                    540 |
+| com_select                        | 51722818         | 51723107         |                 289 |                28.9 |                   1734 |
+| com_set_option                    | 108564134        | 108564754        |                 620 |                  62 |                   3720 |
+| com_show_collations               | 3760530          | 3760568          |                  38 |                 3.8 |                    228 |
+| com_show_processlist              | 366078           | 366082           |                   4 |                 0.4 |                     24 |
+| com_show_status                   | 366047           | 366051           |                   4 |                 0.4 |                     24 |
+| com_show_variables                | 3760535          | 3760573          |                  38 |                 3.8 |                    228 |
+| com_update                        | 6271283          | 6271324          |                  41 |                 4.1 |                    246 |
+| connections                       | 3781382          | 3781420          |                  38 |                 3.8 |                    228 |
+| created_tmp_disk_tables           | 983223           | 983224           |                   1 |                 0.1 |                      6 |
+| created_tmp_tables                | 9134044          | 9134126          |                  82 |                 8.2 |                    492 |
+| handler_commit                    | 125798040        | 125798688        |                 648 |                64.8 |                   3888 |
+| handler_delete                    | 6849562          | 6849578          |                  16 |                 1.6 |                     96 |
+| handler_read_first                | 5332451          | 5332498          |                  47 |                 4.7 |                    282 |
+| handler_read_key                  | 373910509        | 373912469        |                1960 |                 196 |                  11760 |
+| handler_read_next                 | 850122025        | 850170403        |               48378 |              4837.8 |                 290268 |
+| handler_read_rnd                  | 255104660        | 255105932        |                1272 |               127.2 |                   7632 |
+| handler_read_rnd_next             | 992505444        | 992549948        |               44504 |              4450.4 |                 267024 |
+| handler_update                    | 27930283         | 27930465         |                 182 |                18.2 |                   1092 |
+| handler_write                     | 2051582925       | 2051602416       |               19491 |              1949.1 |                 116946 |
+| innodb_buffer_pool_pages_data     | 77232            | 77243            |                  11 |                 1.1 |                     66 |
+| innodb_buffer_pool_pages_dirty    | 626              | 645              |                  19 |                 1.9 |                    114 |
+| innodb_buffer_pool_pages_flushed  | 38429812         | 38430032         |                 220 |                  22 |                   1320 |
+| innodb_buffer_pool_pages_misc     | 4294922063       | 4294922052       |                 -11 |                -1.1 |                    -66 |
+| innodb_buffer_pool_read_requests  | 1933796064       | 1933871603       |               75539 |              7553.9 |                 453234 |
+| innodb_buffer_pool_reads          | 11360212         | 11360214         |                   2 |                 0.2 |                     12 |
+| innodb_buffer_pool_write_requests | 1074109722       | 1074115394       |                5672 |               567.2 |                  34032 |
+| innodb_data_fsyncs                | 5583880          | 5583905          |                  25 |                 2.5 |                    150 |
+| innodb_data_read                  | 3339489280       | 3339501568       |               12288 |              1228.8 |                  73728 |
+| innodb_data_reads                 | 11796492         | 11796494         |                   2 |                 0.2 |                     12 |
+| innodb_data_writes                | 105587582        | 105588145        |                 563 |                56.3 |                   3378 |
+| innodb_data_written               | 3721600000       | 3727315968       |             5715968 |            571596.8 |               34295808 |
+| innodb_dblwr_pages_written        | 38429812         | 38430032         |                 220 |                  22 |                   1320 |
+| innodb_dblwr_writes               | 596503           | 596506           |                   3 |                 0.3 |                     18 |
+| innodb_log_write_requests         | 380978894        | 380981368        |                2474 |               247.4 |                  14844 |
+| innodb_log_writes                 | 74407604         | 74407990         |                 386 |                38.6 |                   2316 |
+| innodb_os_log_fsyncs              | 2310799          | 2310807          |                   8 |                 0.8 |                     48 |
+| innodb_os_log_written             | 2905292800       | 2906502656       |             1209856 |            120985.6 |                7259136 |
+| innodb_pages_created              | 1341584          | 1341593          |                   9 |                 0.9 |                     54 |
+| innodb_pages_read                 | 13117652         | 13117654         |                   2 |                 0.2 |                     12 |
+| innodb_pages_written              | 38429812         | 38430032         |                 220 |                  22 |                   1320 |
+| innodb_rows_deleted               | 6849552          | 6849568          |                  16 |                 1.6 |                     96 |
+| innodb_rows_inserted              | 43787980         | 43788207         |                 227 |                22.7 |                   1362 |
+| innodb_rows_read                  | 4289845136       | 4289919560       |               74424 |              7442.4 |                 446544 |
+| innodb_rows_updated               | 24119627         | 24119809         |                 182 |                18.2 |                   1092 |
+| key_read_requests                 | 41262330         | 41262338         |                   8 |                 0.8 |                     48 |
+| open_files                        | 7                | 5                |                  -2 |                -0.2 |                    -12 |
+| opened_files                      | 4212920          | 4212924          |                   4 |                 0.4 |                     24 |
+| questions                         | 253158874        | 253160331        |                1457 |               145.7 |                   8742 |
+| select_full_join                  | 546              | 547              |                   1 |                 0.1 |                      6 |
+| select_range                      | 721945           | 721947           |                   2 |                 0.2 |                     12 |
+| select_scan                       | 12828865         | 12828989         |                 124 |                12.4 |                    744 |
+| sort_range                        | 170971           | 170973           |                   2 |                 0.2 |                     12 |
+| sort_rows                         | 255175383        | 255176655        |                1272 |               127.2 |                   7632 |
+| sort_scan                         | 534078           | 534080           |                   2 |                 0.2 |                     12 |
+| table_locks_immediate             | 142673687        | 142674454        |                 767 |                76.7 |                   4602 |
+| threads_cached                    | 7                | 8                |                   1 |                 0.1 |                      6 |
+| threads_connected                 | 5                | 10               |                   5 |                 0.5 |                     30 |
+| threads_created                   | 840486           | 840509           |                  23 |                 2.3 |                    138 |
++-----------------------------------+------------------+------------------+---------------------+---------------------+------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Some values don&#39;t make sense to do difference on (e.g. &lt;strong&gt;threads_connected&lt;/strong&gt;), since they present with momentary status and are not incrementing as others (e.g. &lt;strong&gt;threads_created&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;Happy SQLing!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Announcing common_schema: common views &amp; routines for MySQL</title>
+      <link>/blog/mysql/announcing-common_schema-common-views-routines-for-mysql/</link>
+      <pubDate>Wed, 13 Jul 2011 06:25:24 +0000</pubDate>
+      
+      <guid>/blog/mysql/announcing-common_schema-common-views-routines-for-mysql/</guid>
+      <description>&lt;p&gt;Today I have released &lt;a title=&#34;common_schema&#34; href=&#34;http://code.openark.org/forge/common_schema&#34;&gt;common_schema&lt;/a&gt;, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server.&lt;/p&gt;
+&lt;h4&gt;What does it do?&lt;/h4&gt;
+&lt;p&gt;There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &amp;amp; transactions, security, internals... There are basic functions answering for common needs.&lt;/p&gt;
+&lt;p&gt;Some of the views/routines simply formalize those queries we tend to write over and over again. Others take the place of external tools, answering complex questions via SQL and metadata. Still others help out with SQL generation.&lt;/p&gt;
+&lt;p&gt;Here are a few highlights:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Did you know you can work out &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/global_status_diff_nonzero.html&#34;&gt;simple monitoring&lt;/a&gt; of your server with a &lt;em&gt;query&lt;/em&gt;?  There&#39;s a view to do that for you.&lt;/li&gt;
+&lt;li&gt;How about showing just &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_top.html&#34;&gt;the good parts of the processlist&lt;/a&gt;?&lt;/li&gt;
+&lt;li&gt;Does your schema have &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html&#34;&gt;redundant keys&lt;/a&gt;?&lt;/li&gt;
+&lt;li&gt;Or InnoDB tables with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/no_pk_innodb_tables.html&#34;&gt;no PRIMARY KEY&lt;/a&gt;?&lt;/li&gt;
+&lt;li&gt;Is AUTO_INCREMENT &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/auto_increment_columns.html&#34;&gt;running out of space&lt;/a&gt;?&lt;/li&gt;
+&lt;li&gt;Can I get the SQL statements to &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html&#34;&gt;generate my FOREIGN KEYs&lt;/a&gt;? To drop them?&lt;/li&gt;
+&lt;li&gt;And can we finally get &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html&#34;&gt;SHOW GRANTS for all accounts&lt;/a&gt;, and as an &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html&#34;&gt;SQL query&lt;/a&gt;?&lt;/li&gt;
+&lt;li&gt;Ever needed a &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/general_functions.html#crc64&#34;&gt;64 bit CRC function&lt;/a&gt;?&lt;/li&gt;
+&lt;li&gt;And aren&#39;t you tired of writing the cumbersome SUBSTRING_INDEX(SUBSTRING_INDEX(str, &#39;,&#39;, 3), &#39;,&#39;, -1)? &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/string_functions.html#split_token&#34;&gt;There&#39;s an alternative&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;There&#39;s more. Take a look at the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html&#34;&gt;common_schema documentation&lt;/a&gt; for full listing. And it&#39;s evolving: I&#39;ve got quite a few ideas already for future components.&lt;/p&gt;
+&lt;p&gt;Some of these views rely on heavyweight INFORMATION_SCHEMA tables. You should be aware of the impact and &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/risks.html&#34;&gt;risks&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;What do I need to install?&lt;/h4&gt;
+&lt;p&gt;There&#39;s no script or executable file. It&#39;s just a schema. The distribution in an SQL file which generates &lt;em&gt;common_schema&lt;/em&gt;. Much like a dump file.&lt;/p&gt;
+&lt;h4&gt;&lt;!--more--&gt;What are the system requirements?&lt;/h4&gt;
+&lt;p&gt;It&#39;s just between you and your MySQL. There are currently three distribution files, dedicated for different versions of MySQL (and allowing for increased functionality):&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;common_schema_mysql_51&lt;/strong&gt;: fits all MySQL &amp;gt;= 5.1 distributions&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;common_schema_innodb_plugin&lt;/strong&gt;: fits MySQL &amp;gt;= 5.1, with InnoDB plugin + INFORMATION_SCHEMA tables enabled&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;common_schema_percona_server&lt;/strong&gt;: fits Percona Server &amp;gt;= 5.1&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Refer to the &lt;a rel=&#34;nofollow&#34; href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/download.html&#34;&gt;documentation&lt;/a&gt; for more details.&lt;/p&gt;
+&lt;h4&gt;What are the terms of use?&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;BSD license&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Where can I download it?&lt;/h4&gt;
+&lt;p&gt;On the &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema project page&lt;/a&gt;. Enjoy it!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Checking for AUTO_INCREMENT capacity with single query</title>
+      <link>/blog/mysql/checking-for-auto_increment-capacity-with-single-query/</link>
+      <pubDate>Tue, 05 Apr 2011 07:36:56 +0000</pubDate>
+      
+      <guid>/blog/mysql/checking-for-auto_increment-capacity-with-single-query/</guid>
+      <description>&lt;p&gt;&lt;em&gt;Darn!&lt;/em&gt; This means &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-show-limits.html&#34;&gt;oak-show-limits&lt;/a&gt; becomes redundant. Am I not supposed to speak about it on my &lt;a href=&#34;http://en.oreilly.com/mysql2011/public/schedule/detail/17155&#34;&gt;coming presentation&lt;/a&gt;? Bad timing!&lt;/p&gt;
+&lt;p&gt;You have &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; columns. How far are you pushing the limits? Are you going to run out of &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; values soon? Perhaps you wonder whether you should &lt;strong&gt;ALTER&lt;/strong&gt; from &lt;strong&gt;INT&lt;/strong&gt; to &lt;strong&gt;BIGINT&lt;/strong&gt;?&lt;/p&gt;
+&lt;p&gt;The answer is all there in &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt;. The &lt;strong&gt;TABLES&lt;/strong&gt; table shows the current &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; value per table, and the &lt;strong&gt;COLUMNS&lt;/strong&gt; table tells us all about a column&#39;s data type.&lt;/p&gt;
+&lt;p&gt;It takes some ugly code to deduce the maximum value per column type, what with signed/unsigned and data type, but then its very simple. Here is the query:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  TABLE_SCHEMA,
+  TABLE_NAME,
+  COLUMN_NAME,
+  DATA_TYPE,
+  COLUMN_TYPE,
+  IF(
+    LOCATE(&#39;unsigned&#39;, COLUMN_TYPE) &amp;gt; 0,
+    1,
+    0
+  ) AS IS_UNSIGNED,
+  (
+    CASE DATA_TYPE
+      WHEN &#39;tinyint&#39; THEN 255
+      WHEN &#39;smallint&#39; THEN 65535
+      WHEN &#39;mediumint&#39; THEN 16777215
+      WHEN &#39;int&#39; THEN 4294967295
+      WHEN &#39;bigint&#39; THEN 18446744073709551615
+    END &amp;gt;&amp;gt; IF(LOCATE(&#39;unsigned&#39;, COLUMN_TYPE) &amp;gt; 0, 0, 1)
+  ) AS MAX_VALUE,
+  AUTO_INCREMENT,
+  AUTO_INCREMENT / (
+    CASE DATA_TYPE
+      WHEN &#39;tinyint&#39; THEN 255
+      WHEN &#39;smallint&#39; THEN 65535
+      WHEN &#39;mediumint&#39; THEN 16777215
+      WHEN &#39;int&#39; THEN 4294967295
+      WHEN &#39;bigint&#39; THEN 18446744073709551615
+    END &amp;gt;&amp;gt; IF(LOCATE(&#39;unsigned&#39;, COLUMN_TYPE) &amp;gt; 0, 0, 1)
+  ) AS AUTO_INCREMENT_RATIO
+FROM
+  INFORMATION_SCHEMA.COLUMNS
+  INNER JOIN INFORMATION_SCHEMA.TABLES USING (TABLE_SCHEMA, TABLE_NAME)
+WHERE
+  TABLE_SCHEMA NOT IN (&#39;mysql&#39;, &#39;INFORMATION_SCHEMA&#39;, &#39;performance_schema&#39;)
+  AND EXTRA=&#39;auto_increment&#39;
+;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;There&#39;s one row in the result set for each &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; column. since at most one &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; column can exist for any given table, each row also identifies a unique table. Resulting columns are mostly self-explanatory, but here&#39;s some details on some of the columns:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;IS_UNSIGNED&lt;/strong&gt;: &lt;strong&gt;1&lt;/strong&gt; when the column is &lt;strong&gt;UNSIGNED&lt;/strong&gt;, &lt;strong&gt;0&lt;/strong&gt; otherwise.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;MAX_VALUE&lt;/strong&gt;: maximum value that can be contained within column.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt;: current &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; value for table.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;AUTO_INCREMENT_RATIO&lt;/strong&gt;: value in the range &lt;strong&gt;[0..1]&lt;/strong&gt;, where &lt;strong&gt;1&lt;/strong&gt; means &#34;100% full&#34;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;A sample output:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;+--------------+------------+--------------+-----------+-----------------------+-------------+------------+----------------+----------------------+
+| TABLE_SCHEMA | TABLE_NAME | COLUMN_NAME  | DATA_TYPE | COLUMN_TYPE           | IS_UNSIGNED | MAX_VALUE  | AUTO_INCREMENT | AUTO_INCREMENT_RATIO |
++--------------+------------+--------------+-----------+-----------------------+-------------+------------+----------------+----------------------+
+| sakila       | actor      | actor_id     | smallint  | smallint(5) unsigned  |           1 |      65535 |            201 |               0.0031 |
+| sakila       | address    | address_id   | smallint  | smallint(5) unsigned  |           1 |      65535 |            606 |               0.0092 |
+| sakila       | category   | category_id  | tinyint   | tinyint(3) unsigned   |           1 |        255 |             17 |               0.0667 |
+| sakila       | city       | city_id      | smallint  | smallint(5) unsigned  |           1 |      65535 |            601 |               0.0092 |
+| sakila       | country    | country_id   | smallint  | smallint(5) unsigned  |           1 |      65535 |            110 |               0.0017 |
+| sakila       | customer   | customer_id  | smallint  | smallint(5) unsigned  |           1 |      65535 |            600 |               0.0092 |
+| sakila       | film       | film_id      | smallint  | smallint(5) unsigned  |           1 |      65535 |           1001 |               0.0153 |
+| sakila       | inventory  | inventory_id | mediumint | mediumint(8) unsigned |           1 |   16777215 |           4582 |               0.0003 |
+| sakila       | language   | language_id  | tinyint   | tinyint(3) unsigned   |           1 |        255 |              7 |               0.0275 |
+| sakila       | payment    | payment_id   | smallint  | smallint(5) unsigned  |           1 |      65535 |          16050 |               0.2449 |
+| sakila       | rental     | rental_id    | int       | int(11)               |           0 | 2147483647 |          16050 |               0.0000 |
+| sakila       | staff      | staff_id     | tinyint   | tinyint(3) unsigned   |           1 |        255 |              3 |               0.0118 |
+| sakila       | store      | store_id     | tinyint   | tinyint(3) unsigned   |           1 |        255 |              3 |               0.0118 |
++--------------+------------+--------------+-----------+-----------------------+-------------+------------+----------------+----------------------+
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Bonus: free advice on increasing your AUTO_INCREMENT capacity&lt;/h4&gt;
+&lt;p&gt;Make it &lt;strong&gt;UNSIGNED&lt;/strong&gt;. No, really. Check your definitions now.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>oak-hook-general-log: your poor man&#39;s Query Analyzer</title>
+      <link>/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer/</link>
+      <pubDate>Wed, 15 Dec 2010 19:46:06 +0000</pubDate>
+      
+      <guid>/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer/</guid>
+      <description>&lt;p&gt;The latest release of &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt; introduces &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-hook-general-log.html&#34;&gt;oak-hook-general-log&lt;/a&gt;, a handy tool which allows for some analysis of executing queries.&lt;/p&gt;
+&lt;p&gt;Initially I just intended for the tool to be able to dump the general log to standard output, from any machine capable to connect to MySQL. Quick enough, I realized the power it brings.&lt;/p&gt;
+&lt;p&gt;With this tool, one can dump to standard output all queries using temporary tables; or using a specific index; or doing a full index scan; or just follow up on connections; or... For example, the following execution will only log queries which make for filesort:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;oak-hook-general-log --user=root --host=localhost --password=123456 --filter-explain-filesort&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;The problem with using the standard logs&lt;/h4&gt;
+&lt;p&gt;So you have the &lt;em&gt;general log&lt;/em&gt;, which you don&#39;t often enable, since it tends to grow huge within moments. You then have the &lt;em&gt;slow log&lt;/em&gt;. Slow log is great, and is among the top tools for MySQL diagnosis.&lt;/p&gt;
+&lt;p&gt;The slow log allows for &lt;strong&gt;log-queries-not-using-indexes&lt;/strong&gt;, which is yet another nice feature. Not only should you log any query running for over &lt;strong&gt;X&lt;/strong&gt; seconds, but also log any query which does not use an index.&lt;/p&gt;
+&lt;p&gt;Wait. This logs all single-row tables (no single row table will use an index), as well as very small tables (a common &lt;strong&gt;20&lt;/strong&gt; rows lookup table will most often be scanned). These are OK scans. This makes for some noise in the slow log.&lt;/p&gt;
+&lt;p&gt;And how about queries which do use an index, but do so poorly? They use an index, but retrieve some &lt;strong&gt;12,500,000&lt;/strong&gt; rows, &lt;em&gt;using temporary&lt;/em&gt; table &amp;amp; &lt;em&gt;filesort&lt;/em&gt;?&lt;/p&gt;
+&lt;h4&gt;What oak-hook-general-log does for you&lt;/h4&gt;
+&lt;p&gt;This tool streams out the general log, and filters out queries based on their &lt;em&gt;role&lt;/em&gt; or on their &lt;em&gt;execution plan&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;To work at all, it must enable the general log. Moreover, it directs the general log to log table. Mind that this makes for a performance impact, which is why the tool auto-terminates and restores original log settings (default is &lt;strong&gt;1&lt;/strong&gt; minute, configurable). It&#39;s really not a tool you should keep running for days. But during the few moments it runs, it will:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Routinely rotate the &lt;strong&gt;mysql.general_log&lt;/strong&gt; table so that it doesn&#39;t fill up&lt;/li&gt;
+&lt;li&gt;Examine entries found in the general log&lt;/li&gt;
+&lt;li&gt;Cross reference entries to the PROCESSLIST so as to deduce database context (&lt;a href=&#34;http://bugs.mysql.com/bug.php?id=52554&#34;&gt;bug #52554&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;If required and appropriate, evaluate a query&#39;s execution plan&lt;/li&gt;
+&lt;li&gt;Decide whether to dump each entry based on filtering rules&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Filtering rules&lt;/h4&gt;
+&lt;p&gt;Filtering rules are passed as command line options. At current, only one filtering rule applies (if more than one specified only one is used, so no point in passing more than one). Some of the rules are:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;filter-connection&lt;/strong&gt;: only log connect/quit entries&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-fullscan&lt;/strong&gt;: only log full table scans&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-temporary&lt;/strong&gt;: only log queries which create implicit temporary tables&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-rows-exceed&lt;/strong&gt;: only log queries where more than &lt;strong&gt;X&lt;/strong&gt; number of rows are being accessed on some table (estimated)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-total-rows-exceed&lt;/strong&gt;: only log queries where more than &lt;strong&gt;X&lt;/strong&gt; number of rows are accessed on all tables combined (estimated, with possibly incorrect numbers on some queries)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-key&lt;/strong&gt;: only log queries using a specific index. This feature somewhat overlaps with Maatkit&#39;s &lt;em&gt;mk-index-usage&lt;/em&gt; (read &lt;a href=&#34;http://www.mysqlperformanceblog.com/2010/11/11/advanced-index-analysis-with-mk-index-usage/&#34;&gt;announcement&lt;/a&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-contains&lt;/strong&gt;: a general purpose &lt;em&gt;grep&lt;/em&gt; on the execution plan. Log queries where the execution plan contains &lt;em&gt;some text&lt;/em&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;There are other filters, and I will possibly add more in due time.&lt;/p&gt;
+&lt;p&gt;Here are a couple cases I used &lt;em&gt;oak-hook-general-log&lt;/em&gt; for:&lt;/p&gt;
+&lt;h4&gt;Use case: temporary tables&lt;/h4&gt;
+&lt;p&gt;I have a server with this alarming chart (courtesy &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;) of temporary tables:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;Created tmp tables per second&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=370x180&amp;amp;chts=303030,12&amp;amp;chtt=Latest+24+hours:+Dec+9,+06:30++-++Dec+10,+06:30&amp;amp;chf=c,s,ffffff&amp;amp;chdl=created_tmp_tables_psec|created_tmp_disk_tables_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4&amp;amp;chd=s:yzzy02zzz100zzz0rv9zz0zyzyz0yy2xz1t11xzztz0xr1xt2tz07vwzz100100z31z111yz1vzzzzz1zs80r902s1111010y20z03z11487zz011z11011002w0q5rxxz0y00z0s02xy1yy0,gggfghggfgggghhgYekhhghhhhhghfjghhdihfhgdghgZhgcicihpcehhhhhhhifkigjihghjehgiigjgYqiYqgiaihiifkhekhfijgiihhggggggggggfhgghffZoYgggggggggdihfggghg&amp;amp;chxt=x,y&amp;amp;chxr=1,0,35.060000&amp;amp;chxl=0:||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||+|&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chg=4.17,25,1,2,2.08,0&amp;amp;chxp=0,2.08,6.25,10.42,14.59,18.76,22.93,27.10,31.27,35.44,39.61,43.78,47.95,52.12,56.29,60.46,64.63,68.80,72.97,77.14,81.31,85.48,89.65,93.82,97.99&amp;amp;tsstart=2010-12-09+06:30:00&amp;amp;tsstep=600&#34; alt=&#34;&#34; width=&#34;370&#34; height=&#34;180&#34; /&gt;
+
+&lt;/blockquote&gt;
+What could possibly create &lt;strong&gt;30&lt;/strong&gt; temporary tables per second on average?
+
+The slow log produced nothing helpful, even with &lt;strong&gt;log-queries-not-using-indexes&lt;/strong&gt; enabled. There were a lot of queries not using indexes there, but nothing at these numbers. With:
+&lt;blockquote&gt;
+&lt;pre&gt;oak-hook-general-log --filter-explain-temporary&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;enabled for &lt;strong&gt;1&lt;/strong&gt; minute, nothing came out. Weird. Enabled for &lt;strong&gt;5&lt;/strong&gt; minutes, I got one entry. Turned out a scheduled script, acting once per &lt;strong&gt;5&lt;/strong&gt; minutes, was making a single complicated query involving many nested views, which accounted for some &lt;em&gt;hundreds&lt;/em&gt; of temporary tables created. All of them very small, query time was very fast. There is no temporary tables problem with this server, case closed.&lt;/p&gt;
+&lt;h4&gt;Use case: connections&lt;/h4&gt;
+&lt;p&gt;A server had issues with some exceptions being thrown on the client side. There was a large number of new connections created per second although the client was using a connection pool. Suspecting the pool didn&#39;t work well, I issued:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;oak-hook-general-log --filter-connect&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The pool was working well, all right. No entries for that client were recorder in &lt;strong&gt;1&lt;/strong&gt; minute of testing. However, it turned out some old script was flooding the MySQL server with requests, every second. The log showed root@somehost, and sure enough, the script was disabled. Exceptions were due to another reason; it was good to eliminate a suspect.&lt;/p&gt;
+&lt;p&gt;Some of the tool&#39;s use case is relatively easy to solve with tail, grep &amp;amp; awk; others are not. I am using it more and more often, and find it to make significant shortcuts in tracking down queries.&lt;/p&gt;
+&lt;h4&gt;Get it&lt;/h4&gt;
+&lt;p&gt;Download the tool as part of &lt;em&gt;openark kit&lt;/em&gt;: access the &lt;a href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;openark kit project page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Or get the &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/src/oak/oak-hook-general-log.py&#34;&gt;source code&lt;/a&gt; directly.&lt;/p&gt;
+&lt;p&gt;Feedback is most welcome.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>openark-kit (rev. 170): new tools, new functionality</title>
+      <link>/blog/mysql/openark-kit-rev-170-new-tools-new-functionality/</link>
+      <pubDate>Wed, 15 Dec 2010 08:31:24 +0000</pubDate>
+      
+      <guid>/blog/mysql/openark-kit-rev-170-new-tools-new-functionality/</guid>
+      <description>&lt;p&gt;I&#39;m pleased to announce a new release of the &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt;. There&#39;s a lot of new functionality inside; following is a brief overview.&lt;/p&gt;
+&lt;p&gt;The &lt;em&gt;openark kit&lt;/em&gt; is a set of utilities for MySQL. They  solve everyday maintenance tasks, which may be complicated or time  consuming to work by hand.&lt;/p&gt;
+&lt;p&gt;It&#39;s been a while since the last announced release. Most of my attention was on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, building new features, writing documentation etc. However my own use of &lt;em&gt;openark kit&lt;/em&gt; has only increased in the past few months, and there&#39;s new useful solutions to common problems that have been developed.&lt;/p&gt;
+&lt;p&gt;I&#39;ve used and improved many tools over this time, but doing the final cut, along with proper documentation, took some time. Anyway, here are the highlights:&lt;/p&gt;
+&lt;h4&gt;New tool: oak-hook-general-log&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;oak-hook-general-log&lt;/em&gt; hooks up a MySQL server and dumps the general log based on filtering rules, applying to query role or execution plan. It is possible to only dump connect/disconnect entries, queries which make a full table scan, or use temporary tables, or scan more than X number of rows, or...&lt;/p&gt;
+&lt;p&gt;I&#39;ll write more on this tool shortly.&lt;/p&gt;
+&lt;h4&gt;New tool: oak-prepare-shutdown&lt;/h4&gt;
+&lt;p&gt;This tool makes for an orderly and faster shutdown by safely stopping replication, and flushing InnoDB pages to disk prior to shutting down (keeping server available for connections even while attempting to flush dirty pages to disk). A typical use case would be:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;oak-prepare-shutdown --user=root --ask-pass --socket=/tmp/mysql.sock &amp;amp;&amp;amp; /etc/init.d/mysql stop&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;New tool: oak-repeat query&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;oak-repeat-query&lt;/em&gt; repeats executing a given query until some condition holds. The condition can be:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Number of given iterations has been reached&lt;/li&gt;
+&lt;li&gt;Given time has elapsed&lt;/li&gt;
+&lt;li&gt;No rows have been affected by query&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The tool comes in handy for cleanup jobs, warming up caches, etc.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;New tool: oak-get-slave-lag&lt;/h4&gt;
+&lt;p&gt;This simple tool just returns the number of seconds a slave is behind master. But it also returns with an appropriate exit code, based on a given threshold: &lt;strong&gt;0&lt;/strong&gt; when lag is good, &lt;strong&gt;1&lt;/strong&gt; (error exit code) when lag is too great or slave fails to replicate.&lt;/p&gt;
+&lt;p&gt;This tool has been used by 3rd party applications, such as a load balancer, to determine whether a slave should be accessed.&lt;/p&gt;
+&lt;h4&gt;Updated tool: oak-chunk-update&lt;/h4&gt;
+&lt;p&gt;This extremely useful utility breaks down very long queries into smaller chunks. These could be queries which should affect a huge amount of rows, or queries which cannot utilize an index.&lt;/p&gt;
+&lt;p&gt;Updates to the tool include limiting the range of rows the tool scans, by specifying start and stop position (either by providing constant values or by SELECT query). Also added is auto-termination when no rows are found to be affected. Last, it is possible to override INFORMATION_SCHEMA lookup by explicitly specifying chunking key.&lt;/p&gt;
+&lt;p&gt;This tool works great for your daily/weekly/monthly batch jobs; in creating DWH tables; populating new columns; purging old entries; clearing data based on non-indexed values; generating summary tables; and more.&lt;/p&gt;
+&lt;h4&gt;Frozen tool: oak-apply-ri&lt;/h4&gt;
+&lt;p&gt;I haven&#39;t been using this tool for a while. The main work down by this tool can be done with &lt;em&gt;oak-chunk-update&lt;/em&gt;. There are some additional safety checks &lt;em&gt;oak-apply-ri&lt;/em&gt; provides; I&#39;m thinking over if they justify the tool&#39;s existence.&lt;/p&gt;
+&lt;h4&gt;Frozen tool: oak-online-alter-table&lt;/h4&gt;
+&lt;p&gt;With the appearance of Facebook’s &lt;a href=&#34;http://www.facebook.com/note.php?note_id=430801045932&#34;&gt;Online Schema Change&lt;/a&gt; (OSC) tool, which derives from &lt;em&gt;oak-online-alter-table&lt;/em&gt;, I&#39;m not sure I will continue developing the tool. I intend to wait for general feedback on OSC before making a decision.&lt;/p&gt;
+&lt;h4&gt;Documentation&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html&#34;&gt;Documentation&lt;/a&gt; is now part of &lt;em&gt;openark kit&lt;/em&gt;&#39;s SVN repository.&lt;/p&gt;
+&lt;h4&gt;Download&lt;/h4&gt;
+&lt;p&gt;The &lt;em&gt;openark kit&lt;/em&gt; project is currently hosted by Google Code.  Downloads are available at the Google Code &lt;a href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;openark kit project page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Downloads are available in the following packaging formats:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;.deb&lt;/strong&gt; package, to be installed on &lt;em&gt;debian&lt;/em&gt;, &lt;em&gt;ubuntu&lt;/em&gt; and otherwise debian based distributions.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;.rpm&lt;/strong&gt; package, architecture free (&lt;em&gt;noarch&lt;/em&gt;), for RPM supporting Linux distributions such as &lt;em&gt;RedHat&lt;/em&gt;, &lt;em&gt;Fedora&lt;/em&gt;, &lt;em&gt;CentOS&lt;/em&gt; etc.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;.tar.gz&lt;/strong&gt; using python&#39;s distutils installer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;source&lt;/strong&gt;, directly retrieved from SVN or from above python package.&lt;/li&gt;
+&lt;li&gt;Some distribution specific &lt;a href=&#34;http://software.opensuse.org/search?baseproject=ALL&amp;amp;p=1&amp;amp;q=openark-kit&#34;&gt;RPM packages&lt;/a&gt;, courtesy Lenz Grimmer.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Feedback&lt;/h4&gt;
+&lt;p&gt;Your feedback is welcome! I may not always respond promptly; and I confess that some bugs were left open for more than I would have liked them to. I hope to make for good quality of code, and bug reporting is one major factor you can control.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>EXPLAIN: missing db info</title>
+      <link>/blog/mysql/explain-missing-db-info/</link>
+      <pubDate>Tue, 11 May 2010 06:57:02 +0000</pubDate>
+      
+      <guid>/blog/mysql/explain-missing-db-info/</guid>
+      <description>&lt;p&gt;I&#39;m further developing a general log hook, which can stream queries from the general log.&lt;/p&gt;
+&lt;p&gt;A particular direction I&#39;m taking is to filter queries by their type of actions. For example, the tool (&lt;a href=&#34;http://code.google.com/p/openarkkit/source/browse/trunk/openarkkit/src/oak/oak-hook-general-log.py&#34;&gt;oak-hook-general-log&lt;/a&gt;) can be instructed to only stream out those queries which involve creation of a temporary table; or those which cause for a filesort, or full index scan, etc.&lt;/p&gt;
+&lt;p&gt;This is done by evaluating of query execution plans on the fly. I suspect the &lt;a href=&#34;http://www.mysql.com/why-mysql/white-papers/mysql_wp_queryanalyzer.php&#34;&gt;MySQL query analyzer&lt;/a&gt; roughly does the same (as a small part of what it does).&lt;/p&gt;
+&lt;p&gt;It&#39;s almost nothing one cannot do with sed/awk. However, I bumped into a couple of problems:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;The general log (and the &lt;strong&gt;mysql.general_log table&lt;/strong&gt;, in  particular) does not indicate the particular database one is using for the query. Since slow log does indicate this data, I &lt;a href=&#34;http://bugs.mysql.com/bug.php?id=52554&#34;&gt;filed a bug&lt;/a&gt; on this. I currently solve this by crossing connection id with the process list, where the current database is listed. It&#39;s shaky, but mostly works.&lt;/li&gt;
+&lt;li&gt;Just realized: there&#39;s no DB info in the &lt;strong&gt;EXPLAIN&lt;/strong&gt; output! It&#39;s weird, since I&#39;ve been EXPLAINing queries for years now. But I&#39;ve always had the advantage of &lt;em&gt;knowing&lt;/em&gt; the schema used: either because I was manually executing the query on a known schema, or &lt;a href=&#34;http://www.maatkit.org/doc/mk-query-digest.html&#34;&gt;mk-query-digest&lt;/a&gt; was kind enough to let me know.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;!--more--&gt;For example, look at the following imaginary query, involving both the &lt;strong&gt;world&lt;/strong&gt; and &lt;strong&gt;sakila&lt;/strong&gt; databases:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; use test;
+Database changed
+mysql&amp;gt; EXPLAIN SELECT * FROM world.Country JOIN sakila.city WHERE Country.Capital = city.city_id;
++----+-------------+---------+--------+---------------+---------+---------+-----------------------+------+-------------+
+| id | select_type | table   | type   | possible_keys | key     | key_len | ref                   | rows | Extra       |
++----+-------------+---------+--------+---------------+---------+---------+-----------------------+------+-------------+
+|  1 | SIMPLE      | Country | ALL    | NULL          | NULL    | NULL    | NULL                  |  239 |             |
+|  1 | SIMPLE      | city    | eq_ref | PRIMARY       | PRIMARY | 2       | world.Country.Capital |    1 | Using where |
++----+-------------+---------+--------+---------------+---------+---------+-----------------------+------+-------------+
+2 rows in set (0.00 sec)
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The query is imaginary, since the tables don&#39;t actually have anything in common. But look at the &lt;strong&gt;EXPLAIN&lt;/strong&gt; result: can you tell where &lt;strong&gt;city&lt;/strong&gt; came from? &lt;strong&gt;Country&lt;/strong&gt; can somehow be parsed from the &lt;strong&gt;ref&lt;/strong&gt; column, but no help on &lt;strong&gt;city&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Moreover, table aliases show on the &lt;strong&gt;EXPLAIN&lt;/strong&gt; plan (which is good), but with no reference to the original table.&lt;/p&gt;
+&lt;p&gt;So, is it back to parsing of the SQL query? I&#39;m &lt;span style=&#34;text-decoration: line-through;&#34;&gt;lazy&lt;/span&gt; reluctant to do that. It&#39;s error prone, and one needs to implement, or use, a good parser, which also accepts MySQL dialect. Haven&#39;t looked into this yet.&lt;/p&gt;
+&lt;p&gt;I&#39;m currently at a standstill with regard to automated query execution plan evaluation where database cannot be determined.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Static charts vs. interactive charts</title>
+      <link>/blog/mysql/static-charts-vs-interactive-charts/</link>
+      <pubDate>Tue, 02 Mar 2010 15:28:08 +0000</pubDate>
+      
+      <guid>/blog/mysql/static-charts-vs-interactive-charts/</guid>
+      <description>&lt;p&gt;I&#39;m having my usual fun with charts. Working on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, I&#39;ve generated monitoring charts using the &lt;a href=&#34;http://code.google.com/apis/chart/image_charts.html&#34;&gt;Google Chars API&lt;/a&gt;. But I&#39;ve also had chance to experiment and deploy interactive charts, JavaScript based. In particular, I used and tweaked &lt;a href=&#34;http://www.danvk.org/dygraphs/&#34;&gt;dygraphs&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;I&#39;d like to note some differences in using charts of both kinds. And I think it makes a very big difference.&lt;/p&gt;
+&lt;h4&gt;Static charts&lt;/h4&gt;
+&lt;p&gt;I&#39;ll call any image-based chart by &#34;static chart&#34;. It&#39;s just a static image. Example of such charts are those generated by Google Image Charts (they now also have new, interactive charts), or &lt;a href=&#34;http://oss.oetiker.ch/rrdtool/index.en.html&#34;&gt;RRDtool&lt;/a&gt;. Show below is an example of a static chart; in this example, generated by Google:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=808080,12&amp;amp;chtt=Dec+4,+15:00++-++Dec+5,+15:00&amp;amp;chf=c,s,ffffff&amp;amp;chdl=com_select_psec|com_insert_psec|com_delete_psec|com_update_psec|com_replace_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;amp;chd=s:zpvxszxsxur11p1xt10wyxzuyv6xw4yx3x041x2zz6zvz7y91x23z4niqkkmojllkhknhlgnmimohilkkqgkkmnmhlljinjmnhmo________________imlnpmkukopmnpjsojnrrlrqnpprs,iZagVcgWXaZdjVbgSbhYdXZXZcbcXZbcadabccabbZaaZeabdYbbZXceWUXaXYXSXVXaSSZUUXWYUUXbTYUUVabWWVZZVYaWZZYa________________ZYbVcXWdYWZcXaYaYWXYfZcdaVZaZ,MNNNNNONLKOMPNNMNNOPMNNLMQNOMMMNMNNNNRONNOPMNQMPONPOLMTNKJKMKKJILKILJJJLIIKUMHJJIIHHHKJIIHIIIHJHIIJM________________NOMLMMLOPOPKLKKNPKMMNMOPQNNOL,NIIMHKOIHKIKOHKMGKNJKIJIKMKLJJMKIKJKLLJLLJLLKMLJLJKKKIIVIIJLJKJHJIKLIHMIIKIKIIKLHKIIJLKIJJKKIJKIKKJK________________IIKILJJLKIKKHJJJJIJJMIKLKGJKK,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA________________AAAAAAAAAAAAAAAAAAAAAAAAAAAAA&amp;amp;chxt=x,y&amp;amp;chxr=1,0,136.620000&amp;amp;chxl=0:||16:00||+||20:00||+||00:00||+||04:00||+||08:00||+||12:00||+||&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chg=4.17,25,1,2,0.00,0&amp;amp;chxp=0,0.00,4.17,8.34,12.51,16.68,20.85,25.02,29.19,33.36,37.53,41.70,45.87,50.04,54.21,58.38,62.55,66.72,70.89,75.06,79.23,83.40,87.57,91.74,95.91,100.08&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Pros and cons of static charts&lt;/h4&gt;
+Pros
+&lt;ul&gt;
+	&lt;li&gt;Images can be viewed on any graphical platform. Browsers, email clients, cell phones, whatever.&lt;/li&gt;
+	&lt;li&gt;Self contained: chart image, legend, scales: all in one image.&lt;/li&gt;
+	&lt;li&gt;As such, easy to move around.&lt;/li&gt;
+	&lt;li&gt;Are safe to use.&lt;/li&gt;
+&lt;/ul&gt;
+Cons
+&lt;ul&gt;
+	&lt;li&gt;Images are fuzzy. Is the &lt;strong&gt;com_replace_psec&lt;/strong&gt; really 0? Maybe it&#39;s 0.1? A larger value can make lower values hard to tell.&lt;/li&gt;
+	&lt;li&gt;Images are inaccurate: the colors can lie. The red and green lines showing are hard to tell apart. The red is painted above the green. Data gets &#34;lost&#34;.&lt;/li&gt;
+	&lt;li&gt;They do not zoom (one needs to regenerate larger image)&lt;/li&gt;
+	&lt;li&gt;Unless encoded with base64, HTML pages which include images need to link outside.&lt;/li&gt;
+	&lt;li&gt;In the particular case of Google Charts, one is limited to 2K length URL. Trust me, it&#39;s a big limitation! (PS, Google now support POST method to allow for up to 16K. But... it&#39;s a POST method...)&lt;/li&gt;
+	&lt;li&gt;In the particular case of Google Charts, one must have an internet connection.&lt;/li&gt;
+	&lt;li&gt;In the particular case of Google Charts, one must submit data to Google.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Interactive charts&lt;/h4&gt;
+Interactive charts are those which react to your commands. These are either JavaScript or Flash based, mostly. They allow for really nice features. Take the following chart as an example: try and &lt;strong&gt;move over with your mouse&lt;/strong&gt;; or &lt;strong&gt;select sections to zoom in&lt;/strong&gt;.
+
+&lt;script src=&#34;http://code.openark.org/blog/wp-content/uploads/2010/03/dygraph-combined.js&#34; type=&#34;text/javascript&#34;&gt;&lt;/script&gt;
+&lt;!--[if IE]&gt;&lt;script src=&#34;http://code.openark.org/blog/wp-content/uploads/2010/03/excanvas-min.js&#34;&gt;&lt;/script&gt;&lt; ![endif]--&gt;
+
+&lt;blockquote&gt;
+&lt;pre&gt;
+&lt;/pre&gt;
+&lt;h4&gt;DML&lt;/h4&gt;
+&lt;div id=&#34;graphDiv_DML&#34; class=&#34;graphdiv&#34; style=&#34;width: 400px; height: 160px;&#34;&gt;[graphDiv]&lt;/div&gt;
+&lt;div id=&#34;labelsDiv_DML&#34; class=&#34;legend&#34;&gt;[labelsDiv]&lt;/div&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;script type=&#34;text/javascript&#34;&gt;// &lt; ![CDATA[&lt;br /&gt;
+// &lt; ![CDATA[&lt;br /&gt;
+ g_DML = new Dygraph( document.getElementById(&#34;graphDiv_DML&#34;),                         &#34;Date,com_select_psec,com_insert_psec,com_delete_psec,com_update_psec,com_replace_psec\n2009-12-04 15:00:00,113.28,76.54,26.14,29.54,0.00\n2009-12-04 15:10:00,91.51,55.74,30.07,18.13,0.00\n2009-12-04 15:20:00,104.98,57.75,28.26,18.24,0.00\n2009-12-04 15:30:00,110.64,72.17,30.17,27.58,0.00\n2009-12-04 15:40:00,97.79,46.27,29.27,15.91,0.00\n2009-12-04 15:50:00,114.35,61.85,29.55,22.45,0.00\n2009-12-04 16:00:00,110.82,72.38,30.67,30.70,0.00\n2009-12-04 16:10:00,99.05,49.70,29.35,18.56,0.00\n2009-12-04 16:20:00,109.68,50.87,25.74,16.55,0.00\n2009-12-04 16:30:00,103.92,58.70,22.09,22.58,0.00\n2009-12-04 16:40:00,97.24,56.29,31.71,18.78,0.00\n2009-12-04 16:50:00,119.25,65.72,27.80,22.56,0.00\n2009-12-04 17:00:00,118.31,78.34,34.18,30.43,0.00\n2009-12-04 17:10:00,91.06,47.59,29.66,16.60,0.00\n2009-12-04 17:20:00,117.81,59.82,28.94,21.40,0.00\n2009-12-04 17:30:00,109.79,71.37,27.62,27.64,0.00\n2009-12-04 17:40:00,101.07,40.51,29.57,14.18,0.00\n2009-12-04 17:50:00,117.66,61.18,28.31,22.44,0.00\n2009-12-04 18:00:00,115.48,72.82,32.12,28.74,0.00\n2009-12-04 18:10:00,106.51,54.34,32.96,20.37,0.00\n2009-12-04 18:20:00,111.34,65.11,27.60,22.60,0.00\n2009-12-04 18:30:00,109.66,52.25,29.47,18.47,0.00\n2009-12-04 18:40:00,113.63,55.16,28.67,19.98,0.00\n2009-12-04 18:50:00,103.72,51.86,24.67,18.08,0.00\n2009-12-04 19:00:00,111.27,55.78,26.66,22.62,0.00\n2009-12-04 19:10:00,105.73,63.16,35.37,25.88,0.00\n2009-12-04 19:20:00,130.50,60.07,29.82,22.99,0.00\n2009-12-04 19:30:00,110.41,62.64,30.35,24.46,0.00\n2009-12-04 19:40:00,107.05,52.04,27.15,19.22,0.00\n2009-12-04 19:50:00,126.11,57.06,27.12,19.34,0.00\n2009-12-04 20:00:00,111.36,61.40,26.13,25.96,0.00\n2009-12-04 20:10:00,108.82,61.97,29.52,23.49,0.00\n2009-12-04 20:20:00,122.57,59.28,26.03,18.48,0.00\n2009-12-04 20:30:00,109.35,65.42,29.21,23.13,0.00\n2009-12-04 20:40:00,117.19,57.69,28.01,19.24,0.00\n2009-12-04 20:50:00,125.03,61.15,28.95,21.74,0.00\n2009-12-04 21:00:00,118.31,63.11,29.66,23.99,0.00\n2009-12-04 21:10:00,109.98,62.24,38.77,24.02,0.00\n2009-12-04 21:20:00,121.28,57.78,30.48,20.26,0.00\n2009-12-04 21:30:00,113.89,59.62,29.77,23.72,0.00\n2009-12-04 21:40:00,113.93,60.42,29.35,24.71,0.00\n2009-12-04 21:50:00,130.36,55.68,31.94,21.16,0.00\n2009-12-04 22:00:00,114.11,58.93,32.62,24.41,0.00\n2009-12-04 22:10:00,105.52,58.58,26.04,24.47,0.00\n2009-12-04 22:20:00,113.52,57.04,29.26,22.28,0.00\n2009-12-04 22:30:00,132.64,66.22,34.87,26.82,0.00\n2009-12-04 22:40:00,112.08,59.19,27.16,23.73,0.00\n2009-12-04 22:50:00,136.62,59.74,33.41,20.04,0.00\n2009-12-04 23:00:00,119.58,65.67,31.40,24.40,0.00\n2009-12-04 23:10:00,109.12,53.74,28.38,19.60,0.00\n2009-12-04 23:20:00,121.52,60.03,33.16,22.38,0.00\n2009-12-04 23:30:00,123.33,59.59,31.09,22.51,0.00\n2009-12-04 23:40:00,114.75,56.82,25.53,23.43,0.00\n2009-12-04 23:50:00,124.92,51.26,27.86,19.03,0.00\n2009-12-05 00:00:00,88.23,63.21,41.50,18.59,0.00\n2009-12-05 00:10:00,75.10,66.62,29.94,48.01,0.00\n2009-12-05 00:20:00,94.85,49.27,22.05,18.66,0.00\n2009-12-05 00:30:00,80.27,45.21,20.56,17.55,0.00\n2009-12-05 00:40:00,80.96,52.03,21.66,21.14,0.00\n2009-12-05 00:50:00,85.21,57.68,26.57,23.58,0.00\n2009-12-05 01:00:00,88.66,52.56,21.75,20.94,0.00\n2009-12-05 01:10:00,78.66,53.26,22.89,22.36,0.00\n2009-12-05 01:20:00,83.80,50.74,20.65,19.49,0.00\n2009-12-05 01:30:00,82.70,39.99,17.23,15.86,0.00\n2009-12-05 01:40:00,79.66,52.35,23.55,20.94,0.00\n2009-12-05 01:50:00,74.56,47.64,23.05,18.97,0.00\n2009-12-05 02:00:00,81.25,51.35,17.94,21.61,0.00\n2009-12-05 02:10:00,86.83,58.48,25.03,24.95,0.00\n2009-12-05 02:20:00,73.31,41.39,21.09,17.56,0.00\n2009-12-05 02:30:00,82.31,39.70,19.84,16.74,0.00\n2009-12-05 02:40:00,71.19,55.84,19.05,25.97,0.00\n2009-12-05 02:50:00,88.00,44.13,25.32,17.74,0.00\n2009-12-05 03:00:00,84.54,44.78,18.42,18.78,0.00\n2009-12-05 03:10:00,76.92,50.57,17.91,21.81,0.00\n2009-12-05 03:20:00,84.45,49.12,21.54,18.58,0.00\n2009-12-05 03:30:00,89.52,54.20,45.41,22.39,0.00\n2009-12-05 03:40:00,74.15,44.67,26.54,18.04,0.00\n2009-12-05 03:50:00,76.32,44.36,15.02,18.39,0.00\n2009-12-05 04:00:00,83.90,52.30,19.50,22.39,0.00\n2009-12-05 04:10:00,80.26,61.12,20.66,25.68,0.00\n2009-12-05 04:20:00,80.95,42.11,16.95,14.84,0.00\n2009-12-05 04:30:00,93.01,53.36,17.91,21.94,0.00\n2009-12-05 04:40:00,72.70,45.22,16.63,18.16,0.00\n2009-12-05 04:50:00,81.22,44.73,15.41,18.54,0.00\n2009-12-05 05:00:00,80.02,46.60,16.07,21.04,0.00\n2009-12-05 05:10:00,84.33,57.86,21.77,24.71,0.00\n2009-12-05 05:20:00,87.48,60.54,19.66,22.95,0.00\n2009-12-05 05:30:00,86.19,48.62,18.47,17.51,0.00\n2009-12-05 05:40:00,72.92,50.10,18.46,21.00,0.00\n2009-12-05 05:50:00,81.79,48.14,15.75,19.36,0.00\n2009-12-05 06:00:00,83.11,55.70,17.15,23.02,0.00\n2009-12-05 06:10:00,77.98,55.89,18.36,23.16,0.00\n2009-12-05 06:20:00,77.05,45.96,18.06,17.27,0.00\n2009-12-05 06:30:00,87.58,53.76,15.56,20.79,0.00\n2009-12-05 06:40:00,79.33,58.86,21.02,22.84,0.00\n2009-12-05 06:50:00,85.33,49.99,16.23,18.82,0.00\n2009-12-05 07:00:00,87.54,56.70,17.96,23.31,0.00\n2009-12-05 07:10:00,73.33,56.51,17.57,21.74,0.00\n2009-12-05 07:20:00,84.02,52.77,21.21,20.80,0.00\n2009-12-05 07:30:00,88.86,58.34,27.45,23.10,0.00\n2009-12-05 07:40:00,,,,,\n2009-12-05 07:50:00,,,,,\n2009-12-05 08:00:00,,,,,\n2009-12-05 08:10:00,,,,,\n2009-12-05 08:20:00,,,,,\n2009-12-05 08:30:00,,,,,\n2009-12-05 08:40:00,,,,,\n2009-12-05 08:50:00,,,,,\n2009-12-05 09:00:00,,,,,\n2009-12-05 09:10:00,,,,,\n2009-12-05 09:20:00,,,,,\n2009-12-05 09:30:00,,,,,\n2009-12-05 09:40:00,,,,,\n2009-12-05 09:50:00,,,,,\n2009-12-05 10:00:00,,,,,\n2009-12-05 10:10:00,,,,,\n2009-12-05 10:20:00,77.11,55.87,29.31,18.09,0.00\n2009-12-05 10:30:00,85.31,53.70,31.03,18.46,0.00\n2009-12-05 10:40:00,82.72,61.32,26.30,22.98,0.00\n2009-12-05 10:50:00,87.28,46.53,25.04,18.04,0.00\n2009-12-05 11:00:00,92.07,62.62,27.09,25.14,0.00\n2009-12-05 11:10:00,84.59,50.42,25.97,19.96,0.00\n2009-12-05 11:20:00,80.34,49.64,25.75,20.31,0.00\n2009-12-05 11:30:00,103.61,64.36,31.79,24.71,0.00\n2009-12-05 11:40:00,80.03,54.33,33.83,22.37,0.00\n2009-12-05 11:50:00,90.42,48.24,31.26,18.43,0.00\n2009-12-05 12:00:00,92.51,56.34,33.53,22.45,0.00\n2009-12-05 12:10:00,84.34,62.26,22.66,23.31,0.00\n2009-12-05 12:20:00,86.24,51.96,25.69,16.02,0.00\n2009-12-05 12:30:00,92.08,58.61,23.16,19.34,0.00\n2009-12-05 12:40:00,78.48,53.33,22.72,19.51,0.00\n2009-12-05 12:50:00,97.85,57.71,29.80,20.19,0.00\n2009-12-05 13:00:00,89.23,54.84,34.62,20.93,0.00\n2009-12-05 13:10:00,78.92,50.02,22.47,18.19,0.00\n2009-12-05 13:20:00,87.24,50.92,26.37,19.38,0.00\n2009-12-05 13:30:00,96.29,54.78,27.13,20.04,0.00\n2009-12-05 13:40:00,96.39,69.48,30.21,27.19,0.00\n2009-12-05 13:50:00,83.21,55.13,26.48,18.00,0.00\n2009-12-05 14:00:00,97.00,63.61,30.89,22.23,0.00\n2009-12-05 14:10:00,94.65,65.33,33.51,25.04,0.00\n2009-12-05 14:20:00,86.94,58.14,36.10,22.07,0.00\n2009-12-05 14:30:00,91.91,47.25,28.41,14.45,0.00\n2009-12-05 14:40:00,92.55,55.73,29.59,20.69,0.00\n2009-12-05 14:50:00,97.35,58.90,31.63,22.22,0.00\n2009-12-05 15:00:00,97.91,56.09,23.80,21.68,0.00\n&#34;,                         { chartDiv:  document.getElementById(&#34;chartDiv_DML&#34;), labelsDiv: document.getElementById(&#34;labelsDiv_DML&#34;) } ); g_DML.resize(400,160);&lt;br /&gt;
+// ]]&gt;&lt;/script&gt;&lt;/p&gt;
+&lt;p&gt;The above chart is generated with &lt;em&gt;dygraphs&lt;/em&gt;. Since it is embedded within my Wordpress page, the layout is affected by that of my theme. Take a look at this &lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2010/03/mycheckpoint_interactive_demo.html&#34;&gt;&lt;strong&gt;example page&lt;/strong&gt;&lt;/a&gt; to see similar charts outside this blog site (Internet Explorer users: Maxmimize/minimize button will not work well for now. And, may I suggest &lt;a href=&#34;http://www.mozilla.com/en-US/firefox&#34;&gt;Mozilla Firefox&lt;/a&gt;?)&lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2010/03/mycheckpoint_interactive_demo.html&#34;&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h4&gt;Pros and cons of interactive charts&lt;/h4&gt;
+&lt;p&gt;Pros&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Can present you with exact values. No more doubt about the &lt;strong&gt;com_replace_psec&lt;/strong&gt; values.&lt;/li&gt;
+&lt;li&gt;Can allow for zoom in, zoom out.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Cons&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Need supporting platform. The above cannot be viewed by non-JavaScript browsers (cell phones, etc.)&lt;/li&gt;
+&lt;li&gt;Browser support is also an issue with JavaScript.&lt;/li&gt;
+&lt;li&gt;Emailing such report will result in mail blocking in many companies: mail filters will not allow for JavaScript code to pass.&lt;/li&gt;
+&lt;li&gt;Charts are not necessarily self-contained, in terms of the chart entity With Flash charts (e.g. Fusion Charts) this works. But in the above, the legend and scales are outside the image. As such, they cannot be just moved around.&lt;/li&gt;
+&lt;li&gt;HTML pages which include such charts &lt;em&gt;can be&lt;/em&gt; self contained. The HTML page can include all the JavaScript dependencies, in addition to the chart generating code. Flash based charts cannot be self contained.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Summary&lt;/h4&gt;
+&lt;p&gt;Interactive charts are cool!&lt;/p&gt;
+&lt;p&gt;I&#39;m now integrating &lt;a href=&#34;http://www.danvk.org/dygraphs/&#34;&gt;dygraphs&lt;/a&gt; into &lt;em&gt;mycheckpoint&lt;/em&gt; (How nice it is to work with BSD &amp;amp; MIT licenses!). Though I may later switch to &lt;a href=&#34;http://code.google.com/p/flot/&#34;&gt;flot&lt;/a&gt;, interactive charts will be the next standard charting way in &lt;em&gt;mycheckpoint&lt;/em&gt;. I will continue supporting static Google Charts, as follows from the above pros and cons list.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Performance analysis with mycheckpoint</title>
+      <link>/blog/mysql/performance-analysis-with-mycheckpoint/</link>
+      <pubDate>Thu, 12 Nov 2009 12:47:00 +0000</pubDate>
+      
+      <guid>/blog/mysql/performance-analysis-with-mycheckpoint/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; (see &lt;a href=&#34;http://code.openark.org/blog/mysql/announcing-mycheckpoint-lightweight-sql-oriented-monitoring-for-mysql&#34;&gt;announcement&lt;/a&gt;) allows for both graph presentation and quick SQL access to monitored &amp;amp; analyzed data. I&#39;d like to show the power of combining them both.&lt;/p&gt;
+&lt;h4&gt;InnoDB performance&lt;/h4&gt;
+&lt;p&gt;Taking a look at one of the most important InnoDB metrics: the read hit ratio (we could get the same graph by looking at the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-html-reports&#34;&gt;HTML report&lt;/a&gt;):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT innodb_read_hit_percent FROM sv_report_chart_sample \G
+*************************** 1. row ***************************
+innodb_read_hit_percent: http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+10,+11:40++-++Nov+11,+08:55+(0+days,+21+hours)&amp;amp;chdl=innodb_read_hit_percent&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:400664366P6674y7176677677u467773y64ux166666764366646y616666666666644444434444s6u4S331444404433341334433646777666666074736777r1777767764776666F667777617777777777777777yaRi776776mlf667676xgx776766rou67767777u37797777x76676776u6A737464y67467761777666643u66446&amp;amp;chxt=x,y&amp;amp;chxr=1,99.60,100.00&amp;amp;chxl=0:||Nov+10,+15:55|Nov+10,+20:10|Nov+11,+00:25|Nov+11,+04:40|&amp;amp;chxs=0,505050,10&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;innodb_read_hit_percent&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+10,+11:40++-++Nov+11,+08:55+(0+days,+21+hours)&amp;amp;chdl=innodb_read_hit_percent&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:400664366P6674y7176677677u467773y64ux166666764366646y616666666666644444434444s6u4S331444404433341334433646777666666074736777r1777767764776666F667777617777777777777777yaRi776776mlf667676xgx776766rou67767777u37797777x76676776u6A737464y67467761777666643u66446&amp;amp;chxt=x,y&amp;amp;chxr=1,99.60,100.00&amp;amp;chxl=0:||Nov+10,+15:55|Nov+10,+20:10|Nov+11,+00:25|Nov+11,+04:40|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+We see that read hit is usually high, but occasionally drops low, down to 99.7, or even 99.6. But it seems like most of the time we are above 99.95% read hit ratio. It&#39;s hard to tell about 99.98%.
+&lt;h4&gt;Can we know for sure?&lt;/h4&gt;
+We can stress our eyes, yet be certain of little. It&#39;s best if we just query for the metrics! &lt;em&gt;mycheckpoint&lt;/em&gt; provides with all data, accessible by simple SQL queries:&lt;!--more--&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT SUM(innodb_read_hit_percent &amp;gt; 99.95)/count(*)
+  FROM sv_report_sample;
++-----------------------------------------------+
+| SUM(innodb_read_hit_percent &amp;gt; 99.95)/count(*) |
++-----------------------------------------------+
+|                                        0.7844 |
++-----------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Yes, most of the time we&#39;re above 99.95% read hit ratio: but not too often!&lt;/p&gt;
+&lt;p&gt;I&#39;m more interested in seeing how much time my server&#39;s above 99.98% read hit:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT SUM(innodb_read_hit_percent &amp;gt; 99.98)/count(*)
+  FROM sv_report_sample;
++-----------------------------------------------+
+| SUM(innodb_read_hit_percent &amp;gt; 99.98)/count(*) |
++-----------------------------------------------+
+|                                        0.3554 |
++-----------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We can see the server only has 99.98% read hit percent 35% of the time. Need to work on that!&lt;/p&gt;
+&lt;h4&gt;Disk activity&lt;/h4&gt;
+&lt;p&gt;Lower read hit percent means higher number of disk reads; that much is obvious. The first two following graphs present this obvious connection. But the third graph tells us another fact: with increased disk I/O, we can expect more (and longer) locks.&lt;/p&gt;
+&lt;p&gt;Again, this should be very intuitive, when thinking about it this way. The problem sometimes arises when we try to analyze it the other way round: &#34;Hey! InnoDB has a lot of locks! What are we going to do about it?&#34;. Many times, people will look for answers in their &lt;em&gt;transactions&lt;/em&gt;, their &lt;em&gt;Isolation Level&lt;/em&gt;, their &lt;em&gt;LOCK IN SHARE MODE&lt;/em&gt; clauses. But the simple answer can be: &#34;There&#39;s a lot of I/O, so everything has to wait; therefore we increase the probability for locks; therefore there&#39;s more locks&#34;.&lt;/p&gt;
+&lt;p&gt;The answer, then, is to reduce I/O. The usual stuff: slow queries; indexing; ... and, yes, perhaps transactions or tuning.&lt;/p&gt;
+&lt;p&gt;The charts below make it quite clear that we have an issue of excessive reads -&amp;gt; less read hit -&amp;gt; increased I/O -&amp;gt; more locks.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;DML&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Oct+31,+17:00++-++Nov+11,+08:00+(10+days,+15+hours)&amp;amp;chdl=com_select_psec|com_insert_psec|com_delete_psec|com_update_psec|com_replace_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;amp;chd=s:IJJJJJKHGHGHGHHHHHIIIJJJKKKLKLLIHHHIHIHIIIJJJJJKKKLLLLMIHHHHHHHIIIIIJJKKKLLLLMMIHIIIIIIIIIIJJJJKKLLLLMMIHHHIHIHIIIJJJJJKKLKLLLLIHHHIHIHIIIIJIJJJJKKKKKKHHHHHHHHHHHHIIIIJIJJJJJKHHHHHHHHHHIIJJNKLLKKLLLMSMHHIHHHIOSae9RNPJIIJJJKHGGGHGGHHHHHJJKJLKLLLMKMJHIIIIIII,EEEEEEEFEEEEEEEFEFFFFFFFFFFFFFFEEFFEEEEEFFFFFFFFFFFGFFFGFFFFEEEEFFFFFFGGFGFFFFFGEFFFEEFFFFFFFFFFFFFFFFFGEEEEEEEEFFFGGFFFFGFFFFFGEEEFFEEFFEFFEEFFFFFFFEEFEEEEEEEEEEEEEEFFEEEEFEEGEEEEEEEEEFFFFFFFFFEFFFFHEEEEEEEFFFFFFFFFFEEEEFEHEFEEEEEEEEFFFGFGGFFFFFFIEEEEEEEF,CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCDCCCCCCDDCCCCCCCCCCCCCCCDCCCCCCCCCCCCCCCCCCDCCCCECCBCBCCCCCCCCCCDCCCCCDCECCCCCCCCCCCCCCCCCCCDCCCDCCCCBBCCCCDCCDCCCCCCCCCECCCBBCCCCCCCCCCCCCCCCCCFCCBCCCCCCCCCCCCCCCCCCCCFCCCCBCCCCCCCDCCCCDCCDCCGCCCCCCCD,CBCCCBBCBBBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCCCCCCCCCCCCCCBBBCCCCCCBCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBBBBBBCBBBBBBBBCBBCCCCCCCCCCCCCCCCCCCCC,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&amp;amp;chxt=x,y&amp;amp;chxr=1,0,680.42&amp;amp;chxl=0:||Nov+2,+20:00|Nov+4,+23:00|Nov+7,+02:00|Nov+9,+05:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+
+&lt;img class=&#34;alignnone&#34; title=&#34;innodb_read_hit_percent&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Oct+31,+17:00++-++Nov+11,+08:00+(10+days,+15+hours)&amp;amp;chdl=innodb_read_hit_percent&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:8p879mq7z1377377777z788863778839z13773877633697786888969z1379377667275377376672813167266771288716689y759121685885785236675889869232685789w63y69997989999252696878y8698878588886933368587ffpibibaTYRfVAdXjqfdmbYneRhciXYcifb6995802z56377666576877268875913278387&amp;amp;chxt=x,y&amp;amp;chxr=1,99.44,99.99&amp;amp;chxl=0:||Nov+2,+20:00|Nov+4,+23:00|Nov+7,+02:00|Nov+9,+05:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+
+&lt;img class=&#34;alignnone&#34; title=&#34;innodb_io&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Oct+31,+17:00++-++Nov+11,+08:00+(10+days,+15+hours)&amp;amp;chdl=innodb_buffer_pool_reads_psec|innodb_buffer_pool_pages_flushed_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4&amp;amp;chd=s:DYDDBZVEPMJEFKFGGGEOEDDDEJDECBGBONKEFJEFFFIHFCDDCECCCBECSPLECJEFGHFLDGHEDHEEEDHCMJMGFLGHFELMDCDLEFDBRDFBKIKECIDEHEDHJHFEDGCDCDFCKJKFEJFECRGHNFCCBFBECBCCLHKFBGDEDUEGBCCEEHDCDDFBJJJFEIDFwrfpthozmqqcn3g9hYjkbpqdsvhxormohorGCBHDOLNGEHEDFFGIEFDEDKFDDDGCLIJECIDE,EEEEEGEFSWUFFEGHKIHHHGGHJIHHHHGGQbTFFEFFHGGGGFFHHHGHGFFGUdYGDEGFJKIHHHLKJJJIHHHGHZQRGFGHIHIGGGHIIIGHFFFEHYPNCEFEHHIIIKKJIJHHGIFFGbSPFGJIGFGGGEFFEFEFFEEGSIUODCDFHGGFEEGGGGGGGHFFGYPNDFFGJHIJJIJIHHGFFFEHHVSLCDGIHIHGIHGGFGFFFGIJTRSMEEFFGHHIIIHJKLKHIHGHPNNMCFGE&amp;amp;chxt=x,y&amp;amp;chxr=1,0,151.44&amp;amp;chxl=0:||Nov+2,+20:00|Nov+4,+23:00|Nov+7,+02:00|Nov+9,+05:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+
+&lt;img class=&#34;alignnone&#34; title=&#34;innodb_row_lock_waits_psec&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Oct+31,+17:00++-++Nov+11,+08:00+(10+days,+15+hours)&amp;amp;chdl=innodb_row_lock_waits_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:GWFGGYSHQJKFGJHIHIHNGHGGGKHHFFGGMMJFFKHHHKMIHGIIJGGFGFHGTNOGFJIHGJGKGJHGGGGFHFJFPIKFFJHJIFLKGGFIFGGEVEJGPILGFIGHJJHIJKGGFJGLIGKGJMSGGIGIGVGGQJGHHKHIGHFGLHMHFIFIGQGGIFGJHIEEHFHGKLJHGGGIYgTVXOaXabSUadW9gVfRSeaQbfalXeYcXTiGHIKHKEJEFFFGGGIGGGGHGKGGHGLGPJHGFJEG&amp;amp;chxt=x,y&amp;amp;chxr=1,0,1.42&amp;amp;chxl=0:||Nov+2,+20:00|Nov+4,+23:00|Nov+7,+02:00|Nov+9,+05:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+By the way, the above resulted from the fact that, due to a problematic query, all slave stopped replicating. Slaves participated in read-balancing, so when they went stale, all reads were directed at the master (the monitored node).
+&lt;h4&gt;You have the metrics at your disposal&lt;/h4&gt;
+Looking at the following chart:
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;questions&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+11,+15:15++-++Nov+12,+12:30+(0+days,+21+hours)&amp;amp;chdl=queries_psec|questions_psec|slow_queries_psec|com_commit_psec|com_set_option_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;amp;chd=s:pqpviksvvz0vuxxxjpw0mwpkkso1vhuvn0nnrtx2uisrnvoknmusomqvlyymsvpuweqslwumkomutcromzrinukvwcuzotujjto1shrtszqlu849mXenejkaZlZhcYbgciaZZegecUWhZkaYWebfaXVaecdZUZgdbSbccbcTXYeaaTYZfZeVjbnZhRdegcfYorkdmVadqenfcknkoadeuhrjcbptpkhkqkrqfjprrtmllmnqdwsusojoo0qtpwp4,abfjVQebgjaWeedkWRgcelWUcdclYUhddnaVidendUieflaUhcfkdRfefmgSjianfPkcdmfUegamfRmcfmgTgegmhQghgmgWeiepfShfhqjcqzwzfVYdbfbUXbXcYSYaYdVWUZabWTTbXeYUVZYdVTUYabYWUYbbXSWaYaYSSXZZVTVZaXZURZaWbQWZaaYWUWbaZSUadadVUcbbbTWYeabXUUcebUYbabdVUYbbdTWaaccWTddaeTWbdbgXXdci,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,MLOPJHNMNPLKNNNQJHOMNQJJMMMQLIPMNSLJPNNRNJPNNRKJPMNQNHONNRNIPPLROHQNMRNJOOMRNHRMNRNJONOROHOPOROKNPNTOIPOOTOMQUSUNJKNLOLJKMKMKIKLKMJJILLMKIIMKNJJJLKNIJJKKMKJIKLMKHJLKLKIIKKLJIJLKKKJHLLKLHJLKLKJIKLLKIJLMLMKJMMMMIJKMLLKIJMNLJKMLMMJJKLMNIKLLMMKIMMLNIKMMMOKKNMP&amp;amp;chxt=x,y&amp;amp;chxr=1,0,916.47&amp;amp;chxl=0:||Nov+11,+19:30|Nov+11,+23:45|Nov+12,+04:00|Nov+12,+08:15|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+It appears that there&#39;s no slow queries. But this may be misleading: perhaps there&#39;s just a little, that don&#39;t show due to the chart&#39;s large scale?
+
+One could argue that this is the chart&#39;s fault. Perhaps there should be a distinct chart for &#34;slow queries percent&#34;. Perhaps I&#39;ll add one. But we can&#39;t have special charts for everything. It&#39;s would be too tiresome to look at hundreds of charts.
+
+Anyway, my point is: let&#39;s verify just how many slow queries we have:
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT slow_queries_psec FROM sv_hour ORDER BY id DESC;
++-------------------+
+| slow_queries_psec |
++-------------------+
+|              3.05 |
+|              3.83 |
+|              4.39 |
+|              4.03 |
+|              3.86 |
+|              3.56 |
+|              3.73 |
+|              3.79 |
+|              3.58 |
+|              3.55 |
+...
++-------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So, between 3 and 4 slow queries per second. It doesn&#39;t look too good in this light. Checking on the percentage of slow queries (of total questions):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT ROUND(100*slow_queries_diff/questions_diff, 1) AS slow_queries_percent
+  FROM sv_hour ORDER BY id DESC LIMIT 10;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Or, since the above calculation is pre-defined in the reports tables:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT slow_queries_percent FROM sv_report_hour_recent;
++----------------------+
+| slow_queries_percent |
++----------------------+
+|                  0.8 |
+|                  1.0 |
+|                  1.2 |
+|                  1.2 |
+|                  1.1 |
+|                  1.0 |
+|                  1.1 |
+|                  1.1 |
+|                  1.0 |
+...
++----------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Accessible data&lt;/h4&gt;
+&lt;p&gt;This is what I&#39;ve been trying to achieve with &lt;em&gt;mycheckpoint&lt;/em&gt;. As a DBA, consultant and SQL geek I find that direct SQL access works best for me. It&#39;s like loving command line interface over GUI tools. Direct SQL gives you so much more control and information.&lt;/p&gt;
+&lt;p&gt;Charting is important, since it&#39;s easy to watch and get first impressions, or find extreme changes. But beware of relying on charts all the time. Scale issues, misleading human interpretation, technology limitations - all these make charts inaccurate.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; allows for both methods, and, I believe, intuitively so.&lt;/p&gt;
+&lt;p&gt;&amp;lt;/propaganda&amp;gt;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Replication analysis with mycheckpoint</title>
+      <link>/blog/mysql/replication-analysis-with-mycheckpoint/</link>
+      <pubDate>Wed, 11 Nov 2009 05:50:28 +0000</pubDate>
+      
+      <guid>/blog/mysql/replication-analysis-with-mycheckpoint/</guid>
+      <description>&lt;p&gt;I would like to show how &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycehckpoint&lt;/a&gt; (see &lt;a href=&#34;http://code.openark.org/blog/mysql/announcing-mycheckpoint-lightweight-sql-oriented-monitoring-for-mysql&#34;&gt;announcement&lt;/a&gt;) can be put to use for analyzing various replication metrics.&lt;/p&gt;
+&lt;h4&gt;Lagging slaves&lt;/h4&gt;
+&lt;p&gt;A slave has been monitored. Monitoring started at a time when it was way behind master (about two days lag), but it has since caught up. This can be easily verified by the following chart:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;seconds_behind_master&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+08:00+(4+days,+22+hours)&amp;amp;chdl=seconds_behind_master&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:976431zzzywutrpnliiifdbZYXVTRRRPNLJHEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&amp;amp;chxt=x,y&amp;amp;chxr=1,0,169811&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+08:00|Nov+9,+08:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+The above chart can be obtained by viewing the HTML report:
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT &lt;strong&gt;html&lt;/strong&gt; FROM sv_report_html&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Or by directly issuing the query:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;seconds_behind_master&lt;/strong&gt; FROM sv_report_chart_hour\G
+*************************** 1. row ***************************
+seconds_behind_master: http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+08:00+(4+days,+22+hours)&amp;amp;chdl=seconds_behind_master&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:976431zzzywutrpnliiifdbZYXVTRRRPNLJHEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&amp;amp;chxt=x,y&amp;amp;chxr=1,0,169811&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+08:00|Nov+9,+08:00|&amp;amp;chxs=0,505050,10&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This is all nice. But I&#39;m also interested in the &lt;em&gt;rate&lt;/em&gt; at which slave lag decreased. Many ignore this important metric: just how fast does your slave replicate?&lt;/p&gt;
+&lt;h4&gt;&lt;!--more--&gt;Slave catchup speed&lt;/h4&gt;
+&lt;p&gt;So we&#39;re looking for the &lt;em&gt;slope&lt;/em&gt; of the above graph. Luckily, the slope is nothing but the difference in &lt;strong&gt;seconds_behind_master&lt;/strong&gt; divided by elapsed time. &lt;em&gt;mycheckpoint&lt;/em&gt; supports the &lt;strong&gt;*_psec&lt;/strong&gt; metrics for all known variables.&lt;/p&gt;
+&lt;p&gt;Again, we can just look at the HTML report, or we can issue:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;seconds_behind_master_psec&lt;/strong&gt; FROM sv_report_chart_hour\G
+*************************** 1. row ***************************
+seconds_behind_master_psec: http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+08:00+(4+days,+22+hours)&amp;amp;chdl=seconds_behind_master_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:fbdebXU0wvOgaYXVUIutFTacefXXS4xhYRTJAKf90444444444444444444444482444444445444444444444472544444444444444444444481544444&amp;amp;chxt=x,y&amp;amp;chxr=1,-2.35,0.19&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+08:00|Nov+9,+08:00|&amp;amp;chxs=0,505050,10&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;And get this chart:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;seconds_behind_master_psec&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+08:00+(4+days,+22+hours)&amp;amp;chdl=seconds_behind_master_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:fbdebXU0wvOgaYXVUIutFTacefXXS4xhYRTJAKf90444444444444444444444482444444445444444444444472544444444444444444444481544444&amp;amp;chxt=x,y&amp;amp;chxr=1,-2.35,0.19&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+08:00|Nov+9,+08:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+The numbers show a reasonable slave catchup speed (lower is better). For example, a &lt;strong&gt;-1&lt;/strong&gt; value indicates that the slave is replicating twice as fast as the master. So if we&#39;re 10 minutes behind, catch up will occur 10 minutes from now (the slave will cover for the missing 10 minutes plus the future 10 minutes by which the master will be writing). At times, replication went very fast (slope as low as &lt;strong&gt;-2.25&lt;/strong&gt; on average), and at times is was very slow (&lt;strong&gt;-0.25&lt;/strong&gt;).
+
+But all negative numbers are good! They mean slave is faster than master. Indeed, once the slave caught up, numbers climbed to &lt;strong&gt;0&lt;/strong&gt;: the slave has since been running at same speed as the master.
+&lt;h4&gt;Estimating slave catchup time&lt;/h4&gt;
+When we have a lagging slave, there&#39;s nothing more interesting to known than &#34;when will it finally catch up?&#34;. We can do the math: calculating slope, extrapolating the expected point in time where the lag drops to &lt;strong&gt;0&lt;/strong&gt;; or we can just ask!
+
+Let&#39;s first ask the hard way, then the human way:
+
+Querying the history of estimations:
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT ts, &lt;strong&gt;estimated_slave_catchup_seconds&lt;/strong&gt; FROM sv_report_hour;
++---------------------+---------------------------------+
+| ts                  | estimated_slave_catchup_seconds |
++---------------------+---------------------------------+
+| 2009-11-06 16:00:00 |                          142984 |
+| 2009-11-06 17:00:00 |                           47988 |
+| 2009-11-06 18:00:00 |                           31416 |
+| 2009-11-06 19:00:00 |                           22896 |
+| 2009-11-06 20:00:00 |                           20202 |
+| 2009-11-06 21:00:00 |                           13062 |
+| 2009-11-06 22:00:00 |                            7932 |
+| 2009-11-06 23:00:00 |                            5220 |
+| 2009-11-07 00:00:00 |                            2740 |
+| 2009-11-07 01:00:00 |                            NULL |
+| 2009-11-07 02:00:00 |                             463 |
+| 2009-11-07 03:00:00 |                            NULL |
+| 2009-11-07 04:00:00 |                            NULL |
+| 2009-11-07 05:00:00 |                            NULL |
+| 2009-11-07 06:00:00 |                            NULL |
+...
++---------------------+---------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;(NULL occurs when slave has caught up; so nothing to estimate)&lt;/p&gt;
+&lt;p&gt;Had we been checking up on human reports at the time of lag, we would see something like:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;report&lt;/strong&gt; FROM sv_report_human_hour ORDER BY ID DESC LIMIT 1\G
+*************************** 1. row ***************************
+report:
+Report period: 2009-11-06 16:00:00 to 2009-11-06 17:00:00. Period is 60 minutes (1.00 hours)
+Uptime: 100.0% (Up: 1 days, 05:34:00 hours)
+
+...
+...
+...
+
+Replication:
+    Master status file number: 541, position: 825383347
+    Relay log space limit: 10737418240, used: 4512632192  (42.0%)
+    Seconds behind master: 47185
+    &lt;strong&gt;Estimated time for slave to catch up: 142984 seconds (1 days, 15:43:05 hours)  ETA: 2009-11-08 07:43:05&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The human report suggested it would take more than a day and a half for replication to catch up; it also provided with ETA: &#39;&lt;strong&gt;&lt;/strong&gt;&lt;strong&gt;2009-11-08 07:43:05&lt;/strong&gt;&#39;.&lt;/p&gt;
+&lt;p&gt;As an interesting note, to issue the above report I &lt;em&gt;went back in time&lt;/em&gt; and issued:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT report FROM sv_report_human_hour &lt;strong&gt;WHERE ts=&#39;2009-11-06 16:00:00&#39;&lt;/strong&gt;\G&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;It&#39;s possible to retroactively generate report, for as long as data still exists.&lt;/p&gt;
+&lt;h4&gt;Checking up on relay log space&lt;/h4&gt;
+&lt;p&gt;Slaves are limited in relay log space. They can only accumulate as much relay logs.&lt;/p&gt;
+&lt;p&gt;Usually the slave SQL thread is slower than the IO thread, which means when the slave lags behind, it writes more and more relay logs, while having hard time reading them. Once it runs out of relay log space, it stops asking the master for more binary logs, and waits for relay log space to free.&lt;/p&gt;
+&lt;p&gt;How much relay log space should a slave have?&lt;/p&gt;
+&lt;p&gt;Well, if you&#39;re not worries about disk space, let it have as much as it would like to; but let&#39;s look at the implications of relay log space limit. Again, by either looking at the HTML report or by directly issuing:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT relay_log_used_mb FROM sv_report_chart_hour\G
+*************************** 1. row ***************************
+relay_log_used_mb: http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+09:00+(4+days,+23+hours)&amp;amp;chdl=relay_log_space_limit_mb|relay_log_space_mb&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4&amp;amp;chd=s:999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999,9999999999989570xytsuxursojfhcabWRSOJEGBCBCDEGBCEBDEFGBEGBDFBCEFGBCDEGBDFBDFCFACEGBCDEGBCBBDEFACEFBCEGBCDEFABCEBEDFACDEF&amp;amp;chxt=x,y&amp;amp;chxr=1,0,10240.10309792&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+09:00|Nov+9,+09:00|&amp;amp;chxs=0,505050,10&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We get:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;relay_log_used_mb&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+09:00+(4+days,+23+hours)&amp;amp;chdl=relay_log_space_limit_mb|relay_log_space_mb&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4&amp;amp;chd=s:999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999,9999999999989570xytsuxursojfhcabWRSOJEGBCBCDEGBCEBDEFGBEGBDFBCEFGBCDEGBDFBDFCFACEGBCDEGBCBBDEFACEFBCEGBCDEFABCEBEDFACDEF&amp;amp;chxt=x,y&amp;amp;chxr=1,0,10240.10309792&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+09:00|Nov+9,+09:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I see that 2 days lag (comparing with the above charts) will cause the relay log space to fill up. I would consider this to be OK, since I don&#39;t normally expect such lags. I can see that a one-day lag is well within relay log space. I conclude that the &lt;strong&gt;relay_log_space_limit&lt;/strong&gt; server variable is properly configured in my case.&lt;/p&gt;
+&lt;div id=&#34;_mcePaste&#34; style=&#34;overflow: hidden; position: absolute; left: -10000px; top: 19px; width: 1px; height: 1px;&#34;&gt;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+10:00++-++Nov+10,+08:00+(4+days,+22+hours)&amp;amp;chdl=seconds_behind_master_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:fbdebXU0wvOgaYXVUIutFTacefXXS4xhYRTJAKf90444444444444444444444482444444445444444444444472544444444444444444444481544444&amp;amp;chxt=x,y&amp;amp;chxr=1,-2.35,0.19&amp;amp;chxl=0:||Nov+6,+09:00|Nov+7,+09:00|Nov+8,+08:00|Nov+9,+08:00|&amp;amp;chxs=0,505050,10&lt;/div&gt;</description>
+    </item>
+    
+    <item>
+      <title>Announcing mycheckpoint: lightweight, SQL oriented monitoring for MySQL</title>
+      <link>/blog/mysql/announcing-mycheckpoint-lightweight-sql-oriented-monitoring-for-mysql/</link>
+      <pubDate>Tue, 10 Nov 2009 15:16:59 +0000</pubDate>
+      
+      <guid>/blog/mysql/announcing-mycheckpoint-lightweight-sql-oriented-monitoring-for-mysql/</guid>
+      <description>&lt;p&gt;I&#39;m proud to announce &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a monitoring utility for MySQL, with strong emphasis on user accessibility to monitored data.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is a different kind of monitoring tool. It leaves the power in the user&#39;s hand. It&#39;s power is not with script-based calculations of recorded data. It&#39;s with the creation of a view hierarchy, which allows the user to access computed metrics directly.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is needed first, to deploy a monitoring schema. It &lt;em&gt;may&lt;/em&gt; be needed next, so as to INSERT recorded data (GLOBAL STATUS, GLOBAL VARIABLES, MASTER STATUS, SLAVE STATUS) -- but this is just a simple INSERT; anyone can do that, even another monitoring tool.&lt;/p&gt;
+&lt;p&gt;It is then that you do not need it anymore: everything is laid at your fingertips. Consider:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;SELECT&lt;/strong&gt; innodb_read_hit_percent, DML &lt;strong&gt;FROM&lt;/strong&gt; sv_report_chart_hour;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;&lt;img class=&#34;alignnone&#34; title=&#34;Google chart #1&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+13:10++-++Nov+6,+10:25+(0+days,+21+hours)&amp;amp;chdl=innodb_read_hit_percent&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:xz3m3P34z3svvz33xzsvxvvsz11xz344443x443133x414131444344144444o1K44444444664446664636444444z64x3666466666641q6666666666666666666666366668888616686866zMGq66666vhqW46666zqPx44466zljz444434343444444433434334434K434441413344444414444343434443434666666664464636&amp;amp;chxt=x,y&amp;amp;chxr=1,99.66,100.00&amp;amp;chxl=0:||Nov+5,+17:25|Nov+5,+21:40|Nov+6,+01:55|Nov+6,+06:10|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;Google Chat #2&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Oct+26,+19:00++-++Nov+6,+10:00+(10+days,+15+hours)&amp;amp;chdl=com_select_psec|com_insert_psec|com_delete_psec|com_update_psec|com_replace_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;amp;chd=s:11455ljjkkjnlmnoo268wyy123445njjjkjkllnoorsuvyvxv4533mikkljklmnoqrstuxy001223mojjkjkkllnnpqrrttuvyxyxkghghhhiihijjklmnnoprrssfdeefefgihjjmnoqstwwzx00khiijijilkmopprsuuxx0012khiijhihkjmmnprtwt0z2242mjjkljlknnnnpqrrwwzy1034jijhjijjkkmoqqsswvyx0z11khihjijjkkk,WXYWW4UUWSSRTUWWWjoncZYXZYZXXzUSSSTUVWYWWYbgbYXWWWWWW7aWTTTSTWXXWVVVWWWYXZZXXznTTVTUUVYWVYWUVWVVWVXWU3WWUVVSSSTSTSSTWTUUVUTUUVSUTTTUUVUVVVVVVWXWVXXVVUSVXUSSTTVWVVWVWZXYYbZXXaVVVVUTUUWXVVYZabXaYXXWWaTXZXUTVVVVVVVYZYYYWWWWVaTSRRSSSTVXZaaYWYYbXXWYXbTTUXXUUVVV,JKLKKtJIHHGILJJJJJKJKJKKKKLKKpIHGJGIIJJKJKJJJJJJKKLKKwNIJHGHJJJJLJLJJIKKKKKKKlbIIHHJIKJJKJKKKKKKLLKKMtKHGGHGGLIKMJJMJJJIJJJIIKJHHHIGIJJJJIIJJJIJJKJIJKIIGKHHKLJJKJJJIJJJIJIJKMJJHIHHMMKJJIJIIIHIIIIIIOJIIHIHIJJJJIJIIKIJLKJLKQIHGHGHIKKKKKJJJLKKKKKOKRJJHHHIIKKK,HIIHHJHHHHHHHHIHHHIIIIIIIIIIHJHHHHHHIHIIHHIIIIHHHHIHHIHHHHHGHIIIHHHHHHIIIIIHHJHHHHHHHHHHHHIHHHIHHHHHHIHHHHHHHHHHGGHHHHGGGGHGGIGGGGGHHHHHGHHHHHHHHHHHHIHHHHHHHHHHHHHHHHHHIHHHHJHHHHHHHHHHHHHHHHHHHIIHHJHHHHHHHHIHHHHHHHIIHHHHHIHHHHHHHHHHHIIIHHIIIIIIHIHHHHHHHHHH,&amp;amp;chxt=x,y&amp;amp;chxr=1,0,142.31&amp;amp;chxl=0:||Oct+28,+22:00|Oct+31,+01:00|Nov+2,+04:00|Nov+4,+07:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; provides the views which take raw data (just &lt;strong&gt;innodb_buffer_pool_read_requests&lt;/strong&gt;, &lt;strong&gt;com_select&lt;/strong&gt;, &lt;strong&gt;innodb_buffer_pool_size&lt;/strong&gt;, &lt;strong&gt;table_open_cache&lt;/strong&gt;, &lt;strong&gt;seconds_behind_master&lt;/strong&gt; etc.) and generate Google Charts URLs, HTML reports, human readable reports, or otherwise easily accessible data.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;Data is provided in different time resolutions:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Per sampling&lt;/li&gt;
+&lt;li&gt;Per hour aggregated data&lt;/li&gt;
+&lt;li&gt;Per day aggregated data&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;It is thus easy to get a fine grained or a daily overview of your status. In fact, the &lt;em&gt;SQL-generated&lt;/em&gt; &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2009/11/report.html&#34;&gt;HTML report&lt;/a&gt; lays them all together.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-google-charts&#34;&gt;generating Google Charts&lt;/a&gt; and &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-html-reports&#34;&gt;HTML reports&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;It is more about data accessibility&lt;/h4&gt;
+&lt;p&gt;Charts are cool to look at, but they are not useful for detailed analysis. The user is free to ask anything of the supporting views:&lt;/p&gt;
+&lt;p&gt;I want to see the average number of SELECT queries per second in the last 5 hours:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, com_select_psec FROM sv_hour ORDER BY id DESC LIMIT 5;
++---------------------+-----------------+
+| ts                  | com_select_psec |
++---------------------+-----------------+
+| 2009-11-09 11:00:00 |          294.17 |
+| 2009-11-09 10:00:00 |          198.37 |
+| 2009-11-09 09:00:00 |          151.29 |
+| 2009-11-09 08:00:00 |           90.06 |
+| 2009-11-09 07:00:00 |           82.98 |
++---------------------+-----------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Hmm. Seems like too many SELECTs in the last hour.&lt;/p&gt;
+&lt;p&gt;Unrelated, is the InnoDB buffer pool being utilized well?&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, innodb_buffer_pool_used_percent, innodb_read_hit_percent
+       FROM sv_report_sample
+       ORDER BY id DESC LIMIT 5;
++---------------------+---------------------------------+-------------------------+
+| ts                  | innodb_buffer_pool_used_percent | innodb_read_hit_percent |
++---------------------+---------------------------------+-------------------------+
+| 2009-11-09 12:35:01 |                           100.0 |                   99.93 |
+| 2009-11-09 12:30:01 |                           100.0 |                   99.89 |
+| 2009-11-09 12:25:01 |                           100.0 |                   99.60 |
+| 2009-11-09 12:20:01 |                           100.0 |                   99.14 |
+| 2009-11-09 12:15:01 |                           100.0 |                   98.99 |
++---------------------+---------------------------------+-------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Apparently, &lt;strong&gt;innodb_buffer_pool_size&lt;/strong&gt; could use some more memory.&lt;/p&gt;
+&lt;p&gt;When did we have excessive amount of writes?&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, com_insert_psec
+       FROM sv_hour
+       WHERE com_insert_psec &amp;gt; (SELECT 2*AVG(com_insert_psec) FROM sv_hour);
++---------------------+-----------------+
+| ts                  | com_insert_psec |
++---------------------+-----------------+
+| 2009-10-27 00:00:00 |          133.66 |
+| 2009-10-28 00:00:00 |          121.79 |
+| 2009-10-29 00:00:00 |          138.88 |
+| 2009-10-30 00:00:00 |          120.79 |
+| 2009-10-31 00:00:00 |          131.78 |
++---------------------+-----------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Something is going on on those midnights!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/querying-for-data&#34;&gt;querying for data&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Human reports&lt;/h4&gt;
+&lt;p&gt;But while we&#39;re at it: it&#39;s nice to let the user the ability to ask around; but why not provide with some niceties? Special views aggregate monitored data to present human readable reports:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT report FROM sv_report_human_hour ORDER BY id DESC LIMIT 1,1 \G&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;Report period: 2009-11-08 14:00:00 to 2009-11-08 15:00:00. Period is 60 minutes (1.00 hours)
+Uptime: 100.0% (Up: 285 days, 07:17:28 hours)
+
+InnoDB:
+    innodb_buffer_pool_size: 4718592000 bytes (4500.0MB). Used: 100.0%
+    Read hit: 99.75%
+    Disk I/O: 83.00 reads/sec  20.33 flushes/sec
+    Estimated log written per hour: 797.0MB
+    Locks: 0.32/sec  current: 0
+
+MyISAM key cache:
+    key_buffer_size: 33554432 bytes (32.0MB). Used: 18.3%
+    Read hit: 99.7%  Write hit: 100.0%
+
+DML:
+    SELECT:  149.88/sec  34.1%
+    INSERT:  55.84/sec  12.7%
+    UPDATE:  17.55/sec  4.0%
+    DELETE:  20.68/sec  4.7%
+    REPLACE: 0.00/sec  0.0%
+    SET:     170.05/sec  38.7%
+    COMMIT:  0.02/sec  0.0%
+    slow:    2.28/sec  0.5% (slow time: 2sec)
+
+Selects:
+    Full scan: 8.37/sec  5.6%
+    Full join: 0.00/sec  0.0%
+    Range:     40.45/sec  27.0%
+    Sort merge passes: 0.00/sec
+
+Locks:
+    Table locks waited:  0.00/sec  0.0%
+
+Tables:
+    Table cache: 2048. Used: 26.5%
+    Opened tables: 0.00/sec
+
+Temp tables:
+    Max tmp table size:  67108864 bytes (64.0MB)
+    Max heap table size: 67108864 bytes (64.0MB)
+    Created:             7.15/sec
+    Created disk tables: 0.51/sec  7.1%
+
+Connections:
+    Max connections: 200. Max used: 245  122.5%
+    Connections: 3.31/sec
+    Aborted:     0.07/sec  2.1%
+
+Threads:
+    Thread cache: 32. Used: 50.0%
+    Created: 0.06/sec
+
+Replication:
+    Master status file number: 1494, position: 404951764
+    Relay log space limit: 10737418240, used: N/A  (N/A%)
+    Seconds behind master: N/A
+    Estimated time for slave to catch up: N/A seconds (N/A days, N/A hours)  ETA: N/A&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above is a &lt;em&gt;SQL-generated&lt;/em&gt; report. The view&#39;s CREATE statement is &lt;em&gt;ugly&lt;/em&gt;, trust me! But the user needs not be aware of this -- all is generated behind the scenes. Since it is SQL-generated, the report is not actually stored anywhere; and one can generate reports for as long as data exists. A three months old data can still be evaluated and used to produce a fresh report.&lt;/p&gt;
+&lt;p&gt;The above report resembles the ever-so-useful &lt;a href=&#34;http://hackmysql.com/mysqlreport&#34;&gt;mysqlreport&lt;/a&gt; by &lt;a href=&#34;http://hackmysql.com/&#34;&gt;&lt;strong&gt;Daniel Nichter&lt;/strong&gt;&lt;/a&gt;. I have drawn many ideas from this tool.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-human-reports&#34;&gt;generating human readable reports&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Tracking change of parameters&lt;/h4&gt;
+&lt;p&gt;Since &lt;em&gt;mycheckpoint&lt;/em&gt; records server variables, it&#39;s easy enough to detect a change in variable. Did you dynamically change a variable and forgot to update &lt;strong&gt;my.cnf&lt;/strong&gt;? Were you baffled when the server restarted and everything started behaving differently? Just ask away:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM sv_param_change;
++---------------------+-----------------+-----------+-----------+
+| ts                  | variable_name   | old_value | new_value |
++---------------------+-----------------+-----------+-----------+
+| 2009-11-04 13:00:01 | max_connections |       500 |       200 |
++---------------------+-----------------+-----------+-----------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Doh! That&#39;s how we got &lt;strong&gt;122.5%&lt;/strong&gt; max used connections!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/detecting-parameters-change&#34;&gt;detecting parameters change&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Additional notes&lt;/h4&gt;
+&lt;p&gt;Just recently, a somewhat similar project, &lt;a href=&#34;http://www.pythian.com/news/4703/sar-sql-the-script-formerly-known-as-mysar&#34;&gt;sar-sql&lt;/a&gt; was announced by &lt;a href=&#34;http://mmatemate.blogspot.com/&#34;&gt;&lt;strong&gt;Gerry Narvaja&lt;/strong&gt;&lt;/a&gt; (Ex-&lt;a href=&#34;http://www.pythian.com/&#34;&gt;Pythian&lt;/a&gt;). When sar-sql (formerly MySAR) was announced, my own code and ideas were at late stages. I&#39;ve pondered about this, and have decided to go on with a separate project. While both make use of the same ideas, the implementation is quite different.&lt;/p&gt;
+&lt;p&gt;With proper setup, &lt;em&gt;mycheckpoint&lt;/em&gt; can be used as an add-on to other monitoring tools. I currently have no plans for doing that, but time will tell.&lt;/p&gt;
+&lt;p&gt;I believe the ease of access to monitored data is a compelling reason to try out &lt;em&gt;mycheckpoint&lt;/em&gt;. Please visit the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint home page&lt;/a&gt;, read through the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;, and take some &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/download&#34;&gt;downloads&lt;/a&gt; with you!&lt;/p&gt;
+&lt;p&gt;As always, community feedback is welcome. Feel free to throw in valueable feedback, &lt;a href=&#34;http://code.google.com/p/mycheckpoint/issues/list&#34;&gt;bug reports&lt;/a&gt; or even a couple of tomatoes!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;BSD license&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>How NOT to test that mysqld is alive</title>
+      <link>/blog/mysql/how-not-to-test-that-mysqld-is-alive/</link>
+      <pubDate>Thu, 01 Oct 2009 09:17:27 +0000</pubDate>
+      
+      <guid>/blog/mysql/how-not-to-test-that-mysqld-is-alive/</guid>
+      <description>&lt;p&gt;I had a call from a new customer last week. They had issues with their MySQL server. Apparently, it was repeatingly crashing, every few hours. To have their production system kept alive, they used a script to periodically see if MySQL was still alive, and if not - start it.&lt;/p&gt;
+&lt;p&gt;I was first thinking in directions of old installations; wrong memory allocations (too little memory for large content; to large memory allocation for weak machine). When I reached the customer&#39;s premises, I quickly reviewed general settings, while explaining some basic configuration guidelines. There were peculiarities (e.g. &lt;strong&gt;query_cache_limit&lt;/strong&gt; being larger than &lt;strong&gt;query_cache_size&lt;/strong&gt;), but nothing to obviously suggest a reason for crash.&lt;/p&gt;
+&lt;p&gt;I then observed the error log. Took some time to find it, since the &lt;strong&gt;log_error&lt;/strong&gt; parameter appeared twice in the &lt;strong&gt;my.cnf&lt;/strong&gt; file; first one appearing at the very beginning, the second (overwriting the first) was far into the file.&lt;/p&gt;
+&lt;p&gt;Sure enough, there were a lot of startup messages. And... shutdown messages. In fact, the log looked something like:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;090923 17:38:15  mysqld started
+090923 17:38:16  InnoDB: Started; log sequence number 0 3707779031
+090923 17:38:16 [Note] /usr/local/mysql/bin/mysqld: ready for connections.
+Version: &#39;5.0.77-log&#39;  socket: &#39;/tmp/mysql50.sock&#39;  port: 3306  MySQL Community Server (GPL)
+090923 19:53:41 [Note] /usr/local/mysql/bin/mysqld: Normal shutdown
+090923 19:53:56  mysqld started
+090923 19:53:56  InnoDB: Started; log sequence number 0 5288400927
+090923 19:53:56 [Note] /usr/local/mysql/bin/mysqld: ready for connections.
+Version: &#39;5.0.77-log&#39;  socket: &#39;/tmp/mysql50.sock&#39;  port: 3306  MySQL Community Server (GPL)
+090929 22:38:48 [Note] /usr/local/mysql/bin/mysqld: Normal shutdown
+090923 22:38:58  mysqld started
+090923 22:38:58  InnoDB: Started; log sequence number 0 7102832776
+090923 22:38:58 [Note] /usr/local/mysql/bin/mysqld: ready for connections.
+Version: &#39;5.0.77-log&#39;  socket: &#39;/tmp/mysql50.sock&#39;  port: 3306  MySQL Community Server (GPL)
+...&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;(The above is just a sample, not the original file).&lt;/p&gt;
+&lt;p&gt;Well, the log says there&#39;s a lot of &lt;em&gt;normal&lt;/em&gt; shutdowns.&lt;/p&gt;
+&lt;h4&gt;Looking at the script&lt;/h4&gt;
+&lt;p&gt;Next it was time to look at the script which was supposed to verify MySQL was up and running - else wise start it. And it went something like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;while&lt;/strong&gt; [ 1 ];
+  &lt;strong&gt;if&lt;/strong&gt; [`ps aux | grep mysqld | wc -l` &lt;strong&gt;-lt&lt;/strong&gt; 2]
+    &lt;strong&gt;then&lt;/strong&gt; /etc/init.d/mysql restart
+  ...
+  sleep 60&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The script was looking for all processes, then &lt;strong&gt;grep&lt;/strong&gt;ping for &lt;strong&gt;mysqld&lt;/strong&gt;, counting number of lines in output. It expected 2 lines: one for the &lt;strong&gt;mysqld&lt;/strong&gt; process, one for the &lt;strong&gt;grep mysqld&lt;/strong&gt; process itself.&lt;/p&gt;
+&lt;p&gt;If you don&#39;t know what&#39;s wrong with this, a very brief explanation about how pipelines work in unix work it at place:&lt;/p&gt;
+&lt;p&gt;Pipelined processes do not execute one after another, or one before another. They are all executed &lt;em&gt;at once&lt;/em&gt;. So, &#34;&lt;strong&gt;ps aux | grep mysqld | wc -l&#34;&lt;/strong&gt; immediately spawns &lt;strong&gt;ps&lt;/strong&gt;, &lt;strong&gt;grep&lt;/strong&gt;, &lt;strong&gt;wc&lt;/strong&gt;, then sets the standard output of one to the standard input of the other (most simplified description I could think of).&lt;/p&gt;
+&lt;p&gt;It is likely that &lt;strong&gt;grep&lt;/strong&gt; will outrun &lt;strong&gt;ps&lt;/strong&gt; in the race for starting up. So &lt;strong&gt;grep&lt;/strong&gt; is started, already waiting for input from &lt;strong&gt;ps&lt;/strong&gt;, which then notices both &lt;strong&gt;mysqld&lt;/strong&gt; is alive, but also &lt;strong&gt;grep mysqld&lt;/strong&gt;, lists them both along with other processes, to be filtered by &lt;strong&gt;grep&lt;/strong&gt;, to be counted by &lt;strong&gt;wc &lt;/strong&gt;(returning two lines count).&lt;/p&gt;
+&lt;p&gt;But this is just because &lt;strong&gt;ps&lt;/strong&gt; is heavier than &lt;strong&gt;grep&lt;/strong&gt;. It doesn&#39;t &lt;em&gt;have&lt;/em&gt; to be like that.&lt;/p&gt;
+&lt;h4&gt;The less common scenario&lt;/h4&gt;
+&lt;p&gt;Every once and again, &lt;strong&gt;ps&lt;/strong&gt; outruns &lt;strong&gt;grep&lt;/strong&gt; in the race for starting up. It would list the active processes, and no &#34;grep&#34; would appear in the listing. &lt;strong&gt;grep&lt;/strong&gt; would then run, filtering the result of &lt;strong&gt;ps&lt;/strong&gt;, then to be counted by &lt;strong&gt;wc&lt;/strong&gt; -- oh, there is only one line now! The script assumes this means mysqld is down (since it assumed &lt;strong&gt;grep&lt;/strong&gt; is always there), and &lt;em&gt;restarts mysqld&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;So, the script which was supposed to take care of MySQL crashes, was actually causing them (though no crash occurred).&lt;/p&gt;
+&lt;h4&gt;Better ways to test that MySQL is alive&lt;/h4&gt;
+&lt;p&gt;Look for the &lt;em&gt;pid&lt;/em&gt; file. This is the standard (that&#39;s how the mysql service works). Look for the unix socket file. Both require that you parse the my.cnf file to learn where these files are.&lt;/p&gt;
+&lt;p&gt;If you&#39;re reluctant to read the configuration files, other options are at hand. OK, look for the process; but use &lt;strong&gt;pgrep mysqld&lt;/strong&gt;. No need to list all processes, then &lt;strong&gt;grep&lt;/strong&gt; them.&lt;/p&gt;
+&lt;p&gt;And best way, that will set your mind at ease even if you&#39;re worried that &#34;mysql is running but not responding; it is stuck&#34;: connect to MySQL and issue &lt;strong&gt;SELECT 1&lt;/strong&gt;, &lt;strong&gt;SELECT NOW()&lt;/strong&gt;, &lt;strong&gt;SELECT &lt;em&gt;something&lt;/em&gt;&lt;/strong&gt;. This would be the ultimate test that MySQL is up, listening, responding and valid.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

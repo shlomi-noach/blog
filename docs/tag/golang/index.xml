@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Golang on code.openark.org</title>
+    <link>/blog/tag/golang/</link>
+    <description>Recent content in Golang on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Mon, 23 Nov 2015 14:22:34 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/golang/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Forking Golang repositories on GitHub and managing the import path</title>
+      <link>/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path/</link>
+      <pubDate>Mon, 23 Nov 2015 14:22:34 +0000</pubDate>
+      
+      <guid>/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path/</guid>
+      <description>&lt;p&gt;Problem: there&#39;s an awesome Golang project on GitHub which you want to fork. You want to develop &amp;amp; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything.&lt;/p&gt;
+&lt;p&gt;A couple solutions offered below. First, though, let&#39;s get some names.&lt;/p&gt;
+&lt;h3&gt;A sample case, the problem at hand&lt;/h3&gt;
+&lt;p&gt;There&#39;s an awesome tool on &lt;strong&gt;&lt;em&gt;http://github.com/awsome-org/tool&lt;/em&gt;&lt;/strong&gt;. You successfully fork it onto &lt;strong&gt;&lt;em&gt;http://github.com/awesome-you/tool&lt;/em&gt;&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;You want to collaborate on &lt;strong&gt;&lt;em&gt;http://github.com/awesome-you/tool&lt;/em&gt;&lt;/strong&gt;; you wish to pull, commit &amp;amp; push. Maybe you want to send pull requests to the origin.&lt;/p&gt;
+&lt;p&gt;The following is commonly found throughout &lt;strong&gt;.go&lt;/strong&gt; files in the repository:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;import (
+    &#34;github.com/awesome-org/tool/config&#34;
+    &#34;github.com/awesome-org/tool/driver&#34;
+    &#34;github.com/awesome-org/tool/net&#34;
+    &#34;github.com/awesome-org/tool/util&#34;
+)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;If you:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;go get http://github.com/awesome-you/tool&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;golang&lt;/em&gt; creates your &lt;strong&gt;$GOPATH/src/github.com/awesome-you/tool/&lt;/strong&gt;, which is awesome. However, as you resolve dependencies via&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;cd $GOPATH/src/github.com/awesome-you/tool/ ; go get ./...&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;golang&lt;/em&gt; digs into the source code, finds references to &lt;strong&gt;github.com/awesome-org/tool/config&lt;/strong&gt;, &lt;strong&gt;github.com/awesome-org/tool/driver&lt;/strong&gt; etc, and fetches &lt;em&gt;those&lt;/em&gt; from &lt;strong&gt;http://github.com/awsome-org/tool&lt;/strong&gt; and onto &lt;strong&gt;$GOPATH/src/github.com/awesome-org/tool/&lt;/strong&gt;, which is not awesome. You actually have two copies of the code, one from your fork, one from the origin, and your own fork will be largely ignored as it mostly points back to the origin.&lt;/p&gt;
+&lt;h3&gt;A bad solution&lt;/h3&gt;
+&lt;p&gt;The dirty, bad solution would be for you to go over the source code and replace &lt;strong&gt;&#34;github.com/awesome-org/tool&#34;&lt;/strong&gt; entries with &lt;strong&gt;&#34;github.com/awesome-you/tool&#34;&lt;/strong&gt;. It is bad for two reasons:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You will not be able to further pull changes from upstream&lt;/li&gt;
+&lt;li&gt;You will not be able to pull-request and push your own changes upstream&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;When I say &#34;You will not be able&#34; I mean &#34;in a reasonable, developer-friendly manner&#34;. The code will be incompatible with upstream and you have effectively detached your code. You will need to keep editing and re-editing those entries anytime you wish to pull/push upstream.&lt;/p&gt;
+&lt;h3&gt;Solution #1: add remote&lt;/h3&gt;
+&lt;p&gt;Described in &lt;a href=&#34;http://blog.campoy.cat/2014/03/github-and-go-forking-pull-requests-and.html&#34;&gt;GitHub and Go: forking, pull requests, and go-getting&lt;/a&gt;, follow these procedures:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;go get http://github.com/awesome-org/tool
+git remote add &lt;strong&gt;awesome-you-fork&lt;/strong&gt; http://github.com/awesome-you/tool&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;You&#39;re adding your repository as &lt;a href=&#34;http://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes&#34;&gt;remote&lt;/a&gt;. You will from now on need to explicitly:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;git pull --rebase &lt;strong&gt;awesome-you-fork&lt;/strong&gt;
+git push &lt;strong&gt;awesome-you-fork&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;If you forget to add the &lt;strong&gt;&#34;awesome-you-fork&#34;&lt;/strong&gt; argument, you are pulling and pushing from upstream.&lt;/p&gt;
+&lt;h3&gt;Solution #2: cheat &#34;go get&#34;, DIY&lt;/h3&gt;
+&lt;p&gt;The problem began with the &lt;strong&gt;go get&lt;/strong&gt; command, which copied the URI path onto &lt;strong&gt;$GOPATH/src&lt;/strong&gt;. However &lt;strong&gt;go get&lt;/strong&gt; implicitly issues a git clone, and we can do the same ourselves. We will dirty our hands just once, and then benefit from an ambiguous-less environment.&lt;/p&gt;
+&lt;p&gt;We will now create our git repository in the name of &lt;strong&gt;awesome-org&lt;/strong&gt; but with the contents of &lt;strong&gt;awesome-you&lt;/strong&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;cd $GOPATH
+mkdir -p {src,bin,pkg}
+mkdir -p &lt;strong&gt;src/github.com/awesome-org/&lt;/strong&gt;
+cd src/github.com/awesome-org/
+git clone git@github.com:&lt;strong&gt;awesome-you/tool.git&lt;/strong&gt; # OR: git clone https://github.com/&lt;strong&gt;awesome-you/tool.git&lt;/strong&gt;
+cd tool/
+go get ./...&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;strong&gt;mkdir -p {src,bin,pkg}&lt;/strong&gt; is there just in case you do not have anything setup in your &lt;strong&gt;$GOPATH&lt;/strong&gt;. We then create the repository path under the name of &lt;strong&gt;awesome-org&lt;/strong&gt;, but once inside clone from &lt;strong&gt;awesome-you&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;The source code&#39;s import path fits your directory layout now, but as you push/pull you are only speaking to your own &lt;strong&gt;awesome-you&lt;/strong&gt; repository.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

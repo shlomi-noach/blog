@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Charts on code.openark.org</title>
+    <link>/blog/tag/charts/</link>
+    <description>Recent content in Charts on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Wed, 17 Jul 2013 20:57:06 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/charts/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>common_schema 2.1 released: advanced &amp; improved split(), persistent script tables, more schema analysis, and (ahem) charts!</title>
+      <link>/blog/mysql/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts/</link>
+      <pubDate>Wed, 17 Jul 2013 20:57:06 +0000</pubDate>
+      
+      <guid>/blog/mysql/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;&lt;strong&gt;common_schema 2.1&lt;/strong&gt;&lt;/a&gt; is released! &lt;em&gt;common_schema&lt;/em&gt; is your free &amp;amp; open source companion schema within your MySQL server, providing with a function library, scripting capabilities, powerful routines and ready-to-apply information and recommendations.&lt;/p&gt;
+&lt;p&gt;New and noteworthy in version &lt;strong&gt;2.1&lt;/strong&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Better &lt;em&gt;QueryScript&#39;&lt;/em&gt;s &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split()&lt;/strong&gt;&lt;/a&gt; functionality&lt;/li&gt;
+&lt;li&gt;Persistent tables for QueryScript: no long held temporary tables&lt;/li&gt;
+&lt;li&gt;Index creation analysis, further range partition analysis&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/grant_access.html&#34;&gt;&lt;strong&gt;grant_access()&lt;/strong&gt;&lt;/a&gt;: allow everyone to use &lt;em&gt;common_schema&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;Ascii charts, google charts&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;debugged_routines&lt;/strong&gt;: show routines with debug code&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Other minor enhancements and bugfixes not listed.&lt;/p&gt;
+&lt;p&gt;Here&#39;s a breakdown of the above:&lt;/p&gt;
+&lt;h4&gt;split() enhancements&lt;/h4&gt;
+&lt;p&gt;&lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;split&lt;/a&gt;&lt;/strong&gt; is one of those parts of &lt;em&gt;common_schema&lt;/em&gt; that (should) appeal to every DBA. Break a huge transaction automagically into smaller chunks, and don&#39;t worry about how it&#39;s done. If you like, throttle execution, or print progress, or...&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; enhancements include:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;A much better auto-detection-and-selection of the chunking index. &lt;em&gt;split&lt;/em&gt; now consults all columns covered by the index, and uses realistic heuristics to decide which &lt;strong&gt;UNIQUE KEY&lt;/strong&gt; on your table is best for the chunking process. A couple bugs are solved on the way; &lt;em&gt;split&lt;/em&gt; is much smarter now.&lt;/li&gt;
+&lt;li&gt;Better support for multi-column chunking keys. You may now utilize the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters&#34;&gt;&lt;strong&gt;start&lt;/strong&gt;/&lt;strong&gt;stop&lt;/strong&gt; parameters&lt;/a&gt; even on multi column keys, passing a comma delimited of values for the &lt;em&gt;split&lt;/em&gt; operation to start/end with, respectively. Also fixed issue for nonexistent &lt;strong&gt;start/stop&lt;/strong&gt; values, which are now valid: &lt;em&gt;split&lt;/em&gt; will just keep to the given range.&lt;/li&gt;
+&lt;li&gt;split no longer requires a temporary table open through the duration of its operation. See next section.&lt;!--more--&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Persistent script tables&lt;/h4&gt;
+&lt;p&gt;QueryScript used to use several temporary tables for its operation. Thus, a script could hold open two or three temporary tables for the entire execution duration. For long &lt;em&gt;split&lt;/em&gt; operations, for example, this could mean hours and days.&lt;/p&gt;
+&lt;p&gt;Temporary tables are nice and quick to respond (well, MyISAM tables are, until MySQL &lt;strong&gt;5.7&lt;/strong&gt; is out), but make for an inherent problem: stopped slaves must not shut down nor restart when replication has an open temporary table. Why? Well, because the slave forgets about the temporary tables. When it resumes operation, it will not recognize DML issued against those tables it has forgotten. That&#39;s why &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-prepare-shutdown.html&#34;&gt;oak-prepare-shutdown&lt;/a&gt; is so good for slaves.&lt;/p&gt;
+&lt;p&gt;When temporary tables are short-lived, this is typically not an issue. But if you are not allowed to restart your slave throughout a 24 hour operation, that&#39;s a limitation.&lt;/p&gt;
+&lt;p&gt;As of &lt;strong&gt;2.1&lt;/strong&gt;, QueryScript does not require long held temporary tables. In fact, typical scripts do not create &lt;em&gt;any&lt;/em&gt; temporary tables. A &lt;em&gt;split&lt;/em&gt; operation creates and immediately drops a series of temporary tables. These are dropped even before actual &lt;em&gt;split&lt;/em&gt; operation begins. All tables operated on are persistent &lt;strong&gt;InnoDB&lt;/strong&gt; tables.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Result&lt;/em&gt;: safer script replication. There&#39;s another nice side effect I may take advantage of in a later release: ability to monitor and control flow of concurrent scripts.&lt;/p&gt;
+&lt;h4&gt;Schema analysis&lt;/h4&gt;
+&lt;p&gt;Two noteworthy additions to schema analysis views:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table.html&#34;&gt;&lt;strong&gt;sql_alter_table&lt;/strong&gt;&lt;/a&gt; now includes the &lt;strong&gt;sql_drop_keys&lt;/strong&gt; &amp;amp; &lt;strong&gt;sql_add_keys&lt;/strong&gt; columns. For each table, you get the SQL statements to create and drop the existing indexes. I developed this when I hit &lt;a href=&#34;https://groups.google.com/d/msg/tokudb-user/hLlHwlp2AL0/nvNlUCzhxAwJ&#34;&gt;this problem&lt;/a&gt; with TokuDB.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_range_partitions.html&#34;&gt;&lt;strong&gt;sql_range_partitions&lt;/strong&gt;&lt;/a&gt; now includes the &lt;strong&gt;count_past_partitions&lt;/strong&gt; &amp;amp; &lt;strong&gt;count_future_partitions&lt;/strong&gt;; when your table is partitioned by some type of time range, these views tell you how many partitions are in the past, and how many are to be written to in the future. This turns useful when you want to rotate or otherwise set a retention policy for your range partitions.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;grant_access()&lt;/h4&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/grant_access.html&#34;&gt;&lt;strong&gt;grant_access()&lt;/strong&gt;&lt;/a&gt; routine &lt;strong&gt;GRANT&lt;/strong&gt;s all accounts on your server with &lt;strong&gt;SELECT&lt;/strong&gt; &amp;amp; &lt;strong&gt;EXECUTE&lt;/strong&gt; privileges on &lt;em&gt;common_schema&lt;/em&gt;. This is a quick complementary to the installation process (though you have to invoke it yourself; it&#39;s up to you).&lt;/p&gt;
+&lt;h4&gt;Ascii/google line charts&lt;/h4&gt;
+&lt;p&gt;Laugh all you want! And find how cool it is to get (poor man&#39;s) instant charting like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;line_chart&lt;/strong&gt;(&#39;select ts, com_insert_psec, com_update_psec from mycheckpoint.sv_hour limit 100&#39;, &#39;insert per second, update per second&#39;) ;
++---------+------------------------------------------------------------------------------------------------------+
+| y_scale | chart                                                                                                |
++---------+------------------------------------------------------------------------------------------------------+
+| 162     | -#-------------------------------------------------------------------------------------------------- |
+| 152     | ---------------------------------------------------------------------------------------------------- |
+| 143     | ---------------------------------------------------------------------------------------------------- |
+| 134     | ---------------------------------------------------------------------------------------------------- |
+| 124     | ---------------------------------------------------------------------------------------------------- |
+| 115     | ------------------------------------------------------------#--------------------------------------- |
+| 106     | ---------------------------------------------------------------------------------------------------- |
+| 96      | -*-------------------------------------------------------------------------------------------------- |
+| 87      | ---------------------------------#-------------------------#---------------------------------------- |
+| 77      | ---------------------------------------------------------------------------------#------------------ |
+| 68      | ---------------------------------------------------------------------------#------------------------ |
+| 59      | #-------------------------------#------------------------------------------------------------------- |
+| 49      | ---##------#-#-##-#-#--#--###----------------##---------------------------------#-----#---###------- |
+| 40      | --#------#--#-#--#-#-##-##----##--###########--######--------#############-*#-##--####-###---####### |
+| 31      | *-**--#-#-*-**-**------**--**#-****-**-*****-*******-#---#-*------------**---#--*------------------- |
+| 21      | ----*#*#*--*--*--******--**--**----*--*-----*-------**#*#**-************--#-****-******************* |
+| 12      | -----*-*-*--------------------------------------------*-*-----------------*------------------------- |
+|         | v::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::v |
+|         | 2010-10-06 20:00:00                                                              2010-10-10 23:00:00 |
+|         |     # insert per second                                                                              |
+|         |     * update per second                                                                              |
++---------+------------------------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;You can get the same in &lt;a href=&#34;https://developers.google.com/chart/image/&#34;&gt;Google Image Charts&lt;/a&gt; format. Yes, it&#39;s deprecated (and has been for a year -- it&#39;s still working)&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;google_line_chart&lt;/strong&gt;(&#39;select ts, com_insert_psec, com_update_psec from mycheckpoint.sv_hour limit 100&#39;, &#39;insert per second, update per second&#39;) \G
+
+google_chart_url: &lt;a href=&#34;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06%2020:00:00||||||||||||||||||||||||2010-10-07%2020:00:00|||||||||||||||||||||||||2010-10-08%2021:00:00|||||||||||||||||||||||||2010-10-09%2022:00:00|||||||||||||||||||||||||2010-10-10%2023:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert%20per%20second|update%20per%20second&amp;amp;chdlp=b&#34;&gt;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06%2020:00:00||||||||||||||||||||||||2010-10-07%2020:00:00|||||||||||||||||||||||||2010-10-08%2021:00:00|||||||||||||||||||||||||2010-10-09%2022:00:00|||||||||||||||||||||||||2010-10-10%2023:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert%20per%20second|update%20per%20second&amp;amp;chdlp=b&lt;/a&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above translates into the following image:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06 20:00:00||||||||||||||||||||||||2010-10-07 20:00:00|||||||||||||||||||||||||2010-10-08 21:00:00|||||||||||||||||||||||||2010-10-09 22:00:00|||||||||||||||||||||||||2010-10-10 23:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert per second|update per second&amp;amp;chdlp=b&#34;&gt;&lt;img class=&#34;aligncenter&#34; alt=&#34;&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06 20:00:00||||||||||||||||||||||||2010-10-07 20:00:00|||||||||||||||||||||||||2010-10-08 21:00:00|||||||||||||||||||||||||2010-10-09 22:00:00|||||||||||||||||||||||||2010-10-10 23:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert per second|update per second&amp;amp;chdlp=b&#34; width=&#34;800&#34; height=&#34;350&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;Throw you own query in. Make &lt;strong&gt;1st&lt;/strong&gt; column your ordering column, &lt;strong&gt;2nd&lt;/strong&gt; [, &lt;strong&gt;3rd&lt;/strong&gt;...] value columns. Provide your own legend. Watch it instantly. And laugh all you want.&lt;/p&gt;
+&lt;p&gt;Read more about &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/charting_routines.html&#34;&gt;common_schema&#39;s charting routines&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;debugged_routines&lt;/h4&gt;
+&lt;p&gt;The new &lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/debugged_routines.html&#34;&gt;debugged_routines&lt;/a&gt;&lt;/strong&gt; view shows you which routines are currently &#34;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug_compile_routine.html&#34;&gt;compiled with debug mode&lt;/a&gt;&#34;.&lt;/p&gt;
+&lt;p&gt;I will write more on the state of &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html&#34;&gt;&lt;strong&gt;rdebug&lt;/strong&gt;&lt;/a&gt; in a future post.&lt;/p&gt;
+&lt;h4&gt;Try it, get it&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;2.1&lt;/strong&gt; comes with over &lt;strong&gt;500&lt;/strong&gt; tests and fast growing.&lt;/li&gt;
+&lt;li&gt;It supports MySQL &lt;strong&gt;5.1&lt;/strong&gt;, &lt;strong&gt;5.5&lt;/strong&gt;, &lt;strong&gt;5.6&lt;/strong&gt;, Percona Server and MariaDB.&lt;/li&gt;
+&lt;li&gt;It has superb documentation (may I say so?) with a lot of examples &amp;amp; drill down into edge cases.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You are &lt;strong&gt;&lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;free to download&lt;/a&gt;&lt;/strong&gt; and use it.&lt;/p&gt;
+&lt;p&gt;Your feedback is welcome! Indeed, many of this version&#39;s improvements originated with community feedback.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

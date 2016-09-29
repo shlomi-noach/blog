@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Performance_schema on code.openark.org</title>
+    <link>/blog/tag/performance_schema/</link>
+    <description>Recent content in Performance_schema on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Fri, 07 Aug 2015 14:39:59 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/performance_schema/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+      <link>/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/</link>
+      <pubDate>Fri, 07 Aug 2015 14:39:59 +0000</pubDate>
+      
+      <guid>/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/</guid>
+      <description>&lt;p&gt;MySQL &lt;strong&gt;5.7&lt;/strong&gt; introduces a change in the way we query for global variables and status variables: the &lt;strong&gt;INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)&lt;/strong&gt; tables are now deprecated and empty. Instead, we are to use the respective &lt;strong&gt;performance_schema.(global|session)_(variables|status)&lt;/strong&gt; tables.&lt;/p&gt;
+&lt;p&gt;But the change goes farther than that; there is also a security change. Oracle created a pitfall of &lt;strong&gt;2&lt;/strong&gt; changes at the same time:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Variables/status moved to a different table&lt;/li&gt;
+&lt;li&gt;Privileges required on said table&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;As an example, my non-root user gets:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; show session variables like &#39;tx_isolation&#39;;
+ERROR 1142 (42000): SELECT command denied to user &#39;normal_user&#39;@&#39;my_host&#39; for table &#39;session_variables&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Who gets affected by this? Nearly &lt;em&gt;everyone and everything&lt;/em&gt;.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Your Nagios will not be able to read status variables&lt;/li&gt;
+&lt;li&gt;Your ORM will not be able to determine session variables&lt;/li&gt;
+&lt;li&gt;Your replication user will fail connecting (see &lt;a href=&#34;http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html&#34;&gt;this post by Giuseppe&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;And most everyone else.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Change your app code to choose the correct schema (information_schema vs. performance_schema)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;GRANT&lt;/strong&gt; the permissions on your database&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Perhaps at this point you still do not consider this to be a problem. You may be thinking: &lt;em&gt;well, let&#39;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Not so fast. Can you really that simply create those GRANTs?&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;Migration woes&lt;/h3&gt;
+&lt;p&gt;How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.&lt;/p&gt;
+&lt;p&gt;This should not be any different for &lt;strong&gt;5.7&lt;/strong&gt;. We would like to provision a &lt;strong&gt;5.7&lt;/strong&gt; slave in our topologies and just see that everything works. Well, we have, and things don&#39;t just work. Our Nagios stops working for that &lt;strong&gt;5.7&lt;/strong&gt; slave. &lt;em&gt;Orchestrator&lt;/em&gt; started complaining (by this time I&#39;ve &lt;a href=&#34;https://github.com/outbrain/orchestrator/releases/tag/v1.4.291&#34;&gt;already fixed it&lt;/a&gt; to be more tolerant for the &lt;strong&gt;5.7&lt;/strong&gt; problems so no crashes here).&lt;/p&gt;
+&lt;p&gt;I hope you see the problem by now.&lt;/p&gt;
+&lt;blockquote&gt;You cannot issue a &lt;strong&gt;GRANT SELECT ON performance_schema.global_variables TO &#39;...&#39;&lt;/strong&gt; on your &lt;strong&gt;5.6&lt;/strong&gt; master.&lt;/blockquote&gt;
+&lt;p&gt;The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your &lt;strong&gt;5.7&lt;/strong&gt; slave, which means you will not be able to &lt;strong&gt;SHOW GLOBAL VARIABLES&lt;/strong&gt; on your slave, which means everything remains broken.&lt;/p&gt;
+&lt;p&gt;Yes, you can issue this directly on your &lt;strong&gt;5.7&lt;/strong&gt; slaves. It&#39;s &lt;em&gt;doable&lt;/em&gt;, but &lt;em&gt;undesired&lt;/em&gt;. It&#39;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#39;s unfriendly to GTID (make sure to &lt;strong&gt;SET SQL_LOG_BIN=0&lt;/strong&gt; before that).&lt;/p&gt;
+&lt;h3&gt;WHY in the first place?&lt;/h3&gt;
+&lt;p&gt;It seems like a security thing. I&#39;m not sure whether this was intended. So you prevent a &lt;strong&gt;SHOW GLOBAL VARIABLES&lt;/strong&gt; for a normal user. Makes sense. And yet:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; show global variables like &#39;hostname&#39;;
+ERROR 1142 (42000): SELECT command denied to user &#39;normal_user&#39;@&#39;my_host&#39; for table &#39;global_variables&#39;
+
+mysql&amp;gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&amp;gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Seems like I&#39;m allowed access to that info after all. So it&#39;s not strictly a security design decision. For status variable, I admit, I don&#39;t have a similar workaround.&lt;/p&gt;
+&lt;h3&gt;Solutions?&lt;/h3&gt;
+&lt;p&gt;The following are meant to be solutions, but do not really solve the problem:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;SHOW&lt;/strong&gt; commands. &lt;strong&gt;SHOW GLOBAL|SESSION VARIABLES|STATUS&lt;/strong&gt; will work properly, and will implicitly know whether to provide the results via &lt;strong&gt;information_schema&lt;/strong&gt; or &lt;strong&gt;performance_schema&lt;/strong&gt; tables.
+&lt;ul&gt;
+&lt;li&gt;But, aren&#39;t we meant to be happier with &lt;strong&gt;SELECT&lt;/strong&gt; queries? So that I can really do stuff that is smarter than &lt;strong&gt;LIKE &#39;variable_name%&#39;&lt;/strong&gt;?&lt;/li&gt;
+&lt;li&gt;And of course you cannot use &lt;strong&gt;SHOW&lt;/strong&gt; in server side cursors. Your stored routines are in a mess now.&lt;/li&gt;
+&lt;li&gt;This does not solve the GRANTs problem.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;a href=&#34;http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56&#34;&gt;show_compatibility_56&lt;/a&gt;&lt;/strong&gt;: an introduced variable in &lt;strong&gt;5.7&lt;/strong&gt;, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+&lt;ul&gt;
+&lt;li&gt;Documentation introduces it, and says it is deprecated.
+&lt;ul&gt;
+&lt;li&gt;time-travel-paradox :O&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;But it actually works in &lt;strong&gt;5.7.8&lt;/strong&gt; (latest)
+&lt;ul&gt;
+&lt;li&gt;time-travel-paradox plot thickens&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Your automation scripts do not know in advance whether your MySQL has this variable
+&lt;ul&gt;
+&lt;li&gt;Hence &lt;strong&gt;SELECT @@global.show_compatibility_56&lt;/strong&gt; will produce an error on &lt;strong&gt;5.6&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;But the &#34;safe&#34; way of &lt;strong&gt;SHOW GLOBAL VARIABLES LIKE &#39;show_compatibility_56&#39;&lt;/strong&gt; will fail on a privilege error on &lt;strong&gt;5.7&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;time-travel-paradox :O&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Actually advised by my colleague Simon J. Mudd, &lt;strong&gt;show_compatibility_56&lt;/strong&gt; defaults to &lt;strong&gt;OFF&lt;/strong&gt;. I &lt;em&gt;support&lt;/em&gt; this line of thought. Or else it&#39;s &lt;strong&gt;old_passwords=1&lt;/strong&gt; all over again.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;show_compatibility_56&lt;/strong&gt; doesn&#39;t solve the GRANTs problem.&lt;/li&gt;
+&lt;li&gt;This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from &lt;strong&gt;&#34;1&#34;&lt;/strong&gt; to &lt;strong&gt;&#34;0&#34;&lt;/strong&gt;, I&#39;m back at square one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Suggestion&lt;/h3&gt;
+&lt;p&gt;I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in &lt;strong&gt;5.6&lt;/strong&gt; if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Flow 1&lt;/strong&gt;: keep &lt;strong&gt;information_schema&lt;/strong&gt;, later migration into &lt;strong&gt;performance_schema&lt;/strong&gt;
+&lt;ul&gt;
+&lt;li&gt;In &lt;strong&gt;5.7&lt;/strong&gt;, &lt;strong&gt;information_schema&lt;/strong&gt; tables should still produce the data.&lt;/li&gt;
+&lt;li&gt;No security constraints on &lt;strong&gt;information_schema&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Generate WARNINGs on reading from &lt;strong&gt;information_schema&lt;/strong&gt; (&#34;...this will be deprecated...&#34;)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;performance_schema &lt;/strong&gt;&lt;em&gt;also available&lt;/em&gt;. With security constraints, whatever.&lt;/li&gt;
+&lt;li&gt;In &lt;strong&gt;5.8&lt;/strong&gt; remove &lt;strong&gt;information_schema&lt;/strong&gt; tables; we are left with &lt;strong&gt;performance_schema&lt;/strong&gt; only.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Flow 2&lt;/strong&gt;: easy migration into &lt;strong&gt;performance_schema&lt;/strong&gt;:
+&lt;ul&gt;
+&lt;li&gt;In &lt;strong&gt;5.7&lt;/strong&gt;, &lt;strong&gt;performance_schema&lt;/strong&gt; tables should not require any special privileges. Any user can read from them.&lt;/li&gt;
+&lt;li&gt;Keep &lt;strong&gt;show_compatibility_56 &lt;/strong&gt;as it is.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;SHOW&lt;/strong&gt; commands choose between &lt;strong&gt;information_schema&lt;/strong&gt; or &lt;strong&gt;performance_schema&lt;/strong&gt; on their own -- just as things are done now.&lt;/li&gt;
+&lt;li&gt;In &lt;strong&gt;5.8&lt;/strong&gt;, &lt;strong&gt;performance_schema&lt;/strong&gt; tables will require &lt;strong&gt;SELECT&lt;/strong&gt; privileges.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;As always, I love the work done by the engineers; and I love how they listen to the community.&lt;/p&gt;
+&lt;p&gt;Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?&lt;/p&gt;
+&lt;h3&gt;[UPDATE 2015-08-19]&lt;/h3&gt;
+&lt;p&gt;Please &lt;a href=&#34;http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html&#34;&gt;see this followup&lt;/a&gt; by Morgan Tocker of Oracle.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

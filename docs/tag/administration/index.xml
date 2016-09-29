@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Administration on code.openark.org</title>
+    <link>/blog/tag/administration/</link>
+    <description>Recent content in Administration on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Wed, 08 Feb 2012 11:53:30 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/administration/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>common_schema rev. 218: QueryScript, throttling, processes, documentation</title>
+      <link>/blog/mysql/common_schema-rev-218-queryscript-throttling-processes-documentation/</link>
+      <pubDate>Wed, 08 Feb 2012 11:53:30 +0000</pubDate>
+      
+      <guid>/blog/mysql/common_schema-rev-218-queryscript-throttling-processes-documentation/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt;, revision &lt;strong&gt;218&lt;/strong&gt; is released, with major new features, top one being &lt;em&gt;server side scripting&lt;/em&gt;. Here are the highlights:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.queryscript.com/&#34;&gt;&lt;strong&gt;QueryScript&lt;/strong&gt;&lt;/a&gt;: server side scripting is now supported by &lt;em&gt;common_schema&lt;/em&gt;, which acts as an interpreter for QueryScript code.&lt;/li&gt;
+&lt;li&gt;Throttling for queries is now made available via the &lt;strong&gt;throttle()&lt;/strong&gt; function.&lt;/li&gt;
+&lt;li&gt;Enhancements to processlist-related views, including the new &lt;strong&gt;slave_hosts&lt;/strong&gt; view.&lt;/li&gt;
+&lt;li&gt;Inline documentation/help is available via the &lt;strong&gt;help()&lt;/strong&gt; routine.&lt;/li&gt;
+&lt;li&gt;more...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;QueryScript&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; makes for a QueryScript implementation for MySQL. You can run server side scripts, interpreted by &lt;em&gt;common_schema&lt;/em&gt;, which allow for easy syntax and greater power than was otherwise previously available on the MySQL server. For example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;foreach($table, $schema, $engine: table like &#39;%&#39;)
+  if ($engine = &#39;ndbcluster&#39;)
+    ALTER ONLINE TABLE :$schema.:$table REORGANIZE PARTITION;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;QueryScript includes flow control, conditional branching, variables &amp;amp; variable expansion, script throttling and more.&lt;/p&gt;
+&lt;p&gt;Read more on &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;common_schema&#39;s QueryScript implementation&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;&lt;!--more--&gt;Query throttling&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.openark.org/blog/mysql/self-throttling-mysql-queries&#34;&gt;Throttling for MySQL queries&lt;/a&gt; was suggested by means of elaborate query manipulation. It is now reduced into a single throttle function: one can now just invoke &lt;strong&gt;throttle(3)&lt;/strong&gt; on one&#39;s query, so as to make the query execute for a &lt;em&gt;longer&lt;/em&gt; time, while taking short sleep breaks during operation, easing up the query&#39;s demand for resources.&lt;/p&gt;
+&lt;p&gt;Read more on &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/throttle.html&#34;&gt;query throttling&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Process views&lt;/h4&gt;
+&lt;p&gt;The &lt;strong&gt;processlist_grantees&lt;/strong&gt; view provides with more details on the running processes. &lt;strong&gt;slave_hosts&lt;/strong&gt; is a new view, listing hostnames of connected slaves.&lt;/p&gt;
+&lt;p&gt;Read more on &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/process_views.html&#34;&gt;process views&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;help()&lt;/h4&gt;
+&lt;p&gt;The &lt;em&gt;common_schema&lt;/em&gt; documentation is now composed of well over &lt;strong&gt;100&lt;/strong&gt; pages, including synopsis, detailed internals discussion, notes and examples. I can&#39;t exaggerate in saying that the documentation took the vast majority of time for this code to release.&lt;/p&gt;
+&lt;p&gt;The documentation is now made available inline, from within you mysql client, via the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/help.html&#34;&gt;&lt;strong&gt;help()&lt;/strong&gt;&lt;/a&gt; routine. Want to know more about redundant (duplicate) keys and how to find them? Just type:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;call help(&#39;redundant&#39;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;and see what comes out!&lt;/p&gt;
+&lt;p&gt;The entire &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html&#34;&gt;documentation&lt;/a&gt;, which is available online as well as a downloadable bundle, is embedded into &lt;em&gt;common_schema&lt;/em&gt; itself. It&#39;s rather cool.&lt;/p&gt;
+&lt;h4&gt;Tests&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is tested. The number of tests in &lt;em&gt;common_schema&lt;/em&gt; is rapidly growing, and new tests are introduced for new features as well as for older ones. There is not yet full coverage for all views, but I&#39;m working hard at it. &lt;em&gt;common_schema&lt;/em&gt; is a robust piece of code!&lt;/p&gt;
+&lt;h4&gt;Get it!&lt;/h4&gt;
+&lt;p&gt;Download &lt;em&gt;common_schema&lt;/em&gt; on the &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema project page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Read the documentation &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html&#34;&gt;online&lt;/a&gt;, or download it as well (or call for &lt;strong&gt;help()&lt;/strong&gt;)&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is released under the BSD license.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>QueryScript: SQL scripting language</title>
+      <link>/blog/mysql/queryscript-sql-scripting-language/</link>
+      <pubDate>Wed, 08 Feb 2012 11:43:19 +0000</pubDate>
+      
+      <guid>/blog/mysql/queryscript-sql-scripting-language/</guid>
+      <description>&lt;p&gt;Introducing &lt;strong&gt;&lt;a href=&#34;http://www.queryscript.com/&#34;&gt;QueryScript&lt;/a&gt;&lt;/strong&gt;: a programming language aimed for SQL scripting, seamlessly combining scripting power such as flow control &amp;amp; variables with standard SQL statements or RDBMS-specific commands.&lt;/p&gt;
+&lt;p&gt;QueryScript is available fro MySQL via &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema&lt;/a&gt;, which adds MySQL-specific usage.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;What does QueryScript look like?&lt;/em&gt; Here are a few code samples:&lt;/p&gt;
+&lt;p&gt;Turn a bulk DELETE operation into smaller tasks. Throttle in between.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;while (DELETE FROM archive.events WHERE ts &amp;lt; CURDATE() LIMIT 1000)
+{
+  throttle 2;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Convert all InnoDB tables in the &#39;sakila&#39; database to compressed format:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;foreach ($table, $schema, $engine: table in sakila)
+{
+  if ($engine = &#39;InnoDB&#39;)
+    ALTER TABLE :$schema.:$table ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Shard your data across multiple schemata:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;foreach($shard: {USA, GBR, JAP, FRA})
+{
+  CREATE DATABASE db_:$shard;
+  CREATE TABLE db_:$shard.city LIKE world.City;
+  INSERT INTO db_:$shard.city SELECT * FROM world.City WHERE CountryCode = $shard;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;!--more--&gt;This tight integration between script and SQL, with the power of iteration, conditional statements, variables, variable expansion, throttling etc., makes QueryScript a power tool, with capabilities superseding those of stored routines, and allowing for simplified, dynamic code.&lt;/p&gt;
+&lt;p&gt;QueryScript code is interpreted. It&#39;s just a text, so it can be read from a @user_defined_variable, a table column, text file, what have you. For example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; &lt;strong&gt;set&lt;/strong&gt; @script := &#34;while (TIME(SYSDATE()) &amp;lt; &#39;17:00:00&#39;) SELECT * FROM world.City WHERE id = 1 + FLOOR((RAND()*4079));&#34;;
+mysql&amp;gt; &lt;strong&gt;call&lt;/strong&gt; run(@script);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;For more details, consult the &lt;strong&gt;&lt;a href=&#34;http://www.queryscript.com/&#34;&gt;QueryScript&lt;/a&gt;&lt;/strong&gt; site.&lt;/p&gt;
+&lt;p&gt;If you&#39;re a MySQL user/DBA, better read the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;&lt;strong&gt;common_schema QueryScript documentation&lt;/strong&gt;&lt;/a&gt;, to better understand the specific &lt;em&gt;common_schema&lt;/em&gt; implementation and enhanced features.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt;, including the QueryScript interpreter, can be downloaded from the &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema project page&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

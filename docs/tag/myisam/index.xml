@@ -1,0 +1,965 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Myisam on code.openark.org</title>
+    <link>/blog/tag/myisam/</link>
+    <description>Recent content in Myisam on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Wed, 30 May 2012 09:03:18 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/myisam/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Getting rid of huge ibdata file, no dump required, part II</title>
+      <link>/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii/</link>
+      <pubDate>Wed, 30 May 2012 09:03:18 +0000</pubDate>
+      
+      <guid>/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii/</guid>
+      <description>&lt;p&gt;This post continues &lt;a href=&#34;http://code.openark.org/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required&#34;&gt;Getting rid of huge ibdata file, no dump required, part I&lt;/a&gt;, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing &lt;em&gt;everything at once&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;In previous part we put aside the issue of foreign keys. We address this issue now.&lt;/p&gt;
+&lt;h4&gt;What if my InnoDB tables have foreign keys?&lt;/h4&gt;
+&lt;p&gt;MyISAM does not support them, so you can&#39;t just &lt;strong&gt;ALTER&lt;/strong&gt; an InnoDB table to MyISAM and back into InnoDB, and expect everything to work.&lt;/p&gt;
+&lt;p&gt;Alas, this calls for additional steps (i.e. additional &lt;strong&gt;ALTER&lt;/strong&gt; commands). However, these still fall well under the concept of &lt;em&gt;&#34;do it one table at a time, then take time to recover your breath and replication lag&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;h4&gt;Save , drop and restore your Foreign Keys setup&lt;/h4&gt;
+&lt;p&gt;You can use &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt;&#39;s  &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html&#34;&gt;sql_foreign_keys&lt;/a&gt; to get the full listing and create definition of your foreign keys. For example, assume we use the &lt;strong&gt;sakila&lt;/strong&gt; database:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT create_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA=&#39;sakila&#39; INTO OUTFILE &#39;/somewhere/safe/create_foreign_keys.sql&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;(replace &lt;strong&gt;TABLE_SCHEMA=&#39;sakila&#39;&lt;/strong&gt; with whatever you want).&lt;/p&gt;
+&lt;p&gt;A sample output would be something like this (&lt;em&gt;note: no semicolon on end of line&lt;/em&gt;):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;ALTER TABLE `sakila`.`address` ADD CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `sakila`.`city` (`city_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`city` ADD CONSTRAINT `fk_city_country` FOREIGN KEY (`country_id`) REFERENCES `sakila`.`country` (`country_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+...&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Once the above is in a safe place, you will want to DROP all of your foreign keys. Again, using &lt;em&gt;common_schema&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT drop_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA=&#39;sakila&#39;;
++-----------------------------------------------------------------------------------+
+| drop_statement                                                                    |
++-----------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` DROP FOREIGN KEY `fk_address_city`                 |
+| ALTER TABLE `sakila`.`city` DROP FOREIGN KEY `fk_city_country`                    |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_address`            |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_store`              |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language`                   |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language_original`          |
+| ...                                                                               |
++-----------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;You don&#39;t want to issue all these at once: do them one at a time, and wait for your slave to catch up.&lt;/p&gt;
+&lt;p&gt;Once this is done, you can move on to the steps described in Part I of this post: converting tables to MyISAM, shutting down, removing InnoDB files, then converting back to InnoDB.&lt;/p&gt;
+&lt;p&gt;And then, taking breath again, you must re-import the foreign keys. Use the &lt;strong&gt;ADD CONSTRAINT&lt;/strong&gt; commands you have saved earlier on. Again, one at a time, wait for slave to catch up.&lt;/p&gt;
+&lt;p&gt;To reiterate, for each table you would take the following steps:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Make sure the FK definition is safely stored somewhere&lt;/li&gt;
+&lt;li&gt;STOP SLAVE&lt;/li&gt;
+&lt;li&gt;Drop all table&#39;s foreign keys: ALTER TABLE ... DROP FOREIGN KEY ..., DROP FOREIGN KEY ...&lt;/li&gt;
+&lt;li&gt;START SLAVE&lt;/li&gt;
+&lt;li&gt;Wait for slave to catch up&lt;/li&gt;
+&lt;li&gt;STOP SLAVE&lt;/li&gt;
+&lt;li&gt;ALTER TABLE ... ENGINE=MyISAM (*)&lt;/li&gt;
+&lt;li&gt;START SLAVE&lt;/li&gt;
+&lt;li&gt;Wait for slave to catch up&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;(*) Altering to MyISAM drops FK constraints, so the above could actually be done in one step. I&#39;m cautious and illustrate in two.&lt;/p&gt;
+&lt;p&gt;Once all tables are altered, and InnoDB tablespace is removed, restoration is as follows: for each table,&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;STOP SLAVE&lt;/li&gt;
+&lt;li&gt;ALTER TABLE ... ENGINE=InnoDB [create options]&lt;/li&gt;
+&lt;li&gt;START SLAVE&lt;/li&gt;
+&lt;li&gt;Wait for slave to catch up&lt;/li&gt;
+&lt;li&gt;STOP SLAVE&lt;/li&gt;
+&lt;li&gt;ALTER TABLE ... ADD CONSTRAINT ..., ADD CONSTRAINT ...(+)&lt;/li&gt;
+&lt;li&gt;START SLAVE&lt;/li&gt;
+&lt;li&gt;Wait for slave to catch up&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;(+) Alas, you can&#39;t convert to InnoDB and add constraints at the same time...&lt;/p&gt;
+&lt;h4&gt;This is not entirely safe&lt;/h4&gt;
+&lt;p&gt;A MyISAM slave to an InnoDB master with foreign keys is a tricky business. It really depends on the type of foreign keys you have and the use you make of them. See &lt;a title=&#34;Link to Impact of foreign keys absence on replicating slaves&#34; href=&#34;http://code.openark.org/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves&#34; rel=&#34;bookmark&#34;&gt;Impact of foreign keys absence on replicating slaves&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Getting rid of huge ibdata file, no dump required</title>
+      <link>/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/</link>
+      <pubDate>Tue, 22 May 2012 07:33:05 +0000</pubDate>
+      
+      <guid>/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/</guid>
+      <description>&lt;p&gt;You &lt;a href=&#34;http://code.openark.org/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file&#34;&gt;have&lt;/a&gt; been &lt;a href=&#34;http://ronaldbradford.com/blog/leveraging-the-innodb-plugin-2011-02-11/&#34;&gt;told&lt;/a&gt; (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named &lt;strong&gt;ibdata1&lt;/strong&gt;), when moving to &lt;strong&gt;innodb_file_per_table&lt;/strong&gt;, is to do a logical dump of your data, completely erase everything, then import the dump.&lt;/p&gt;
+&lt;p&gt;To quickly reiterate, you can only delete the &lt;strong&gt;ibdata1&lt;/strong&gt; file when no InnoDB tables exist. Delete this file with an existing InnoDB table, even a table in its own tablespace, and nothing ever works anymore.&lt;/p&gt;
+&lt;h4&gt;The problem with the dump-based solution&lt;/h4&gt;
+&lt;p&gt;The impact of doing a logical dump is often overwhelming. Well, the dump may be tolerable, but the restore is much longer. The real pain is that you can&#39;t do this one table at a time: you have to destroy everything before dropping the &lt;strong&gt;ibdata1&lt;/strong&gt; file; you then have to import everything.&lt;/p&gt;
+&lt;p&gt;Perhaps the most common scenario is that we do the changes on a slave, so as not to completely shut down our database. This is nice; no one is aware of the shutdown process. However, Huston, we have a problem: we need to make sure we can keep up the binary logs on the master for the duration of the &lt;em&gt;entire process&lt;/em&gt;.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;A semi-solution for binary logs&lt;/h4&gt;
+&lt;p&gt;You may get by by keeping the &lt;strong&gt;SQL_IO_THREAD&lt;/strong&gt; running on the slave while dump is taken (SQL thread is better turned off). If you&#39;re careful, you could do the same after restarting the database: you should still be able to acquire relay logs. With row based replication becoming more common, the problem of binary logs disk space returns: the logs (rather, log entries) are just so much larger!&lt;/p&gt;
+&lt;p&gt;Either way, the process can takes long days, at the end of which your slave is up, but lags for long days behind.&lt;/p&gt;
+&lt;h4&gt;Wishful thought: do it one table at a time&lt;/h4&gt;
+&lt;p&gt;If we could do it one table at a time, and assuming our dataset is fairly split among several tables (i.e. not all of our &lt;strong&gt;500GB&lt;/strong&gt; of data is in one huge table), life would be easier: we could work on a single table, resume replication, let the slave catch up, then do the same for the next table.&lt;/p&gt;
+&lt;p&gt;How? Didn&#39;t we just say one can only drop the &lt;strong&gt;ibdata1&lt;/strong&gt; file when no InnoDB tables exist?&lt;/p&gt;
+&lt;h4&gt;Solution: do it one table at a time&lt;/h4&gt;
+&lt;p&gt;I&#39;m going to illustrate what seems like a longer procedure. I will later show why it is not, in fact, longer.&lt;/p&gt;
+&lt;p&gt;The idea is to first convert all your tables to MyISAM (Yay! A use for MyISAM!). That is, convert your tables one table at a time, using normal &lt;strong&gt;ALTER TABLE t ENGINE=MyISAM&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Please let go of the foreign keys issue right now. I will address it later, there&#39;s a lot to be addressed.&lt;/p&gt;
+&lt;p&gt;So, on a slave:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;STOP SLAVE&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;One &lt;strong&gt;ALTER TABLE ... ENGINE=MyISAM&lt;br /&gt;
+&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;START SLAVE&lt;/strong&gt; again&lt;/li&gt;
+&lt;li&gt;Wait for slave catch up&lt;/li&gt;
+&lt;li&gt;GOTO &lt;strong&gt;1&lt;/strong&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;What do we end up with? A MyISAM only database. What do we do with it? Why, convert it back to InnoDB, of course!&lt;/p&gt;
+&lt;p&gt;But, before that, we:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Shut MySQL down&lt;/li&gt;
+&lt;li&gt;Delete &lt;strong&gt;ibdata1&lt;/strong&gt; file, &lt;strong&gt;ib_logfile[01]&lt;/strong&gt; (i.e. delete all InnoDB files)&lt;/li&gt;
+&lt;li&gt;Start MySQL&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;A new &lt;strong&gt;ibdata1&lt;/strong&gt; file, and new transaction log files will be created. Note: the new ibdata1 file is &lt;em&gt;small&lt;/em&gt;. Mission almost accomplished.&lt;/p&gt;
+&lt;p&gt;We then:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;STOP SLAVE&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Do one &lt;strong&gt;ALTER TABLE ... ENGINE=InnoDB [ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8 ...]&lt;br /&gt;
+&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;START SLAVE&lt;/strong&gt; again&lt;/li&gt;
+&lt;li&gt;Wait for slave catch up&lt;/li&gt;
+&lt;li&gt;GOTO &lt;strong&gt;1&lt;/strong&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;What do we end up with? An InnoDB only database, with true file per table, and a small &lt;strong&gt;ibdata1&lt;/strong&gt; file. Space recovered!&lt;/p&gt;
+&lt;h4&gt;The advantage of this method&lt;/h4&gt;
+&lt;p&gt;The thing is, we resume replication after each table alteration. This means breaking the lag period into many smaller periods. While the &lt;em&gt;total&lt;/em&gt; runtime does not reduce, we do reduce the maximum lag time. And this makes for easier recovery: no need to store multitudes of binary logs!&lt;/p&gt;
+&lt;h4&gt;So what about the foreign keys?&lt;/h4&gt;
+&lt;p&gt;Phew. Continued next post.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Auto caching tables</title>
+      <link>/blog/mysql/auto-caching-tables/</link>
+      <pubDate>Tue, 06 Mar 2012 15:18:36 +0000</pubDate>
+      
+      <guid>/blog/mysql/auto-caching-tables/</guid>
+      <description>&lt;p&gt;Is there a way to create a caching table, some sort of a materialized view, such that &lt;em&gt;upon selecting&lt;/em&gt; from that table, its data is validated/invalidated?&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Hint&lt;/em&gt;: yes.&lt;/p&gt;
+&lt;p&gt;But to elaborate the point: say I have some table &lt;strong&gt;data_table&lt;/strong&gt;. Can I rewrite all my queries which access &lt;strong&gt;data_table&lt;/strong&gt; to read from some &lt;strong&gt;autocache_data_table&lt;/strong&gt;, but have nothing changed in the query itself? No caveats, no additional &lt;strong&gt;WHERE&lt;/strong&gt;s, and still have that &lt;strong&gt;autocache_data_table&lt;/strong&gt; provide with the correct data, dynamically updated by some rule &lt;em&gt;of our choice&lt;/em&gt;?&lt;/p&gt;
+&lt;p&gt;And: no &lt;em&gt;crontab&lt;/em&gt;, no &lt;em&gt;event scheduler&lt;/em&gt;, and no funny triggers on &lt;strong&gt;data_table&lt;/strong&gt;? In such way that invalidation/revalidation occurs &lt;em&gt;upon &lt;strong&gt;SELECT&lt;/strong&gt;&lt;/em&gt;?&lt;/p&gt;
+&lt;p&gt;Well, yes.&lt;/p&gt;
+&lt;p&gt;This post is long, but I suggest you read it through to understand the mechanism, it will be worthwhile.&lt;/p&gt;
+&lt;h4&gt;Background&lt;/h4&gt;
+&lt;p&gt;The following derives from my long research on how to provide better, faster and &lt;em&gt;safer&lt;/em&gt; access to &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt; tables. It is however not limited to this exact scenario, and in this post I provide with a simple, general purpose example. I&#39;ll have more to share about &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt; specific solutions shortly.&lt;/p&gt;
+&lt;p&gt;I was looking for a server side solution which would not require query changes, apart from directing the query to other tables. Solution has to be supported by all standard MySQL installs; so: no plugins, no special rebuilds.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Sample data&lt;/h4&gt;
+&lt;p&gt;I&#39;ll explain by walking through the solution. Let&#39;s begin with some sample table:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE TABLE sample_data (
+  id INT UNSIGNED NOT NULL PRIMARY KEY,
+  dt DATETIME,
+  msg VARCHAR(128) CHARSET ascii
+);
+
+INSERT INTO sample_data VALUES (1, NOW(), &#39;sample txt&#39;);
+INSERT INTO sample_data VALUES (2, NOW(), &#39;sample txt&#39;);
+INSERT INTO sample_data VALUES (3, NOW(), &#39;sample txt&#39;);
+
+SELECT * FROM sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;In this simplistic example, I wish to create a construct which looks exactly like &lt;strong&gt;sample_data&lt;/strong&gt;, but which caches data according to some heuristic. It will, in fact, cache the entire content of &lt;strong&gt;sample_data&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;That much is not a problem: just create another table to cache the data:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE TABLE cache_sample_data LIKE sample_data;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The big question is: how do you make the table invalidate itself while &lt;strong&gt;SELECT&lt;/strong&gt;ing from it?&lt;/p&gt;
+&lt;p&gt;Here&#39;s the deal. I&#39;ll ask for your patience while I draw the outline, and start with failed solutions. By the end, everything will work.&lt;/p&gt;
+&lt;h4&gt;Failed attempt: purge rows from the table even while reading it&lt;/h4&gt;
+&lt;p&gt;My idea is to create a stored function which purges the &lt;strong&gt;cache_sample_data&lt;/strong&gt; table, then fills in with fresh data, according to some heuristic. Something like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DELIMITER $$
+
+CREATE FUNCTION `revalidate_cache_sample_data`() RETURNS tinyint unsigned
+    MODIFIES SQL DATA
+    DETERMINISTIC
+    SQL SECURITY INVOKER
+BEGIN
+  if(rand() &amp;gt; 0.1) then
+    return 0; -- simplistic heuristic
+  end if;
+
+  DELETE FROM cache_sample_data;
+  INSERT INTO cache_sample_data SELECT * FROM sample_data;
+  RETURN 0;
+END $$
+
+DELIMITER ;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So the function uses some heuristic. It&#39;s a funny &lt;strong&gt;RAND()&lt;/strong&gt; in our case; you will want to check up on time stamps, or some flags, what have you. But this is not the important part here, and I want to keep the focus on the main logic.&lt;/p&gt;
+&lt;p&gt;Upon deciding the table needs refreshing, the function purges all rows, then copies everything from &lt;strong&gt;sample_data&lt;/strong&gt;. Sounds fair enough?&lt;/p&gt;
+&lt;p&gt;Let&#39;s try and invoke it. Just write some query by hand:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              &lt;strong&gt;0&lt;/strong&gt; |
++--------------------------------+
+
+mysql&amp;gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              &lt;strong&gt;0&lt;/strong&gt; |
++--------------------------------+
+
+mysql&amp;gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              &lt;strong&gt;1&lt;/strong&gt; |
++--------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;First two invocations - nothing. The third one indicated a revalidation of cache data. Let&#39;s verify:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM cache_sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;OK, seems like the function works.&lt;/p&gt;
+&lt;p&gt;We now gather some courage, and try combining calling to this function even while SELECTing from the cache table, like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To explain what happens in the above query, consider its &lt;a href=&#34;http://code.openark.org/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql&#34;&gt;programmatic nature&lt;/a&gt;: we create a derived table, populated by the function&#39;s result. That means the function is invoked in order to generate the derived table. The derived table itself must be materialized before the query begins execution, and so it is that we first invoke the function, then make the &lt;strong&gt;SELECT&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Don&#39;t open the champagne yet. While the above paragraph is correct, we are deceived: in this last invocation, the function did &lt;strong&gt;not&lt;/strong&gt; attempt a revalidation. The &lt;strong&gt;RAND()&lt;/strong&gt; function just didn&#39;t provide with the right value.&lt;/p&gt;
+&lt;p&gt;Let&#39;s try again:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
+&lt;strong&gt;ERROR 1442 (HY000): Can&#39;t update table &#39;cache_sample_data&#39; in stored function/trigger because it is already used by statement which invoked this stored function/trigger.&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Aha! Bad news. The MySQL manual says on &lt;a href=&#34;http://dev.mysql.com/doc/refman/5.1/en/stored-program-restrictions.html&#34;&gt;Restrictions on Stored Programs&lt;/a&gt;:&lt;/p&gt;
+&lt;blockquote&gt;A stored function or trigger cannot modify a table that is already being used (for reading or writing) by the statement that invoked the function or trigger.&lt;/blockquote&gt;
+&lt;h4&gt;Anyone to the rescue?&lt;/h4&gt;
+&lt;p&gt;I was quite upset. Can we not make this work? At sorrow times like these, one reflects back on words of wiser people. What would &lt;a href=&#34;http://rpbouman.blogspot.com/&#34;&gt;Roland Bouman&lt;/a&gt; say on this?&lt;/p&gt;
+&lt;p&gt;Oh, yes; he would say: &lt;em&gt;&#34;we can use a &lt;strong&gt;FEDERATED&lt;/strong&gt; table which connect onto itself, thus bypass the above restriction&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Unfortunately, &lt;strong&gt;FEDERATED&lt;/strong&gt; is by default disabled nowadays; I cannot rely on its existence. Besides, to use &lt;strong&gt;FEDERATED&lt;/strong&gt; one has to fill in passwords and stuff. Definitely not an out-of-the-box solution in this case.&lt;/p&gt;
+&lt;p&gt;Few more days gone by. Decided the problem cannot be solved. And then it hit me.&lt;/p&gt;
+&lt;h4&gt;MyISAM to the rescue&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;&lt;strong&gt;MyISAM&lt;/strong&gt;&lt;/em&gt;? Really?&lt;/p&gt;
+&lt;p&gt;Yes, and not only &lt;strong&gt;MyISAM&lt;/strong&gt;, but also its cousin: it&#39;s long abandoned cousin, forgotten once &lt;strong&gt;views&lt;/strong&gt; and &lt;strong&gt;partitions&lt;/strong&gt; came into MySQL. &lt;strong&gt;&lt;a href=&#34;http://dev.mysql.com/doc/refman/5.1/en/merge-storage-engine.html&#34;&gt;MERGE&lt;/a&gt;&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;MERGE&lt;/strong&gt; reflects the data contained within &lt;strong&gt;MyISAM&lt;/strong&gt; tables. Perhaps the most common use for &lt;strong&gt;MERGE&lt;/strong&gt; is to work out partitioned-like table of records, with &lt;strong&gt;MyISAM&lt;/strong&gt; table-per month, and an overlooking &lt;strong&gt;MERGE&lt;/strong&gt; table dynamically adding and removing tables from its view.&lt;/p&gt;
+&lt;p&gt;But I intend for &lt;strong&gt;MERGE&lt;/strong&gt; a different use: just be an identical reflection of &lt;strong&gt;cache_sample_data&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;So we must work out the following:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;ALTER TABLE &lt;strong&gt;cache_sample_data&lt;/strong&gt; ENGINE=&lt;strong&gt;MyISAM&lt;/strong&gt;;
+CREATE TABLE &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt; LIKE cache_sample_data;
+ALTER TABLE &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt; ENGINE=&lt;strong&gt;MERGE&lt;/strong&gt; &lt;strong&gt;UNION=(cache_sample_data)&lt;/strong&gt;;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I just want to verify the new table is setup correctly:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM cache_sample_data_wrapper;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Seems fine.&lt;/p&gt;
+&lt;p&gt;So the next step is what makes the difference: the two tables are &lt;em&gt;not the same&lt;/em&gt;. One &lt;em&gt;relies on the other&lt;/em&gt;, but they are distinct. Our function &lt;strong&gt;DELETE&lt;/strong&gt;s from and &lt;strong&gt;INSERT&lt;/strong&gt;s to &lt;strong&gt;cached_sample_data&lt;/strong&gt;, but it does &lt;em&gt;not affect, nor lock&lt;/em&gt;, &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;We now rewrite our query to read:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  cache_sample_data_wrapper.*
+FROM
+  &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt;,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This query is perfectly valid. It works. To illustrate, I do:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;-- Try this a few times till RAND() is lucky:
+
+&lt;strong&gt;TRUNCATE&lt;/strong&gt; cache_sample_data;
+
+SELECT
+  cache_sample_data_wrapper.*
+FROM
+  cache_sample_data_wrapper,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Whoa! Where did all this data come from? Didn&#39;t we just &lt;strong&gt;TRUNCATE&lt;/strong&gt; the table?&lt;/p&gt;
+&lt;p&gt;The query worked. The function re-populated &lt;strong&gt;cache_sample_data&lt;/strong&gt;.&lt;/p&gt;
+&lt;h4&gt;The final touch&lt;/h4&gt;
+&lt;p&gt;Isn&#39;t the above query just &lt;em&gt;beautiful&lt;/em&gt;? I suppose not many will share my opinion. What happened to my declaration that &lt;em&gt;&#34;the original query need not be changed, apart from querying a different table&#34;&lt;/em&gt;?&lt;/p&gt;
+&lt;p&gt;Yes, indeed. It&#39;s now time for the final touch. There&#39;s nothing amazing in this step, but we all know the way it is packaged is what makes the sale. We will now use &lt;em&gt;views&lt;/em&gt;. We use two of them since a view must not contain a &lt;em&gt;subquery&lt;/em&gt; in the &lt;strong&gt;FROM&lt;/strong&gt; clause. Here goes:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE OR REPLACE VIEW &lt;strong&gt;revalidate_cache_sample_data_view&lt;/strong&gt; AS
+  SELECT revalidate_cache_sample_data()
+;
+
+CREATE OR REPLACE VIEW &lt;strong&gt;autocache_sample_data&lt;/strong&gt; AS
+  SELECT
+    cache_sample_data_wrapper.*
+  FROM
+    cache_sample_data_wrapper,
+    revalidate_cache_sample_data_view
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;And finally, we can make a very simple query like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT * FROM &lt;strong&gt;autocache_sample_data&lt;/strong&gt;;
+--
+-- &lt;strong&gt;&lt;span style=&#34;color: #ff9900;&#34;&gt;Magic in work now!&lt;/span&gt;&lt;/strong&gt;
+--
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Much as we would query the original &lt;strong&gt;sample_data&lt;/strong&gt; table.&lt;/p&gt;
+&lt;h4&gt;Summary&lt;/h4&gt;
+&lt;p&gt;So what have we got? A stored routine, a &lt;strong&gt;MyISAM&lt;/strong&gt; table, a &lt;strong&gt;MERGE&lt;/strong&gt; table and two views. Quite a lot of constructs just to cache a table! But a beautiful cache access: &lt;em&gt;plain old SQL queries&lt;/em&gt;. The flow looks like this:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2011/11/autocache_flow.png&#34;&gt;&lt;img class=&#34;alignnone size-full wp-image-4463&#34; title=&#34;autocache flow chart&#34; src=&#34;/blog/blog/assets/autocache_flow.png&#34; alt=&#34;&#34; width=&#34;835&#34; height=&#34;625&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;Our cache table is a &lt;strong&gt;MyISAM&lt;/strong&gt; table. It can get corrupted, which is bad. But not completely bad: it&#39;s nothing more than a cache; we can throw away its entire data, and revalidate. We can actually ask the function to revalidate (say, pass a parameter).&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Self throttling MySQL queries</title>
+      <link>/blog/mysql/self-throttling-mysql-queries/</link>
+      <pubDate>Tue, 01 Nov 2011 09:55:47 +0000</pubDate>
+      
+      <guid>/blog/mysql/self-throttling-mysql-queries/</guid>
+      <description>&lt;p&gt;Recap on the problem:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;A query takes a long time to complete.&lt;/li&gt;
+&lt;li&gt;During this time it makes for a lot of I/O.&lt;/li&gt;
+&lt;li&gt;Query&#39;s I/O overloads the db, making for other queries run slow.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;I introduce the notion of self-throttling queries: queries that go to sleep, by themselves, throughout the runtime. The sleep period means the query does not perform I/O at that time, which then means other queries can have their chance to execute.&lt;/p&gt;
+&lt;p&gt;I present two approaches:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The naive approach: for every &lt;strong&gt;1,000&lt;/strong&gt; rows, the query sleep for &lt;strong&gt;1&lt;/strong&gt; second&lt;/li&gt;
+&lt;li&gt;The factor approach: for every &lt;strong&gt;1,000&lt;/strong&gt; rows, the query sleeps for the amount of time it took to iterate those &lt;strong&gt;1,000&lt;/strong&gt; rows (effectively doubling the total runtime of the query).&lt;!--more--&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Sample query&lt;/h4&gt;
+&lt;p&gt;We use a simple, single-table scan. No aggregates (which complicate the solution considerably).&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;The naive solution&lt;/h4&gt;
+&lt;p&gt;We need to know every &lt;strong&gt;1,000&lt;/strong&gt; rows. So we need to count the rows. We do that by using a counter, as follows:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days,
+  @row_counter := @row_counter + 1
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;A thing that bothers me, is that I wasn&#39;t asking for an additional column. I would like the result set to remain as it were; same result structure. We also want to sleep for &lt;strong&gt;1&lt;/strong&gt; second for each &lt;strong&gt;1,000&lt;/strong&gt; rows. So we merge the two together along with one of the existing columns, like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  rental_id +
+    IF(
+      (@row_counter := @row_counter + 1) % 1000 = 0,
+      SLEEP(1), 0
+    ) AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To remain faithful to &lt;a href=&#34;http://code.openark.org/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql&#34;&gt;my slides&lt;/a&gt;, I rewrite as follows, and this is &lt;em&gt;the naive solution&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  rental_id +
+    CASE
+      WHEN &lt;strong&gt;(@row_counter := @row_counter + 1) % 1000 = 0&lt;/strong&gt; THEN &lt;strong&gt;SLEEP(1)&lt;/strong&gt;
+      ELSE &lt;strong&gt;0&lt;/strong&gt;
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;strong&gt;WHEN&lt;/strong&gt; clause always returns &lt;strong&gt;0&lt;/strong&gt;, so it does not affect the value of &lt;strong&gt;rental_id&lt;/strong&gt;.&lt;/p&gt;
+&lt;h4&gt;The factor approach&lt;/h4&gt;
+&lt;p&gt;In the factor approach we wish to keep record of query execution, every &lt;strong&gt;1,000&lt;/strong&gt; rows. I introduce a nested &lt;strong&gt;WHEN&lt;/strong&gt; statement which updates time records. I rely on &lt;strong&gt;SYSDATE()&lt;/strong&gt; to return the true time, and on &lt;strong&gt;NOW()&lt;/strong&gt; to return query execution start time.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN &lt;strong&gt;@row_counter % 1000 = 0&lt;/strong&gt; THEN
+        CASE
+          WHEN (@time_now := &lt;strong&gt;SYSDATE()&lt;/strong&gt;) IS NULL THEN NULL
+          WHEN (@time_diff := (&lt;strong&gt;TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now)&lt;/strong&gt;)) IS NULL THEN NULL
+          WHEN &lt;strong&gt;SLEEP(@time_diff)&lt;/strong&gt; IS NULL THEN NULL
+          WHEN (@chunk_start_time := &lt;strong&gt;SYSDATE()&lt;/strong&gt;) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Proof&lt;/h4&gt;
+&lt;p&gt;How can we prove that the queries do indeed work?&lt;/p&gt;
+&lt;p&gt;We can see if the total runtime sums up to the number of sleep calls, in seconds; but how do we know that sleeps do occur at the correct times?&lt;/p&gt;
+&lt;p&gt;A solution I offer is to use a stored routines which logs to a MyISAM table (a non transactional table) the exact time (using &lt;strong&gt;SYSDATE()&lt;/strong&gt;) and value per row. The following constructs are introduced:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;CREATE TABLE&lt;/strong&gt; test.proof(
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dt DATETIME NOT NULL,
+  msg VARCHAR(255)
+) &lt;strong&gt;ENGINE=MyISAM&lt;/strong&gt;;
+
+DELIMITER $$
+&lt;strong&gt;CREATE FUNCTION&lt;/strong&gt; test.prove_it(message VARCHAR(255)) RETURNS TINYINT
+DETERMINISTIC
+MODIFIES SQL DATA
+BEGIN
+  &lt;strong&gt;INSERT INTO test.proof (dt, msg) VALUES (SYSDATE(), message); RETURN 0;&lt;/strong&gt;
+END $$
+DELIMITER ;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;strong&gt;prove_it()&lt;/strong&gt; function records the immediate time and a message into the MyISAM table, which immediately accepts the write, being non-transactional. It returns with &lt;strong&gt;0&lt;/strong&gt;, so we will now embed it within the query. Of course, the function itself incurs some overhead, but it will nevertheless convince you that &lt;strong&gt;SLEEP()&lt;/strong&gt;s do occur at the right time!&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN @row_counter % 1000 = 0 THEN
+        CASE
+          WHEN (@time_now := SYSDATE()) IS NULL THEN NULL
+          WHEN (@time_diff := (TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now))) IS NULL THEN NULL
+          WHEN SLEEP(@time_diff)&lt;strong&gt; + test.prove_it(CONCAT(&#39;will sleep for &#39;, @time_diff, &#39; seconds&#39;))&lt;/strong&gt; IS NULL THEN NULL
+          WHEN (@chunk_start_time := SYSDATE()) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;
+
+mysql&amp;gt; SELECT * FROM test.proof;
++----+---------------------+--------------------------+
+| id | dt                  | msg                      |
++----+---------------------+--------------------------+
+|  1 | 2011-11-01 09:22:36 | will sleep for 1 seconds |
+|  2 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  3 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  4 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  5 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  6 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  7 | 2011-11-01 09:22:38 | will sleep for 1 seconds |
+|  8 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+|  9 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 10 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 11 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 12 | 2011-11-01 09:22:40 | will sleep for 1 seconds |
+| 13 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 14 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 15 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
++----+---------------------+--------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above query is actually very fast. Try adding &lt;strong&gt;BENCHMARK(1000,ENCODE(&#39;hello&#39;,&#39;goodbye&#39;))&lt;/strong&gt; to rental_id so as to make it slower, or just use it on a really large table, see what happens (this is what I actually used to make the query run for several seconds in the example above).&lt;/p&gt;
+&lt;p&gt;Observant reads will note that the &lt;strong&gt;&#34;will sleep...&#34;&lt;/strong&gt; message actually gets written &lt;em&gt;after&lt;/em&gt; the &lt;strong&gt;SLEEP()&lt;/strong&gt; call. I leave this as it is.&lt;/p&gt;
+&lt;p&gt;Another very nice treat of the code is that you don&#39;t need sub-second resolution for it to work. If you look at the above, we don&#39;t actually go to sleep every &lt;strong&gt;1,000&lt;/strong&gt; rows (&lt;strong&gt;1,000&lt;/strong&gt; is just too quick in the query -- perhaps I should have used &lt;strong&gt;10,000&lt;/strong&gt; seconds). But we &lt;em&gt;do&lt;/em&gt; make it once a second has &lt;em&gt;elapsed&lt;/em&gt;. Which means it works correctly &lt;em&gt;on average&lt;/em&gt;. Of course, the entire discussion is only of interest when a query executes for a &lt;em&gt;substantial&lt;/em&gt; number of seconds, so this is just an anecdote.&lt;/p&gt;
+&lt;h4&gt;And the winner is...&lt;/h4&gt;
+&lt;p&gt;Wow, this &lt;a href=&#34;http://code.openark.org/blog/mysql/contest-for-glory-write-a-self-throttling-mysql-query&#34;&gt;contest&lt;/a&gt; was anything but popular. &lt;strong&gt;&lt;a href=&#34;http://marcalff.blogspot.com/&#34;&gt;Marc Alff&lt;/a&gt;&lt;/strong&gt; is the obvious winner: he is the &lt;em&gt;only&lt;/em&gt; one to suggest a solution :)&lt;/p&gt;
+&lt;p&gt;But Marc uses a very nice trick: he reads the &lt;strong&gt;PERFORMANCE_SCHEMA&lt;/strong&gt;. Now, I&#39;m not sure how the &lt;strong&gt;PERFORMANCE_SCHEMA&lt;/strong&gt; gets updated. I know that the &lt;strong&gt;INFORMATION_SCHEMA.GLOBAL_STATUS&lt;/strong&gt; table does not get updated by a query until the query completes (so you cannot expect a change in &lt;strong&gt;innodb_rows_read&lt;/strong&gt; throughout the execution of the query). I just didn&#39;t test it (homework, anyone?). If it does get updated, then we can throttle the query based on InnoDB page reads using a simple query. Otherwise, an access to &lt;strong&gt;/proc/diskstats&lt;/strong&gt; is possible, assuming no &lt;em&gt;apparmor&lt;/em&gt; or &lt;em&gt;SELinux&lt;/em&gt; are blocking us.&lt;/p&gt;
+&lt;p&gt;Marc also uses a stored function, which is the &lt;em&gt;clean&lt;/em&gt; way of doing it; however I distrust the overhead incurred by s stored routine and prefer my solution (which is, admittedly, not a pretty SQL sight!).&lt;/p&gt;
+&lt;p&gt;Happy throttling!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Limiting table disk quota in MySQL</title>
+      <link>/blog/mysql/limiting-table-disk-quota-in-mysql/</link>
+      <pubDate>Mon, 07 Mar 2011 09:08:21 +0000</pubDate>
+      
+      <guid>/blog/mysql/limiting-table-disk-quota-in-mysql/</guid>
+      <description>&lt;p&gt;Question asked by a student: is there a way to limit a table&#39;s quote on disk? Say, limit a table to 2GB, after which it will refuse to grow? Note that the requirement is that rows are never DELETEd. The table must simply refuse to be updated once it reaches a certain size.&lt;/p&gt;
+&lt;p&gt;There is no built-in way to limit a table&#39;s quota on disk. First thing to observe is that MySQL has nothing to do with this. It is entirely up to the storage engine to provide with such functionality. The storage engine is the one to handle data storage: how table and keys are stored on disk. Just consider the difference between MyISAM&#39;s &lt;strong&gt;.MYD&lt;/strong&gt; &amp;amp; &lt;strong&gt;.MYI&lt;/strong&gt; to InnoDB&#39;s shared tablespace &lt;strong&gt;ibdata1&lt;/strong&gt; to InnoDB&#39;s file-per table &lt;strong&gt;.ibd&lt;/strong&gt; files.&lt;/p&gt;
+&lt;p&gt;The only engine I know of that has a quota is the MEMORY engine: it accepts the &lt;strong&gt;max_heap_table_size&lt;/strong&gt;, which limits the size of a single table in memory. Hrmmm... In memory...&lt;/p&gt;
+&lt;h4&gt;Why limit?&lt;/h4&gt;
+&lt;p&gt;I&#39;m not as yet aware of the specific requirements of said company, but this is not the first time I heard this question.&lt;/p&gt;
+&lt;p&gt;The fact is: when MySQL runs out of disk space, it goes with a BOOM. It crashed ungracefully, with binary logs being out of sync, replication being out of sync. To date, and I&#39;ve seen some cases, InnoDB merely crashes and manages to recover once disk space is salvaged, but I am not certain this is guaranteed to be the case. Anyone?&lt;/p&gt;
+&lt;p&gt;And, with MyISAM..., who knows?&lt;/p&gt;
+&lt;p&gt;Rule #1 of MySQL disk usage: &lt;em&gt;don&#39;t run out of disk space.&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Workarounds&lt;/h4&gt;
+&lt;p&gt;I can think of two workarounds, none of which is pretty. The first involves triggers (actually, a few variations for this one), the second involves privileges.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Triggers&lt;/h4&gt;
+&lt;p&gt;The following code (first presented in &lt;a title=&#34;Permanent Link to Triggers Use Case Compilation, Part II&#34; rel=&#34;bookmark&#34; href=&#34;http://code.openark.org/blog/mysql/triggers-use-case-compilation-part-ii&#34;&gt;Triggers Use Case Compilation, Part II&lt;/a&gt;) assumed the DATA_LENGTH and INDEX_LENGTH values in INFORMATION_SCHEMA to be good indicators:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DROP TABLE IF EXISTS `world`.`logs`;
+CREATE TABLE  `world`.`logs` (
+  `logs_id` int(11) NOT NULL auto_increment,
+  `ts` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
+  `message` varchar(255) character set utf8 NOT NULL,
+  PRIMARY KEY  (`logs_id`)
+) ENGINE=MyISAM;
+
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT DATA_LENGTH+INDEX_LENGTH FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=&#39;world&#39; AND TABLE_NAME=&#39;LOGS&#39; INTO @estimated_table_size;
+  IF (@estimated_table_size &amp;gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Or, you could write your own UDF, e.g. &lt;strong&gt;get_table_file_size(fully_qualified_table_name)&lt;/strong&gt; and be more accurate:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT get_table_file_size(&#39;world.logs&#39;) INTO @table_size;
+  IF (@table_size &amp;gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;(Same should be done for &lt;strong&gt;UPDATE&lt;/strong&gt; operations)&lt;/p&gt;
+&lt;p&gt;In both workarounds above, triggers are pre-defined. But triggers are performance-killers.&lt;/p&gt;
+&lt;p&gt;How about preventing writing to the table only when it&#39;s truly on the edge? A simple shell script, spawned by a cronjob, could do this well: get the file size of a specific table, and test if it&#39;s larger than &lt;em&gt;n&lt;/em&gt; bytes. If not, the script exits. If the file is indeed too large, the scripts invokes the following on &lt;em&gt;mysql&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT 0 FROM `logs table is full` INTO @error;
+END $$
+
+DELIMITER ;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So, during most of the time, there is no trigger. Only when the external script detects that table is too large, does it create a trigger. The trigger has no logic: it simply raises an error (PS, use &lt;strong&gt;raise&lt;/strong&gt; in MySQL &lt;strong&gt;5.5&lt;/strong&gt;).&lt;/p&gt;
+&lt;h4&gt;Privileges&lt;/h4&gt;
+&lt;p&gt;Another way to work around the problem is to use security features. Instead of creating a trigger on the table, &lt;strong&gt;REVOKE&lt;/strong&gt; the &lt;strong&gt;INSERT&lt;/strong&gt; &amp;amp; &lt;strong&gt;UPDATE&lt;/strong&gt; privileges from the appropriate user on that table.&lt;/p&gt;
+&lt;p&gt;This may turn out to be a difficult task, since MySQL has no notion of &lt;em&gt;fine grain changes&lt;/em&gt;. That is, suppose we have:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;GRANT INSERT, UPDATE, DELETE, SELECT ON mydb.* TO &#39;webuser&#39;@&#39;%.webdomain&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;If we just do:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;REVOKE SELECT ON mydb.logs FROM &#39;webuser&#39;@&#39;%.webdomain&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We get:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;There is no such grant defined for user &#39;webuser&#39; on host &#39;%.webdomain&#39; on table &#39;logs&#39;.&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So this requires setting up privileges on the table level in the first place. Plus note that as long as the grants on the database level do allow for INSERTs, you cannot override it on the table level.&lt;/p&gt;
+&lt;h4&gt;Other ideas?&lt;/h4&gt;
+&lt;p&gt;I never actually implemented table disk quota. I&#39;m not sure this is a viable solution; but I haven&#39;t heard all the arguments in favor as yet, so I don&#39;t want to rule this out.&lt;/p&gt;
+&lt;p&gt;Please share below if you are using other means of table size control, other than the trivial cleanup of old records.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Personal observation: more migrations from MyISAM to InnoDB</title>
+      <link>/blog/mysql/personal-observation-more-migrations-from-myisam-to-innodb/</link>
+      <pubDate>Wed, 16 Jun 2010 18:43:42 +0000</pubDate>
+      
+      <guid>/blog/mysql/personal-observation-more-migrations-from-myisam-to-innodb/</guid>
+      <description>&lt;p&gt;I&#39;m evidencing an increase in the planning, confidence &amp;amp; execution for MyISAM to InnoDB migration.&lt;/p&gt;
+&lt;p&gt;How much can a single consultant observe? I agree Oracle should not go to PR based on my experience. But I find that:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;More companies are now familiar with InnoDB than there used to.&lt;/li&gt;
+&lt;li&gt;More companies are interested in migration to InnoDB than there used to.&lt;/li&gt;
+&lt;li&gt;More companies feel such migration to be safe.&lt;/li&gt;
+&lt;li&gt;More companies start up with an InnoDB based solution than with a MyISAM based solution.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This is the way I see it. No doubt, the Oracle/Sun deal made its impact. The fact that InnoDB is no longer a 3rd party; the fact Oracle invests in InnoDB and no other engine (Falcon is down, no real development on MyISAM); the fact InnoDB is to be the default engine: all these put companies at ease with migration.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;I am happy with this change. I believe for most installations InnoDB provides with a clear advantage over MyISAM (though MyISAM has its uses), and this makes for more robust, correct and manageable MySQL instances; the kind that make a DBA&#39;s life easier and quieter. And it is easier to make customers see the advantages.&lt;/p&gt;
+&lt;p&gt;I am not inclined to say &lt;em&gt;&#34;You should migrate your entire database to InnoDB&#34;&lt;/em&gt;. I don&#39;t do that a lot. But recently, more customers approach and say &lt;em&gt;&#34;We were thinking about migrating our entire database to InnoDB, what do you think?&#34;&lt;/em&gt;. What a change of approach.&lt;/p&gt;
+&lt;p&gt;And, yes: there are still &lt;em&gt;a lot&lt;/em&gt; of companies using MyISAM based databases, who still live happily.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>A MyISAM backup is blocking as read-only, including mysqldump backup</title>
+      <link>/blog/mysql/a-myisam-backup-is-blocking-as-read-only-including-mysqldump-backup/</link>
+      <pubDate>Tue, 18 May 2010 19:29:05 +0000</pubDate>
+      
+      <guid>/blog/mysql/a-myisam-backup-is-blocking-as-read-only-including-mysqldump-backup/</guid>
+      <description>&lt;p&gt;Actually this is (almost) all I wanted to say. This is intentionally posted with all related keywords in title, in the hope that a related search on Google will result with this post on first page.&lt;/p&gt;
+&lt;p&gt;I&#39;m just still encountering companies who use MyISAM as their storage engine and are &lt;em&gt;unaware&lt;/em&gt; that their nightly backup actually blocks their application, basically rendering their product unavailable for long minutes to hours on a nightly basis.&lt;/p&gt;
+&lt;p&gt;So this is posted as a warning for those who were not aware of this fact.&lt;/p&gt;
+&lt;p&gt;There is no hot (non blocking) backup for MyISAM. Closest would be file system snapshot, but even this requires flushing of tables, which may take a while to complete. If you must have a hot backup, then either use replication - and take the risk of the slave not being in complete sync with the master - or use another storage engine, i.e. InnoDB.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>The depth of an index: primer</title>
+      <link>/blog/mysql/the-depth-of-an-index-primer/</link>
+      <pubDate>Thu, 09 Apr 2009 05:55:08 +0000</pubDate>
+      
+      <guid>/blog/mysql/the-depth-of-an-index-primer/</guid>
+      <description>&lt;p&gt;InnoDB and MyISAM use B+ and B trees for indexes (InnoDB also has internal hash index).&lt;/p&gt;
+&lt;p&gt;In both these structures, the depth of the index is an important factor. When looking for an indexed row, a search is made on the index, from root to leaves.&lt;/p&gt;
+&lt;p&gt;Assuming the index is not in memory, the depth of the index represents the minimal cost (in I/O operation) for an index based lookup. Of course, most of the time we expect large portions of the indexes to be cached in memory. Even so, the depth of the index is an important factor. The deeper the index is, the worse it performs: there are simply more lookups on index nodes.&lt;/p&gt;
+&lt;p&gt;What affects the depth of an index?&lt;/p&gt;
+&lt;p&gt;There are quite a few structural issues, but it boils down to two important factors:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;The number of rows in the table: obviously, more rows leads to larger index, larger indexes grow in depth.&lt;/li&gt;
+&lt;li&gt;The size of the indexed column(s). An index on an INT column can be expected to be shallower than an index on a CHAR(32) column (on a very small number of rows they may have the same depth, so we&#39;ll assume a large number of rows).&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;!--more--&gt;Of course, these two factors also affect the total size of the index, hence its disk usage, but I wish to concentrate on the index depth.&lt;/p&gt;
+&lt;p&gt;Let&#39;s emphasize the second factor. It is best to index shorter columns, if that is possible. It is the reason behind using an index on a VARCHAR&#39;s prefix (e.g. KEY(email_address(16)). It is also a reason to use INT, instead of BIGINT columns for your primary key, when BIGINT is not required.&lt;/p&gt;
+&lt;p&gt;The larger the indexed data type is (or the total size of data types for all columns in a combined index), the less values that can fit in an index node. The less values in a node, the more node splits occur; the more nodes are required to build the index. The less values in the node, the less &lt;em&gt;wide&lt;/em&gt; the index tree is. The less wide an index tree is, and the more nodes it has - the deeper it gets.&lt;/p&gt;
+&lt;p&gt;So bigger data types lead to deeper trees. Deeper trees lead to more IO operations on lookup.&lt;/p&gt;
+&lt;h4&gt;InnoDB&lt;/h4&gt;
+&lt;p&gt;On InnoDB there&#39;s another issue: all tables are clustered by primary key. Any access to table data requires diving into, or traversing the primary key tree.&lt;/p&gt;
+&lt;p&gt;On InnoDB, a secondary index (any index which is not the primary key) does not lead to table data. Instead, the &#34;data&#34; in the leaf nodes of a secondary index - are the primary key values.&lt;/p&gt;
+&lt;p&gt;And so, when looking up a value on an InnoDB table using a secondary key, we first search the secondary key to retrieve the primary key value, then go to the primary key tree to retrieve the data.&lt;/p&gt;
+&lt;p&gt;This means two index lookups, one of which is always the primary key.&lt;/p&gt;
+&lt;p&gt;On InnoDB, it is therefore in particular important to keep the primary key small. Have small data types. Prefer an SMALLINT to INT, if possible. Prefer an INT to BIGINT, if possible. Prefer an integer value over some VARCHAR text.&lt;/p&gt;
+&lt;p&gt;With long data types used in an InnoDB primary key, not only is the primary key index bloated (deep), but also every other index gets to be bloated, as the leaf values in all other indexes are those same long data types.&lt;/p&gt;
+&lt;h4&gt;MyISAM&lt;/h4&gt;
+&lt;p&gt;MyISAM does not use clustered trees, hence the primary key is just a regular unique key. All indexes are created equal and an index lookup only consists of a single index search. Therefore, two indexes do no affect one another, with the exception that they are competing on the same key cache.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>LOCK TABLES in MyISAM is NOT a poor man&#39;s tranactions substitute</title>
+      <link>/blog/mysql/lock-tables-in-myisam-is-not-a-poor-mans-tranactions-substitute/</link>
+      <pubDate>Wed, 18 Mar 2009 09:37:56 +0000</pubDate>
+      
+      <guid>/blog/mysql/lock-tables-in-myisam-is-not-a-poor-mans-tranactions-substitute/</guid>
+      <description>&lt;p&gt;I get to hear that a lot: that LOCK TABLES with MyISAM is some sort of replacement for transactions; some model we can work with which gives us &#39;transactional flavor&#39;.&lt;/p&gt;
+&lt;p&gt;It isn&#39;t, and here&#39;s why.&lt;/p&gt;
+&lt;p&gt;When we speak of a transactional database/engine, we check out its ACID compliance. Let&#39;s break out the ACID and see what LOCK TABLES provides us with:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;A&lt;/strong&gt;: Atomicity. MyISAM does not provide atomicity.  If we have LOCK TABLES followed by two statements, then closed by UNLOCK TABLES, then it follows that a crash between the two statements will have the first one applied, the second one not not applied. No mechanism ensures an &#34;all or nothing&#34; behavior.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;C&lt;/strong&gt;: Consistency. An error in a statement would roll back the entire transaction in a transactional database. This won&#39;t work on MyISAM: every statement is &#34;committed&#34; immediately.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;I&lt;/strong&gt;: Isolation. Without LCOK TABLES, working with MyISAM resembles using the &lt;strong&gt;read uncommitted&lt;/strong&gt;, or &lt;strong&gt;dirty read&lt;/strong&gt; isolation level. With LOCK TABLES - it depends. If you were to use LOCK TABLES ... WRITE on all tables in all statements, you would get the &lt;strong&gt;serializable&lt;/strong&gt; isolation level. Actually it would be more than &lt;strong&gt;serializable&lt;/strong&gt;. It would be &lt;em&gt;truely serial&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;D&lt;/strong&gt;: Durability. Did the INSERT succeed? And did the power went down just after? MyISAM provides not guarantees that the data will be there.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;So of all ACID properties, the only thing we could get is a &lt;strong&gt;serializable&lt;/strong&gt; isolation level, and that, too, only if we used LOCK TABLES ... WRITE  practically everywhere.&lt;/p&gt;
+&lt;p&gt;Where does the notion come from, then?&lt;/p&gt;
+&lt;p&gt;There&#39;s one thing which LOCK TABLES does help us with: race conditions. It effectively creates a mutex block. The same effect could be achieved when using GET_LOCK() and RELEASE_LOCK(). Perhaps this is the source of confusion.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>MySQL User Group Meetings in Israel</title>
+      <link>/blog/mysql/mysql-user-group-meetings-in-israel/</link>
+      <pubDate>Wed, 11 Mar 2009 07:42:18 +0000</pubDate>
+      
+      <guid>/blog/mysql/mysql-user-group-meetings-in-israel/</guid>
+      <description>&lt;p&gt;This is a short note that the MySQL User Group Meetings in Israel are established (well, re-established after a very long period).&lt;/p&gt;
+&lt;p&gt;Thanks to Eddy Resnick from Sun Microsystems Israel who has set up the meetings. So far, we&#39;ve had 2 successful meetings, and we intend to have more! First one was in Sun&#39;s offices in Herzlia; second one, held last week, was at &lt;a title=&#34;Interbit&#34; href=&#34;http://interbit.co.il/&#34;&gt;Interbit&lt;/a&gt; (a MySQL training center) in Ramat Gan. We hope to hold these meetings on a monthly basis, and the next ones are expected to be held at Interbit.&lt;/p&gt;
+&lt;p&gt;A new (blessed) law in Israel forbids us from sending invitations for these meetings via email without prior consent of the recepient (this law has passed as means of stopping spam). We do realize there are many users out there who would be interested in these meeting. For those users: please stay tuned to Interbit&#39;s website, where future meetings will be published - or just give them a call!&lt;/p&gt;
+&lt;p&gt;It was my honor to present a short session, one of three in this last meeting. Other presenters were Erad Deutch, who presented &#34;MySQL Success Stories&#34;, and Moshe Kaplan, who presented &#34;Sharding Solutions&#34;. I have presented &#34;MyISAM &amp;amp; InnoDB Tuning Fundamentals&#34;, where I have layed down the basics behind parameter tuning for these storage engines.&lt;/p&gt;
+&lt;p&gt;As per audience request, here&#39;s the &lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2009/03/innodb_myisam_tuning_fundamentals_share.pdf&#34;&gt;presentation&lt;/a&gt; in PDF format:&lt;/p&gt;
+&lt;p&gt;I intend to give sessions in future meetings, and have already started working on my next one. So please come, it&#39;s a fun way to pass a nice afternoon. See you there!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Less known SQL syntax and functions in MySQL</title>
+      <link>/blog/mysql/less-known-sql-syntax-and-functions-in-mysql/</link>
+      <pubDate>Sun, 23 Nov 2008 07:53:52 +0000</pubDate>
+      
+      <guid>/blog/mysql/less-known-sql-syntax-and-functions-in-mysql/</guid>
+      <description>&lt;p&gt;&#34;Standard SQL&#34; is something you read about. All popular databases have modified version of SQL. Each database adds its own flavor and features to the standard. MySQL is no different.&lt;/p&gt;
+&lt;p&gt;Some deviations are storage engine dependent. Others are more general. Many, such as &lt;strong&gt;&lt;code&gt;INSERT IGNORE&lt;/code&gt;&lt;/strong&gt;, are commonly used. Here&#39;s a list of some MySQL deviations to SQL, which are not so well known.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;I&#39;ll be using MySQL&#39;s &lt;a title=&#34;MySQL&#39;s world database setup&#34; href=&#34;http://dev.mysql.com/doc/world-setup/en/world-setup.html&#34;&gt;world database&lt;/a&gt; for demonstration.&lt;/p&gt;
+&lt;h4&gt;GROUP_CONCAT&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;Assume the following query: &lt;strong&gt;&lt;code&gt;SELECT CountryCode, COUNT(*) FROM City GROUP BY CountryCode&lt;/code&gt;&lt;/strong&gt;, which selects the number of cities per country, using MySQL&#39;s world database. It is possible to get a name for one &#34;sample&#34; city per country using standard SQL: &lt;strong&gt;&lt;code&gt;SELECT CountryCode, Name, COUNT(*) FROM City GROUP BY CountryCode&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;But in MySQL it is also possible to get the list of cities per group: &lt;strong&gt;&lt;code&gt;SELECT CountryCode, GROUP_CONCAT(Name), COUNT(*) FROM City GROUP BY CountryCode&lt;/code&gt;&lt;/strong&gt;. This will provide with a comma delimited string of all city names per country.&lt;/p&gt;
+&lt;h4&gt;ORDER BY NULL&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;If you ran the previous queries, you may have noticed that the results were ordered by CountryCode. MySQL&#39;s default behavior when &lt;strong&gt;&lt;code&gt;GROUP BY&lt;/code&gt;&lt;/strong&gt; is used, is to order by the grouped column. But this means sorting is required, possibly using merge passes and temporary tables. MySQL accepts the following syntax:&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;&lt;strong&gt;&lt;code&gt;SELECT CountryCode, COUNT(*) FROM City GROUP BY CountryCode ORDER BY NULL&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;If you &lt;strong&gt;&lt;code&gt;EXPLAIN&lt;/code&gt;&lt;/strong&gt; the query, you&#39;ll see no &#34;Using filesort&#34;. When not using &lt;strong&gt;&lt;code&gt;ORDER BY NULL&lt;/code&gt;&lt;/strong&gt;, &#34;Using filesort&#34; appears.&lt;/p&gt;
+&lt;h4&gt;ALTER TABLE ... ORDER BY&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;MyISAM tables are not clustered. The table data is independent of indexes. Depending on &lt;strong&gt;&lt;code&gt;concurrent_insert&lt;/code&gt;&lt;/strong&gt; settings, new rows are either appended to the end of the table, or fill the space previously occupied by &lt;strong&gt;DELETE&lt;/strong&gt;d rows.&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;When you &lt;strong&gt;&lt;code&gt;SELECT (*) FROM Country&lt;/code&gt;&lt;/strong&gt;, the order of rows is as stored on disk. It is possible to do a one-time reordering of rows in a MyISAM table by executing: &lt;strong&gt;&lt;code&gt;ALTER TABLE Country ORDER BY Code&lt;/code&gt;&lt;/strong&gt;. This is a lengthy operation (on large tables), which locks the table, so take care when using it. The change does not last for long, either: as you &lt;strong&gt;&lt;code&gt;INSERT&lt;/code&gt;&lt;/strong&gt; new rows, the rows get out of order again. But if your table does not get modified, or only gets modified rarely, this is a nice trick to use when order of rows is important, and you don&#39;t want to pay the price of sorting per query.&lt;/p&gt;
+&lt;h4&gt;ROW_COUNT()&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;Anyone who uses MySQL with a connector (say, Connector/J with JDBC), knows that &lt;strong&gt;&lt;code&gt;INSERT&lt;/code&gt;&lt;/strong&gt;, &lt;code&gt;&lt;strong&gt;DELETE&lt;/strong&gt; &lt;/code&gt;and &lt;code&gt;&lt;strong&gt;UPDATE&lt;/strong&gt; &lt;/code&gt;statements return with an integer value: the number of modified rows. In MySQL, the explicit way to get the number of modified rows is to invoke &lt;strong&gt;&lt;code&gt;SELECT ROW_COUNT()&lt;/code&gt;&lt;/strong&gt; right after your query. This method is useful if you like to know whether your &lt;strong&gt;&lt;code&gt;DELETE&lt;/code&gt;&lt;/strong&gt; did in fact remove rows, or &lt;strong&gt;&lt;code&gt;INSERT IGNORE&lt;/code&gt;&lt;/strong&gt; did in fact add a row, etc.&lt;/p&gt;
+&lt;h4&gt;LIMIT&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;Well, MySQL DBAs are familiar with it. I just thought I&#39;d mention &lt;strong&gt;&lt;code&gt;LIMIT&lt;/code&gt;&lt;/strong&gt;, since it&#39;s a MySQL deviation. I was surprised to find that out, when an Oracle DBA once asked me how I did paging with results. &#34;You mean like &lt;strong&gt;&lt;code&gt;LIMIT 60,10&lt;/code&gt;&lt;/strong&gt;?&#34; I asked, and he replied: &#34;LIMIT??&#34;. So, you can &lt;strong&gt;&lt;code&gt;LIMIT&lt;/code&gt;&lt;/strong&gt; to limit the number of results, like: &lt;strong&gt;&lt;code&gt;SELECT * FROM Country LIMIT 10&lt;/code&gt;&lt;/strong&gt;, to only get first 10 rows, or to do paging like: &lt;strong&gt;&lt;code&gt;SELECT * FROM Country LIMIT 60,10&lt;/code&gt;&lt;/strong&gt;, which skips 60 rows, then reads 10.&lt;/p&gt;
+&lt;h4&gt;SQL_CALC_FOUND_ROWS, FOUND_ROWS()&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;While at it, it may be required to use LIMIT to only return 10 rows, but still ask MySQL how many rows there really were. Do it like this:&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;&lt;strong&gt;&lt;code&gt;SELECT SQL_CALC_FOUND_ROWS Code, Name FROM Country LIMIT 10;&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;&lt;strong&gt;&lt;code&gt;SELECT FOUND_ROWS();&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;First query gives the required 10 results. Second query says &#34;239&#34;, which is the total rows I would get had I not used &lt;strong&gt;&lt;code&gt;LIMIT&lt;/code&gt;&lt;/strong&gt;. Note that a &lt;strong&gt;&lt;code&gt;SELECT SQL_CALC_FOUND_ROWS&lt;/code&gt;&lt;/strong&gt; is a &#34;heavy&#34; query, which actually searches through the entire rowset, and then only returns the LIMITed rows. Use with care.&lt;/p&gt;
+&lt;h4&gt;PROCEDURE ANALYSE&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;A very nice diagnostic tool, which tells us what data types are proper based on existing data. If we have an &lt;strong&gt;&lt;code&gt;INT&lt;/code&gt;&lt;/strong&gt; column, but all values are smaller than 200, &lt;strong&gt;&lt;code&gt;PROCEDURE_ANALYSE()&lt;/code&gt;&lt;/strong&gt; recommends that we use a &lt;strong&gt;&lt;code&gt;TINYINT&lt;/code&gt;&lt;/strong&gt;. Usage: &lt;strong&gt;&lt;code&gt;SELECT * FROM Country PROCEDURE ANALYSE(10,10)&lt;/code&gt;&lt;/strong&gt;. Just remember it does not anticipate data growth. It only relies on current data.&lt;/p&gt;
+&lt;h4&gt;INSERT IGNORE&lt;/h4&gt;
+&lt;p style=&#34;padding-left: 30px;&#34;&gt;OK, I said above that it is commonly used, but couldn&#39;t help myself, it&#39;s just too useful to leave out. &lt;strong&gt;&lt;code&gt;INSERT IGNORE INTO City (id, Name) VALUES (1000, &#39;Te Anau&#39;)&lt;/code&gt;&lt;/strong&gt; will silently abort if there&#39;s a &lt;strong&gt;&lt;code&gt;UNIQUE KEY&lt;/code&gt;&lt;/strong&gt; on `id` and an existing id=1000 value. A normal &lt;strong&gt;&lt;code&gt;INSERT&lt;/code&gt;&lt;/strong&gt; will terminate with an error, or raise an Exception in your application&#39;s code. It is of particular use when doing an extended INSERT: &lt;strong&gt;&lt;code&gt;INSERT IGNORE INTO City (id, Name) VALUES (1000, &#39;Te Anau&#39;), (9009, &#39;Wanaka&#39;)&lt;/code&gt;&lt;/strong&gt; may have trouble with the first row, but &lt;em&gt;will&lt;/em&gt; insert the second row. &lt;strong&gt;&lt;code&gt;ROW_COUNT()&lt;/code&gt;&lt;/strong&gt; can tell me how well it went.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Two storage engines; different plans, Part II</title>
+      <link>/blog/mysql/two-storage-engines-different-plans-part-ii/</link>
+      <pubDate>Fri, 07 Nov 2008 19:55:08 +0000</pubDate>
+      
+      <guid>/blog/mysql/two-storage-engines-different-plans-part-ii/</guid>
+      <description>&lt;p&gt;In &lt;a title=&#34; Two storage engines; different plans, Part I&#34; href=&#34;http://code.openark.org/blog/?p=9&#34;&gt;Part I&lt;/a&gt; of this article, we have seen how the internal structure of the storage engine&#39;s index can affect an execution plan. We&#39;ve seen that some plans are inherent to the way engines are implemented.&lt;/p&gt;
+&lt;p&gt;We wish to present a second scenario in which execution plans vary for different storage engines. Again, we will consider MyISAM and InnoDB. Again, we will use the world database for testing. This time, we will see how confident the storage engines are in their index search capabilities.&lt;/p&gt;
+&lt;p&gt;Many newcomers to databases often believe that an index search is always preferable to full table scan. This is not the case. If I were to look for 10 rows in a 1,000,000 rows table, using an indexed column - I could benefit from an index search. However, if I’m looking for 200,000 rows on that table (that’s 20% of the rows) - an index search can actually be much more expensive than a full table scan.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;There are several points to consider here: a full table scan is often close to sequential, whereas an index traversal is not. Not only are the index nodes stored non sequentially, but the links from the index to table data may look like a macaroni plate. Also, the index structure itself is a tree-structure, and it can be shown that the number of pages in the index can be larger than the number of pages in the table. Even for partial index scans, it may be worthwhile to simply scan the table.&lt;/p&gt;
+&lt;p&gt;The threshold above which table scan is preferred is somewhere between 10% and 30% in common DBMS.&lt;/p&gt;
+&lt;p&gt;We will consider here a scenario where we index a two-valued column, a simple ‘T’ and ‘F’ enum. “That’s a very poor column to index”, you may say. But what if the ratio between the two values is high? Say, 1000:1? Should there be different search plans for the ‘F’ valued rows and for the ‘T’ valued rows?&lt;/p&gt;
+&lt;p&gt;Let us duplicate the CountryLanguage table, and make it much larger. We will create a table named “cl”, with some 125K rows.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; SHOW CREATE TABLE CountryLanguage \G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+Table: CountryLanguage&lt;br /&gt;
+Create Table: CREATE TABLE `CountryLanguage` (&lt;br /&gt;
+`CountryCode` char(3) NOT NULL default &#39;&#39;,&lt;br /&gt;
+`Language` char(30) NOT NULL default &#39;&#39;,&lt;br /&gt;
+`IsOfficial` enum(&#39;T&#39;,&#39;F&#39;) NOT NULL default &#39;F&#39;,&lt;br /&gt;
+`Percentage` float(4,1) NOT NULL default &#39;0.0&#39;,&lt;br /&gt;
+PRIMARY KEY  (`CountryCode`,`Language`)&lt;br /&gt;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; CREATE TABLE cl SELECT * FROM CountryLanguage;&lt;br /&gt;
+Query OK, 984 rows affected (0.02 sec)&lt;br /&gt;
+Records: 984  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;And now make it very large:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; INSERT INTO cl SELECT * FROM cl;&lt;br /&gt;
+Query OK, 984 rows affected (0.02 sec)&lt;br /&gt;
+Records: 984  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;…&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; INSERT INTO cl SELECT * FROM cl;&lt;br /&gt;
+Query OK, 62976 rows affected (0.08 sec)&lt;br /&gt;
+Records: 62976  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; UPDATE cl SET IsOfficial=&#39;F&#39;;&lt;br /&gt;
+Query OK, 1265 rows affected (0.23 sec)&lt;br /&gt;
+Rows matched: 125952  Changed: 1265  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; UPDATE cl SET IsOfficial=&#39;T&#39; WHERE RAND()&amp;lt;0.001;&lt;br /&gt;
+Query OK, 148 rows affected (0.20 sec)&lt;br /&gt;
+Rows matched: 148  Changed: 148  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;We have now a large table, where the majority of rows have ‘F’ values for ‘IsOfficial’, and the minority have ‘T’. We shall now add an index on this column, and will then make sure the table is in MyISAM (it may be created with another storage engine, depending on our default engine parameter).&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; ALTER TABLE cl ADD INDEX (IsOfficial);&lt;br /&gt;
+Query OK, 125952 rows affected (0.31 sec)&lt;br /&gt;
+Records: 125952  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; ALTER TABLE cl ENGINE=MyISAM;&lt;br /&gt;
+Query OK, 125952 rows affected (1.21 sec)&lt;br /&gt;
+Records: 125952  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Now let us compare the search plans for ‘F’ and for ‘T’.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial=&#39;F&#39; \G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: cl&lt;br /&gt;
+type: ALL&lt;br /&gt;
+possible_keys: IsOfficial&lt;br /&gt;
+key: NULL&lt;br /&gt;
+key_len: NULL&lt;br /&gt;
+ref: NULL&lt;br /&gt;
+rows: 94464&lt;br /&gt;
+Extra: Using where&lt;br /&gt;
+1 row in set (0.02 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial=&#39;T&#39; \G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: cl&lt;br /&gt;
+type: ref&lt;br /&gt;
+possible_keys: IsOfficial&lt;br /&gt;
+key: IsOfficial&lt;br /&gt;
+key_len: 1&lt;br /&gt;
+ref: const&lt;br /&gt;
+rows: 138&lt;br /&gt;
+Extra: Using where&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;What MyISAM decided was that an index search on the ‘F’ rows is useless. A table scan was deemed to be preferable. However, for ‘T’ values rows, the index we created was just fine, and would indeed be used.&lt;/p&gt;
+&lt;p&gt;InnoDB will state differently.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; ALTER TABLE cl ENGINE=InnoDB;&lt;br /&gt;
+Query OK, 125952 rows affected (1.07 sec)&lt;br /&gt;
+Records: 125952  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial=&#39;F&#39; \G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: cl&lt;br /&gt;
+type: ref&lt;br /&gt;
+possible_keys: IsOfficial&lt;br /&gt;
+key: IsOfficial&lt;br /&gt;
+key_len: 1&lt;br /&gt;
+ref: const&lt;br /&gt;
+rows: 61667&lt;br /&gt;
+Extra: Using where&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial=&#39;T&#39; \G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: cl&lt;br /&gt;
+type: ref&lt;br /&gt;
+possible_keys: IsOfficial&lt;br /&gt;
+key: IsOfficial&lt;br /&gt;
+key_len: 1&lt;br /&gt;
+ref: const&lt;br /&gt;
+rows: 148&lt;br /&gt;
+Extra: Using where&lt;br /&gt;
+1 row in set (0.00 sec)&lt;br /&gt;
+&lt;/code&gt;&lt;br /&gt;
+&lt;/strong&gt;On the ‘T’ search, MyISAM and InnoDB agree. But look at the plan for the ‘F’ rows: InnoDB still prefers an index search to table scan, even though it estimates a lookup on 50% of the rows.&lt;/p&gt;
+&lt;p&gt;The behavior just exposed is not entirely consistent. InnoDB and MyISAM differ in the way they update the index statistics. While ANALYZE TABLE on MyISAM performs an exaustive search on index values, InnoDB will only do 10 random test dives and return with a rough calculation. In fact, InnDB’s estimations can greatly vary from the real values distribution, and successive calls to ANALYZE table can produce varying results.&lt;/p&gt;
+&lt;p&gt;What has been presented in this part is not a rule to live by. You shouldn’t base your queries or expected behavior on the index distribution or search plan calculated by the storage engine. These may change in time. What’s instructive here is the freedom MySQL gives the storage engines in decision making, and the different actions taken when dealing with different engines.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Two storage engines; different plans, Part I</title>
+      <link>/blog/mysql/two-storage-engines-different-plans-part-i/</link>
+      <pubDate>Sat, 01 Nov 2008 18:36:29 +0000</pubDate>
+      
+      <guid>/blog/mysql/two-storage-engines-different-plans-part-i/</guid>
+      <description>&lt;p&gt;A popping question is: &#34;Can an execution plan change for different storage engines?&#34;&lt;/p&gt;
+&lt;p&gt;The answer is &#34;Yes&#34;. I will present two such cases, where the MySQL optimizer will choose different execution plans, based on our choice of storage engine.&lt;/p&gt;
+&lt;p&gt;We will consider MyISAM and InnoDB, the two most popular engines. The two differ in many respects, and in particular, the way they implement indexes and statistics: two major players in the optimizer&#39;s point of view.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;Let&#39;s start with the famous &lt;em&gt;world &lt;/em&gt;database, available from &lt;a title=&#34;http://dev.mysql.com/doc/world-setup/en/world-setup.html&#34; href=&#34;http://dev.mysql.com/doc/world-setup/en/world-setup.html&#34;&gt;dev.mysql.com&lt;/a&gt;. All tables in this schema are defined as MyISAM. We will alter them between MyISAM and InnoDB as we go along.&lt;/p&gt;
+&lt;p&gt;A peek at the Country table reveals:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; SHOW CREATE TABLE Country \G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+Table: Country&lt;br /&gt;
+Create Table: CREATE TABLE `Country` (&lt;br /&gt;
+`Code` char(3) NOT NULL default &#39;&#39;,&lt;br /&gt;
+`Name` char(52) NOT NULL default &#39;&#39;,&lt;br /&gt;
+`Continent` enum(&#39;Asia&#39;,&#39;Europe&#39;,&#39;North America&#39;,&#39;Africa&#39;,&#39;Oceania&#39;,&#39;Antarctica&#39;,&#39;South America&#39;) NOT NULL default &#39;Asia&#39;,&lt;br /&gt;
+...&lt;br /&gt;
+PRIMARY KEY  (`Code`)&lt;br /&gt;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;To see the first example of execution plan difference, we will add an index on the Country table:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;ALTER TABLE Country ADD INDEX (Continent);&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;And run the following query to find European country codes:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; SELECT Code FROM Country WHERE Continent = &#39;Europe&#39;;&lt;br /&gt;
++------+&lt;br /&gt;
+| Code |&lt;br /&gt;
++------+&lt;br /&gt;
+| NLD  |&lt;br /&gt;
+| ALB  |&lt;br /&gt;
+| AND  |&lt;br /&gt;
+| BEL  |&lt;br /&gt;
+| BIH  |&lt;br /&gt;
+| GBR  |&lt;br /&gt;
+...&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;But how is this query executed?&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT Code FROM Country WHERE Continent = &#39;Europe&#39;\G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: Country&lt;br /&gt;
+type: ref&lt;br /&gt;
+possible_keys: Continent&lt;br /&gt;
+key: Continent&lt;br /&gt;
+key_len: 1&lt;br /&gt;
+ref: const&lt;br /&gt;
+rows: 37&lt;br /&gt;
+Extra: Using where&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Simple enough: we asked for European countries only. MySQL has found the index on Continent to be appropriate. However, to get the actual Code, a table row read was necessary.&lt;/p&gt;
+&lt;p&gt;InnoDB will provide a different plan, though:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; ALTER TABLE Country ENGINE=InnoDB;&lt;br /&gt;
+Query OK, 239 rows affected (0.18 sec)&lt;br /&gt;
+Records: 239  Duplicates: 0  Warnings: 0&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT Code FROM Country WHERE Continent = &#39;Europe&#39;\G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: Country&lt;br /&gt;
+type: ref&lt;br /&gt;
+possible_keys: Continent&lt;br /&gt;
+key: Continent&lt;br /&gt;
+key_len: 1&lt;br /&gt;
+ref: const&lt;br /&gt;
+rows: 46&lt;br /&gt;
+Extra: Using where; Using index&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Can you spot the difference? The &#34;Extra&#34; column now indicates &#34;Using index&#34; (The numbers of expected rows also differ, but that&#39;s another issue).&lt;/p&gt;
+&lt;p&gt;The reason for this change lies with the way MyISAM and InnoDB implement indexes. MyISAM takes the approach where the table data resides in its own space (and in fact, its own file), and all indexes refer to rows in that space. MyISAM is using nonclustered indexes.&lt;/p&gt;
+&lt;p&gt;InnoDB, however, uses a clustered index on the PRIMARY KEY. That is, for every table there is always a PRIMARY KEY index (even if we never defined one), and table data is aggregated withing the index&#39; structure. And so, to access table rows, one must first traverse the PRIMARY KEY index. This type of index is called a &#34;clustered index&#34;. The Code column is the primary key, and therefore the data is clustered on the Code column.&lt;/p&gt;
+&lt;p&gt;InnoDB&#39;s secondary indexes behave altogether differently. A secondary index does not refer to the table rows directly, but instead refer to the PRIMARY KEY value, which relates to those rows. A table look up using a secondary key involves a search on that key, only to get a PRIMARY KEY value, and search on that clustered index as well. A side effect is that a secondary index includes the values of the PRIMARY KEY. Each secondary index, like the one we created on Continent, is somewhat a compound index, like on (Continent, Code). This is the reason that for our query, a search on the index was enough. There was no need to access table data, since all relevant data could be found within the index.&lt;/p&gt;
+&lt;p&gt;I say &#34;somewhat&#34;, because in contrast with an index on (Continent, Code), the index does not necessarily store the PRIMARY KEY values in any particular order. To prove this, let&#39;s ask the following:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;mysql&amp;gt; EXPLAIN SELECT Code FROM Country WHERE Continent = &#39;Europe&#39; ORDER BY Code\G&lt;br /&gt;
+*************************** 1. row ***************************&lt;br /&gt;
+id: 1&lt;br /&gt;
+select_type: SIMPLE&lt;br /&gt;
+table: Country&lt;br /&gt;
+type: ref&lt;br /&gt;
+possible_keys: Continent&lt;br /&gt;
+key: Continent&lt;br /&gt;
+key_len: 1&lt;br /&gt;
+ref: const&lt;br /&gt;
+rows: 46&lt;br /&gt;
+Extra: Using where; Using index; Using filesort&lt;br /&gt;
+1 row in set (0.00 sec)&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;There&#39;s a &#34;Using filesort&#34; comment in the &#34;Extra&#34; column, which would not be there had we used a compound index on (Continent, Code).&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

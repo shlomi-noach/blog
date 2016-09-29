@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Data Integrity on code.openark.org</title>
+    <link>/blog/tag/data-integrity/</link>
+    <description>Recent content in Data Integrity on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Mon, 14 May 2012 07:52:41 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/data-integrity/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Impact of foreign keys absence on replicating slaves</title>
+      <link>/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves/</link>
+      <pubDate>Mon, 14 May 2012 07:52:41 +0000</pubDate>
+      
+      <guid>/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves/</guid>
+      <description>&lt;p&gt;In this post I describe what happens when a slave&#39;s Foreign Key setup is different from that of the master. I&#39;m in particular interested in a setup where the slave has a subset of the master&#39;s foreign keys, or no foreign keys at all. I wish to observe whether integrity holds.&lt;/p&gt;
+&lt;h4&gt;Making the changes&lt;/h4&gt;
+&lt;p&gt;Which foreign keys do we have and how do we drop them? If you want to do this by hand, well, good luck! Fortunately, &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt; provides with quite a few handy views and routines to assist us. Consider viewing the existing foreign keys on &lt;strong&gt;sakila&lt;/strong&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;master&amp;gt; SELECT &lt;strong&gt;create_statement&lt;/strong&gt; FROM &lt;strong&gt;common_schema.sql_foreign_keys&lt;/strong&gt; WHERE TABLE_SCHEMA=&#39;sakila&#39;;
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| create_statement                                                                                                                                                                                |
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` ADD CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `sakila`.`city` (`city_id`) ON DELETE RESTRICT ON UPDATE CASCADE                             |
+| ALTER TABLE `sakila`.`city` ADD CONSTRAINT `fk_city_country` FOREIGN KEY (`country_id`) REFERENCES `sakila`.`country` (`country_id`) ON DELETE RESTRICT ON UPDATE CASCADE                       |
+| ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE               |
+| ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE                       |
+| ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE                   |
+| ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE |
+| ALTER TABLE `sakila`.`film_actor` ADD CONSTRAINT `fk_film_actor_actor` FOREIGN KEY (`actor_id`) REFERENCES `sakila`.`actor` (`actor_id`) ON DELETE RESTRICT ON UPDATE CASCADE                   |
+| ALTER TABLE `sakila`.`film_actor` ADD CONSTRAINT `fk_film_actor_film` FOREIGN KEY (`film_id`) REFERENCES `sakila`.`film` (`film_id`) ON DELETE RESTRICT ON UPDATE CASCADE                       |
+| ALTER TABLE `sakila`.`film_category` ADD CONSTRAINT `fk_film_category_category` FOREIGN KEY (`category_id`) REFERENCES `sakila`.`category` (`category_id`) ON DELETE RESTRICT ON UPDATE CASCADE |
+| ALTER TABLE `sakila`.`film_category` ADD CONSTRAINT `fk_film_category_film` FOREIGN KEY (`film_id`) REFERENCES `sakila`.`film` (`film_id`) ON DELETE RESTRICT ON UPDATE CASCADE                 |
+| ALTER TABLE `sakila`.`inventory` ADD CONSTRAINT `fk_inventory_film` FOREIGN KEY (`film_id`) REFERENCES `sakila`.`film` (`film_id`) ON DELETE RESTRICT ON UPDATE CASCADE                         |
+| ALTER TABLE `sakila`.`inventory` ADD CONSTRAINT `fk_inventory_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE                     |
+| ALTER TABLE `sakila`.`payment` ADD CONSTRAINT `fk_payment_customer` FOREIGN KEY (`customer_id`) REFERENCES `sakila`.`customer` (`customer_id`) ON DELETE RESTRICT ON UPDATE CASCADE             |
+| ALTER TABLE `sakila`.`payment` ADD CONSTRAINT `fk_payment_rental` FOREIGN KEY (`rental_id`) REFERENCES `sakila`.`rental` (`rental_id`) ON DELETE SET NULL ON UPDATE CASCADE                     |
+| ALTER TABLE `sakila`.`payment` ADD CONSTRAINT `fk_payment_staff` FOREIGN KEY (`staff_id`) REFERENCES `sakila`.`staff` (`staff_id`) ON DELETE RESTRICT ON UPDATE CASCADE                         |
+| ALTER TABLE `sakila`.`rental` ADD CONSTRAINT `fk_rental_customer` FOREIGN KEY (`customer_id`) REFERENCES `sakila`.`customer` (`customer_id`) ON DELETE RESTRICT ON UPDATE CASCADE               |
+| ALTER TABLE `sakila`.`rental` ADD CONSTRAINT `fk_rental_inventory` FOREIGN KEY (`inventory_id`) REFERENCES `sakila`.`inventory` (`inventory_id`) ON DELETE RESTRICT ON UPDATE CASCADE           |
+| ALTER TABLE `sakila`.`rental` ADD CONSTRAINT `fk_rental_staff` FOREIGN KEY (`staff_id`) REFERENCES `sakila`.`staff` (`staff_id`) ON DELETE RESTRICT ON UPDATE CASCADE                           |
+| ALTER TABLE `sakila`.`staff` ADD CONSTRAINT `fk_staff_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE                     |
+| ALTER TABLE `sakila`.`staff` ADD CONSTRAINT `fk_staff_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE                             |
+| ALTER TABLE `sakila`.`store` ADD CONSTRAINT `fk_store_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE                     |
+| ALTER TABLE `sakila`.`store` ADD CONSTRAINT `fk_store_staff` FOREIGN KEY (`manager_staff_id`) REFERENCES `sakila`.`staff` (`staff_id`) ON DELETE RESTRICT ON UPDATE CASCADE                     |
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Most of the foreign key constraints use &lt;strong&gt;RESTRICT&lt;/strong&gt; for &lt;strong&gt;DELETE&lt;/strong&gt; (meaning you are not allowed to delete a parent row when children exist), and &lt;strong&gt;CASCADE&lt;/strong&gt; for &lt;strong&gt;UPDATE&lt;/strong&gt; (meaning changes to parent will propagate to children). This is good, since I want to test behavior of both &lt;strong&gt;RESTRICT&lt;/strong&gt; and &lt;strong&gt;CASCADE&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;OK, we wish to remove these constraints from the slave. To see what we are going to do, consider:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;slave1&amp;gt; select &lt;strong&gt;drop_statement&lt;/strong&gt; from &lt;strong&gt;common_schema.sql_foreign_keys&lt;/strong&gt; where table_schema=&#39;sakila&#39;;
++-----------------------------------------------------------------------------------+
+| drop_statement                                                                    |
++-----------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` DROP FOREIGN KEY `fk_address_city`                 |
+| ALTER TABLE `sakila`.`city` DROP FOREIGN KEY `fk_city_country`                    |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_address`            |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_store`              |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language`                   |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language_original`          |
+| ALTER TABLE `sakila`.`film_actor` DROP FOREIGN KEY `fk_film_actor_actor`          |
+| ALTER TABLE `sakila`.`film_actor` DROP FOREIGN KEY `fk_film_actor_film`           |
+| ALTER TABLE `sakila`.`film_category` DROP FOREIGN KEY `fk_film_category_category` |
+| ALTER TABLE `sakila`.`film_category` DROP FOREIGN KEY `fk_film_category_film`     |
+| ALTER TABLE `sakila`.`inventory` DROP FOREIGN KEY `fk_inventory_film`             |
+| ALTER TABLE `sakila`.`inventory` DROP FOREIGN KEY `fk_inventory_store`            |
+| ALTER TABLE `sakila`.`payment` DROP FOREIGN KEY `fk_payment_customer`             |
+| ALTER TABLE `sakila`.`payment` DROP FOREIGN KEY `fk_payment_rental`               |
+| ALTER TABLE `sakila`.`payment` DROP FOREIGN KEY `fk_payment_staff`                |
+| ALTER TABLE `sakila`.`rental` DROP FOREIGN KEY `fk_rental_customer`               |
+| ALTER TABLE `sakila`.`rental` DROP FOREIGN KEY `fk_rental_inventory`              |
+| ALTER TABLE `sakila`.`rental` DROP FOREIGN KEY `fk_rental_staff`                  |
+| ALTER TABLE `sakila`.`staff` DROP FOREIGN KEY `fk_staff_address`                  |
+| ALTER TABLE `sakila`.`staff` DROP FOREIGN KEY `fk_staff_store`                    |
+| ALTER TABLE `sakila`.`store` DROP FOREIGN KEY `fk_store_address`                  |
+| ALTER TABLE `sakila`.`store` DROP FOREIGN KEY `fk_store_staff`                    |
++-----------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To actually make the DROP, we use &lt;em&gt;common_schema&lt;/em&gt;&#39;s &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html&#34;&gt;eval()&lt;/a&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;slave1&amp;gt; call &lt;strong&gt;common_schema.eval&lt;/strong&gt;(&#34;select drop_statement from common_schema.sql_foreign_keys where table_schema=&#39;sakila&#39;&#34;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;eval()&lt;/em&gt; is a handy routine which invokes statements generated by the given query.&lt;/p&gt;
+&lt;p&gt;This concludes the setup part.&lt;/p&gt;
+&lt;p&gt;Tests will include:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Attempting to delete a parent row&lt;/li&gt;
+&lt;li&gt;Attempting to add an invalid child row&lt;/li&gt;
+&lt;li&gt;Attempting to update parent row&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;I was thinking there would be a difference between the two binary log file formats: &lt;strong&gt;STATEMENT&lt;/strong&gt; and &lt;strong&gt;ROW&lt;/strong&gt;. But the tests I produced showed no difference.&lt;/p&gt;
+&lt;h4&gt;Tests&lt;/h4&gt;
+&lt;p&gt;Attempting to delete parent row:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;master&amp;gt; delete from actor where actor_id=1;
+ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key constraint fails (`sakila`.`film_actor`, CONSTRAINT `fk_film_actor_actor` FOREIGN KEY (`actor_id`) REFERENCES `actor` (`actor_id`) ON UPDATE CASCADE)
+
+slave1&amp;gt; select * from actor where actor_id=1;
++----------+------------+-----------+---------------------+
+| actor_id | first_name | last_name | last_update         |
++----------+------------+-----------+---------------------+
+|        1 | PENELOPE   | GUINESS   | 2006-02-15 04:34:33 |
++----------+------------+-----------+---------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Good: the master refused the &lt;strong&gt;DELETE&lt;/strong&gt;, and no &lt;strong&gt;DELETE&lt;/strong&gt; occurred on slave. Integrity is intact.&lt;/p&gt;
+&lt;p&gt;Attempting to add an invalid child row:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;master&amp;gt; insert into film_actor (actor_id, film_id, last_update) values (9999, 1, NOW());
+ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint fails (`sakila`.`film_actor`, CONSTRAINT `fk_film_actor_actor` FOREIGN KEY (`actor_id`) REFERENCES `actor` (`actor_id`) ON UPDATE CASCADE)
+
+slave&amp;gt; select * from film_actor where actor_id=9999;
+Empty set (0.00 sec)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Integrity is still intact.&lt;/p&gt;
+&lt;p&gt;Attempting to update parent row: there is nothing invalid about this operation. I&#39;m wondering whether changes are &lt;strong&gt;CASCADE&lt;/strong&gt;d on slave as well as on master:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;master&amp;gt; update actor set actor_id=999 where actor_id=199;
+
+master&amp;gt; select count(*) from film_actor where actor_id=999;
++----------+
+| count(*) |
++----------+
+|       15 |
++----------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;strong&gt;999&lt;/strong&gt; value wasn&#39;t there before on the master, so this verifies the &lt;strong&gt;CASCADE&lt;/strong&gt; works on master. As for slave:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;slave&amp;gt; select count(*) from actor where actor_id=999;
++----------+
+| count(*) |
++----------+
+|        1 |
++----------+
+
+slave&amp;gt; select count(*) from film_actor where actor_id=999;
++----------+
+| count(*) |
++----------+
+|        0 |
++----------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Bummer! The actor&#39;s row was updated, but cascading did not work on slave.&lt;/p&gt;
+&lt;p&gt;This is actually &lt;a href=&#34;http://dev.mysql.com/doc/refman/5.0/en/innodb-and-mysql-replication.html&#34;&gt;documented&lt;/a&gt;. However, the documentation only relates to the issue of slave tables being &lt;strong&gt;MyISAM&lt;/strong&gt;. The problem occurs even when the slave tables are &lt;strong&gt;InnoDB&lt;/strong&gt;, and have no foreign key constraints.&lt;/p&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;My personal interest in the scenario is due to something I&#39;m working on, I&#39;ll elaborate on a future post. People sometime hope to get rid of foreign keys, and might wonder whether replication performance would boost having constraints removed on slaves.&lt;/p&gt;
+&lt;p&gt;When slave does not enforce foreign keys, you cannot rely on integrity with cascading constraints. An ugly patch might be to use triggers so as to &lt;a href=&#34;http://code.openark.org/blog/mysql/triggers-use-case-compilation-part-i&#34;&gt;simulate their behavior&lt;/a&gt;. Performance wise this is very bad.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

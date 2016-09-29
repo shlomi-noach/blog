@@ -1,0 +1,637 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Opinions on code.openark.org</title>
+    <link>/blog/tag/opinions/</link>
+    <description>Recent content in Opinions on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Wed, 28 Sep 2016 14:22:14 +0000</lastBuildDate>
+    <atom:link href="/blog/tag/opinions/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Three wishes for a new year</title>
+      <link>/blog/mysql/three-wishes-for-a-new-year-4</link>
+      <pubDate>Wed, 28 Sep 2016 14:22:14 +0000</pubDate>
+      
+      <guid>/blog/mysql/three-wishes-for-a-new-year-4</guid>
+      <description>&lt;p&gt;(Almost) another new year by Jewish calendar. What do I wish for the following year?&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;World peace&lt;/li&gt;
+&lt;li&gt;Good health to all&lt;/li&gt;
+&lt;li&gt;Relaxed GTID constraints&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;I&#39;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? &lt;code&gt;gh-ost&lt;/code&gt;&amp;nbsp;has to write something to the binary log. Thus, it &#34;corrupts&#34; the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but...&lt;/p&gt;
+&lt;p&gt;I understand the idea and need for the &lt;code&gt;Executed GTID Set&lt;/code&gt;. It will&amp;nbsp;certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a &lt;code&gt;flush tables with read lock&lt;/code&gt;&amp;nbsp;without disabling &lt;code&gt;sql_log_bin&lt;/code&gt;. Things just happen.&lt;/p&gt;
+&lt;p&gt;For that, I would like to suggest GTID control levels, such as:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;em&gt;Strict&lt;/em&gt;: same as Oracle&#39;s existing&amp;nbsp;implementation. Executed sets, purged sets, whatnot.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Last executed&lt;/em&gt;: a mode where the only thing that counts is the last executed GTID value. If I repoint replica,&amp;nbsp;all it needs to check is &#34;hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don&#39;t care about comparing executed and purged sets, I will trust you and keep running from that point on&#34;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Declarative&lt;/em&gt;: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;I realize Oracle MySQL GTID is out for some over 3 years now, but I&#39;m sorry - I still have reservations and see&amp;nbsp;use cases where I fear it will not serve me right.&lt;/p&gt;
+&lt;p&gt;How about my previous years wishes? World peace and good health never came through, however:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;My &lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-2015&#34;&gt;2015 wish&lt;/a&gt; for &#34;decent, operations friendly built in online table refactoring&#34; was unmet, however &lt;code&gt;gh-ost&lt;/code&gt;&amp;nbsp;is a thing now and exceeds my expectations. No, really. Please come see &lt;a href=&#34;https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations&#34;&gt;Tom &amp;amp; myself present gh-ost&lt;/a&gt; and how it changed our migration paradigm.&lt;/li&gt;
+&lt;li&gt;My &lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-201&#34;&gt;2012 wish&lt;/a&gt; for &#34;decent, long waited for, implementation of &lt;a href=&#34;http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function&#34;&gt;Window Functions&lt;/a&gt; (aka Analytic Functions) for MySQL&#34; was met by&amp;nbsp;MariaDB&#39;s &lt;a href=&#34;https://mariadb.com/kb/en/mariadb/window-functions/&#34;&gt;window functions&lt;/a&gt;.&lt;br&gt;
+Not strictly Window Functions, but Oracle MySQL 8.0 will &lt;a href=&#34;http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/&#34;&gt;support CTE&lt;/a&gt; (hierarchial/recursive), worth a mention.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;See you in Amsterdam!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Thoughts on MaxScale automated failover (and Orchestrator)</title>
+      <link>/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator/</link>
+      <pubDate>Wed, 18 Nov 2015 11:17:48 +0000</pubDate>
+      
+      <guid>/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator/</guid>
+      <description>&lt;p&gt;Having attended a talk (as part of the &lt;a href=&#34;https://blog.mariadb.org/2015-developers-meeting-amsterdam/&#34;&gt;MariaDB Developer Meeting in Amsterdam&lt;/a&gt;) about recent developments of &lt;a href=&#34;https://mariadb.com/products/mariadb-maxscale&#34;&gt;MaxScale&lt;/a&gt; in executing automated failovers, here are some (late) observations of mine.&lt;/p&gt;
+&lt;p&gt;I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food for thought, points for action and otherwise recommendations.&lt;/p&gt;
+&lt;p&gt;Some functionality of the MaxScale failover is also implemented by &lt;strong&gt;&lt;a href=&#34;https://github.com/outbrain/orchestrator&#34;&gt;orchestrator&lt;/a&gt;&lt;/strong&gt;, which I author. &lt;em&gt;Orchestrator&lt;/em&gt; was built in production environments by and for operational people. In this respect it has gained many insights and had to cope with many real-world cases, special cases &amp;amp; Murphy&#39;s law cases. This post compares logic, feature set and capabilities of the two where relevant. To some extent the below will read as &#34;hey, I&#39;ve already implemented this; shame to re-implement the same&#34;, and indeed I think that way; but it wouldn&#39;t be the first time a code of mine would just be re-implemented by someone else and I&#39;ve done the same, myself.&lt;/p&gt;
+&lt;p&gt;I&#39;m describing the solution the way I understood it from the talk. If I&#39;m wrong on any account I&#39;m happy to be corrected via comments below. &lt;strong&gt;Edit:&lt;/strong&gt; &lt;em&gt;please see comment by&lt;/em&gt; &lt;a class=&#34;url&#34; href=&#34;http://www.mariadb.com/&#34; rel=&#34;external nofollow&#34;&gt;Dipti Joshi&lt;/a&gt;&lt;/p&gt;
+&lt;h3&gt;General overview&lt;/h3&gt;
+&lt;p&gt;The idea is that MaxScale operates as a proxy to your topology. You do not connect to your master directly, but rather through MaxScale. Thus, MaxScale acts as a proxy to your master.&lt;/p&gt;
+&lt;p&gt;The next phase is that MaxScale would also auto-detect master failure, fix the topology for you, promote a new master, and will have your application unaware of all the complexity and without the app having to change setup/DNS/whatever. Of course some write downtime is implied.&lt;/p&gt;
+&lt;p&gt;Now for some breakdown.&lt;/p&gt;
+&lt;h3&gt;Detection&lt;/h3&gt;
+&lt;p&gt;The detection of a dead master, the check by which a failover is initiated, is based on MaxScale not being able to query the master. This calls for some points for consideration:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Typically, I would see &#34;I can&#39;t connect to the master therefore failover&#34; as too hysterical, and the basis for a lot of false positives.&lt;/li&gt;
+&lt;li&gt;However, since in the discussed configuration MaxScale is &lt;em&gt;the only access point&lt;/em&gt; to the master, the fact MaxScale cannot connect to the master means the master is inaccessible &lt;em&gt;de-facto&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;In light of the above, the decision makes sense - but I still hold that it would make false positives.&lt;/li&gt;
+&lt;li&gt;I&#39;m unsure (I &lt;em&gt;think&lt;/em&gt; not; can anyone comment?) if MaxScale would make multiple attempts over time and only reach the conclusion after X successive failures. This would reduce the false positives.&lt;/li&gt;
+&lt;li&gt;I&#39;m having a growing dislike to a &#34;check for 4 successive times then alert/failover&#34; Nagios-style behavior. &lt;em&gt;Orchestrator&lt;/em&gt; takes a different approach where it recognizes a master&#39;s death by not being able to connect to the master &lt;em&gt;as well as&lt;/em&gt; being able to connect to 1st tier slaves, check their status and observe that &lt;em&gt;they&#39;re unable to connect to the master as well&lt;/em&gt;. See &lt;a title=&#34;Permanent Link to What makes a MySQL server failure/recovery case?&#34; href=&#34;http://code.openark.org/blog/mysql/what-makes-a-mysql-server-failurerecovery-case&#34; rel=&#34;bookmark&#34;&gt;What makes a MySQL server failure/recovery case?&lt;/a&gt;. This approach still calls for further refinement (what if the master is temporarily deadlocked? Is this a failover or not?).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;Assumed topology&lt;/h3&gt;
+&lt;p&gt;MaxScale assumes the topology is all MariaDB, and all slaves are using (MariaDB) GTID replication. Well, MaxScale does not actually assumes that. It is assumed so by the &lt;a href=&#34;https://github.com/mariadb-corporation/replication-manager&#34;&gt;MariaDB Replication Manager&lt;/a&gt; which MaxScale invokes. But I&#39;m getting ahead of myself here.&lt;/p&gt;
+&lt;h3&gt;Topology detection&lt;/h3&gt;
+&lt;p&gt;MaxScale does not recognize the master by configuration but rather by state. It observes the servers it should observe, and concludes which is the master.&lt;/p&gt;
+&lt;p&gt;I&#39;m using similar approach in &lt;em&gt;orchestrator&lt;/em&gt;. I maintain that this approach works well and opens the Chakras for complex recovery options.&lt;/p&gt;
+&lt;h3&gt;Upon failure detection&lt;/h3&gt;
+&lt;p&gt;When MaxScale detects failure, it invokes external scripts to fix the problem. There are some similar and different particulars here as compared to &lt;em&gt;orchestrator&lt;/em&gt;, and I will explain what&#39;s wrong with the MaxScale approach:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Although MaxScale observes the topology and understands who is the master and who isn&#39;t, the executed scripts do not. They need to re-discover everything by themselves.&lt;/li&gt;
+&lt;li&gt;This implies the scripts start without memory of &#34;what was last observed&#34;. This is one of the greatest strengths of &lt;em&gt;orchestrator&lt;/em&gt;: it knows what the state was just before the failure, and, having the bigger picture, can make informed decisions.
+&lt;ul&gt;
+&lt;li&gt;As a nasty example, what do you do when some the first tier slaves also happen to be inaccessible at that time? What if one of those happens to further have slaves of its own?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;The MariaDB Replication Manager script (to be referenced as &lt;em&gt;repmgr&lt;/em&gt;) assumes all instances to be MariaDB with GTID.
+&lt;ul&gt;
+&lt;li&gt;It is also implied that all my slaves are configured with binary logs &amp;amp; log-slave-updates&lt;/li&gt;
+&lt;li&gt;That&#39;s &lt;strong&gt;way too restrictive&lt;/strong&gt;.
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;Orchestrator&lt;/em&gt; handles all following topologies: Oracle MySQL with/out GTID, MariaDB with/out GTID, MariaDB hybrid GTID &amp;amp; non-GTID replication, Pseudo-GTID (MySQL and/or MariaDB), hybrid normal &amp;amp; binlog servers topologies, slaves with/out log-slave-updates, hybrid Oracle &amp;amp; MariaDB &amp;amp; Binlog Servers &amp;amp; Pseudo-GTID.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;repmgr&lt;/em&gt; is unaware of data centers &amp;amp; physical environments. You want failover to be as local to your datacenters as possible. Avoid too many cross-DC replication streams.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Failover invocation&lt;/h3&gt;
+&lt;p&gt;MaxScale invokes the failover scripts &lt;em&gt;asynchronously&lt;/em&gt;. This is a major flaw imho, as the decoupling between the monitoring and acting processes leads to further problems, see further.&lt;/p&gt;
+&lt;h3&gt;After failover&lt;/h3&gt;
+&lt;p&gt;MaxScale continuously scans the topology and observes that some other server has been promoted. This behavior is similar to &lt;em&gt;orchestrator&#39;s&lt;/em&gt;. But the following differences are noteworthy:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Because of both the decoupling as well as the asynchronous invocation by MaxScale, it doesn&#39;t really have any idea if and how the promotion resolved.&lt;/li&gt;
+&lt;li&gt;I don&#39;t know that there&#39;s any anti-flapping mechanism, nor that there could be. If MaxScale doesn&#39;t care what happened to the failover script, it shouldn&#39;t be able to keep up with flapping scenarios.&lt;/li&gt;
+&lt;li&gt;Nor is there a minimal suspend period between any two failure recoveries, that I know of. MaxScale can actually have easier life than &lt;em&gt;orchestrator&lt;/em&gt; in this regard as it is (I suspect) strictly associated with &lt;em&gt;a topology&lt;/em&gt;. Not like there&#39;s a single MaxScale handling multiple topologies. So it should be very easy to keep track of failures.&lt;/li&gt;
+&lt;li&gt;Or, if there is a minimal period and I&#39;m just uninformed -- what makes sure it is not smaller than the time it takes for the failover?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Further on failover&lt;/h3&gt;
+&lt;p&gt;I wish to point out that one component of the system analyses a failure scenario, and another one fixes it. I suggest this is an undesired design. The &#34;fixer&#34; must have its own ability to diagnose problems as it makes progress (or else it is naive and would fail in many production cases). And the &#34;analyzer&#34; part must have some wisdom of its own so as to suggest course of action; or understand the consequences of the recovery done by the &#34;fixer&#34;.&lt;/p&gt;
+&lt;h3&gt;Use of shell scripts&lt;/h3&gt;
+&lt;p&gt;Generally speaking, the use of shell scripts as external hooks is evil:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Shell scripts tend to be poorly audited&lt;/li&gt;
+&lt;li&gt;With poor clarity as for what went wrong&lt;/li&gt;
+&lt;li&gt;Killing them has operational difficulty (detect the shell script, find possible children, detached children)&lt;/li&gt;
+&lt;li&gt;The approach of &#34;if you want something else, just write a shell script for it&#34; is nice for some things, but as the problem turns complex, you turn out to just write big parts of the solution in shell. This decouples your code to unwanted degree.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;At this time, &lt;em&gt;orchestrator&lt;/em&gt; also uses external hooks. However:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Fixing the topology happens within &lt;em&gt;orchestrator&lt;/em&gt;, not by external scripts. There is an elaborate, auditable, visible decision making.
+&lt;ul&gt;
+&lt;li&gt;Decision making includes data center considerations, different configuration of servers involved, servers hinted as candidates, servers configured to be ignored, servers known to be downtimed.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Leaving the external scripts with the task of managing DNS changes or what have you.
+&lt;ul&gt;
+&lt;li&gt;Today, at Booking.com, we have a special operational tool (called the dba tool) which does that, manages rosters, issues puppet etc. This tool is itself well audited. Granted, there is still decoupling, but information does not just get lost.&lt;/li&gt;
+&lt;li&gt;Sometime in the future I suspect I will extend &lt;strong&gt;&lt;a href=&#34;https://github.com/outbrain/orchestrator-agent&#34;&gt;orchestrator-agent&lt;/a&gt;&lt;/strong&gt; to participate in failovers, which means the entire flow is within &lt;em&gt;orchestrator&#39;s&lt;/em&gt; scope.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;High availability&lt;/h3&gt;
+&lt;p&gt;All the above is only available via a single MaxScale server. What happens if it dies?&lt;/p&gt;
+&lt;p&gt;There is a MaxScale/pacemaker setup I&#39;m aware of. If one MaxScale dies, pacemaker takes charge and starts another on another box.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;But this means real downtime&lt;/li&gt;
+&lt;li&gt;There are no multiple-MaxScale servers to load-balance on&lt;/li&gt;
+&lt;li&gt;The MaxScale started by pacemaker is newly born, and does not have the big picture of the topology. It needs to go through a &#34;peaceful time&#34; to understand what&#39;s going on.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;More High Availability&lt;/h3&gt;
+&lt;p&gt;At a time where MaxScale will be able to load-balance and run on multiple nodes, MariaDB will have to further tackle:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Leader election&lt;/li&gt;
+&lt;li&gt;Avoiding concurrent initiation of failovers
+&lt;ul&gt;
+&lt;li&gt;Either via group communication&lt;/li&gt;
+&lt;li&gt;Or via shared datastore&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Taking off from a failed/crashed MaxScale server&#39;s work
+&lt;ul&gt;
+&lt;li&gt;Or rolling it back&lt;/li&gt;
+&lt;li&gt;Or just cleaning it up&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;And generally share all those little pieces of information, such as &#34;Hey, now this server is the master&#34; (are all MaxScales in complete agreement on the topology?) or &#34;I have failed over this topology, we should avoid failing it over again for the next 10 minutes&#34; and more.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The above are supported by &lt;em&gt;orchestrator&lt;/em&gt;. It provides leader election, automated leader promotion, fair recognition of various failure scenarios, picking up a failed recovery from a failed &lt;em&gt;orchestrator&lt;/em&gt;. Data is shared by a backend MySQL datastore, and before you shout &lt;em&gt;SPOF&lt;/em&gt;, make it Galera/NDB.&lt;/p&gt;
+&lt;h3&gt;Further little things that can ruin your day&lt;/h3&gt;
+&lt;h4&gt;How about having a delayed replica?&lt;/h4&gt;
+&lt;p&gt;Here&#39;s an operational use case we had to tackle.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You have a slave configured to lag by &lt;strong&gt;24&lt;/strong&gt; hours. You know the drill: hackers / accidental &lt;strong&gt;DROP TABLE&lt;/strong&gt;...&lt;/li&gt;
+&lt;li&gt;How much time will an automated tool spend on reconnecting this slave to the topology?
+&lt;ul&gt;
+&lt;li&gt;This could take long minutes&lt;/li&gt;
+&lt;li&gt;Will your recovery hang till this is resolved?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Since &lt;em&gt;orchestrator&lt;/em&gt; heals the topology in-house, it knows how to push certain operations till after specific other operations took place. For example, &lt;em&gt;orchestrator&lt;/em&gt; wants to heal the entire topology, but pushes the delayed replicas aside, under the assumption that it will be able to fix them later (fair assumption, because they are known to be behind our promoted master); it will proceed to fix everything else, execute external hooks (change DNS etc.) and only then come back to the delayed replica. All the while, the process is audited.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Flapping ruins your day&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;Not only do you want some stall period between two failovers, you also want your team to respond to a failover and acknowledge it. Or clear up the stall period having verified the source of the problem. Or force the next failover even if it comes sooner than the stall period termination.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Binlog formats&lt;/h4&gt;
+&lt;p&gt;It is still not uncommon to have Statement Based Replication running. And then it is also not uncommon to have one or two slaves translating to Row Based Replication because of:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Some app that has to read ROW based format&lt;/li&gt;
+&lt;li&gt;Experimenting with RBR for purposes of upgrade&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You just can&#39;t promote such a RBR slave on top of SBR slaves; it wouldn&#39;t work. &lt;em&gt;Orchestrator&lt;/em&gt; is aware of such rules. I still need to integrate this particular consideration into the promotion algorithm.&lt;/p&gt;
+&lt;h4&gt;Versions&lt;/h4&gt;
+&lt;p&gt;Likewise, not all your slaves are of same version. You should not promote a newer version slave on top of an older version slave. Again, &lt;em&gt;orchestrator&lt;/em&gt; will not allow putting such a topology, and again, I still need to integrate this consideration into the promotion algorithm.&lt;/p&gt;
+&lt;h3&gt;In summary&lt;/h3&gt;
+&lt;p&gt;There is a long way for MaxScale failover to go. When you consider the simplest, all-MariaDB-GTID-equal-slaves small topology case, things are kept simple and probably sustainable. But issues like complex topologies, flapping, special slaves, different configuration, high availability, leadership, acknowledgements, and more, call for a more advanced solution.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>New statements I&#39;d like to see in MySQL 5.8</title>
+      <link>/blog/mysql/new-statements-id-like-to-see-in-mysql-5-8/</link>
+      <pubDate>Thu, 08 Oct 2015 09:44:50 +0000</pubDate>
+      
+      <guid>/blog/mysql/new-statements-id-like-to-see-in-mysql-5-8/</guid>
+      <description>&lt;p&gt;Following up on &lt;a title=&#34;Link to New features I&#39;d like to see in MySQL 5.8&#34; href=&#34;http://code.openark.org/blog/mysql/new-features-id-like-to-see-in-mysql-5-8&#34; rel=&#34;bookmark&#34;&gt;New features I&#39;d like to see in MySQL 5.8&lt;/a&gt;, here are &lt;em&gt;statements&lt;/em&gt; I would like to see in MySQL 5.8:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;ENABLE EVENTS;&lt;/strong&gt;&lt;br /&gt;
+When promoting a slave to master, I want to be able to enable all those events that are in &lt;strong&gt;SLAVESIDE_DISABLED&lt;/strong&gt; state. Today I script an iteration over the events an constructing the &lt;strong&gt;ALTER EVENT...ENABLE&lt;/strong&gt; statement one by one. Just activate those!&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;SKIP GTID TRANSACTION;&lt;/strong&gt;&lt;br /&gt;
+I have a transaction on slave that I want to skip, and there&#39;s GTID. The sequence of&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;STOP SLAVE;
+SET GTID_NEXT=&#34;...&#34;;
+BEGIN;
+COMMIT;
+SET GTID_NEXT=&#34;AUTOMATIC&#34;;
+START SLAVE;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;is just something I don&#39;t want to do. To compute the &lt;strong&gt;GTID_NEXT&lt;/strong&gt;; to open a transaction; to use session variables; this may seem straightforward to import the above from a shell script, but calculating the next GTID is not entirely trivial; issuing the above from your programming language makes for a weird &lt;em&gt;&#34;all these have to be in the same session AND you&#39;re going to do a transaction meanwhile&#34;&lt;/em&gt;. With golang it&#39;s actually a problem.&lt;br /&gt;
+Make it simple for me. I&#39;m willing to do the &lt;strong&gt;STOP/START SLAVE&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;BINLOG ENTRY &#39;&amp;lt;arbitrary text&amp;gt;&#39;;&lt;/strong&gt;&lt;br /&gt;
+Very selfishly, I want to be able to inject a comment into the binary log, of arbitrary text. I want this comment to appear in SBR format, as if it were a DDL.&lt;br /&gt;
+My selfish reason: injection of Pseudo-GTID. But I can see various other use cases, such as application level injection of app-logic checkpointing; chef/glu injection of &lt;em&gt;&#34;code deployed at this time&#34;&lt;/em&gt;; application injection of &lt;em&gt;&#34;daily audit done to this point&#34;&lt;/em&gt;. This is too cool and too easy to skip.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;SHOW RELAY LOGS;&lt;/strong&gt;&lt;br /&gt;
+Similar to &lt;strong&gt;SHOW BINARY LOGS;&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;PURGE RELAY LOGS TO &#39;...&#39;;&lt;/strong&gt;&lt;br /&gt;
+Similar to &lt;strong&gt;PURGE BINARY LOGS TO &#39;...&#39;;&lt;/strong&gt;&lt;br /&gt;
+It&#39;s time relay logs stopped being 2nd class citizens.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;SHOW NONBLOCKING [GLOBAL|SESSION] STATUS;&lt;/strong&gt;&lt;br /&gt;
+Issue a SHOW GLOBAL|SESSION STATUS query that only shows those variables for which it does not need to block. i.e. this is a safe, fast &lt;em&gt;&#34;show me everything you&#39;ve got that I won&#39;t need to pay for&#34;&lt;/em&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Yes, yes, &lt;em&gt;statements&lt;/em&gt; are also features, I know.&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>New features I&#39;d like to see in MySQL 5.8</title>
+      <link>/blog/mysql/new-features-id-like-to-see-in-mysql-5-8/</link>
+      <pubDate>Wed, 07 Oct 2015 10:02:16 +0000</pubDate>
+      
+      <guid>/blog/mysql/new-features-id-like-to-see-in-mysql-5-8/</guid>
+      <description>&lt;p&gt;Following up on Morgan Tocker&#39;s &lt;a href=&#34;http://www.tocker.ca/2015/09/14/what-would-you-like-to-see-in-mysql-5-8.html&#34;&gt;What would you like to see in MySQL 5.8?&lt;/a&gt;, having attended and participated at the &lt;a href=&#34;https://www.percona.com/live/europe-amsterdam-2015/sessions/mysql-58-dreaming-and-brainstorming&#34;&gt;brainstorming at Percona Live Amsterdam&lt;/a&gt;, and publishing this post while failing to comply with any of Morgan&#39;s suggested media, these are the features I would like to see in MySQL &lt;strong&gt;5.8&lt;/strong&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Dynamicly enable/disable &lt;strong&gt;log-bin&lt;/strong&gt; and &lt;strong&gt;log-slave-updates&lt;/strong&gt;&lt;br /&gt;
+Today, when changing chef/puppet role of a server from a simple slave to an intermediate master and vice versa, a MySQL restart is required. This is a very big pain which makes replication automation complex, not to mention warmup times.&lt;/li&gt;
+&lt;li&gt;&#34;&lt;strong&gt;&lt;a href=&#34;http://man7.org/linux/man-pages/man1/nice.1.html&#34;&gt;nice&lt;/a&gt;&lt;/strong&gt;&#34;.&lt;br /&gt;
+I want to be able to execute a query that is &lt;em&gt;nice, i.e&lt;/em&gt; has lower priority; will not consume all resources; will stall/throttle so as to allow other queries to complete. Luis asked and I said this could be on a per statement basis, e.g. add a &lt;strong&gt;SQL_NICE&lt;/strong&gt; query hint. But I&#39;m unsure that would be the correct behavior. It also makes sense to do so on a per connection basis (perhaps provide connection attributed to hint &lt;em&gt;niceness&lt;/em&gt;?).&lt;/li&gt;
+&lt;li&gt;Online-&lt;em&gt;ier&lt;/em&gt; &lt;strong&gt;ALTER TABLE&lt;/strong&gt;. I would in particular want it to apply the &lt;em&gt;nice&lt;/em&gt; feature, above. Otherwise throttle by user defined metrics.&lt;/li&gt;
+&lt;li&gt;Online-&lt;em&gt;ier&lt;/em&gt; &lt;strong&gt;ALTER TABLE&lt;/strong&gt; in replication stream.  Can the slaves run the &lt;strong&gt;ALTER&lt;/strong&gt; statement in parallel?&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Re-Group Commit&lt;/strong&gt;: in MTS, and when intermediate masters involved, copy+paste the group commit as applied on master as working downstream. I suspect this is easily achievable. The result: same parallelism for replicating slaves in all levels, whether they replicate directly from master or from 2nd, 3rd tier intermediate masters. Today parallelism decreases as we go downstream.&lt;/li&gt;
+&lt;li&gt;Global user-defined-variables. I want to be able to define arbitrary (global) variables that I can later query via &lt;strong&gt;SELECT @@global.arbitrary&lt;/strong&gt;. This would be similar to HTML &lt;strong&gt;5&lt;/strong&gt;&#39;s &lt;strong&gt;&#34;data-*&#34;&lt;/strong&gt; attributes. I often wish I could tell &amp;amp; ask MySQL my puppet role; or the server status (is it live? Is it offline? Does it belong to a specific pool? etc.). Similar to &lt;strong&gt;&#34;loose-*&#34;&lt;/strong&gt; syntax, this could be a &lt;strong&gt;&#34;data-*&#34;&lt;/strong&gt; or &lt;strong&gt;&#34;user-*&#34;&lt;/strong&gt; name prefix system.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;I will follow up on new &lt;em&gt;statements&lt;/em&gt; I would like to see in MySQL &lt;strong&gt;5.8&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;The brainstorming session at PerconaLive, I should note, was pure joy, and apart from getting two nice furry dolphins I enjoyed the engagement, the diversity of ideas, and the fact Oracle engineers (Mark in particular) were very busy taking notes or otherwise openly discussing the viability of some requested features.&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+      <link>/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/</link>
+      <pubDate>Fri, 07 Aug 2015 14:39:59 +0000</pubDate>
+      
+      <guid>/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/</guid>
+      <description>&lt;p&gt;MySQL &lt;strong&gt;5.7&lt;/strong&gt; introduces a change in the way we query for global variables and status variables: the &lt;strong&gt;INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)&lt;/strong&gt; tables are now deprecated and empty. Instead, we are to use the respective &lt;strong&gt;performance_schema.(global|session)_(variables|status)&lt;/strong&gt; tables.&lt;/p&gt;
+&lt;p&gt;But the change goes farther than that; there is also a security change. Oracle created a pitfall of &lt;strong&gt;2&lt;/strong&gt; changes at the same time:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Variables/status moved to a different table&lt;/li&gt;
+&lt;li&gt;Privileges required on said table&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;As an example, my non-root user gets:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; show session variables like &#39;tx_isolation&#39;;
+ERROR 1142 (42000): SELECT command denied to user &#39;normal_user&#39;@&#39;my_host&#39; for table &#39;session_variables&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Who gets affected by this? Nearly &lt;em&gt;everyone and everything&lt;/em&gt;.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Your Nagios will not be able to read status variables&lt;/li&gt;
+&lt;li&gt;Your ORM will not be able to determine session variables&lt;/li&gt;
+&lt;li&gt;Your replication user will fail connecting (see &lt;a href=&#34;http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html&#34;&gt;this post by Giuseppe&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;And most everyone else.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Change your app code to choose the correct schema (information_schema vs. performance_schema)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;GRANT&lt;/strong&gt; the permissions on your database&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Perhaps at this point you still do not consider this to be a problem. You may be thinking: &lt;em&gt;well, let&#39;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Not so fast. Can you really that simply create those GRANTs?&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;Migration woes&lt;/h3&gt;
+&lt;p&gt;How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.&lt;/p&gt;
+&lt;p&gt;This should not be any different for &lt;strong&gt;5.7&lt;/strong&gt;. We would like to provision a &lt;strong&gt;5.7&lt;/strong&gt; slave in our topologies and just see that everything works. Well, we have, and things don&#39;t just work. Our Nagios stops working for that &lt;strong&gt;5.7&lt;/strong&gt; slave. &lt;em&gt;Orchestrator&lt;/em&gt; started complaining (by this time I&#39;ve &lt;a href=&#34;https://github.com/outbrain/orchestrator/releases/tag/v1.4.291&#34;&gt;already fixed it&lt;/a&gt; to be more tolerant for the &lt;strong&gt;5.7&lt;/strong&gt; problems so no crashes here).&lt;/p&gt;
+&lt;p&gt;I hope you see the problem by now.&lt;/p&gt;
+&lt;blockquote&gt;You cannot issue a &lt;strong&gt;GRANT SELECT ON performance_schema.global_variables TO &#39;...&#39;&lt;/strong&gt; on your &lt;strong&gt;5.6&lt;/strong&gt; master.&lt;/blockquote&gt;
+&lt;p&gt;The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your &lt;strong&gt;5.7&lt;/strong&gt; slave, which means you will not be able to &lt;strong&gt;SHOW GLOBAL VARIABLES&lt;/strong&gt; on your slave, which means everything remains broken.&lt;/p&gt;
+&lt;p&gt;Yes, you can issue this directly on your &lt;strong&gt;5.7&lt;/strong&gt; slaves. It&#39;s &lt;em&gt;doable&lt;/em&gt;, but &lt;em&gt;undesired&lt;/em&gt;. It&#39;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#39;s unfriendly to GTID (make sure to &lt;strong&gt;SET SQL_LOG_BIN=0&lt;/strong&gt; before that).&lt;/p&gt;
+&lt;h3&gt;WHY in the first place?&lt;/h3&gt;
+&lt;p&gt;It seems like a security thing. I&#39;m not sure whether this was intended. So you prevent a &lt;strong&gt;SHOW GLOBAL VARIABLES&lt;/strong&gt; for a normal user. Makes sense. And yet:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; show global variables like &#39;hostname&#39;;
+ERROR 1142 (42000): SELECT command denied to user &#39;normal_user&#39;@&#39;my_host&#39; for table &#39;global_variables&#39;
+
+mysql&amp;gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&amp;gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Seems like I&#39;m allowed access to that info after all. So it&#39;s not strictly a security design decision. For status variable, I admit, I don&#39;t have a similar workaround.&lt;/p&gt;
+&lt;h3&gt;Solutions?&lt;/h3&gt;
+&lt;p&gt;The following are meant to be solutions, but do not really solve the problem:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;SHOW&lt;/strong&gt; commands. &lt;strong&gt;SHOW GLOBAL|SESSION VARIABLES|STATUS&lt;/strong&gt; will work properly, and will implicitly know whether to provide the results via &lt;strong&gt;information_schema&lt;/strong&gt; or &lt;strong&gt;performance_schema&lt;/strong&gt; tables.
+&lt;ul&gt;
+&lt;li&gt;But, aren&#39;t we meant to be happier with &lt;strong&gt;SELECT&lt;/strong&gt; queries? So that I can really do stuff that is smarter than &lt;strong&gt;LIKE &#39;variable_name%&#39;&lt;/strong&gt;?&lt;/li&gt;
+&lt;li&gt;And of course you cannot use &lt;strong&gt;SHOW&lt;/strong&gt; in server side cursors. Your stored routines are in a mess now.&lt;/li&gt;
+&lt;li&gt;This does not solve the GRANTs problem.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;a href=&#34;http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56&#34;&gt;show_compatibility_56&lt;/a&gt;&lt;/strong&gt;: an introduced variable in &lt;strong&gt;5.7&lt;/strong&gt;, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+&lt;ul&gt;
+&lt;li&gt;Documentation introduces it, and says it is deprecated.
+&lt;ul&gt;
+&lt;li&gt;time-travel-paradox :O&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;But it actually works in &lt;strong&gt;5.7.8&lt;/strong&gt; (latest)
+&lt;ul&gt;
+&lt;li&gt;time-travel-paradox plot thickens&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Your automation scripts do not know in advance whether your MySQL has this variable
+&lt;ul&gt;
+&lt;li&gt;Hence &lt;strong&gt;SELECT @@global.show_compatibility_56&lt;/strong&gt; will produce an error on &lt;strong&gt;5.6&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;But the &#34;safe&#34; way of &lt;strong&gt;SHOW GLOBAL VARIABLES LIKE &#39;show_compatibility_56&#39;&lt;/strong&gt; will fail on a privilege error on &lt;strong&gt;5.7&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;time-travel-paradox :O&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Actually advised by my colleague Simon J. Mudd, &lt;strong&gt;show_compatibility_56&lt;/strong&gt; defaults to &lt;strong&gt;OFF&lt;/strong&gt;. I &lt;em&gt;support&lt;/em&gt; this line of thought. Or else it&#39;s &lt;strong&gt;old_passwords=1&lt;/strong&gt; all over again.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;show_compatibility_56&lt;/strong&gt; doesn&#39;t solve the GRANTs problem.&lt;/li&gt;
+&lt;li&gt;This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from &lt;strong&gt;&#34;1&#34;&lt;/strong&gt; to &lt;strong&gt;&#34;0&#34;&lt;/strong&gt;, I&#39;m back at square one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Suggestion&lt;/h3&gt;
+&lt;p&gt;I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in &lt;strong&gt;5.6&lt;/strong&gt; if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Flow 1&lt;/strong&gt;: keep &lt;strong&gt;information_schema&lt;/strong&gt;, later migration into &lt;strong&gt;performance_schema&lt;/strong&gt;
+&lt;ul&gt;
+&lt;li&gt;In &lt;strong&gt;5.7&lt;/strong&gt;, &lt;strong&gt;information_schema&lt;/strong&gt; tables should still produce the data.&lt;/li&gt;
+&lt;li&gt;No security constraints on &lt;strong&gt;information_schema&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Generate WARNINGs on reading from &lt;strong&gt;information_schema&lt;/strong&gt; (&#34;...this will be deprecated...&#34;)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;performance_schema &lt;/strong&gt;&lt;em&gt;also available&lt;/em&gt;. With security constraints, whatever.&lt;/li&gt;
+&lt;li&gt;In &lt;strong&gt;5.8&lt;/strong&gt; remove &lt;strong&gt;information_schema&lt;/strong&gt; tables; we are left with &lt;strong&gt;performance_schema&lt;/strong&gt; only.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Flow 2&lt;/strong&gt;: easy migration into &lt;strong&gt;performance_schema&lt;/strong&gt;:
+&lt;ul&gt;
+&lt;li&gt;In &lt;strong&gt;5.7&lt;/strong&gt;, &lt;strong&gt;performance_schema&lt;/strong&gt; tables should not require any special privileges. Any user can read from them.&lt;/li&gt;
+&lt;li&gt;Keep &lt;strong&gt;show_compatibility_56 &lt;/strong&gt;as it is.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;SHOW&lt;/strong&gt; commands choose between &lt;strong&gt;information_schema&lt;/strong&gt; or &lt;strong&gt;performance_schema&lt;/strong&gt; on their own -- just as things are done now.&lt;/li&gt;
+&lt;li&gt;In &lt;strong&gt;5.8&lt;/strong&gt;, &lt;strong&gt;performance_schema&lt;/strong&gt; tables will require &lt;strong&gt;SELECT&lt;/strong&gt; privileges.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;As always, I love the work done by the engineers; and I love how they listen to the community.&lt;/p&gt;
+&lt;p&gt;Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?&lt;/p&gt;
+&lt;h3&gt;[UPDATE 2015-08-19]&lt;/h3&gt;
+&lt;p&gt;Please &lt;a href=&#34;http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html&#34;&gt;see this followup&lt;/a&gt; by Morgan Tocker of Oracle.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Percona Live 2015: Reflections</title>
+      <link>/blog/mysql/percona-live-2015-reflections/</link>
+      <pubDate>Sat, 18 Apr 2015 03:41:07 +0000</pubDate>
+      
+      <guid>/blog/mysql/percona-live-2015-reflections/</guid>
+      <description>&lt;p&gt;Some personal reflections on &lt;a href=&#34;https://www.percona.com/live/mysql-conference-2015/&#34;&gt;PerconaLive 2015&lt;/a&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Percona acquires Tokutek&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Well done! Tokutek develops the TokuDB storage engine for MySQL and TokuMX engine for MongoDB. I will discuss the MySQL aspect only.&lt;/p&gt;
+&lt;p&gt;TokuDB was released as open source in 2013. It has attained a lot of traction and I have used it myself for some time. I met issues with locking or otherwise operational difficulties which I reported, and otherwise was fascinated by such features as great compression, online schema changes, and more.&lt;/p&gt;
+&lt;p&gt;Recently another company, InfiniDB, that also released its MySQL-backed codebase as open source, went out of business. I was afraid the same might happen to Tokutek.&lt;/p&gt;
+&lt;p&gt;I see Percona&#39;s purchase as a very good move for the community. I saw a lot of TokuDB interest in Percona for some time now, and it is clearly interested in the technology. I expect they will add their own hands-on experience into the development of more operations-friendly features; put effort in solving locking issues (it&#39;s been a while since I last checked, of course some of these may have been addressed by now). I am guessing they will work on a Galera/TokuDB integration and offer a &#34;Toku-XtraDB-Cluster&#34;.&lt;/p&gt;
+&lt;p&gt;TokuDB can compete with InnoDB in many places, while in others each will have its distinct advantage.&lt;/p&gt;
+&lt;p&gt;I see this is as good news for the community.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Community Awards and Lightning Talks&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;On a completely different subject, I believe it is commonly accepted that this year&#39;s setup for the community awards &amp;amp; lightning talks was unsuccessful. The noise was astounding, human traffic was interrupting and overall this was a poor experience. We (Giuseppe Maxia, Kortney Runyan &amp;amp; myself) made a quick, informal brainstorming on this and came up with a couple ideas. One of which we hope to try in the upcoming &lt;em&gt;Percona Live Europe - Amsterdam&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;We apologize to the speakers for the difficulties.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Percona Live Europe - Amsterdam&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Haha! Having recently relocated to the Netherlands I&#39;m of course very happy. But regardless, Percona Live London was fun - and yet running on low fuel. I think it was a great idea to change location (and more locations expected in the future). This is the path taken by such conferences as OSCon, Velocity, Strata and more. Amsterdam in particular, as I&#39;ve recently learned, is especially appreciated by many. I think this conf will do great!&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Woz&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;And now for something completely different. Woz&#39; talk was that. I&#39;m happy he came; I appreciate that he discussed education; and it was fun.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Percona Live 2015: Reflections; the Apache CCLA offer</title>
+      <link>/blog/mysql/percona-live-2015-reflections-the-apache-ccla-offer/</link>
+      <pubDate>Sat, 18 Apr 2015 03:11:56 +0000</pubDate>
+      
+      <guid>/blog/mysql/percona-live-2015-reflections-the-apache-ccla-offer/</guid>
+      <description>&lt;p&gt;&lt;strong&gt;Facebook, Google, Twitter, LinkedIn, Alibaba, MariaDB, Percona team up and offer Oracle all public changes under the &lt;a href=&#34;https://www.apache.org/licenses/cla-corporate.txt&#34;&gt;Apache CCLA&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Read again please.&lt;/p&gt;
+&lt;p&gt;My one word summary of this is: Romantic. In the most positive sense.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Disclaimer: I am not a lawyer; this is my understanding of the current status and of the offer.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Summarizing the deal: the teams participating with WebScaleSQL would like to push code upstream. Current legal issues limit their options. Existing patches/contributions from Percona &amp;amp; MariaDB are licensed by GPLv2, which Oracle cannot import as it distributes a commercial, closed source, edition, in addition to its open source MySQL community edition.&lt;/p&gt;
+&lt;p&gt;So what happens is that there is a lot of free code, great patches, new features out there, that are only available via MariaDB or WebscaleSQL or Percona Server, but not in the Oracle MySQL code base. This, in turn, means Oracle re-implements many features originating from said companies. And, more importantly, said companies need to routinely rebase their code on new Oracle releases, repeating tedious work.&lt;/p&gt;
+&lt;p&gt;The offer is that Oracle agrees to the Apache CCLA as a license by which it would be able to incorporate contributions. Oracle would then be able to use incorporated code in both open source and commercial edition. Oracle will choose what code to incorporate; hopefully many patches will be accepted upstream, and the community will benefit from a rich featureset, rapid developed MySQL server.&lt;/p&gt;
+&lt;p&gt;Clearly a lot of work, persuasion, lawyer time, discussions etc. have been invested in this effort. I would like to add my humble &lt;strong&gt;+1/like/favorite/whathaveyou&lt;/strong&gt;. You may add yours by letting Oracle know your opinion on the subject. Media tools are great for this.&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Three wishes for a new year</title>
+      <link>/blog/mysql/three-wishes-for-a-new-year-3/</link>
+      <pubDate>Tue, 23 Sep 2014 11:21:13 +0000</pubDate>
+      
+      <guid>/blog/mysql/three-wishes-for-a-new-year-3/</guid>
+      <description>&lt;div&gt;
+&lt;p&gt;Another new year by Jewish calendar. What do I wish for the following year?&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;World peace&lt;/li&gt;
+&lt;li&gt;Good health to all&lt;/li&gt;
+&lt;li&gt;Multi-core execution for queries&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;After having evaluated a few columnar databases, and having seen how a single query gets 24 cores busy, I can&#39;t look at MySQL the same way again. The fact that a single query consumes a single core only doesn&#39;t seem right in the year 2014. &lt;a href=&#34;https://github.com/greenlion/swanhart-tools/tree/master/shard-query&#34;&gt;Shard-query&lt;/a&gt; is a cool application-level attempt to solve the above; I would like to see stuff like this implemented inside the server (or inside the storage engine where possible).&lt;/p&gt;
+&lt;p&gt;None of my wishes in previous years [&lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year&#34;&gt;2010&lt;/a&gt;], [&lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-2&#34;&gt;2011&lt;/a&gt;], [&lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-201&#34;&gt;2012&lt;/a&gt;], [&lt;a href=&#34;http://code.openark.org/blog/mysql/three-wished-for-a-new-year-2013&#34;&gt;2013&lt;/a&gt;] came true (and mostly gone worse). I&#39;m still willing to settle for two out of three.&lt;/p&gt;
+&lt;/div&gt;</description>
+    </item>
+    
+    <item>
+      <title>Some anecdotes I learned at Percona Live</title>
+      <link>/blog/mysql/some-anecdotes-i-learned-at-percona-live/</link>
+      <pubDate>Tue, 08 Apr 2014 04:06:20 +0000</pubDate>
+      
+      <guid>/blog/mysql/some-anecdotes-i-learned-at-percona-live/</guid>
+      <description>&lt;p&gt;While on the plane back home I wrote down all my impressions from Percona Live 2014. Have lots of TODOs and great ideas to implement. Among all my impressions, there were a few anecdotes worth noting.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;5.6 GTID is still unfriendly. It will require complete shutdown &amp;amp; reconfiguration of your entire replication topology; and some companies present hacks around this. Notable, Facebook recoded GTID related code (slave agrees to replicate with GTID even though its master still uses binlog coordinates). Booking.com have their own hack around slowly migrating their topologies. And in a great lightning talk we were shown how to patch MySQL such that the relay logs turn into a  consistent GTID-like coordinate system.&lt;/li&gt;
+&lt;li&gt;Galera replication has been implemented for TokuDB (only active-passive mode, not active-active). This came as a surprise to Tokutek ; apparently Codership did this within a few hours of work. The rest is up for Tokutek!&lt;/li&gt;
+&lt;li&gt;WebScaleSQL is a cool initiative that aims to assist in pushing commonly desired featured back upstream. It is Web Scale. It is also not a productio0n distribution and I do not expect it to be, It is not a fork that is meant for the common DBA to download and deploy.&lt;/li&gt;
+&lt;li&gt;Tungsten replicator has MySQL to Hadoop replication using staging tables - an auditing of changes that are group-deployed on Hadoop.&lt;/li&gt;
+&lt;li&gt;Still so many people unfamiliar with MySQLSandbox. It&#39;s such a basic tool, especially for testing and local installations.&lt;/li&gt;
+&lt;li&gt;Still misconceptions about common_schema. Yes, I do use it on production.&lt;/li&gt;
+&lt;li&gt;Everyone has the same problems :)&lt;/li&gt;
+&lt;li&gt;Replication is still queen of MySQL&#39;s featureset. We&#39;re still all about failing over, promoting, scaling via replication.&lt;/li&gt;
+&lt;li&gt;Linux rules. Where two MacBooks failed to connect to the projector, my Lenovo/Ubuntu Linux did the job just fine and saved the day.&lt;/li&gt;
+&lt;/ul&gt;</description>
+    </item>
+    
+    <item>
+      <title>Why delegating code to MySQL Stored Routines is poor engineering practice</title>
+      <link>/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/</link>
+      <pubDate>Thu, 06 Feb 2014 10:32:17 +0000</pubDate>
+      
+      <guid>/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/</guid>
+      <description>&lt;p&gt;I happen to use stored routines with MySQL. In fact, my open source project &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt; heavily utilizes them. DBA-wise, I think they provide with a lot of power (alas, the ANSI:SQL 2003 syntax feels more like COBOL than a sane programming language, which is why I use &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt; instead).&lt;/p&gt;
+&lt;p&gt;However I wish to discuss the use of stored routines as integral part of your application code, which I discourage.&lt;/p&gt;
+&lt;p&gt;The common discussion on whether to user or not use stored routines typically revolves around data transfer (with stored routines you transfer less data since it&#39;s being processed on server side), security (with stored routines you can obfuscate/hide internal datasets, and provide with limited and expected API) and performance (with MySQL this is not what you would expect, as routines are interpreted &amp;amp; their queries re-evaluated, as opposed to other RDBMS you may be used to).&lt;/p&gt;
+&lt;p&gt;But I wish to discuss the use of stored routines from an engineering standpoint. The first couple of points I raise are cultural/behavioural.&lt;/p&gt;
+&lt;h4&gt;2nd grade citizens&lt;/h4&gt;
+&lt;p&gt;Your stored routines are not likely to integrate well with your IDE. While your Java/Scala/PHP/Ruby/whatnot code comfortably lies within your home directory, the stored routines live in their own space: a database container. They&#39;re not as visible to you as your standard code. Your IDE is unaware of their existence and is unlikely to have the necessary plugin/state of mind to be able to view these.&lt;/p&gt;
+&lt;p&gt;This leads to difficulty in maintaining the code. People typically resort to using some SQL-oriented GUI tool such as MySQL Workbench, SequelPro or other, commercial tools. But these tools, while make it easy to edit your routine code, do not integrate (well?) with your source control. I can&#39;t say I&#39;ve used all GUI tools; but how many of them will have Git/SVN/Mercurial connectors? How many of them will keep local history changes once you edit a routine? I&#39;m happy to get introduced to such a tool.&lt;/p&gt;
+&lt;p&gt;Even with such integration, you&#39;re split between two IDEs. And if you&#39;re the command line enthusiast, well, you can&#39;t just &lt;strong&gt;svn ci -m &#34;fixed my stored procedure bug&#34;&lt;/strong&gt;. Your code is simply not in your trunk directory.&lt;/p&gt;
+&lt;p&gt;It &lt;em&gt;can&lt;/em&gt; be done. You &lt;em&gt;could&lt;/em&gt; maintain the entire routine code from within your source tree, and hats off to all those who do it. Most will not. See later on about deployments for more on this.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Testing&lt;/h4&gt;
+&lt;p&gt;While engineers are keen on writing unit tests for every class and method they create, they are less keen on doing the same for stored routines. This is an observation, having seen many instalments. And I can tell you why: your stored routine testing will not integrate well with your JUnit/PHPUnit/...&lt;/p&gt;
+&lt;p&gt;There are testing frameworks for databases, and indeed I hacked my own mini unit testing code with &lt;em&gt;common_schema&lt;/em&gt;. But it&#39;s a &lt;em&gt;different&lt;/em&gt; testing framework. You might also have realized by now that testing databases is somewhat different. It &lt;em&gt;can&lt;/em&gt; be done, and hats off again to those that implement it as common practice. Many don&#39;t. Database are often more heavyweight to test. Not all operations done by routines are easily rolled back, which leads to having to rebuild the entire dataset before tests. This in itself leads to longer test periods and a need for multiple test databases so as to allow for concurrent builds.&lt;/p&gt;
+&lt;p&gt;How many companies practice both version control and unit testing over their routine code? I believe not many (and am happy to hear about those who do). To be more direct, of all the companies I ever consulted to: &lt;em&gt;I have never seen one that does both&lt;/em&gt;.&lt;/p&gt;
+&lt;h4&gt;Debugging&lt;/h4&gt;
+&lt;p&gt;MySQL stored routines have built in debugging capabilities. To debug your routines, you will have to use one of two methods:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Simulate your routine code (ie mimic their execution on top of some interpreter). There are tools to do that. For me this is a complete NO GO and utterly untrustworthy. You can mimic what you think is how the routine should behave, but never they full behaviour. While developing &lt;em&gt;common_schema&lt;/em&gt; I came upon plenty weird behaviour, some of it bugs, that you just can&#39;t build into your emulation.&lt;/li&gt;
+&lt;li&gt;Inject debugging code into your routine code. I do that with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html&#34;&gt;RDebug&lt;/a&gt;. You can do breakpoints, step into, step out, most of the interesting stuff. Other tools do that as well. It is not the right way to go: you&#39;re essentially modifying your code, placing more locks, communicating, and losing some functionality. It is a necessary evil solution for a necessary evil programming method... How good can that be?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The right way to go would be to have debugging API built into the MySQL server.&lt;/p&gt;
+&lt;p&gt;But, wait, that would still be next to worthless, since our discussion is over programming with stored routines: letting your application call upon stored routines in your database. Until the day where I could use my IntelliJ debugger to step from my java method which calls upon a stored procedure, and into the stored procedure itself, debugging your code is completely detached from your stored routine debugging.&lt;/p&gt;
+&lt;h4&gt;Refactoring &amp;amp; deploying&lt;/h4&gt;
+&lt;p&gt;Say you wanted to add a column to your table: you would go ahead and add it, and perhaps populate it. You would then modify your application code to support this new column, and deploy. Say you wanted to drop a table column. You would first deploy changes to your application code that ignore said column, and once the code is in place you would go and actually make the DROP.&lt;/p&gt;
+&lt;p&gt;How do you do the same with a stored routine? Support your routine accepts two parameters, and you wish to add a third?&lt;/p&gt;
+&lt;p&gt;There is no support for optional parameters. Your routine either accepts two parameters or three. Your application code will have to provide the exact number of parameters. You will have to deploy &lt;em&gt;both your SQL changes and your application changes at the same time&lt;/em&gt;. This is by definition impossible, unless you are OK with a &lt;em&gt;stop the world approach&lt;/em&gt;, which is unlikely in production.&lt;/p&gt;
+&lt;h4&gt;Code constraints&lt;/h4&gt;
+&lt;p&gt;One solution to the above is to create a new routines. Somehow &#34;overload&#34; it. But you can&#39;t overload a stored routine; you&#39;ll have to create a routine by a new name. This will allow you to slowly and smoothly migrate between the two.&lt;/p&gt;
+&lt;p&gt;Ahem, smoothly? How easy is it to find all invocations of a certain routines from your code? It will be typically lie in some String, or within some XML config file. There is no safe &#34;find references to this procedure&#34; IDE mechanism. There is no constraint in your IDE that will tell you &#34;there is no such procedure&#34; if you misspell the name.&lt;/p&gt;
+&lt;h4&gt;Trash bin&lt;/h4&gt;
+&lt;p&gt;Suppose you overcame the above. You now have two routines. You need to remember to DROP the old one, right? Will you?&lt;/p&gt;
+&lt;p&gt;When presenting &lt;em&gt;common_schema&lt;/em&gt;, a common question I ask the audience is as follows:&lt;/p&gt;
+&lt;blockquote&gt;Suppose I accessed your database and listed the entire set of stored functions and procedures. How many of them are you not even sure are in use anymore? How many of them you think you can DROP, but are too afraid to, and keep them in &lt;em&gt;just in case&lt;/em&gt;?&lt;/blockquote&gt;
+&lt;p&gt;I wouldn&#39;t commonly ask that question had it not always provides a common nodding and smiling in the audience. People forget to drop their routines, and then forget about them, and are never sure whether they are used (your IDE doesn&#39;t easily tell you that, remember? Sure, you can grep around; that&#39;s not what most engineers would do). And those routines pile up to become trash.&lt;/p&gt;
+&lt;h4&gt;Data or code?&lt;/h4&gt;
+&lt;p&gt;Last but not least: a stored routine is a piece of code, right? Well, as far as the database is concerned, it&#39;s really a piece of data. It&#39;s located within a schema. It&#39;s &lt;em&gt;stored&lt;/em&gt;. It is an integral part of your data set: when you back up your &lt;em&gt;data&lt;/em&gt;, you&#39;re most likely to backup the &lt;em&gt;code&lt;/em&gt; as well. When you restore, you&#39;re likely to restore &lt;em&gt;both&lt;/em&gt;. There are obvious advantages to that, DB-wise. Or should I say, DBA-wise. Engineering-wise? Does a database-restore operation count as code deployment? We can argue over beer.&lt;/p&gt;
+&lt;h4&gt;Final notes&lt;/h4&gt;
+&lt;p&gt;Having said all that: yes, I&#39;m using an occasional stored routine. I see these occasions as a necessary evil, and sometimes it&#39;s just the correct solution.&lt;/p&gt;
+&lt;p&gt;I&#39;m happy to know what methods have been developed out there to overcome the above, please share; and please feel free to contradict the above.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Why a professional conference must have a committee, and what that committee does</title>
+      <link>/blog/mysql/why-a-professional-conference-must-have-a-committee-and-what-that-committee-does/</link>
+      <pubDate>Sat, 14 Dec 2013 11:11:49 +0000</pubDate>
+      
+      <guid>/blog/mysql/why-a-professional-conference-must-have-a-committee-and-what-that-committee-does/</guid>
+      <description>&lt;p&gt;What exactly is it that a conference committee does? This post comes as response to a comment on &lt;a href=&#34;http://www.mysqlperformanceblog.com/2013/12/11/percona-live-2014-conference-sneak-peek/&#34;&gt;A sneak peek at the Percona Live MySQL Conference &amp;amp; Expo 2014&lt;/a&gt;, reading:&lt;/p&gt;
+&lt;blockquote&gt;Why the same committee each year? Community should vote on proposals and committee should just work schedule,etc.&lt;/blockquote&gt;
+&lt;p&gt;I&#39;ll pick the glove and shed some light into the work of the committee. While this specific comment related to the Percona Live conference, I trust that my opinions expressed below apply just as well to any (technical?) professional conference; the point below can equally apply to conferences from Oracle MySQL Connect, O&#39;Reilly Velocity to FOSDEM &amp;amp; PyCon.&lt;/p&gt;
+&lt;p&gt;I can sum up the entire answer with one word: &#34;Discussion&#34;. For a breakdown, please read through.&lt;/p&gt;
+&lt;h4&gt;First, what&#39;s not feasible with community-based voting, and what looks very wrong&lt;/h4&gt;
+&lt;p&gt;So why not open up a voting system and let the community do the rating? I always disliked the &#34;send an SMS to this number to vote for X&#34; approach. It is so unbalanced and unreliable: if I were to submit a proposal describing how my company invented/develops/uses X to do great things, I can expect my co-workers to vote for me. In fact, my company would possibly ask my co-workers to do so. I stand a better chance if I work in a large company; less so in a small company.&lt;/p&gt;
+&lt;p&gt;Anonymous votes tend to be touched by politics. I could vote for my company, against a competing product, for my friends, against people I dislike, and none the wiser. We can take away anonymity, which means my votes will be public, which means they are visible to all. In which case my ranking will be affected by what people I rate would think of me; which means my rating would not be based on strictly professional/technical grounds.&lt;/p&gt;
+&lt;p&gt;But before we drop into this endless pit, let&#39;s consider: will I, as a KMyPyVelocirails community member, really engage in reviewing over 300 submissions? How many members of my community would take so many hours of their time to do so? Let me clarify, this is a part-time job. It requires time, and it requires a mindset. I&#39;m guessing here that you cannot count on everyone rating all talks. Some more prominent talks will be reviewed by more people, others may be left little to not reviewed in the first place.&lt;/p&gt;
+&lt;p&gt;The idea of a purely community based rating is romantic and beautiful, but not feasible.&lt;/p&gt;
+&lt;p&gt;And then there&#39;s the &lt;em&gt;discussion&lt;/em&gt;. Let&#39;s look at some of the things the committee is engaged in to clarify.&lt;/p&gt;
+&lt;h4&gt;Duties, responsibility and actions of a conference committee&lt;/h4&gt;
+&lt;p&gt;The following discussion cannot be an exhaustive description of a committee&#39;s work, but it can give a good glimpse into its scope. We begin with the commitment the members take upon themselves: to invest their time and will in the committee&#39;s duties. Once you join in, you are expected to work and deliver.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;The duties of the reviewing committee extend beyond reviewing the proposals -- though this duty is the most critical of all, as it serves the basis for all others. So let&#39;s describe this first.&lt;/p&gt;
+&lt;h4&gt;Reviewing the proposals&lt;/h4&gt;
+&lt;p&gt;Reviewing papers is more than rating them (1-5 stars). We also comment and share our opinion. Members typically explain why they rated the way they did, especially on low rating. Our ratings and comments are visible to other members, and they can react on these. For example, I can disagree with one&#39;s comments and counter-comment myself. We can continue this discussion in our mailing list.&lt;/p&gt;
+&lt;p&gt;We might throw in our experience in attending the same talk in the past. Was it good? Was it bad? Yes, it matters; we want the conference to be successful, and our personal experience is something we bring to the table. We might have some inside knowledge about an emerging technology, or speakers may share with us such knowledge in private section (&lt;em&gt;&#34;By the time this talk is given, this project will have been released as open source&#34;&lt;/em&gt;).&lt;/p&gt;
+&lt;p&gt;We may suggest improvements: &lt;em&gt;&#34;Better make this tutorial 3 hours instead of 6&#34;&lt;/em&gt;, &lt;em&gt;&#34;Should include this topic as well&#34;&lt;/em&gt;. We might (and sometimes do) approach speakers to refine their submissions if we think they can make for good sessions.&lt;/p&gt;
+&lt;p&gt;We can express our true professional opinion on proposals. We wouldn&#39;t always want to share in public; this private discussion works for the benefit of all - there is no reason to suspect we use fluttery nor insults. We just say what we think within our small group -- and still be prepared for backfire from our peers.&lt;/p&gt;
+&lt;p&gt;But, wait. By which guidelines do we vote? Before we even start rating, we set the very basic guidelines, such as &#34;what content are we looking for; what&#39;s this conference about, what it is not, what are the rules for rating, ...&#34;. Can I rate talks submitted by my colleagues? Would that be unfair? But if so, am I allowed to rate our competitors? Wouldn&#39;t &lt;em&gt;that&lt;/em&gt; be unfair as well? Is there an end to it? We set these rules up front.&lt;/p&gt;
+&lt;h4&gt;Meta&lt;/h4&gt;
+&lt;p&gt;Throughout the reviewing process we collect meta-data about the submitted papers. Do we find content that is missing? Do we have enough &#34;beginner&#34; talks?&lt;/p&gt;
+&lt;p&gt;Some speakers submit 5-6 talks, in the hope than one or two make it through. But they don&#39;t really intend to submit 5 or 6 talks if all happen to get approved. And the committee also prefers a variety of speakers. The committee (or committee chairman) reaches to those speakers to understand better their limitations. We can therefore reject talks based on high submission number per speaker.&lt;/p&gt;
+&lt;p&gt;We typically very quickly stumble upon the issue of overlapping content. Some topics are proposed again and again by multiple speakers. We take notes and balance the figures. We sometimes reject talks not because the abstracts are bad, but because we have so many other competing talks on same topic.&lt;/p&gt;
+&lt;p&gt;We may choose to promote an open source product. We may be passionate about this.&lt;/p&gt;
+&lt;p&gt;When we do reach a conclusion that some content is missing, we may pursue the issue by contacting speakers or potential speakers to submit papers on the subject. We may contact specific companies or speakers that we know would provide good value.&lt;/p&gt;
+&lt;p&gt;We make backup plans: speakers cancel; some don&#39;t get Visas, some fall ill. We make a &#34;Waitlist&#34; of sessions and verify with speakers that they would be able to provide them upon request.&lt;/p&gt;
+&lt;p&gt;Speakers may have personal limitations, e.g. only being able to attend on this and that days.&lt;/p&gt;
+&lt;h4&gt;Non reviewing tasks&lt;/h4&gt;
+&lt;p&gt;We are further engaged in shaping the general shape of the conference. The organizers consult with us on various topics. I guess this really depends on the nature of the conference.&lt;/p&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;As you can see from all the above, this is far from just rating all the talks and picking the &#34;top &lt;strong&gt;100&lt;/strong&gt; talks&#34;. There are a lot of constraints, limitations, contradictions, and issues to go through. This cannot be an automated &#34;community vote&#34; thing. And the moment you put someone at the position of making decision, you&#39;re effectively reinventing the committee.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>5 years of blogging</title>
+      <link>/blog/mysql/5-years-of-blogging/</link>
+      <pubDate>Tue, 22 Oct 2013 19:37:50 +0000</pubDate>
+      
+      <guid>/blog/mysql/5-years-of-blogging/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://code.openark.org/blog/&#34;&gt;openark.org blog&lt;/a&gt; is now five years old. Hurrah!&lt;/p&gt;
+&lt;p&gt;Throughout these five years I posted almost exclusively MySQL oriented blogs, though I had every intention of writing on various engineering topics.&lt;/p&gt;
+&lt;p&gt;I still see blogging as one of the most important forms of knowledge sharing, and indeed for me the blogs aggregated at &lt;a href=&#34;http://planet.mysql.com/&#34;&gt;Planet MySQL&lt;/a&gt; are my main source of MySQL information. I especially like to read technical content straight from the developer; but am also keen on being updated with news on conferences, releases, distributions and some insightful opinions.&lt;/p&gt;
+&lt;p&gt;The advent of the Stack Exchange websites makes for a common place where people get to learn &#34;how to issue this query&#34; or &#34;how replication works&#34;. I can see the &lt;a href=&#34;http://dba.stackexchange.com/&#34;&gt;DBA site&lt;/a&gt; gaining popularity, though still going slow. Eventually I suspect it will be the one place where people share their questions and answers.&lt;/p&gt;
+&lt;p&gt;Nevertheless blogging is a great way of sharing a new finding of yours; express an opinion; review a product. So I hope for five more years of active blogging, and thank the readers of this blog for keeping watch!&lt;/p&gt;
+&lt;p&gt;Some numbers: to date I&#39;ve posted &lt;strong&gt;296&lt;/strong&gt; MySQL related posts (so &lt;strong&gt;1.13&lt;/strong&gt; blog posts per week, evenly spread). The vast majority were technical; and a few opinions. I posted &lt;a href=&#34;http://code.openark.org/blog/?s=tales+of+the+trade&#34;&gt;6 comic strips&lt;/a&gt;; most of which were, I&#39;m afraid, largely misunderstood  (the blame is on me) and projected exactly the opposite perception I was trying to express. I&#39;m bound to fail again.&lt;/p&gt;
+&lt;p&gt;Traffic can be better (not sharing all my secrets). Been a slow down in the past months. I know, I haven&#39;t produced much &lt;a href=&#34;http://code.openark.org/blog/mysql/sql-pie-chart&#34;&gt;Pie charts&lt;/a&gt; lately.&lt;/p&gt;
+&lt;p&gt;Again, thank you for reading or commenting. No point in blogging if no one pays attention to your blabbering! And do keep coming :)&lt;/p&gt;
+&lt;p&gt;&amp;lt;/meta-post&amp;gt;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Percona Live 2013 keynotes: followup questions and discussion</title>
+      <link>/blog/mysql/percona-live-2013-keynotes-followup-questions-and-discussion/</link>
+      <pubDate>Sun, 28 Apr 2013 07:23:29 +0000</pubDate>
+      
+      <guid>/blog/mysql/percona-live-2013-keynotes-followup-questions-and-discussion/</guid>
+      <description>&lt;p&gt;Here are a few questions remained open for me from Percona Live 2013 about things that have been said during keynotes; I will appreciate a discussion on comments. Here goes:&lt;/p&gt;
+&lt;h4&gt;Question #1&lt;/h4&gt;
+&lt;blockquote&gt;&lt;a href=&#34;www.percona.com/live/mysql-conference-2013/sessions/keynote-panel-impact-mysql-56-and-its-future-x&#34;&gt;Brian Aker (HP) asks Simone Brunozzi (Amazon)&lt;/a&gt; what the underlying technology for DynamoDB is. Simone says can&#39;t disclose. Brian says: &#34;it&#39;s MySQL!!&#34;. Simone says: &#34;can&#39;t disclose&#34;. Brian insists: &#34;it&#39;s MySQL!!&#34;&lt;/blockquote&gt;
+&lt;p&gt;Seriously? I will be very much surprised to learn that DynamoDB uses MySQL; it doesn&#39;t make sense to me. Why would Brian Aker say that though? Did he just mean to tease Simone or is there something I just don&#39;t get?&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;(Yes, Brian?)&lt;/p&gt;
+&lt;h4&gt;Question #2&lt;/h4&gt;
+&lt;blockquote&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/keynote-state-mysql-ecosystem&#34;&gt;Matt Aslett speaks about adoption of MySQL &amp;amp; variants&lt;/a&gt;, and expected adoption in next years, Mentions MariaDB, Percona Server, SkySQL. KEeps saying how the SkySQL server gets more traction.&lt;/blockquote&gt;
+&lt;p&gt;What does he mean? There&#39;s no SkySQL fork; does he mean SkySQL cloud offer? Or just SkySQL support services, typically for MariaDB variant? But in that case, SkySQL is out of context. What&#39;s going on?&lt;/p&gt;
+&lt;h4&gt;Question #3&lt;/h4&gt;
+&lt;blockquote&gt;Matt Aslett presents quite pessimistic prediction for MySQL. Reduced popularity in next years. Relatively good news for MontyProgram/MariaDB; otherwise a lot of switch-off to PostgreSQL, poor adoption for Continuent, low ratios of &#34;evaluation&#34; to &#34;adoption&#34; of technologies; really quite depressing. Later mentions at about &lt;strong&gt;200+&lt;/strong&gt; questionnaires.&lt;/blockquote&gt;
+&lt;p&gt;I don&#39;t have a special interest here as I don&#39;t work for any mentioned company; other than my general desire to see the ecosystem flourishing.&lt;/p&gt;
+&lt;p&gt;Are &lt;strong&gt;200+&lt;/strong&gt; people enough to both give a faithful picture of current MySQL usage and adoption? Are they enough for prediction &lt;strong&gt;1&lt;/strong&gt; year into the future? &lt;strong&gt;4&lt;/strong&gt; years into the future?&lt;/p&gt;
+&lt;p&gt;In Israel, with less than &lt;strong&gt;8M&lt;/strong&gt; population, election surveys usually look at &lt;strong&gt;500+&lt;/strong&gt; people. To me it doesn&#39;t sound a lot, but statistics is not my strong skill. However those picked for the survey have to be a diverse population, distributed in similar ratio to overall population (so Jews, Muslims, Christians, Orthodox, income level, geographic location, etc.).&lt;/p&gt;
+&lt;p&gt;Does the same happen with those &lt;strong&gt;200+&lt;/strong&gt; questionnaires in the &lt;a href=&#34;http://451research.com/&#34;&gt;451 research&lt;/a&gt;? The reason I ask is this: at the end of keynote Matt says: &#34;if you want your voice to be heard, if you think differently, contact me, and I&#39;ll add you to our survey&#34;. Does this mean anyone stepping up is included? Great, so a hypothetical company called GalleriaDB would encourage its 50 employees to enlist, thereby completely shifting the balance.&lt;/p&gt;
+&lt;p&gt;Who are those &lt;strong&gt;200+&lt;/strong&gt; people in the survey? World wide known experts? Your regular DBA? Your remote DBA consultant? Your web developer? Do they represent the overall MySQL ecosystem population? Do their insights into the future collide with those of everyone?&lt;/p&gt;
+&lt;h4&gt;Please discuss below&lt;/h4&gt;</description>
+    </item>
+    
+    <item>
+      <title>Sessions of interest in Percona Live 2013</title>
+      <link>/blog/mysql/sessions-of-interest-in-percona-live-2013/</link>
+      <pubDate>Tue, 05 Feb 2013 09:03:52 +0000</pubDate>
+      
+      <guid>/blog/mysql/sessions-of-interest-in-percona-live-2013/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/&#34;&gt;Percona Live 2013&lt;/a&gt; is shortly upon us, and it might be a good idea to watch for what&#39;s ahead of us.&lt;/p&gt;
+&lt;h4&gt;Talks of interest&lt;/h4&gt;
+&lt;p&gt;There is no way I can do justice to all. I wish to point out a &lt;em&gt;small&lt;/em&gt; number of sessions I am personally interested in attending. I will not be able to attend them all, since there are too many sessions of interest and too few instances of myself (merely one).&lt;/p&gt;
+&lt;p&gt;I&#39;ve tried to list some talks which are not absolutely obvious (when Peter Zaitsev speaks of MySQL performance, or Monty speaks about MariaDB, or Robert Hodges or Domas speak about replication -- well -- you&#39;re certain to have the ins and outs, right?). I can also expect Galera or Percona XtraDB Cluster talks to attract a lot of attention. There is a lot of good content for each.&lt;/p&gt;
+&lt;p&gt;But I was happy to find some very special talks this year, which are not the &#34;every conference has got to have one talk about this&#34; type. Here&#39;s a hybrid collection of both types.&lt;/p&gt;
+&lt;p&gt;After constructing the list I&#39;ve intentionally dropped two random sessions. If you are speaking, and not mentioned here, your talk must be one of those two!&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/mysql-and-virtualization&#34;&gt;MySQL and Virtualization&lt;/a&gt; (Raghavendra Prabhu): I have family ties with KVM. But seriously, a talk which describes the in-depth relationship between KVM and MySQL instances, how to do instrumentation... I&#39;m very interested!&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/mysql-query-anti-patterns-can-be-moved-sphinx&#34;&gt;MySQL Query Anti-Patterns that can be moved to Sphinx&lt;/a&gt; (Vladimir Fedorkov): Sphinx can be so much more than just fulltext search. You can throw full blown queries onto your sphinx server, and it can sometimes help you avoid complex table design. I expect this talk to deliver a lot of info about how to do so. As not too many people are intimately familiar with Sphinx, this should be a very good off-your-balance kind of talk when you realize the things you could do with this mature technology.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/mysql-cluster-when-use-it-and-when-not&#34;&gt;MySQL Cluster - When to use it and when not to&lt;/a&gt; (Max Mether): I don&#39;t have too much experience with NDB Cluster; and what experience I&#39;ve had is a few years old. I&#39;m happy to learn when NDB is just not for you -- I like the idea of setting up the perimeters first, before embarking on a technology.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/using-percona-toolkit-detect-and-even-prevent-sql-injection-attacks&#34;&gt;Using the Percona Toolkit to detect and even prevent SQL injection attacks&lt;/a&gt; (Justin Swanhart): an unusual talk. I&#39;m totally curios to hear this. Be on the watch for Justin&#39;s other talks: quite extraordinary abstracts!&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/mysql-administration-amazon-rds&#34;&gt;MySQL administration in Amazon RDS&lt;/a&gt; (Ben Black): How many are using RDS? I used it for a short time, and can&#39;t say I had chance to utilize its advantages or get bit by its downsides. Next time I use it, I&#39;d like to be better prepared.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/practical-failover-design-automated-semi-automated-and-manual-failover&#34;&gt;Practical failover design - automated, semi-automated and manual failover&lt;/a&gt; (Yoshinori Matsunobu): failover scenarios and solutions -- nothing much to add!&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/ricks-rots-rules-thumb&#34;&gt;Rick&#39;s RoTs (Rules of Thumb)&lt;/a&gt; (Rick James): good advice on common SQL practice; should be very valuable for developers.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/introduction-sharding-jetpants&#34;&gt;Introduction to Sharding with Jetpants&lt;/a&gt; (Evan Elias): oh I have to see this one. Open source sharding solution? Cloning slaves? Rebalancing shards? Just read the abstract; it is &lt;em&gt;very&lt;/em&gt; promising.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/sessions/reddwarf-database-service-openstack-project&#34;&gt;Reddwarf: Database as a Service Openstack project&lt;/a&gt; (Patrick Galbraith): have to see this one as well! Oh, darn, two &#34;must see&#34; talks on same time slot! (I actually have this &lt;em&gt;on every time slot&lt;/em&gt; this year). Also note Mark Atwood&#39;s talk about RedDwarf, and Patrick&#39;s talk about Chef.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;I will probably construct another list for the more obvious talks. Stay tuned!&lt;/p&gt;
+&lt;h4&gt;Trivia: win a free pass&lt;/h4&gt;
+&lt;p&gt;Glad you made it thus far: the first to answer correctly &lt;em&gt;and&lt;/em&gt; most comprehensively is to receive a &lt;em&gt;free full conference pass&lt;/em&gt;, courtesy Percona.&lt;/p&gt;
+&lt;p&gt;I&#39;m tempted to ask &#34;what&#39;s in my pocket?&#34;. But he answer must be related to MySQL and I don&#39;t carry RDBMS on me, so I&#39;ll go with:&lt;/p&gt;
+&lt;blockquote&gt;&lt;em&gt;Who will open your present,&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Make you play pleasant,&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Tidy your mess,&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Do the same for all else?&lt;/em&gt;&lt;/blockquote&gt;
+&lt;p&gt;Be gentle with me, I&#39;m not a professional riddler and English isn&#39;t may main language. I&#39;m not sure if this riddle is ridiculously easy or impractical to answer -- so let&#39;s consider this as my first attempt as a rhymer.&lt;/p&gt;
+&lt;p&gt;If you would benefit from a free ticket -- please use the comments below! &lt;strong&gt;Note&lt;/strong&gt;: &lt;em&gt;comments will be hidden for a few hours&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;If you only wish to play for the fun of it (maybe you already have a ticket) - just email me at &lt;em&gt;shlomi@[you-know-where-or-just-look-at-the-url-for-this-post].org&lt;/em&gt;; I&#39;ll let you know if you are correct, and perhaps publish in comments at a later stage.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Notes on &#34;5 Tips for migrating your MySQL server to a Galera Cluster&#34;</title>
+      <link>/blog/mysql/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster/</link>
+      <pubDate>Mon, 17 Dec 2012 09:00:18 +0000</pubDate>
+      
+      <guid>/blog/mysql/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster/</guid>
+      <description>&lt;p&gt;This post comes as response to &lt;a href=&#34;http://www.codership.com/content/5-tips-migrating-your-mysql-server-galera-cluster&#34;&gt;5 Tips for migrating your MySQL server to a Galera Cluster&lt;/a&gt; by Henrik Ingo (Galera), which is a good read. This post is a bit lengthy which is one of the reasons why I didn&#39;t just comment on said post.&lt;/p&gt;
+&lt;p&gt;The Galera talk in London was indeed well crowded, judging from my own chair. I think there is an obvious interest in Galera, as well as a general thirst for information from real-life experience. I am personally very interested in production stories; either &#34;war stories&#34; or &#34;peace stories&#34; - anything to shed more light on the adoption of this technology.&lt;/p&gt;
+&lt;p&gt;For disclosure, I have not tried Galera myself as yet. Not on production nor on staging machines. But here&#39;s a couple thoughts on Henrik&#39;s post:&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Primary keys&lt;/h4&gt;
+&lt;p&gt;I think this is a classic &#34;emerging technology&#34; issue. The technology is designed to work with a specific configuration. In our case: InnoDB tables that all have a PRIMARY KEY. And it makes sense, and it&#39;s good practice anyway, but as it happens people &lt;em&gt;do&lt;/em&gt; forget or neglect to create PRIMARY KEYs on their tables.&lt;/p&gt;
+&lt;p&gt;An emerging technology would want to avoid poor experience (modified values for PK, replication failure) by avoiding the problem in the first place. In my view, Galera should simply refuse to work with InnoDB tables that do not have a PRIMARY KEY. This could work out in several ways:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Live: cease to replicate (better than replicate wrong info)&lt;/li&gt;
+&lt;li&gt;Better yet: refuse to start the server (much as InnoDB will refuse to start if the transaction log size differs from the size indicated in the config file)&lt;/li&gt;
+&lt;li&gt;Live &amp;amp; better: refuse to create an InnoDB table without a PRIMARY KEY, or refuse INSERTs into such tables&lt;/li&gt;
+&lt;li&gt;Offline: provide with an initial &#34;review_my_database_and_see_if_it_will_work_just_fine_with_galera&#34; shell/Perl/install script.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Number 4 is easiest to begin with, I suppose; is OK for many people to run once, and could detect a variety of problems.&lt;/p&gt;
+&lt;h4&gt;Events and Triggers&lt;/h4&gt;
+&lt;p&gt;I reject the notion of not using triggers because you don&#39;t know how they will behave. Either Galera supports triggers - in which case you should loudly acknowledge that triggers are &lt;em&gt;just fine&lt;/em&gt;, or it does not, in which case you should loudly exclaim &lt;em&gt;&#34;this won&#39;t work&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Triggers have many downsides, performance impact is, for me, the worst of them. However, I don&#39;t understand the question &lt;em&gt;&#34;do you actually know what they will do when you run them in a multi-master cluster? For that matter, do you know what they do on a master-slave cluster?&#34;&lt;/em&gt;. Does the question refer to Galera cluster? Well, I don&#39;t really know the math behind Galera, either. Does that mean I should not use Galera? Or does the question relate to standard MySQL replication? In which case - yes, it&#39;s in the docs.&lt;/p&gt;
+&lt;p&gt;Instructing the users to avoid certain features because &#34;it&#39;s dark out there&#34; is not the right way. &lt;em&gt;[UPDATE: please see Henrik&#39;s comment]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Also&lt;/h4&gt;
+&lt;p&gt;I should also note the very good post by Marco Tusa: &lt;a href=&#34;http://www.tusacentral.net/joomla/index.php/mysql-blogs/146-mysql-ndb-a-mysql-with-galera-why-we-should-not-compare-them&#34;&gt;MySQL Ndb &amp;amp; MySQL with Galera why we should not compare them.&lt;/a&gt; Marco rejects the comparison between NDB Cluster and Galera for many technical reasons. However there is one level of comparison that is not technical: the desire to be able to query any server out of N servers in a group, and to have consistent results, as well as the desire to allow for one server to crash without worrying about immediate actions like failovers, decision making, lost data etc. This level of comparison should not be taken lightly; this is the &lt;em&gt;&#34;what people actually want, without the gory details&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;I&#39;m looking forward to learning more about Galera. While schedule is not completely finalized yet, I think it&#39;s safe to slip the word that you can find some informative talks in the &lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/&#34;&gt;next Percona Live&lt;/a&gt; conference in Santa Clara, April (no plug intended though happy to plug).&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

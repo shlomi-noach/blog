@@ -1,0 +1,971 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Mysql on code.openark.org</title>
+    <link>/blog/category/mysql/</link>
+    <description>Recent content in Mysql on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Wed, 28 Sep 2016 14:22:14 +0000</lastBuildDate>
+    <atom:link href="/blog/category/mysql/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Three wishes for a new year</title>
+      <link>/blog/mysql/three-wishes-for-a-new-year-4</link>
+      <pubDate>Wed, 28 Sep 2016 14:22:14 +0000</pubDate>
+      
+      <guid>/blog/mysql/three-wishes-for-a-new-year-4</guid>
+      <description>&lt;p&gt;(Almost) another new year by Jewish calendar. What do I wish for the following year?&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;World peace&lt;/li&gt;
+&lt;li&gt;Good health to all&lt;/li&gt;
+&lt;li&gt;Relaxed GTID constraints&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;I&#39;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? &lt;code&gt;gh-ost&lt;/code&gt;&amp;nbsp;has to write something to the binary log. Thus, it &#34;corrupts&#34; the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but...&lt;/p&gt;
+&lt;p&gt;I understand the idea and need for the &lt;code&gt;Executed GTID Set&lt;/code&gt;. It will&amp;nbsp;certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a &lt;code&gt;flush tables with read lock&lt;/code&gt;&amp;nbsp;without disabling &lt;code&gt;sql_log_bin&lt;/code&gt;. Things just happen.&lt;/p&gt;
+&lt;p&gt;For that, I would like to suggest GTID control levels, such as:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;em&gt;Strict&lt;/em&gt;: same as Oracle&#39;s existing&amp;nbsp;implementation. Executed sets, purged sets, whatnot.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Last executed&lt;/em&gt;: a mode where the only thing that counts is the last executed GTID value. If I repoint replica,&amp;nbsp;all it needs to check is &#34;hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don&#39;t care about comparing executed and purged sets, I will trust you and keep running from that point on&#34;&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;Declarative&lt;/em&gt;: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;I realize Oracle MySQL GTID is out for some over 3 years now, but I&#39;m sorry - I still have reservations and see&amp;nbsp;use cases where I fear it will not serve me right.&lt;/p&gt;
+&lt;p&gt;How about my previous years wishes? World peace and good health never came through, however:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;My &lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-2015&#34;&gt;2015 wish&lt;/a&gt; for &#34;decent, operations friendly built in online table refactoring&#34; was unmet, however &lt;code&gt;gh-ost&lt;/code&gt;&amp;nbsp;is a thing now and exceeds my expectations. No, really. Please come see &lt;a href=&#34;https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations&#34;&gt;Tom &amp;amp; myself present gh-ost&lt;/a&gt; and how it changed our migration paradigm.&lt;/li&gt;
+&lt;li&gt;My &lt;a href=&#34;http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-201&#34;&gt;2012 wish&lt;/a&gt; for &#34;decent, long waited for, implementation of &lt;a href=&#34;http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function&#34;&gt;Window Functions&lt;/a&gt; (aka Analytic Functions) for MySQL&#34; was met by&amp;nbsp;MariaDB&#39;s &lt;a href=&#34;https://mariadb.com/kb/en/mariadb/window-functions/&#34;&gt;window functions&lt;/a&gt;.&lt;br&gt;
+Not strictly Window Functions, but Oracle MySQL 8.0 will &lt;a href=&#34;http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/&#34;&gt;support CTE&lt;/a&gt; (hierarchial/recursive), worth a mention.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;See you in Amsterdam!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more</title>
+      <link>/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more</link>
+      <pubDate>Tue, 06 Sep 2016 11:44:14 +0000</pubDate>
+      
+      <guid>/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;https://github.com/github/gh-ost&#34;&gt;gh-ost&lt;/a&gt; version &lt;a href=&#34;https://github.com/github/gh-ost/releases/tag/v1.0.17&#34;&gt;1.0.17&lt;/a&gt; is now released, with various additions and fixes. Here are some notes of interest:&lt;/p&gt;
+&lt;h3&gt;Hooks&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;gh-ost&lt;/code&gt; now supports &lt;a href=&#34;https://github.com/github/gh-ost/blob/master/doc/hooks.md&#34;&gt;hooks&lt;/a&gt;. These are your own executables that &lt;code&gt;gh-ost&lt;/code&gt; will invoke at particular points of interest (validation pass, about to cut-over, success, failure, status, etc.)&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;gh-ost&lt;/code&gt; will set various environment variables for your executables to pick up, passing along such information as migrated/&lt;em&gt;ghost&lt;/em&gt; table name, elapsed time, processed rows, migrated host etc.&lt;/p&gt;
+&lt;h3&gt;Sub-second lag control&lt;/h3&gt;
+&lt;p&gt;At GitHub we&#39;re very strict about replication lag. We keep it well under &lt;code&gt;1&lt;/code&gt; second at most times. &lt;code&gt;gh-ost&lt;/code&gt; can now identify &lt;a href=&#34;https://github.com/github/gh-ost/blob/master/doc/subsecond-lag.md&#34;&gt;sub-second lag on replicas&lt;/a&gt; (well, you need to supply with the right query). Our current production migrations are set by default with &lt;code&gt;--max-lag-millis=500&lt;/code&gt; or less, and our most intensive migrations keep replication lag well below &lt;code&gt;1sec&lt;/code&gt; or even below &lt;code&gt;500ms&lt;/code&gt;&lt;/p&gt;
+&lt;h3&gt;No SUPER&lt;/h3&gt;
+&lt;p&gt;The &lt;code&gt;SUPER&lt;/code&gt; privilege is required to &lt;code&gt;set global binlog_format=&#39;ROW&#39;&lt;/code&gt; and for &lt;code&gt;STOP SLAVE; START SLAVE;&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;If you &lt;em&gt;know&lt;/em&gt; your replica has RBR, you can pass &lt;code&gt;--assume-rbr&lt;/code&gt; and skips those steps.&lt;/p&gt;
+&lt;h3&gt;RDS&lt;/h3&gt;
+&lt;p&gt;Hooks + No Super = RDS, as seems to be the case. For &lt;code&gt;--test-on-replica&lt;/code&gt; you will need to supply your own &lt;code&gt;gh-ost-on-stop-replication&lt;/code&gt; hook, to stop your RDS replica at cut-over phase. See &lt;a href=&#34;https://github.com/github/gh-ost/issues/163#issuecomment-244694616&#34;&gt;this tracking issue&lt;/a&gt;&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;master-master&lt;/h3&gt;
+&lt;p&gt;While active-active are still not supported, you now have greater control over master-master topologies by being able to explicitly pick your master (as &lt;code&gt;gh-ost&lt;/code&gt; arbitrarily picks one of the co-masters). Do so by passing &lt;code&gt;--assume-master-host&lt;/code&gt;. See &lt;a href=&#34;https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md&#34;&gt;cheatsheet&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;tungsten replicator&lt;/h3&gt;
+&lt;p&gt;Similarly, &lt;code&gt;gh-ost&lt;/code&gt; cannot crawl your &lt;code&gt;tungsten&lt;/code&gt; topology, and you are able to specify &lt;code&gt;--tungsten --assume-master-host=the.master.com&lt;/code&gt;. See &lt;a href=&#34;https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md&#34;&gt;cheatsheet&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;Concurrent-rowcount&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;--exact-rowcount&lt;/code&gt; is awesomeness, keeping quite accurate estimate of progress. With &lt;code&gt;--concurrent-rowcount&lt;/code&gt; we begin migration with a rough estimate, and execute &lt;code&gt;select count(*) from your_table&lt;/code&gt; in parallel, updating our estimate later on throughout the migration&lt;/p&gt;
+&lt;h3&gt;Stricter, safer&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;gh-ost&lt;/code&gt; works in &lt;code&gt;STRICT_ALL_TABLES&lt;/code&gt; mode, meaning it would fail rather than set the wrong value to a column.&lt;/p&gt;
+&lt;p&gt;In addition to unit-testing and production continuous test, a set of &lt;a href=&#34;https://github.com/github/gh-ost/blob/master/doc/local-tests.md&#34;&gt;local tests&lt;/a&gt; is growing, hopefully to run as CI tests later on.&lt;/p&gt;
+&lt;h3&gt;Fixed problems&lt;/h3&gt;
+&lt;p&gt;Fixed &lt;code&gt;time_zone&lt;/code&gt; related bug, high &lt;code&gt;unsigned&lt;/code&gt; values bug; added strict check for triggers, relaxed config file parsing, and more. Thank you to community contributors for PRs, from &lt;code&gt;ipv6&lt;/code&gt; to typos!&lt;/p&gt;
+&lt;h3&gt;Known issues&lt;/h3&gt;
+&lt;p&gt;Issues coming and going at all times -- thank you for reporting Issues!&lt;/p&gt;
+&lt;p&gt;We have a confirmed &lt;a href=&#34;https://github.com/github/gh-ost/issues/226&#34;&gt;bug with non-UTF charsets&lt;/a&gt; at this time. Some other minor issues and feature requests are open -- we&#39;ll take them as we go along.&lt;/p&gt;
+&lt;h3&gt;Feedback requests&lt;/h3&gt;
+&lt;p&gt;We are not testing &lt;code&gt;gh-ost&lt;/code&gt; on RDS ourselves. We appreciate community feedback on &lt;a href=&#34;https://github.com/github/gh-ost/issues/163&#34;&gt;this tracking issue&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;We are not testing &lt;code&gt;gh-ost&lt;/code&gt; on Galera/XtraDB cluster ourselves. We appreciate community feedback on &lt;a href=&#34;https://github.com/github/gh-ost/issues/224&#34;&gt;this tracking issue&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;We value submitted Issues and questions.&lt;/p&gt;
+&lt;h3&gt;Speaking&lt;/h3&gt;
+&lt;p&gt;We will be presenting &lt;code&gt;gh-ost&lt;/code&gt; in the next month:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;I will be &lt;a href=&#34;http://githubuniverse.com/program/sessions/#gh-ost&#34;&gt;presenting gh-ost at GitHub Universe&lt;/a&gt;, Sep. 14th&lt;/li&gt;
+&lt;li&gt;Tom Krouper will be &lt;a href=&#34;https://datalayer.com/&#34;&gt;presenting gh-ost at DataLayer&lt;/a&gt;, Seattle, Sep 28th&lt;/li&gt;
+&lt;li&gt;Tom Krouper and myself will be &lt;a href=&#34;https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations&#34;&gt;presenting gh-ost at PerconaLive&lt;/a&gt;, Amsterdam, Oct 5th&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Hope to see you there, and thank you again to all contributors!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>MySQL vs. PostgreSQL, gh-ost perspective</title>
+      <link>/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/</link>
+      <pubDate>Thu, 11 Aug 2016 22:34:10 +0000</pubDate>
+      
+      <guid>/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/</guid>
+      <description>&lt;p&gt;Last week we released &lt;a href=&#34;https://github.com/github/gh-ost&#34;&gt;gh-ost&lt;/a&gt;, &lt;a href=&#34;http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/&#34;&gt;GitHub&#39;s online schema migration tool for MySQL&lt;/a&gt;. As with other open source releases in the MySQL ecosystem, this release was echoed by several &#34;Why not PostgreSQL?&#34; comments. Having been active in open source since many years now, I&#39;m familiar with these responses, and I find this is a good time to share my thoughts. Why? &lt;a href=&#34;https://xkcd.com/386/&#34;&gt;XKCD&lt;/a&gt; knows the answer:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;https://xkcd.com/386/&#34;&gt;&lt;img class=&#34;alignnone&#34; src=&#34;/blog/blog/assets/duty_calls.png&#34; alt=&#34;XKCD: Duty Calls&#34; width=&#34;300&#34; height=&#34;330&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;I picked &lt;a href=&#34;https://brandur.org/fragments/gh-ost&#34;&gt;one post I wish to address&lt;/a&gt; (latest commit: &lt;a href=&#34;https://github.com/brandur/sorg/blob/3dfbd2cd3f5468f035ec86442d2c670a510118d8/content/fragments/gh-ost.md&#34;&gt;3dfbd2cd3f5468f035ec86442d2c670a510118d8&lt;/a&gt;). The author invested some time writing it. It nicely summarizes claims I&#39;ve heard over the years, as well as some prejudice. Through responding to this post I will be generalizing thoughts and impressions to address the common reactions. Dear @brandur, let&#39;s grab a beer some day; I fundamentally disagree with your post and with its claims.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;EDIT&lt;/strong&gt;: linked post has been updated following this writing; I&#39;d like to thank the author for his consideration. Also see his &lt;a href=&#34;https://gist.github.com/brandur/1374c9266c1d9dc32464695df84d9699&#34;&gt;followup post&lt;/a&gt;. The version I&#39;ve responded to in this post is &lt;a href=&#34;https://github.com/brandur/sorg/blob/3dfbd2cd3f5468f035ec86442d2c670a510118d8/content/fragments/gh-ost.md&#34;&gt;this commit&lt;/a&gt;.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;This is not an anti-PostgreSQL post&lt;/h3&gt;
+&lt;p&gt;Disclosure: I appreciate PostgreSQL. I always wanted to be a proficient PostgreSQL user/DBA. I think this project is one of the finest examples of quality open source. It sets some high standards for open source in general, and for RDBMS in particular. I am not emotionally attached to MySQL to the extent that I would hate everything that is not called &#34;MySQL&#34;. I never understood this approach. I am not interested in religious wars. I&#39;m an engineer and this post follows engineering guidelines.&lt;/p&gt;
+&lt;h3&gt;Background&lt;/h3&gt;
+&lt;p&gt;&lt;strong&gt;gh-ost&lt;/strong&gt; delivers powerful online schema migrations to MySQL, differentiating itself from existing tools by being triggerless, auditable, controllable, testable, imposing low workload on the migrated master. It addresses the same problem addressed by existing tools as of 2009.&lt;/p&gt;
+&lt;h3&gt;Feature X&lt;/h3&gt;
+&lt;p&gt;The most basic premise of this post is: &lt;i&gt;MySQL does not have feature X, PostgreSQL does, therefore PostgreSQL. &lt;/i&gt;&lt;/p&gt;
+&lt;p&gt;We&#39;ll discuss the truth of the above shortly, but let&#39;s first discuss the essence of this guideline.&lt;/p&gt;
+&lt;p&gt;It should be generally agreed that a statement of the form &lt;em&gt;&#34;&lt;strong&gt;A&lt;/strong&gt; doesn&#39;t have feature &lt;strong&gt;X&lt;/strong&gt; therefore &lt;strong&gt;B&lt;/strong&gt;&#34;&lt;/em&gt; is incomplete. We understand complex systems have varying feature sets.&lt;/p&gt;
+&lt;p&gt;MySQL has some features PostgreSQL doesn&#39;t. Take, as example, the feature &lt;strong&gt;R&lt;/strong&gt;: MySQL has got it since ages ago, and yet PostgreSQL is slow to adapt it, and relied on 3rd party solutions for many years. MySQL&#39;s implementation of &lt;strong&gt;R&lt;/strong&gt; is far more elaborate than PostgreSQL&#39;s.&lt;/p&gt;
+&lt;p&gt;But if we follow the rule suggested above, we must now migrate from PostgreSQL to MySQL, because PostgreSQL does not have feature &lt;strong&gt;R&lt;/strong&gt; (or one of its variants). Infinite loop!&lt;/p&gt;
+&lt;p&gt;In practice, we evaluate the pros and cons, the features the products &lt;strong&gt;A&lt;/strong&gt; and &lt;strong&gt;B&lt;/strong&gt; have or do not have. Which feature is more important to us? &lt;strong&gt;X&lt;/strong&gt; or &lt;strong&gt;R&lt;/strong&gt;? Is one of them fundamentally required for our operation? Can we work around it if we don&#39;t get it directly from the product? That, and experimentation, is the way an engineer should approach a choice of technology.&lt;/p&gt;
+&lt;p&gt;In the world of RDBMS we are interested, among others and in no particular order, in write latency and throughput, read scale out, durability, loss of data in the event of failure, failure promotion schemes, DR, consistency, SQL features, etc. by this list alone it is impossible to claim &lt;em&gt;&#34;PostgreSQL is better than MySQL&#34;&lt;/em&gt;  nor &lt;em&gt;&#34;MySQL is better than PostgreSQL&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;h3&gt;The particular claim and advice&lt;/h3&gt;
+&lt;p&gt;The author suggests we should be using PostgreSQL because it inherently solves the problem for which we embarked on developing &lt;strong&gt;gh-ost&lt;/strong&gt;. That is, that PostgreSQL supports true online schema changes. That statement is misleading and I resent the way that statement is delivered.&lt;/p&gt;
+&lt;p&gt;The post does not mention that PostgreSQL supports online schema changes for a limited set of operations. I went ahead to double check with the PostgreSQL documentation. I love the documentation! It is detailed and honest. I&#39;m thoroughly satisfied that PostgreSQL only supports a limited set of online operations. I go against the fact the post does not mention that, and leads us to &#34;understand&#34; PostgreSQL has a magic wand.&lt;/p&gt;
+&lt;p&gt;Online table operations are supported in PostgreSQL for adding/removing indexes, for removing columns, and for adding columns under certain conditions. As an example, adding a nullable column is an online operation, whereas adding a column with default value is a locking operation.&lt;/p&gt;
+&lt;p&gt;A very big part of our schema migration including adding/removing indexes and adding columns. Many of these operations fall under the lockless, online operations PostgreSQL would allow. However a large part of our migrations also consists of adding columns with default values, changing data types (e.g. From &lt;strong&gt;INT&lt;/strong&gt; to &lt;strong&gt;BIGINT&lt;/strong&gt;), changing character characteristics (e.g. length of text column), space reclamation, and others. These changes are blocking in PostgreSQL.&lt;/p&gt;
+&lt;p&gt;The premise of the post now turns to: &lt;i&gt;it&#39;s a pity you invested time and money in developing a tool that solves 100% of your problems when you could have switched to PostgreSQL which would solve 40% of your problems!&lt;/i&gt;&lt;/p&gt;
+&lt;p&gt;If I were to insist my fellow engineers at GitHub migrate to PostgreSQL in order to solve the migration problem, and then, once this technical transition is complete let them know 60% of the migrations are not at all addressed and that we are still stuck with the very same problem we started with, I would not be a very popular engineer.&lt;/p&gt;
+&lt;h3&gt;Moreover&lt;/h3&gt;
+&lt;p&gt;&#34;the same advancements never happened in MySQL&#34; is a false statement.&lt;/p&gt;
+&lt;p&gt;As mentioned in the &lt;strong&gt;gh-ost&lt;/strong&gt; announcement, MySQL as of 5.6 does indeed support online, non blocking alter table. In fact, it supports many more variants of online alter table than PostgreSQL does (however, noticeable difference is that PostgreSQL makes those changes &lt;em&gt;transactional&lt;/em&gt; whereas MySQL does not).&lt;/p&gt;
+&lt;p&gt;Also as mentioned, one of the shortcomings of the MySQL implementation is that it is aggressive, and may cause a high impact on the running master. In my understanding the PostgreSQL implementation is no different. There&#39;s nothing to cause throttling, to play nice with the running workload. Yes, in PostgreSQL you can Ctrl-C your &lt;strong&gt;ALTER&lt;/strong&gt;, but who wants to Ctrl-C a &lt;strong&gt;10&lt;/strong&gt; hour operation?&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;gh-ost&lt;/strong&gt; addresses that as well. Its throttling gives super powers over the migration process, kicking in throttling based on master load, replication lag, various human controlled criteria, effectively making it very lightweight on the master.&lt;/p&gt;
+&lt;h3&gt;Misdirection?&lt;/h3&gt;
+&lt;p&gt;&#34;there&#39;s a level of seemingly willful misdirection here that I just can&#39;t wrap my head around&#34;&lt;/p&gt;
+&lt;p&gt;XKCD to the rescue again:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;https://xkcd.com/438/&#34;&gt;&lt;img class=&#34;alignnone&#34; src=&#34;/blog/blog/assets/internet_argument.png&#34; alt=&#34;XKCD: Internet Argument&#34; width=&#34;460&#34; height=&#34;693&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;I dare say this is not the kind of thing a person would say in person, and the accusation is rather severe. It is also ironic. Dear author, consider:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PostgreSQL does not really solve 100% of the problem &lt;strong&gt;gh-ost&lt;/strong&gt; does, and yet you claim we&#39;d be better off with PostgreSQL.&lt;/li&gt;
+&lt;li&gt;MySQL does indeed provide more variants of online alter table than PostgreSQL does, and yet you claim it has no online alter capabilities.&lt;/li&gt;
+&lt;li&gt;I might claim there&#39;s a seemingly willful misdirection in your post. I might claim nowhere in your write up do you mention the deficiencies in PostgreSQL.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Instead, I&#39;d rather like to think that you, and others, are misinformed, basing your opinion on rumors and prejudice instead of facts.&lt;/p&gt;
+&lt;p&gt;I also observe that people all around the world like to willfully differentiate themselves from others. Even in tech. this is the topic for another post, but consider explaining to a complete outsider, say your doctor, why people who work in tech, are engineers, work with data, work with databases, work with relational databases, work with open source relational databases, people who have so much shared experience, still insist on &#34;us and them&#34;, and seek to see the negative in the other. Sheesh.&lt;/p&gt;
+&lt;p&gt;Paraphrasing a memorable sarcastic quote from the movie &lt;a href=&#34;http://www.imdb.com/title/tt0195685/&#34;&gt;Erin Brockovich&lt;/a&gt;: the fact so many of the largest tech companies today choose to use MySQL as their backend database does not mean it&#39;s crap.&lt;/p&gt;
+&lt;p&gt;No. We really think MySQL does a good job. It is not perfect. We work around some of its limitations.&lt;/p&gt;
+&lt;h3&gt;Claims&lt;/h3&gt;
+&lt;p&gt;The claim &#34;you&#39;d be better off with PostgreSQL&#34; (not a quote from aforementioned post) cannot be made without understanding the specific workload of a company/product. It would be presumptuous of me to approach a PostgreSQL based company and say &#34;oh hey why use PostgreSQL? You&#39;d be better off with MySQL!&#34;&lt;/p&gt;
+&lt;p&gt;It makes perfect sense to say &#34;PostgreSQL handles problem X better than MySQL&#34; or even &#34;if your one most important requirement is X, you should switch to PostgreSQL&#34;. Otherwise claiming one database is wholly better than the other cannot be taken seriously.&lt;/p&gt;
+&lt;p&gt;Deficiencies? Any project of scale has deficiencies. It is granted. We observe and measure, and take features and deficiencies into calculation, and that makes for good engineering.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If you&#39;re using PostgreSQL and it works well for you, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;It you&#39;re using MySQL and it works well for you, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;If you found that PostgreSQL works better for you where MySQL does not, and you decided to switch over, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;If you found that MySQL works better for you where PostgreSQL wasn&#39;t, and you decided to switch over, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;If you found that PostgreSQL works better for you where MySQL wasn&#39;t, but decided to stick with MySQL because migrating would be too costly, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;If you found that MySQL works better for you where PostgreSQL wasn&#39;t, but decided to stick with PostgreSQL because migrating would be too costly, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;If you pick one over the other because of licensing constraints, you&#39;re doing the right thing.&lt;/li&gt;
+&lt;li&gt;If you choose to switch over because of rumors, prejudice, FUD, politics, religion, you&#39;re doing it wrong.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Final personal note, on pride&lt;/h3&gt;
+&lt;p&gt;&#34;Yesterday, GitHub broadcasted an indomitable sense of self-satisfaction far and wide...&#34;&lt;/p&gt;
+&lt;p&gt;Oh hey, &lt;a href=&#34;https://xkcd.com/438/&#34;&gt;XKCD again&lt;/a&gt;. But I would like to ask an honest question: if some &lt;strong&gt;pg-gh-ost&lt;/strong&gt; were to be released, a tool that would solve 100% of your PostgreSQL migrations requirements, doing it better than PostgreSQL does, covering all cases, throttling as your daily &lt;em&gt;sqoop&lt;/em&gt; imports kick in, as your rush hour traffic kicks in, giving you far and wide greater control over the migration process, what would you do?&lt;/p&gt;
+&lt;p&gt;Would you write an offensive post filled with accusations, ranting about the deficiencies of PostgreSQL and how people even consider using such a database that needs a third party tool to do a better job at migrations? Would you tweet something like &#34;Or... Use MySQL!&#34;&lt;/p&gt;
+&lt;p&gt;Or would you embrace a project that enriches the PostgreSQL ecosystem, makes it even a greater database to work with, understanding PostgreSQL is not yet perfect and that more work need to be done?&lt;/p&gt;
+&lt;p&gt;I take pride in my craft and love making an impact; if we ever do meet for beer I&#39;m happy to share more  thoughts.&lt;/p&gt;
+&lt;p&gt;s/gh-ost/anything/g&lt;/p&gt;
+&lt;p&gt;Peace on earth&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Introducing gh-ost: triggerless online schema migrations</title>
+      <link>/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations/</link>
+      <pubDate>Mon, 01 Aug 2016 19:19:00 +0000</pubDate>
+      
+      <guid>/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations/</guid>
+      <description>&lt;p&gt;I&#39;m thoroughly happy to introduce &lt;a href=&#34;https://github.com/github/gh-ost&#34;&gt;&lt;strong&gt;gh-ost&lt;/strong&gt;&lt;/a&gt;: triggerless, controllable, auditable, testable, trusted online schema change tool &lt;a href=&#34;http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/&#34;&gt;released today by GitHub&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;gh-ost&lt;/em&gt; now powers our production schema migrations. We hit some serious limitations using &lt;a href=&#34;https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html&#34;&gt;pt-online-schema-change&lt;/a&gt; on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent of causing outages. With &lt;em&gt;gh-ost&lt;/em&gt;, we are now able to migrate our busiest tables at any time, peak hours and heavy workloads included, without causing impact to our service.&lt;/p&gt;
+&lt;p&gt;gh-ost supports testing in production. It goes a long way to build trust, both in integrity and in control. Are your databases just too busy and you cannot run existing online-schema-change tools? Have you suffered outages due to migrations? Are you tired of babysitting migrations that run up to 3:00am? Tired of being the only one tailing logs? Please, take a look at &lt;em&gt;gh-ost&lt;/em&gt;. I believe it changes online migration paradigm.&lt;/p&gt;
+&lt;p&gt;For a more thorough overview, please read the &lt;a href=&#34;http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/&#34;&gt;announcement&lt;/a&gt; on the GitHub Engineering Blog, and proceed to the &lt;a href=&#34;https://github.com/github/gh-ost/blob/master/README.md&#34;&gt;documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;gh-ost&lt;/em&gt; is open sourced under the MIT license.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Solving the non-atomic table swap, Take III: making it atomic</title>
+      <link>/blog/mysql/solving-the-non-atomic-table-swap-take-iii-making-it-atomic/</link>
+      <pubDate>Thu, 07 Jul 2016 14:54:25 +0000</pubDate>
+      
+      <guid>/blog/mysql/solving-the-non-atomic-table-swap-take-iii-making-it-atomic/</guid>
+      <description>&lt;p&gt;With the unintended impression of becoming live blogging, we now follow up on &lt;a title=&#34;Link to Solving the non-atomic table swap, Take II&#34; href=&#34;http://code.openark.org/blog/mysql/solving-the-non-atomic-table-swap-take-ii&#34; rel=&#34;bookmark&#34;&gt;Solving the non-atomic table swap, Take II&lt;/a&gt; and &lt;a title=&#34;Link to Solving the Facebook-OSC non-atomic table swap problem&#34; href=&#34;http://code.openark.org/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem&#34; rel=&#34;bookmark&#34;&gt;Solving the Facebook-OSC non-atomic table swap problem&lt;/a&gt; with a safe, blocking, &lt;em&gt;atomic&lt;/em&gt; solution&lt;/p&gt;
+&lt;h3&gt;Why yet another iteration?&lt;/h3&gt;
+&lt;p&gt;The solution presented in &lt;a title=&#34;Link to Solving the non-atomic table swap, Take II&#34; href=&#34;http://code.openark.org/blog/mysql/solving-the-non-atomic-table-swap-take-ii&#34; rel=&#34;bookmark&#34;&gt;Solving the non-atomic table swap, Take II&lt;/a&gt; was good, in that it was safe. No data corruption. Optimistic: if no connection is killed throughout the process, then completely blocking.&lt;/p&gt;
+&lt;p&gt;Two outstanding issues remained:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If something did go wrong, the solution reverted to a table-outage&lt;/li&gt;
+&lt;li&gt;On replicas, the table swap is non atomic, non blocking. There&#39;s table-outage scenario on replica.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;As it turns out, there&#39;s a simpler solution which overcomes both the above. As with math and physics, the simpler solution is often the preferred one. But it took those previous iterations to gather a few ideas together. So, anyway:&lt;/p&gt;
+&lt;h3&gt;Safe, locking, atomic, asynchronous table swap&lt;/h3&gt;
+&lt;p&gt;Do read the aforementioned previous posts; the quick-quick recap is: we want to be able to &lt;strong&gt;LOCK&lt;/strong&gt; a table &lt;strong&gt;tbl&lt;/strong&gt;, then do some stuff, then swap it out and put some &lt;strong&gt;ghost&lt;/strong&gt; table in its place. MySQL does not allow us to &lt;strong&gt;rename tbl to tbl_old, ghost to tbl&lt;/strong&gt; if we have locks on &lt;strong&gt;tbl&lt;/strong&gt; in that session.&lt;/p&gt;
+&lt;p&gt;The solution we offer is now based on two connections only (as opposed to three, in the &lt;em&gt;optimistic&lt;/em&gt; approach). &#34;Our&#34; connections will be C10, C20. The &#34;normal&#34; app connections are C1..C9, C11..C19, C21..C29.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Connections C1..C9 operate on &lt;strong&gt;tbl&lt;/strong&gt; with normal DML: &lt;strong&gt;INSERT, UPDATE, DELETE&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Connection C10: &lt;strong&gt;CREATE TABLE tbl_old (id int primary key) COMMENT=&#39;magic-be-here&#39;&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Connection C10: &lt;strong&gt;LOCK TABLES tbl WRITE, tbl_old WRITE&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Connections C11..C19, newly incoming, issue queries on &lt;strong&gt;tbl&lt;/strong&gt; but are blocked due to the &lt;strong&gt;LOCK&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Connection C20: &lt;strong&gt;RENAME TABLE tbl TO tbl_old, ghost TO tbl&lt;/strong&gt;&lt;br /&gt;
+This is blocked due to the &lt;strong&gt;LOCK&lt;/strong&gt;, &lt;em&gt;but&lt;/em&gt; gets prioritized on top connections C11..C19 and on top C1..C9 or any other connection that attempts DML on &lt;strong&gt;tbl&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Connections C21..C29, newly incoming, issue queries on &lt;strong&gt;tbl&lt;/strong&gt; but are blocked due to the &lt;strong&gt;LOCK&lt;/strong&gt; and due to the &lt;strong&gt;RENAME&lt;/strong&gt;, waiting in queue&lt;/li&gt;
+&lt;li&gt;Connection C10: checks that C20&#39;s &lt;strong&gt;RENAME&lt;/strong&gt; is applied (looks for the blocked &lt;strong&gt;RENAME&lt;/strong&gt; in processlist)&lt;/li&gt;
+&lt;li&gt;Connection 10: &lt;strong&gt;DROP TABLE tbl_old&lt;/strong&gt;&lt;br /&gt;
+Nothing happens yet; &lt;strong&gt;tbl&lt;/strong&gt; is still locked. All other connections still blocked.&lt;/li&gt;
+&lt;li&gt;Connection 10: &lt;strong&gt;UNLOCK TABLES&lt;br /&gt;
+BAM!&lt;/strong&gt; The &lt;strong&gt;RENAME&lt;/strong&gt; is first to execute, &lt;strong&gt;ghost&lt;/strong&gt; table is swapped in place of &lt;strong&gt;tbl&lt;/strong&gt;, then C1..C9, C11..C19, C21..C29 all get to operate on the new and shiny &lt;strong&gt;tbl&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Some notes&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;We create &lt;strong&gt;tbl_old&lt;/strong&gt; as a blocker for a premature swap&lt;/li&gt;
+&lt;li&gt;It is allowed for a connection to &lt;strong&gt;DROP&lt;/strong&gt; a table it has under a &lt;strong&gt;WRITE LOCK&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;A blocked &lt;strong&gt;RENAME&lt;/strong&gt; is always prioritized over a blocked &lt;strong&gt;INSERT/UPDATE/DELETE&lt;/strong&gt;, no matter who came first&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;What happens on failures?&lt;/h3&gt;
+&lt;p&gt;Much fun. Just works; no rollback required.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If C10 errors on the &lt;strong&gt;CREATE&lt;/strong&gt; we do not proceed.&lt;/li&gt;
+&lt;li&gt;If C10 errors on the &lt;strong&gt;LOCK&lt;/strong&gt; statement, we do not proceed. The table is not locked. App continues to operate as normal.&lt;/li&gt;
+&lt;li&gt;If C10 dies just as C20 is about to issue the &lt;strong&gt;RENAME&lt;/strong&gt;:
+&lt;ul&gt;
+&lt;li&gt;The lock is released, the queries C1..C9, C11..C19 immediately operate on &lt;strong&gt;tbl&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;C20&#39;s &lt;strong&gt;RENAME&lt;/strong&gt; immediately fails because &lt;strong&gt;tbl_old&lt;/strong&gt; exists.&lt;br /&gt;
+The entire operation is failed, but nothing terrible happens; some queries were blocked for some time is all. We will need to retry everything&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;If C10 dies while C20 is blocked on &lt;strong&gt;RENAME&lt;/strong&gt;: Mostly similar to the above. Lock released, then C20 fails the &lt;strong&gt;RENAME&lt;/strong&gt; (because &lt;strong&gt;tbl_old&lt;/strong&gt; exists), then all queries resume normal operation&lt;/li&gt;
+&lt;li&gt;If C20 dies before C10 drops the table, we catch the error and let C10 proceed as planned: &lt;strong&gt;DROP, UNLOCK&lt;/strong&gt;. Nothing terrible happens, some queries were blocked for some time. We will need to retry&lt;/li&gt;
+&lt;li&gt;If C20 dies just after C10 &lt;strong&gt;DROP&lt;/strong&gt;s the table but before the unlock, same as above.&lt;/li&gt;
+&lt;li&gt;If both C10 and C20 die, no problem: &lt;strong&gt;LOCK&lt;/strong&gt; is cleared; &lt;strong&gt;RENAME&lt;/strong&gt; lock is cleared. C1..C9, C11..C19, C21..C29 are free to operate on &lt;strong&gt;tbl&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;No matter what happens, at the end of operation we look for the &lt;strong&gt;ghost&lt;/strong&gt; table. Is it still there? Then we know the operation failed, &#34;atomically&#34;. Is it not there? Then it has been renamed to &lt;strong&gt;tbl&lt;/strong&gt;, and the operation worked atomically.&lt;/p&gt;
+&lt;p&gt;A side note on failure is the matter of cleaning up the magic &lt;strong&gt;tbl_old&lt;/strong&gt;. Here this is a matter of taste. Maybe just let it live and avoid recreating it, or you can drop it if you like.&lt;/p&gt;
+&lt;h3&gt;Impact on app&lt;/h3&gt;
+&lt;p&gt;App connections are guaranteed to be blocked, either until &lt;strong&gt;ghost&lt;/strong&gt; is swapped in, or until operation fails. In the former, they proceed to operate on the new table. In the latter, they proceed to operate on the original table.&lt;/p&gt;
+&lt;h3&gt;Impact on replication&lt;/h3&gt;
+&lt;p&gt;Replication only sees the &lt;strong&gt;RENAME&lt;/strong&gt;. There is no &lt;strong&gt;LOCK&lt;/strong&gt; in the binary logs. Thus, replication sees an atomic two-table swap. There is no table-outage.&lt;/p&gt;
+&lt;h3&gt;Conclusion&lt;/h3&gt;
+&lt;p&gt;This solution satisfies all we wanted to achieve. We&#39;re unlikely to give this another iteration. Well, if some yet-more-elegant solution comes along I&#39;ll be tempted, for the beauty of it, but the solution offered in this post is simple-enough, safe, atomic, replication friendly, and should make everyone happy.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Solving the non-atomic table swap, Take II</title>
+      <link>/blog/mysql/solving-the-non-atomic-table-swap-take-ii/</link>
+      <pubDate>Mon, 20 Jun 2016 11:26:47 +0000</pubDate>
+      
+      <guid>/blog/mysql/solving-the-non-atomic-table-swap-take-ii/</guid>
+      <description>&lt;p&gt;Following up and improving on &lt;a title=&#34;Link to Solving the Facebook-OSC non-atomic table swap problem&#34; href=&#34;http://code.openark.org/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem&#34; rel=&#34;bookmark&#34;&gt;Solving the Facebook-OSC non-atomic table swap problem&lt;/a&gt;, we present a better, safe solution.&lt;/p&gt;
+&lt;h3&gt;Quick, quickest recap:&lt;/h3&gt;
+&lt;p&gt;We are working on a triggerless online schema migration solution. It is based on an asynchronous approach, similarly to the &lt;a href=&#34;https://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932/&#34;&gt;FB osc&lt;/a&gt; and as opposed to the synchronous solution as used by &lt;a href=&#34;https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html&#34;&gt;pt-online-schema-change&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;We asynchronously synchronize (is that even a valid statement?) between some table &lt;strong&gt;tbl&lt;/strong&gt; and a ghost table &lt;strong&gt;ghost&lt;/strong&gt;, and at some time we want to cut-over: swap the two; kick out &lt;strong&gt;tbl&lt;/strong&gt; and put &lt;strong&gt;ghost&lt;/strong&gt; in its place and under its name.&lt;/p&gt;
+&lt;p&gt;However, we cannot use the single statement &lt;strong&gt;rename tbl to tbl_old, ghost to tbl&lt;/strong&gt;, because we use the asynchronous approach, where at the time we lock &lt;strong&gt;tbl&lt;/strong&gt; for writes, we still have some events we need to process and apply onto &lt;strong&gt;ghost&lt;/strong&gt; before swapping the two.&lt;/p&gt;
+&lt;p&gt;And MySQL does not allow a &lt;strong&gt;lock tables tbl write; ... ; &lt;/strong&gt;&lt;strong&gt;rename tbl to tbl_old, ghost to tbl&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;In &lt;a title=&#34;Link to Solving the Facebook-OSC non-atomic table swap problem&#34; href=&#34;http://code.openark.org/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem&#34; rel=&#34;bookmark&#34;&gt;Solving the Facebook-OSC non-atomic table swap problem&lt;/a&gt; we suggested a way that works, unless when it doesn&#39;t work. Read the caveat at the end of the post. Premature death of a connection that participates in the algorithm causes a chain reaction that leads to the premature execution of the &lt;strong&gt;rename&lt;/strong&gt; statement, potentially before we&#39;ve applied those remaining events. This leads to data inconsistency between the old table and the new table, and is unacceptable.&lt;/p&gt;
+&lt;p&gt;To that effect, we were more inclined to go with the Facebook solution, which makes a two-step: &lt;strong&gt;lock tables tbl write; alter table tbl rename to tbl_old; ... ; alter table ghost rename to tbl;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;This two-step solution is guaranteed not to have data inconsistency. Alas, it also implies an outage. There&#39;s a brief moment, in between the two &lt;strong&gt;rename&lt;/strong&gt;s, and during that time where we apply those last changes, where the table &lt;strong&gt;tbl&lt;/strong&gt; is simply not there.&lt;/p&gt;
+&lt;p&gt;Not all applications will fail gracefully on such a scenario.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;UDF&lt;/h3&gt;
+&lt;p&gt;We looked at a solution based on UDFs, where we would create global wait conditions, that are not connection based.&lt;/p&gt;
+&lt;p&gt;We don&#39;t like UDFs. You need to compile them for every new version. Puppetizing their setup is not fun. We wouldn&#39;t like maintaining this. We wouldn&#39;t like doing the operations for this. Neither would the community.&lt;/p&gt;
+&lt;p&gt;We want to make this a community solution. Can we do without UDF?&lt;/p&gt;
+&lt;h3&gt;Rewriting MySQL&lt;/h3&gt;
+&lt;p&gt;We wish to avoid forking our own version of MySQL. It&#39;s not what we do and it&#39;s a pain.&lt;/p&gt;
+&lt;h3&gt;A pure MySQL solution?&lt;/h3&gt;
+&lt;p&gt;We found a solution to embrace; it is &lt;em&gt;optimistic&lt;/em&gt;, and &lt;em&gt;safe&lt;/em&gt;. hat &lt;em&gt;optimistic&lt;/em&gt; means is explained further on, but let&#39;s discuss &lt;em&gt;safe&lt;/em&gt;:&lt;/p&gt;
+&lt;p&gt;The previous solution we came up with as &lt;em&gt;unsafe&lt;/em&gt; because breakage of a single component in the algorithm would lead to inconsistent data. The algorithm itself was fine, as long as no one would break it from the outside. This is the concern: what if some crazy cronjob that cleans up connections (kills idle connections, kills long running transactions) or some unfortunate user command kills one of the connections involved in the cut-over phase? This is not something that would happen every day, but can we protect against it? Our priority is to keep our data intact.&lt;/p&gt;
+&lt;p&gt;The solution allows breakage. Even in the face of death of connections, data is not lost/corrupted, and at worst -- causes a FB-like, recoverable outage scenario.&lt;/p&gt;
+&lt;h3&gt;A step towards the solution, a flawed one&lt;/h3&gt;
+&lt;p&gt;I wish to illustrate something that looks like it would work, but in fact has a hidden flaw. We will later improve on that solution.&lt;/p&gt;
+&lt;p&gt;Let&#39;s assume we have &lt;strong&gt;tbl&lt;/strong&gt;, &lt;strong&gt;ghost&lt;/strong&gt; tables. We execute the following by multiple connections; we call them C1, C2, C3, ...:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;C1: &lt;strong&gt;lock tables tbl write;&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;C2, C3, ..., C17: normal app connections, issuing &lt;strong&gt;insert, delete, update&lt;/strong&gt; on &lt;strong&gt;tbl&lt;/strong&gt;. Because of the lock, they are naturally blocked.&lt;/li&gt;
+&lt;li&gt;We apply those last event we need to apply onto &lt;strong&gt;ghost&lt;/strong&gt;. No new events are coming our way because &lt;strong&gt;tbl&lt;/strong&gt; is blocked.&lt;/li&gt;
+&lt;li&gt;C18: &lt;strong&gt;rename table tbl to tbl_old, ghost to tbl; &lt;/strong&gt;(blocked as well)&lt;/li&gt;
+&lt;li&gt;C1: &lt;strong&gt;unlock tables&lt;/strong&gt;&lt;strong&gt;; &lt;/strong&gt;(everything gets released)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let&#39;s consider the above, and see why it is flawed. But first, why it would typically work in the first place.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Connections C2, ..., C17 came first, and C18 came later. Nevertheless MySQL prioritizes C18 and moves it up the queue of waiting queries on &lt;strong&gt;tbl&lt;/strong&gt;. When we &lt;strong&gt;unlock&lt;/strong&gt;, C18 is the first to execute.&lt;/li&gt;
+&lt;li&gt;We only issue the &lt;strong&gt;rename&lt;/strong&gt; once we&#39;re satisfied we&#39;ve applied those changes. We only &lt;strong&gt;unlock&lt;/strong&gt; once we&#39;re satisfied that the &lt;strong&gt;rename&lt;/strong&gt; has been executed.&lt;/li&gt;
+&lt;li&gt;If for some reason C1 disconnects before we issue the &lt;strong&gt;rename&lt;/strong&gt; - no problem, we just retry from scratch.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;What&#39;s the flaw?&lt;/h4&gt;
+&lt;p&gt;We &lt;strong&gt;rename&lt;/strong&gt; when C1 holds the &lt;strong&gt;lock&lt;/strong&gt;. We check with C1 that it is alive and kicking. Yep, it&#39;s connected and holding the lock. Are you sure? Yep, I&#39;m good! Really really sure? Yep! OK then, let&#39;s &lt;strong&gt;rename!&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&#34;Oh darn&#34;, says C1, &#34;now that you went ahead to &lt;strong&gt;rename&lt;/strong&gt;, but just before you actually sent the request, I decided to take time off and terminate&#34;. Or, more realistically, some job would kill C1.&lt;/p&gt;
+&lt;p&gt;What happens now? The &lt;strong&gt;rename&lt;/strong&gt; is not there yet. All those queries get released, and are immediately applied onto &lt;strong&gt;tbl&lt;/strong&gt;, and &lt;em&gt;then&lt;/em&gt; the &lt;strong&gt;rename&lt;/strong&gt; applies, kicks all those changes into oblivion, and puts &lt;strong&gt;ghost&lt;/strong&gt; in place, where it immediately receives further writes.&lt;/p&gt;
+&lt;p&gt;Those blocking queries were committed but never to be seen again.&lt;/p&gt;
+&lt;p&gt;So here&#39;s another way to look at the problem: the &lt;strong&gt;rename&lt;/strong&gt; made it through even though the connection C1 died just prior to that, whereas we would have loved the &lt;strong&gt;rename&lt;/strong&gt; to abort upon such case.&lt;/p&gt;
+&lt;p&gt;Is there a way in MySQL to cause an operation to &lt;strong&gt;fail or block&lt;/strong&gt; when another connection dies? It&#39;s the other way around! Connections hold locks, and those get released when they die!&lt;/p&gt;
+&lt;p&gt;But there&#39;s a way...&lt;/p&gt;
+&lt;h3&gt;Three step, safe, optimistic solution&lt;/h3&gt;
+&lt;p&gt;Here are the steps to a safe solution:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;C1: &lt;strong&gt;lock tables tbl write;&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;C2, C3, ..., C17: normal app connections, issuing &lt;strong&gt;insert, delete, update&lt;/strong&gt; on &lt;strong&gt;tbl&lt;/strong&gt;. Because of the lock, they are naturally blocked.&lt;/li&gt;
+&lt;li&gt;We apply those last event we need to apply onto &lt;strong&gt;ghost&lt;/strong&gt;. No new events are coming our way because &lt;strong&gt;tbl&lt;/strong&gt; is blocked.&lt;/li&gt;
+&lt;li&gt;C18: checking that C1 is still alive, then &lt;strong&gt;rename table tbl to tbl_old&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;C19: checking to see that C18&#39;s &lt;strong&gt;rename&lt;/strong&gt; is in place (via &lt;strong&gt;show processlist&lt;/strong&gt;), &lt;strong&gt;and&lt;/strong&gt; that C1 is still alive; then issues: &lt;strong&gt;rename table ghost to tbl&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;(meanwhile more queries approach &lt;strong&gt;tbl&lt;/strong&gt;, it doesn&#39;t matter, they all get deprioritized, same as C2...C17)&lt;/li&gt;
+&lt;li&gt;C1: &lt;strong&gt;unlock tables&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;What just happened? Let&#39;s first explain some stuff:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;C18&#39;s &lt;strong&gt;rename&lt;/strong&gt; gets prioritized over the DMLs, even though it came later. That is how MySQL prioritizes queries on metadata-locked tables.&lt;/li&gt;
+&lt;li&gt;C18 checks C1 is still alive, but as before, there&#39;s always the chance C1 will die just at the wrong time -- we&#39;re going to address that.&lt;/li&gt;
+&lt;li&gt;C19 is interested to see that C18 began execution, but potentially C18 will crash by the time C19 actually issues its own &lt;strong&gt;rename&lt;/strong&gt; -- we&#39;re going to address that&lt;/li&gt;
+&lt;li&gt;C19&#39;s query sounds weird. At that time &lt;strong&gt;tbl&lt;/strong&gt; still exists. You&#39;d expect it to fail immediately -- but it does not. It&#39;s valid. This is because &lt;strong&gt;tbl&lt;/strong&gt;&#39;s metadata lock is in use.&lt;/li&gt;
+&lt;li&gt;C19 gets prioritized over all the DMLs, but is known to be behind C18. The two stay in same order of arrival. So, C18 is known to execute before C19.&lt;/li&gt;
+&lt;li&gt;When C1 unlocks, C18 executes first.&lt;/li&gt;
+&lt;li&gt;Metadata lock is still in place on &lt;strong&gt;tbl&lt;/strong&gt; even though it doesn&#39;t actually exist, because of C19.&lt;/li&gt;
+&lt;li&gt;C19 operates next.&lt;/li&gt;
+&lt;li&gt;Finally all the DMLs execute.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;What happens on failures?&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If C1 dies just as C18 is about to issue the &lt;strong&gt;rename&lt;/strong&gt;, we get an outage: &lt;strong&gt;tbl&lt;/strong&gt; is renamed to &lt;strong&gt;tbl_old&lt;/strong&gt;, and the queries get released and complain the table is just not there.
+&lt;ul&gt;
+&lt;li&gt;C19 will not initiate because it is executed &lt;strong&gt;after&lt;/strong&gt; C18 and checks that C1 is alive -- which turns to be untrue.&lt;/li&gt;
+&lt;li&gt;So we &lt;strong&gt;know&lt;/strong&gt; we have outage, and we quickly &lt;strong&gt;rename tbl_old to tbl;&lt;/strong&gt; and go drink coffee, then begin it all again.&lt;/li&gt;
+&lt;li&gt;The outage is unfortunate, but does not put our data in danger.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;If C1 happens to die just as C19 is about to issue its &lt;strong&gt;rename&lt;/strong&gt;, there&#39;s no data integrity: at this point we&#39;ve already asserted the tables are in sync. As C1 dies, C18 will immediately rename &lt;strong&gt;tbl&lt;/strong&gt; to &lt;strong&gt;tbl_old&lt;/strong&gt;. An outage will occur, but not for long, because C19 will next issue &lt;strong&gt;rename ghost to tbl&lt;/strong&gt;, and close the gap. We suffered a minor outage, but no rollback. We roll forward.&lt;/li&gt;
+&lt;li&gt;If C18 happens to die just as C19 is about to issue its &lt;strong&gt;rename&lt;/strong&gt;, nothing bad happens: C19 is still blocking for as long as C1 is running. We find out C18 died, and release C1. C19 attempts to rename &lt;strong&gt;ghost&lt;/strong&gt; onto &lt;strong&gt;tbl&lt;/strong&gt;, but &lt;strong&gt;tbl&lt;/strong&gt; exists and the query fails. The metadata lock is released and all the queries resume operation on the original &lt;strong&gt;tbl&lt;/strong&gt;. The operation failed but without error. We will need to try the entire cycle again.&lt;/li&gt;
+&lt;li&gt;If both C1 and C18 fail at the time C19 is about to begin its &lt;strong&gt;rename&lt;/strong&gt;, same as above.&lt;/li&gt;
+&lt;li&gt;If C18 fails as C19 is already in place, same as above.&lt;/li&gt;
+&lt;li&gt;If C1 fails as C19 is already in place, it&#39;s as good as having it issue the &lt;strong&gt;unlock tables&lt;/strong&gt;. We&#39;re happy.&lt;/li&gt;
+&lt;li&gt;If C19 fails at any given point, we suffer outage. We revert by &lt;code&gt;rename tbl_old to tbl&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This solution relies on the notion that if a previous connection failed, we would not be able to &lt;strong&gt;rename ghost to tbl&lt;/strong&gt; because the table would still be there. That&#39;s what we were looking for; but instead of looking at locks, which get released when a connection terminates, we used a persistent entity: a table.&lt;/p&gt;
+&lt;h3&gt;Conclusion&lt;/h3&gt;
+&lt;p&gt;The algorithm above is &lt;strong&gt;optimistic&lt;/strong&gt;: if no connections get weirdly killed, it&#39;s a valid locking solution, and queries &amp;amp; app are unaware that anything happened (granted, app will notice write latency). If connections do get weirdly killed, we get table-outage at worst case -- an outage that is already considered to be a valid solution anyhow. The algorithm will not allow data corruption.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Solving the Facebook-OSC non-atomic table swap problem</title>
+      <link>/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem/</link>
+      <pubDate>Tue, 03 May 2016 08:42:07 +0000</pubDate>
+      
+      <guid>/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem/</guid>
+      <description>&lt;p&gt;We present a way to use an atomic, blocking table swap in the Facebook Online-Schema-Change solution, as well as in a rumored, other Online-Schema-rumored-Change solution. &lt;strong&gt;Update&lt;/strong&gt;: also a caveat.&lt;/p&gt;
+&lt;h3&gt;Quick recap (really quick)&lt;/h3&gt;
+&lt;p&gt;&lt;a href=&#34;https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html&#34;&gt;pt-online-schema-change&lt;/a&gt; and &lt;a href=&#34;https://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932/&#34;&gt;facebook-osc&lt;/a&gt; are two popular online-schema-change solutions for MySQL. They both use triggers, but in different ways. While the Percona tool uses synchronous table updates, such that any &lt;strong&gt;INSERT|UPDATE|DELETE&lt;/strong&gt; on the modified table causes an &lt;strong&gt;INSERT|UPDATE|DELETE&lt;/strong&gt; on a ghost table, in the Facebook tool all cause an &lt;strong&gt;INSERT&lt;/strong&gt; on a changelog table, which is then iterated, read, having entries applied on the ghost table.&lt;/p&gt;
+&lt;p&gt;The TL;DR is that DMLs on the table propagate synchronously, within same transaction in the Percona tool, and asynchronously, with lag, in the Facebook tool.&lt;/p&gt;
+&lt;h3&gt;What&#39;s the problem with the table swap?&lt;/h3&gt;
+&lt;p&gt;In the Percona tool, once the logic is satisfied the copy is complete, we issue this query:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;RENAME TABLE tbl TO tbl_old, tbl_new TO tbl;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This is an atomic, two table &lt;strong&gt;RENAME&lt;/strong&gt; operation.&lt;/p&gt;
+&lt;p&gt;However with the asynchronous nature of the Facebook tool, such a &lt;strong&gt;RENAME&lt;/strong&gt; would be a mistake. We must first block writes to the modified table, then make sure we have iterated the changelog table to the point of lock, apply those changes onto the ghost table, and only then do the swap.&lt;/p&gt;
+&lt;p&gt;The problem is: you cannot &lt;strong&gt;RENAME TABLES&lt;/strong&gt; while one of them is &lt;strong&gt;LOCK&lt;/strong&gt;ed.&lt;/p&gt;
+&lt;p&gt;This is silly, and inconsistent, because:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&amp;gt; LOCK TABLES tbl WRITE;
+Query OK, 0 rows affected (0.00 sec)
+
+&amp;gt; RENAME TABLE tbl TO tbl_old, tbl_new TO tbl;
+ERROR 1192 (HY000): Can&#39;t execute the given command because you have active locked tables or an active transaction
+
+&amp;gt; ALTER TABLE tbl RENAME TO tbl_old;
+Query OK, 0 rows affected (0.00 sec)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Why would the &lt;strong&gt;RENAME&lt;/strong&gt; fail where the &lt;strong&gt;ALTER&lt;/strong&gt; works?&lt;/p&gt;
+&lt;p&gt;Small thing, but critical to the operation of the online-schema-change. From the &lt;a href=&#34;https://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932/&#34;&gt;Facebook OSC documentation&lt;/a&gt;:&lt;/p&gt;
+&lt;blockquote&gt;Since alter table causes an implicit commit in innodb, innodb locks get released after the first alter table. So any transaction that sneaks in after the first alter table and before the second alter table gets a &#39;table not found&#39; error. The second alter table is expected to be very fast though because copytable is not visible to other transactions and so there is no need to wait.&lt;/blockquote&gt;
+&lt;h3&gt;What the FB solution means&lt;/h3&gt;
+&lt;p&gt;It means for a very brief duration, the table is &lt;em&gt;not there&lt;/em&gt;. Your app will get errors.&lt;/p&gt;
+&lt;p&gt;Of course, we &lt;em&gt;should&lt;/em&gt; be able to handle errors anytime, aywhere. But the honest truth is: we (as in &lt;em&gt;the world&lt;/em&gt;) do not. Many apps will fail ungracefully should they get a &lt;em&gt;table not found&lt;/em&gt; error.&lt;/p&gt;
+&lt;p&gt;An atomic swap, as compared, would make for briefly blocking operations, making the app ignorant of the swap.&lt;/p&gt;
+&lt;h3&gt;Rumor&lt;/h3&gt;
+&lt;p&gt;Rumor has it that we at GitHub are developing a new, triggerless, Online Schema Change tool. It is rumored to be based off binary logs and is rumored to have lots of interesting rumored implications.&lt;/p&gt;
+&lt;p&gt;Such rumored implementation would have to be asynchronous by nature, or so rumors say. And as such, it would fall for the same non-atomic table swap problem.&lt;/p&gt;
+&lt;h3&gt;Solution&lt;/h3&gt;
+&lt;p&gt;Once we heard it was rumored we were working on a triggerless online schema change tool, we realized we would have to solve the non-atomic swap problem. What we did was to gossip about it in between ourselves, which led to three different rumors of a solution, eventually manifested as three different working solutions. All three solutions make for blocking queries on the app&#39;s side. I will present one of these solution here, based on voluntary locks.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;The idea is to make a table locked without actually issuing a &lt;strong&gt;LOCK TABLE&lt;/strong&gt; statement, such that we would be able to run a &lt;strong&gt;RENAME TABLE&lt;/strong&gt; operation, that would &lt;em&gt;wait until we say it&#39;s good to complete&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Let&#39;s assume:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Our table is &lt;strong&gt;tbl&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Ghost table (table onto which we&#39;ve actually made the changes) is &lt;strong&gt;tbl_new&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Our app continuously writes to &lt;strong&gt;tbl&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;We have &lt;strong&gt;3&lt;/strong&gt; connections on our tables, aptly named &lt;strong&gt;#1&lt;/strong&gt;, &lt;strong&gt;#2&lt;/strong&gt;, &lt;strong&gt;#3&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We issue the following, in this order:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;#1&lt;/strong&gt;:&lt;br /&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT GET_LOCK(&#39;ding&#39;, 0);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Lock acquired, no problems&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;#2&lt;/strong&gt;:&lt;br /&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT RELEASE_LOCK(&#39;ding&#39;) FROM tbl WHERE GET_LOCK(&#39;ding&#39;, 999999)&amp;gt;=0 LIMIT 1;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Ignore the &lt;strong&gt;RELEASE_LOCK&lt;/strong&gt; for now, this is merely cleanup. The query attempts to read one row from &lt;strong&gt;tbl&lt;/strong&gt; where &lt;strong&gt;GET_LOCK(&#39;ding&#39;)&amp;gt;=0&lt;/strong&gt;. But &lt;strong&gt;&#39;ding&#39;&lt;/strong&gt; is locked, hence the entire query blocks.&lt;br /&gt;
+Otherwise, other queries on &lt;strong&gt;tbl&lt;/strong&gt; (both reads and writes) are running &lt;em&gt;fine&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;#3&lt;/strong&gt;:&lt;br /&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;RENAME TABLE tbl TO tbl_old, tbl_new TO tbl;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Now the magic begins. The &lt;strong&gt;RENAME&lt;/strong&gt; operation cannot proceed while queries are executing on &lt;strong&gt;tbl&lt;/strong&gt;. In particular, it waits on &lt;strong&gt;#2&lt;/strong&gt; to complete. But &lt;strong&gt;#2&lt;/strong&gt; is blocked on &lt;strong&gt;#1&lt;/strong&gt;, so it does not complete. Our &lt;strong&gt;RENAME&lt;/strong&gt; is also blocked!&lt;br /&gt;
+There are further two consequences that work to our advantage:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Any further incoming &lt;strong&gt;INSERT|UPDATE|DELETE&lt;/strong&gt; on &lt;strong&gt;tbl&lt;/strong&gt; is now unable to proceed; such queries will now wait for the &lt;strong&gt;RENAME&lt;/strong&gt; to complete. So &lt;em&gt;no further updated on &lt;strong&gt;tbl&lt;/strong&gt;&lt;/em&gt; are being applied. App is blocked&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;tbl_new&lt;/strong&gt; is &lt;em&gt;nonblocked&lt;/em&gt;! And this is because how &lt;strong&gt;RENAME&lt;/strong&gt; works internally. Since it couldn&#39;t satisfy the first clause, it doesn&#39;t even check for the second, and does not place a &lt;strong&gt;LOCK&lt;/strong&gt; on &lt;strong&gt;tbl_new&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;OSC:&lt;br /&gt;
+Now that no further writes are possible on &lt;strong&gt;tbl&lt;/strong&gt;, we satisfy ourselves that we&#39;ve iterated to the last of the changelog entries and have applied changes to &lt;strong&gt;tbl_new&lt;/strong&gt;. Exactly how we satisfy ourselves is a matter of implementation. Rumor is that we use a &lt;em&gt;rumor&lt;/em&gt; that the last entry was handled in our rumored solution. That last part is actually not a pun.&lt;br /&gt;
+We are now content that all changes have been applied to &lt;strong&gt;tbl_new&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;#1&lt;/strong&gt;:&lt;br /&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT RELEASE_LOCK(&#39;ding&#39;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;Ding!&lt;/strong&gt; Connection &lt;strong&gt;#2&lt;/strong&gt; gets released, reads some row from &lt;strong&gt;tbl&lt;/strong&gt; (but no one is actually interested in the result set) and completes. The &lt;strong&gt;#3 RENAME&lt;/strong&gt; is not blocking on anything anymore. It executes. The tables are swapped. Once they are swapped, any &lt;strong&gt;INSERT|UPDATE|DELETE&lt;/strong&gt;s that were pending on &lt;strong&gt;tbl&lt;/strong&gt; are released and App is unblocked.&lt;br /&gt;
+The atomic swap is complete.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4&gt;Implementation&lt;/h4&gt;
+&lt;p&gt;Agony. This workaround is agonizing. Is &lt;em&gt;agonization&lt;/em&gt; a word? By rumor written in Go, our OSC has this implemented via goroutines, and the code is one of those atrocities you are ashamed to look at. Well, it&#39;s OK under the circumstances. But really, implementing this is painful, and actually more complicated than the above description. Why is that?&lt;/p&gt;
+&lt;p&gt;In the above we make fro two blocking operations: &lt;strong&gt;#2&lt;/strong&gt; and &lt;strong&gt;#3&lt;/strong&gt;. We must not proceed to &lt;strong&gt;#3&lt;/strong&gt; before &lt;strong&gt;#2&lt;/strong&gt; is applied, and we must not proceed to OSC completion before &lt;strong&gt;#3&lt;/strong&gt; is applied. But how does our code &lt;em&gt;know&lt;/em&gt; that it&#39;s being blocked? If it&#39;s being blocked, it can&#39;t tell me anything, because it&#39;s blocked. If it&#39;s not blocked yet, it can tell me it&#39;s not blocked yet, but I&#39;m really interested in knowing the time it gets blocked.&lt;/p&gt;
+&lt;p&gt;But preferably the exact time, or near exact, because one we start blocking, App suffers. Connections accumulate. We really want to make the swap as quick as possible (and by rumor we have a rollback &amp;amp; retry mechanism for this operation if it exceeds &lt;strong&gt;X&lt;/strong&gt; seconds).&lt;/p&gt;
+&lt;p&gt;Unfortunately the solution involves polling. That is, Once we issue &lt;strong&gt;#2&lt;/strong&gt; (asynchronously, right? It&#39;s &lt;em&gt;blocking&lt;/em&gt;), we aggressively poll &lt;strong&gt;SHOW PROCESSLIST&lt;/strong&gt; and look for that blocked query. And the same for &lt;strong&gt;#3&lt;/strong&gt;. Polling is a form of necessary ugliness in this flow.&lt;/p&gt;
+&lt;p&gt;Other solutions&lt;/p&gt;
+&lt;p&gt;The other two solutions do not use a voluntary lock. Instead:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Use a &lt;strong&gt;LOCK&lt;/strong&gt; on some yet another table and a query involving &lt;em&gt;that&lt;/em&gt; table JOINed with &lt;strong&gt;tbl&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;A &lt;strong&gt;SELECT ... FOR UPDATE&lt;/strong&gt; on yet another table followed by a &lt;strong&gt;SELECT&lt;/strong&gt; on the locked row on &lt;em&gt;that&lt;/em&gt; table JOINed with &lt;strong&gt;tbl.&lt;/strong&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;We leave the implementation as an exercise for the reader.&lt;/p&gt;
+&lt;h3&gt;Can&#39;t we just make the RENAME work under LOCK?&lt;/h3&gt;
+&lt;p&gt;Yeah. That&#39;s what the Facebook people said. &#34;Hey, we can just fix this&#34;.&lt;/p&gt;
+&lt;h3&gt;Update: caveat&lt;/h3&gt;
+&lt;p&gt;Should connection #1 or connection #2 die unexpectedly before we are satisfied the events have all been applied, the `RENAME` gets unblocked due to the collapse of locks, and we end up with a premature swap of the tables, potentially before we have applied the latest entries from the changelog table. This was noted by my colleague Gillian Gunson, and we keep looking into this.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>MySQL Community Awards 2016: the Winners</title>
+      <link>/blog/mysql/mysql-community-awards-2016-the-winners/</link>
+      <pubDate>Fri, 22 Apr 2016 19:03:42 +0000</pubDate>
+      
+      <guid>/blog/mysql/mysql-community-awards-2016-the-winners/</guid>
+      <description>&lt;p&gt;The MySQL Community Awards initiative is an effort to acknowledge and thank individuals and corporates for their contributions to the MySQL ecosystem. It is a from-the-community, by-the-community and for-the-community effort. The committee is composed of an independent group of community members of different orientation and opinion, themselves past winners or known contributors to the community.&lt;/p&gt;
+&lt;p&gt;The 2016 community awards were presented on April 21st, 2016, during the keynotes at the Percona Live conference. The winners are:&lt;/p&gt;
+&lt;h4&gt;MySQL Community Awards: Community Contributor of the year 2016&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Bill Karwin&lt;br /&gt;
+&lt;/strong&gt;Bill has been working with the community for years, helping them understand SQL. Bill is the author of the great book &#34;SQL Antipatterns&#34;. He has given a large amount of help on sites such as StackOverflow, Quora, and of course many conference talks. Bill has provided a huge amount of help to the community directly.&lt;/li&gt;
+&lt;li&gt;&lt;strong style=&#34;line-height: 1.5;&#34;&gt;Domas Mituzas&lt;br /&gt;
+&lt;/strong&gt;Domas Mituzas started in the MySQL ecosystem as a MySQL Support Engineer at MySQL AB. Since he had some spare time, he did a lot of work to scale MySQL at Wikipedia. He is now a small data engineer at Facebook, mostly working with user-facing data systems. He continues to write very interesting blog posts and bug reports. Domas is responsible for giving us MyDumper, PoorMansProfiler, and the infamous Query Cache tuner!&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Yoshinori Matsunobu&lt;br /&gt;
+&lt;/strong&gt;Yoshinori Matsunobu is currently leading the MyRocks effort to get the RocksDB storage engine for MySQL into production at Facebook. Previously (amongst his other accomplishments) he created HandlerSocket, and implemented MHA to support failover automation for MySQL – both of which have been used at many companies. He is a frequent speaker at community events, and his tutorials and slide decks do a lot to increase expertise in the community. He is a frequent bug reporter with a focus on replication (RBR, semi-sync).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;MySQL Community Awards: Application of the year 2016&lt;/h4&gt;
+&lt;p&gt;&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MaxScale&lt;/strong&gt;&lt;br /&gt;
+MariaDB MaxScale is an Open Source dynamic routing gateway. It is widely used as a database load balancer for Galera Cluster deployments, for standard replication setups, and as a replication relay. It has a modular architecture which includes plugins for read-write splitting and query logging. It serves a variety of tasks, from load balancing to database firewall filtering to binlog server and is widely used in production in large topologies.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;MySQL Community Awards: Corporate Contributor of the year 2016&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Booking.com&lt;/strong&gt;&lt;br /&gt;
+Booking.com has been a massive contributor to the MySQL ecosystem, sending many of their excellent DBAs to various conferences to talk. They have provided an innovative test bed for testing out, and giving a wealth of invaluable feedback about new releases (across a wide variety of MySQL and related software projects). Booking.com contributes to Open Source foundations, projects and communities by donating, sponsoring, making code contributions and hosting events. The quality of MySQL is undoubtedly much better today because of their help and input.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Congrats to all winners!&lt;/p&gt;
+&lt;h4&gt;Committee members&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;Baron Schwartz&lt;/li&gt;
+&lt;li&gt;Colin Charles&lt;/li&gt;
+&lt;li&gt;Daniël van Eeden&lt;/li&gt;
+&lt;li&gt;Davi Arnaut&lt;/li&gt;
+&lt;li&gt;Frederic Descamps&lt;/li&gt;
+&lt;li&gt;Geoffrey Anderson&lt;/li&gt;
+&lt;li&gt;Giuseppe Maxia&lt;/li&gt;
+&lt;li&gt;Justin Swanhart&lt;/li&gt;
+&lt;li&gt;Mark Leith&lt;/li&gt;
+&lt;li&gt;Morgan Tocker&lt;/li&gt;
+&lt;li&gt;Philip Stoev&lt;/li&gt;
+&lt;li&gt;Ronald Bradford&lt;/li&gt;
+&lt;li&gt;Santiago Lertora&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Co-secretaries:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Jeremy Cole&lt;/li&gt;
+&lt;li&gt;Shlomi Noach&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Special thanks&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Thank you to this year&#39;s anonymous sponsor for donating the goblets!&lt;/p&gt;
+&lt;p&gt;Thank you to Colin Charles for acquiring and transporting the goblets!&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>MySQL Community Awards 2016: Call for Nominations!</title>
+      <link>/blog/mysql/mysql-community-awards-2016-call-for-nominations/</link>
+      <pubDate>Fri, 05 Feb 2016 17:09:06 +0000</pubDate>
+      
+      <guid>/blog/mysql/mysql-community-awards-2016-call-for-nominations/</guid>
+      <description>&lt;p&gt;The &lt;strong&gt;2016&lt;/strong&gt; MySQL Community Awards event will take place, as usual, in Santa Clara, during the Percona Live Data Performance Conference, April 2016.&lt;/p&gt;
+&lt;p&gt;The MySQL Community Awards is a community based initiative. The idea is to publicly recognize contributors to the MySQL ecosystem. The entire process of discussing, voting and awarding is controlled by an independent group of community members, typically based of past winners or their representatives, as well as known contributors.&lt;/p&gt;
+&lt;p&gt;It is a self-appointed, self-declared, self-making-up-the-rules-as-it-goes committee. It is also very aware of the importance of the community; a no-nonsense, non-political, adhering to tradition, self criticizing committee.&lt;/p&gt;
+&lt;p&gt;The Call for Nominations is open. We are seeking the community’s assistance in nominating candidates in the following categories:&lt;span id=&#34;more-7199&#34;&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;h4&gt;MySQL Community Awards: Community Contributor of the year 2016&lt;/h4&gt;
+&lt;p&gt;This is a personal award; a winner would a person who has made contribution to the MySQL ecosystem. This could be via development, advocating, blogging, speaking, supporting, etc. All things go.&lt;/p&gt;
+&lt;h4&gt;MySQL Community Awards: Application of the year 2016&lt;/h4&gt;
+&lt;p&gt;An application, project, product etc. which supports the MySQL ecosystem by either contributing code, complementing its behaviour, supporting its use, etc. This could range from a one man open source project to a large scale social service.&lt;/p&gt;
+&lt;h4&gt;MySQL Community Awards: Corporate Contributor of the year 2016&lt;/h4&gt;
+&lt;p&gt;A company who made contribution to the MySQL ecosystem. This might be a corporate which released major open source code; one that advocates for MySQL; one that help out community members by... anything.&lt;/p&gt;
+&lt;p&gt;For a list of previous winners, please see &lt;a href=&#34;http://mysqlawards.org/mysql-hall-of-fame/&#34;&gt;MySQL Hall of Fame&lt;/a&gt;.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Process of nomination and voting&lt;/h4&gt;
+&lt;p&gt;Anyone can nominate anyone. When nominating, please make sure to provide a brief explanation on why the candidate is eligible to get the award. Make a good case!&lt;/p&gt;
+&lt;p&gt;The committee will review all nominations and vote; it typically takes two rounds of votes to pick the winners, and a lot of discussion.&lt;/p&gt;
+&lt;p&gt;There will be &lt;em&gt;up to&lt;/em&gt; three winners in each category.&lt;/p&gt;
+&lt;p&gt;Methods of nomination:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Send en email to &lt;strong&gt;mysql.community.awards [ at ] &lt;/strong&gt;&lt;strong&gt;gmail.com&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Comment to this post&lt;/li&gt;
+&lt;li&gt;Assuming you can provide a reasonable description in &lt;strong&gt;140&lt;/strong&gt; characters, tweet your nomination at &lt;a href=&#34;https://twitter.com/search?q=MySQLAwards&amp;amp;src=typd&amp;amp;f=realtime&#34;&gt;#MySQLAwards&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Please submit your nominations no later than &lt;strong&gt;Monday, February 29, 2016&lt;/strong&gt;.&lt;/p&gt;
+&lt;h4&gt;The committee&lt;/h4&gt;
+&lt;p&gt;Members of the committee are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Baron Schwartz, Colin Charles, Daniël van Eeden, Davi Arnaut, Frederic Descamps, Geoffrey Anderson, Giuseppe Maxia, Justin Swanhart, Mark Leith, Morgan Tocker, Philip Stoev, Ronald Bradford, Santiago Lertora&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Jeremy Cole and myself (Shlomi Noach) are acting as co-secretaries; we will be non-voting (except for breaking ties).&lt;/p&gt;
+&lt;p&gt;The committee communicates throughout the nomination and voting process to exchange views and opinions.&lt;/p&gt;
+&lt;h4&gt;The awards&lt;/h4&gt;
+&lt;p&gt;Awards are traditionally donated by some party whose identity remains secret. We are now securing the donation, but if you feel an urgent need to be an anonymous donator, please contact us in private, and thank you!&lt;/p&gt;
+&lt;h4&gt;Support&lt;/h4&gt;
+&lt;p&gt;This is a community effort; we ask for your support in spreading the word and of course in nominating candidates. Thanks!&lt;/p&gt;
+&lt;div class=&#34;sharedaddy sd-sharing-enabled&#34;&gt;&lt;/div&gt;</description>
+    </item>
+    
+    <item>
+      <title>Orchestrator progress</title>
+      <link>/blog/mysql/orchestrator-progress/</link>
+      <pubDate>Wed, 23 Dec 2015 18:01:59 +0000</pubDate>
+      
+      <guid>/blog/mysql/orchestrator-progress/</guid>
+      <description>&lt;p&gt;This comes mostly to reassure, having moved into GitHub: &lt;a href=&#34;https://github.com/outbrain/orchestrator&#34;&gt;orchestrator&lt;/a&gt; development continues.&lt;/p&gt;
+&lt;p&gt;I will have the privilege of working on this open source solution in GitHub. There are a few directions we can take orchestrator to, and we will be looking into the possibilities. We will continue to strengthen the crash recovery process, and in fact I&#39;ve got a couple ideas on drastically shortening Pseudo-GTID recovery time as well as other debts. We will look into yet other directions, which we will share. My new and distinguished team will co-work on/with orchestrator and will no doubt provide useful and actionable input.&lt;/p&gt;
+&lt;p&gt;Orchestrator continues to be open for pull requests, with a temporal latency in response time (it&#39;s the Holidays, mostly).&lt;/p&gt;
+&lt;p&gt;Some Go(lang) limitations (namely the import path, I&#39;ll blog more about it) will most probably imply some changes to the code, which will be well communicated to existing collaborators.&lt;/p&gt;
+&lt;p&gt;Most of all, we will keep orchestrator a generic solution, while keeping focus on what we think is most important - and there&#39;s some interesting vision here. Time will reveal as we make progress.&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>State of automated recovery via Pseudo-GTID &amp; Orchestrator @ Booking.com</title>
+      <link>/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/</link>
+      <pubDate>Fri, 20 Nov 2015 11:41:13 +0000</pubDate>
+      
+      <guid>/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/</guid>
+      <description>&lt;p&gt;This post sums up some of my work on MySQL resilience and high availability at &lt;a href=&#34;http://www.booking.com&#34;&gt;Booking.com&lt;/a&gt; by presenting the current state of automated master and intermediate master recoveries via &lt;a href=&#34;http://code.openark.org/blog/mysql/refactoring-replication-topology-with-pseudo-gtid&#34;&gt;Pseudo-GTID&lt;/a&gt; &amp;amp; &lt;strong&gt;&lt;a href=&#34;https://github.com/outbrain/orchestrator&#34;&gt;Orchestrator&lt;/a&gt;&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, OLAP, GTID (few), no GTID (most), Binlog Servers, filters, hybrid of all the above.&lt;/p&gt;
+&lt;p&gt;Topologies size varies from a single server to many-many-many. Our typical topology has a master in one datacenter, a bunch of slaves in same DC, a slave in another DC acting as an intermediate master to further bunch of slaves in the other DC. Something like this, give or take:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2015/11/booking-topology-sample.png&#34;&gt;&lt;img class=&#34;alignnone wp-image-7480 size-medium&#34; src=&#34;/blog/blog/assets/booking-topology-sample-300x169.png&#34; alt=&#34;booking-topology-sample&#34; width=&#34;300&#34; height=&#34;169&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;However as we are building our third data center (with MySQL deployments mostly completed) the graph turns more complex.&lt;/p&gt;
+&lt;p&gt;Two high availability questions are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;What happens when an intermediate master dies? What of all its slaves?&lt;/li&gt;
+&lt;li&gt;What happens when the master dies? What of the entire topology?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This is not a technical drill down into the solution, but rather on overview of the state. For more, please refer to recent presentations in &lt;a href=&#34;https://speakerdeck.com/shlominoach/managing-and-visualizing-your-replication-topologies-with-orchestrator&#34;&gt;September&lt;/a&gt; and &lt;a href=&#34;https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management&#34;&gt;April&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;At this time we have:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Pseudo-GTID deployed on all chains
+&lt;ul&gt;
+&lt;li&gt;Injected every 5 seconds&lt;/li&gt;
+&lt;li&gt;Using the &lt;a href=&#34;http://code.openark.org/blog/mysql/pseudo-gtid-ascending&#34;&gt;monotonically ascending&lt;/a&gt; variation&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Pseudo-GTID based automated failover for intermediate masters on all chains&lt;/li&gt;
+&lt;li&gt;Pseudo-GTID based automated failover for masters on roughly 30% of the chains.
+&lt;ul&gt;
+&lt;li&gt;The rest of 70% of chains are set for manual failover using Pseudo-GTID.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Pseudo-GTID is in particular used for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Salvaging slaves of a dead intermediate master&lt;/li&gt;
+&lt;li&gt;Correctly grouping and connecting slaves of a dead master&lt;/li&gt;
+&lt;li&gt;Routine refactoring of topologies. This includes:
+&lt;ul&gt;
+&lt;li&gt;Manual repointing of slaves for various operations (e.g. offloading slaves from a busy box)&lt;/li&gt;
+&lt;li&gt;Automated refactoring (for example, used by our automated upgrading script, which consults with &lt;em&gt;orchestrator&lt;/em&gt;, upgrades, shuffles slaves around, updates intermediate master, suffles back...)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;(In the works), failing over binlog reader apps that audit our binary logs.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;Furthermore, Booking.com is also &lt;a href=&#34;https://www.percona.com/live/europe-amsterdam-2015/sessions/binlog-servers-bookingcom&#34;&gt;working on Binlog Servers&lt;/a&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;These take production traffic and offload masters and intermediate masters&lt;/li&gt;
+&lt;li&gt;Often co-serve slaves using round-robin VIP, such that failure of one Binlog Server makes for simple slave replication self-recovery.&lt;/li&gt;
+&lt;li&gt;Are interleaved alongside standard replication
+&lt;ul&gt;
+&lt;li&gt;At this time we have no &#34;pure&#34; Binlog Server topology in production; we always have normal intermediate masters and slaves&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;This hybrid state makes for greater complexity:
+&lt;ul&gt;
+&lt;li&gt;Binlog Servers are not designed to participate in a game of changing masters/intermediate master, unless &lt;a href=&#34;http://jfg-mysql.blogspot.nl/2015/09/abstracting-binlog-servers-and-mysql-master-promotion-wo-reconfiguring-slaves.html&#34;&gt;successors come from their own sub-topology&lt;/a&gt;, which is not the case today.
+&lt;ul&gt;
+&lt;li&gt;For example, a Binlog Server that replicates directly from the master, cannot be repointed to just any new master.&lt;/li&gt;
+&lt;li&gt;But can still hold valuable binary log entries that other slaves may not.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Are not actual MySQL servers, therefore of course cannot be promoted as masters&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Orchestrator&lt;/em&gt; &amp;amp; Pseudo-GTID makes this hybrid topology still resilient:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;Orchestrator&lt;/em&gt; understands the limitations on the hybrid topology and can salvage slaves of 1st tier Binlog Servers via Pseudo-GTID&lt;/li&gt;
+&lt;li&gt;In the case where the Binlog Servers were the most up to date slaves of a failed master, &lt;em&gt;orchestrator&lt;/em&gt; knows to first move potential candidates under the Binlog Server and then extract them out again.&lt;/li&gt;
+&lt;li&gt;At this time Binlog Servers are still unstable. Pseudo-GTID allows us to comfortably test them on a large setup with reduced fear of losing slaves.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Otherwise &lt;em&gt;orchestrator&lt;/em&gt; already understands pure Binlog Server topologies and can do master promotion. When pure binlog servers topologies will be in production &lt;em&gt;orchestrator&lt;/em&gt; will be there to watch over.&lt;/p&gt;
+&lt;h3&gt;Summary&lt;/h3&gt;
+&lt;p&gt;To date, Pseudo-GTID has high scores in automated failovers of our topologies; &lt;em&gt;orchestrator&#39;s&lt;/em&gt; &lt;a href=&#34;http://code.openark.org/blog/mysql/what-makes-a-mysql-server-failurerecovery-case&#34;&gt;holistic approach&lt;/a&gt; makes for reliable diagnostics; together they reduce our dependency on specific servers &amp;amp; hardware, physical location, latency implied by SAN devices.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Orchestrator &amp; Pseudo-GTID for binlog reader failover</title>
+      <link>/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover/</link>
+      <pubDate>Thu, 19 Nov 2015 10:52:16 +0000</pubDate>
+      
+      <guid>/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover/</guid>
+      <description>&lt;p&gt;One of our internal apps at &lt;strong&gt;Booking.com&lt;/strong&gt; audits changes to our tables on various clusters. We used to use &lt;em&gt;tungsten replicator&lt;/em&gt;, but have since migrated onto our own solution.&lt;/p&gt;
+&lt;p&gt;We have a binlog reader (uses &lt;a href=&#34;https://github.com/zendesk/open-replicator&#34;&gt;open-replicator&lt;/a&gt;) running on a slave. It expects Row Based Replication, hence our slave runs with &lt;strong&gt;log-slave-updates&lt;/strong&gt;, &lt;strong&gt;binlog-format=&#39;ROW&#39;&lt;/strong&gt;, to translate from the master&#39;s Statement Based Replication. The binlog reader reads what it needs to read, audits what it needs to audit, and we&#39;re happy.&lt;/p&gt;
+&lt;h3&gt;However what happens if that slave dies?&lt;/h3&gt;
+&lt;p&gt;In such case we need to be able to point our binlog reader to another slave, and it needs to be able to pick up auditing from the same point.&lt;/p&gt;
+&lt;p&gt;This sounds an awful lot like slave repointing in case of master/intermediate master failure, and indeed the solutions are similar. However our binlog reader is not a real MySQL server and does not understands replication. It does not really replicate, it just parses binary logs.&lt;/p&gt;
+&lt;p&gt;We&#39;re also not using GTID. But we &lt;em&gt;are&lt;/em&gt; using Pseudo-GTID. As it turns out, the failover solution is already built in by &lt;a href=&#34;https://github.com/outbrain/orchestrator&#34;&gt;orchestrator&lt;/a&gt;, and this is how it goes:&lt;/p&gt;
+&lt;h3&gt;Normal execution&lt;/h3&gt;
+&lt;p&gt;Our binlog app reads entries from the binary log. Some are of interest for auditing purposes, some are not. An occasional Pseudo-GTID entry is found, and is being stored to ZooKeeper tagged as  &#34;last seen and processed Pseudo-GTID&#34;.&lt;/p&gt;
+&lt;h3&gt;Upon slave failure&lt;/h3&gt;
+&lt;p&gt;We recognize the death of a slave; we have other slaves in the pool; we pick another. Now we need to find the coordinates from which to carry on.&lt;/p&gt;
+&lt;p&gt;We read our &#34;last seen and processed Pseudo-GTID&#34;. Say it reads:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;drop view if exists `meta`.`_pseudo_gtid_hint__asc:56373F17:00000000012B1C8B:50EC77A1`&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;. We now issue:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;$ orchestrator &lt;strong&gt;-c find-binlog-entry&lt;/strong&gt; &lt;strong&gt;-i new.slave.fqdn.com&lt;/strong&gt; --pattern=&#39;drop view if exists `meta`.`_pseudo_gtid_hint__asc:56373F17:00000000012B1C8B:50EC77A1`&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The output of such command are the binlog coordinates of that same entry as found in the new slave&#39;s binlogs:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;binlog.000148:43664433&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Pseudo-GTID entries are only injected once every few seconds (&lt;strong&gt;5&lt;/strong&gt; in our case). Either:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;We are OK to reprocess up to &lt;strong&gt;5&lt;/strong&gt; seconds worth of data (and indeed we are, our mechanism is such that this merely overwrites our previous audit, no corruption happens)&lt;/li&gt;
+&lt;li&gt;Or our binlog reader also keeps track of the number of events since the last processed Pseudo-GTID entry, skipping the same amount of events after failing over.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Planned failover&lt;/h3&gt;
+&lt;p&gt;In case we plan to repoint our binlog reader to another slave, we can further use orchestrator&#39;s power in making an exact correlation between the binlog positions of two slaves. This has always been within its power, but only recently exposed as it own command. We can, at any stage:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;$ sudo orchestrator &lt;strong&gt;-c correlate-binlog-pos&lt;/strong&gt; -i current.instance.fqdn.com --binlog=binlog.002011:72656109 -d some.other.instance.fqdn.com&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The output is the binlog coordinates in &lt;strong&gt;some.other.instance.fqdn.com&lt;/strong&gt; that exactly correlate with &lt;strong&gt;binlog.002011:72656109&lt;/strong&gt; in &lt;strong&gt;current.instance.fqdn.com&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;The case of failure of the binlog reader itself is also handled, but is not the subject of this blog post.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Thoughts on MaxScale automated failover (and Orchestrator)</title>
+      <link>/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator/</link>
+      <pubDate>Wed, 18 Nov 2015 11:17:48 +0000</pubDate>
+      
+      <guid>/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator/</guid>
+      <description>&lt;p&gt;Having attended a talk (as part of the &lt;a href=&#34;https://blog.mariadb.org/2015-developers-meeting-amsterdam/&#34;&gt;MariaDB Developer Meeting in Amsterdam&lt;/a&gt;) about recent developments of &lt;a href=&#34;https://mariadb.com/products/mariadb-maxscale&#34;&gt;MaxScale&lt;/a&gt; in executing automated failovers, here are some (late) observations of mine.&lt;/p&gt;
+&lt;p&gt;I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food for thought, points for action and otherwise recommendations.&lt;/p&gt;
+&lt;p&gt;Some functionality of the MaxScale failover is also implemented by &lt;strong&gt;&lt;a href=&#34;https://github.com/outbrain/orchestrator&#34;&gt;orchestrator&lt;/a&gt;&lt;/strong&gt;, which I author. &lt;em&gt;Orchestrator&lt;/em&gt; was built in production environments by and for operational people. In this respect it has gained many insights and had to cope with many real-world cases, special cases &amp;amp; Murphy&#39;s law cases. This post compares logic, feature set and capabilities of the two where relevant. To some extent the below will read as &#34;hey, I&#39;ve already implemented this; shame to re-implement the same&#34;, and indeed I think that way; but it wouldn&#39;t be the first time a code of mine would just be re-implemented by someone else and I&#39;ve done the same, myself.&lt;/p&gt;
+&lt;p&gt;I&#39;m describing the solution the way I understood it from the talk. If I&#39;m wrong on any account I&#39;m happy to be corrected via comments below. &lt;strong&gt;Edit:&lt;/strong&gt; &lt;em&gt;please see comment by&lt;/em&gt; &lt;a class=&#34;url&#34; href=&#34;http://www.mariadb.com/&#34; rel=&#34;external nofollow&#34;&gt;Dipti Joshi&lt;/a&gt;&lt;/p&gt;
+&lt;h3&gt;General overview&lt;/h3&gt;
+&lt;p&gt;The idea is that MaxScale operates as a proxy to your topology. You do not connect to your master directly, but rather through MaxScale. Thus, MaxScale acts as a proxy to your master.&lt;/p&gt;
+&lt;p&gt;The next phase is that MaxScale would also auto-detect master failure, fix the topology for you, promote a new master, and will have your application unaware of all the complexity and without the app having to change setup/DNS/whatever. Of course some write downtime is implied.&lt;/p&gt;
+&lt;p&gt;Now for some breakdown.&lt;/p&gt;
+&lt;h3&gt;Detection&lt;/h3&gt;
+&lt;p&gt;The detection of a dead master, the check by which a failover is initiated, is based on MaxScale not being able to query the master. This calls for some points for consideration:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Typically, I would see &#34;I can&#39;t connect to the master therefore failover&#34; as too hysterical, and the basis for a lot of false positives.&lt;/li&gt;
+&lt;li&gt;However, since in the discussed configuration MaxScale is &lt;em&gt;the only access point&lt;/em&gt; to the master, the fact MaxScale cannot connect to the master means the master is inaccessible &lt;em&gt;de-facto&lt;/em&gt;.&lt;/li&gt;
+&lt;li&gt;In light of the above, the decision makes sense - but I still hold that it would make false positives.&lt;/li&gt;
+&lt;li&gt;I&#39;m unsure (I &lt;em&gt;think&lt;/em&gt; not; can anyone comment?) if MaxScale would make multiple attempts over time and only reach the conclusion after X successive failures. This would reduce the false positives.&lt;/li&gt;
+&lt;li&gt;I&#39;m having a growing dislike to a &#34;check for 4 successive times then alert/failover&#34; Nagios-style behavior. &lt;em&gt;Orchestrator&lt;/em&gt; takes a different approach where it recognizes a master&#39;s death by not being able to connect to the master &lt;em&gt;as well as&lt;/em&gt; being able to connect to 1st tier slaves, check their status and observe that &lt;em&gt;they&#39;re unable to connect to the master as well&lt;/em&gt;. See &lt;a title=&#34;Permanent Link to What makes a MySQL server failure/recovery case?&#34; href=&#34;http://code.openark.org/blog/mysql/what-makes-a-mysql-server-failurerecovery-case&#34; rel=&#34;bookmark&#34;&gt;What makes a MySQL server failure/recovery case?&lt;/a&gt;. This approach still calls for further refinement (what if the master is temporarily deadlocked? Is this a failover or not?).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;&lt;/p&gt;
+&lt;h3&gt;Assumed topology&lt;/h3&gt;
+&lt;p&gt;MaxScale assumes the topology is all MariaDB, and all slaves are using (MariaDB) GTID replication. Well, MaxScale does not actually assumes that. It is assumed so by the &lt;a href=&#34;https://github.com/mariadb-corporation/replication-manager&#34;&gt;MariaDB Replication Manager&lt;/a&gt; which MaxScale invokes. But I&#39;m getting ahead of myself here.&lt;/p&gt;
+&lt;h3&gt;Topology detection&lt;/h3&gt;
+&lt;p&gt;MaxScale does not recognize the master by configuration but rather by state. It observes the servers it should observe, and concludes which is the master.&lt;/p&gt;
+&lt;p&gt;I&#39;m using similar approach in &lt;em&gt;orchestrator&lt;/em&gt;. I maintain that this approach works well and opens the Chakras for complex recovery options.&lt;/p&gt;
+&lt;h3&gt;Upon failure detection&lt;/h3&gt;
+&lt;p&gt;When MaxScale detects failure, it invokes external scripts to fix the problem. There are some similar and different particulars here as compared to &lt;em&gt;orchestrator&lt;/em&gt;, and I will explain what&#39;s wrong with the MaxScale approach:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Although MaxScale observes the topology and understands who is the master and who isn&#39;t, the executed scripts do not. They need to re-discover everything by themselves.&lt;/li&gt;
+&lt;li&gt;This implies the scripts start without memory of &#34;what was last observed&#34;. This is one of the greatest strengths of &lt;em&gt;orchestrator&lt;/em&gt;: it knows what the state was just before the failure, and, having the bigger picture, can make informed decisions.
+&lt;ul&gt;
+&lt;li&gt;As a nasty example, what do you do when some the first tier slaves also happen to be inaccessible at that time? What if one of those happens to further have slaves of its own?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;The MariaDB Replication Manager script (to be referenced as &lt;em&gt;repmgr&lt;/em&gt;) assumes all instances to be MariaDB with GTID.
+&lt;ul&gt;
+&lt;li&gt;It is also implied that all my slaves are configured with binary logs &amp;amp; log-slave-updates&lt;/li&gt;
+&lt;li&gt;That&#39;s &lt;strong&gt;way too restrictive&lt;/strong&gt;.
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;Orchestrator&lt;/em&gt; handles all following topologies: Oracle MySQL with/out GTID, MariaDB with/out GTID, MariaDB hybrid GTID &amp;amp; non-GTID replication, Pseudo-GTID (MySQL and/or MariaDB), hybrid normal &amp;amp; binlog servers topologies, slaves with/out log-slave-updates, hybrid Oracle &amp;amp; MariaDB &amp;amp; Binlog Servers &amp;amp; Pseudo-GTID.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;repmgr&lt;/em&gt; is unaware of data centers &amp;amp; physical environments. You want failover to be as local to your datacenters as possible. Avoid too many cross-DC replication streams.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Failover invocation&lt;/h3&gt;
+&lt;p&gt;MaxScale invokes the failover scripts &lt;em&gt;asynchronously&lt;/em&gt;. This is a major flaw imho, as the decoupling between the monitoring and acting processes leads to further problems, see further.&lt;/p&gt;
+&lt;h3&gt;After failover&lt;/h3&gt;
+&lt;p&gt;MaxScale continuously scans the topology and observes that some other server has been promoted. This behavior is similar to &lt;em&gt;orchestrator&#39;s&lt;/em&gt;. But the following differences are noteworthy:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Because of both the decoupling as well as the asynchronous invocation by MaxScale, it doesn&#39;t really have any idea if and how the promotion resolved.&lt;/li&gt;
+&lt;li&gt;I don&#39;t know that there&#39;s any anti-flapping mechanism, nor that there could be. If MaxScale doesn&#39;t care what happened to the failover script, it shouldn&#39;t be able to keep up with flapping scenarios.&lt;/li&gt;
+&lt;li&gt;Nor is there a minimal suspend period between any two failure recoveries, that I know of. MaxScale can actually have easier life than &lt;em&gt;orchestrator&lt;/em&gt; in this regard as it is (I suspect) strictly associated with &lt;em&gt;a topology&lt;/em&gt;. Not like there&#39;s a single MaxScale handling multiple topologies. So it should be very easy to keep track of failures.&lt;/li&gt;
+&lt;li&gt;Or, if there is a minimal period and I&#39;m just uninformed -- what makes sure it is not smaller than the time it takes for the failover?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Further on failover&lt;/h3&gt;
+&lt;p&gt;I wish to point out that one component of the system analyses a failure scenario, and another one fixes it. I suggest this is an undesired design. The &#34;fixer&#34; must have its own ability to diagnose problems as it makes progress (or else it is naive and would fail in many production cases). And the &#34;analyzer&#34; part must have some wisdom of its own so as to suggest course of action; or understand the consequences of the recovery done by the &#34;fixer&#34;.&lt;/p&gt;
+&lt;h3&gt;Use of shell scripts&lt;/h3&gt;
+&lt;p&gt;Generally speaking, the use of shell scripts as external hooks is evil:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Shell scripts tend to be poorly audited&lt;/li&gt;
+&lt;li&gt;With poor clarity as for what went wrong&lt;/li&gt;
+&lt;li&gt;Killing them has operational difficulty (detect the shell script, find possible children, detached children)&lt;/li&gt;
+&lt;li&gt;The approach of &#34;if you want something else, just write a shell script for it&#34; is nice for some things, but as the problem turns complex, you turn out to just write big parts of the solution in shell. This decouples your code to unwanted degree.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;At this time, &lt;em&gt;orchestrator&lt;/em&gt; also uses external hooks. However:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Fixing the topology happens within &lt;em&gt;orchestrator&lt;/em&gt;, not by external scripts. There is an elaborate, auditable, visible decision making.
+&lt;ul&gt;
+&lt;li&gt;Decision making includes data center considerations, different configuration of servers involved, servers hinted as candidates, servers configured to be ignored, servers known to be downtimed.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Leaving the external scripts with the task of managing DNS changes or what have you.
+&lt;ul&gt;
+&lt;li&gt;Today, at Booking.com, we have a special operational tool (called the dba tool) which does that, manages rosters, issues puppet etc. This tool is itself well audited. Granted, there is still decoupling, but information does not just get lost.&lt;/li&gt;
+&lt;li&gt;Sometime in the future I suspect I will extend &lt;strong&gt;&lt;a href=&#34;https://github.com/outbrain/orchestrator-agent&#34;&gt;orchestrator-agent&lt;/a&gt;&lt;/strong&gt; to participate in failovers, which means the entire flow is within &lt;em&gt;orchestrator&#39;s&lt;/em&gt; scope.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;High availability&lt;/h3&gt;
+&lt;p&gt;All the above is only available via a single MaxScale server. What happens if it dies?&lt;/p&gt;
+&lt;p&gt;There is a MaxScale/pacemaker setup I&#39;m aware of. If one MaxScale dies, pacemaker takes charge and starts another on another box.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;But this means real downtime&lt;/li&gt;
+&lt;li&gt;There are no multiple-MaxScale servers to load-balance on&lt;/li&gt;
+&lt;li&gt;The MaxScale started by pacemaker is newly born, and does not have the big picture of the topology. It needs to go through a &#34;peaceful time&#34; to understand what&#39;s going on.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;More High Availability&lt;/h3&gt;
+&lt;p&gt;At a time where MaxScale will be able to load-balance and run on multiple nodes, MariaDB will have to further tackle:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Leader election&lt;/li&gt;
+&lt;li&gt;Avoiding concurrent initiation of failovers
+&lt;ul&gt;
+&lt;li&gt;Either via group communication&lt;/li&gt;
+&lt;li&gt;Or via shared datastore&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Taking off from a failed/crashed MaxScale server&#39;s work
+&lt;ul&gt;
+&lt;li&gt;Or rolling it back&lt;/li&gt;
+&lt;li&gt;Or just cleaning it up&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;And generally share all those little pieces of information, such as &#34;Hey, now this server is the master&#34; (are all MaxScales in complete agreement on the topology?) or &#34;I have failed over this topology, we should avoid failing it over again for the next 10 minutes&#34; and more.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The above are supported by &lt;em&gt;orchestrator&lt;/em&gt;. It provides leader election, automated leader promotion, fair recognition of various failure scenarios, picking up a failed recovery from a failed &lt;em&gt;orchestrator&lt;/em&gt;. Data is shared by a backend MySQL datastore, and before you shout &lt;em&gt;SPOF&lt;/em&gt;, make it Galera/NDB.&lt;/p&gt;
+&lt;h3&gt;Further little things that can ruin your day&lt;/h3&gt;
+&lt;h4&gt;How about having a delayed replica?&lt;/h4&gt;
+&lt;p&gt;Here&#39;s an operational use case we had to tackle.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You have a slave configured to lag by &lt;strong&gt;24&lt;/strong&gt; hours. You know the drill: hackers / accidental &lt;strong&gt;DROP TABLE&lt;/strong&gt;...&lt;/li&gt;
+&lt;li&gt;How much time will an automated tool spend on reconnecting this slave to the topology?
+&lt;ul&gt;
+&lt;li&gt;This could take long minutes&lt;/li&gt;
+&lt;li&gt;Will your recovery hang till this is resolved?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Since &lt;em&gt;orchestrator&lt;/em&gt; heals the topology in-house, it knows how to push certain operations till after specific other operations took place. For example, &lt;em&gt;orchestrator&lt;/em&gt; wants to heal the entire topology, but pushes the delayed replicas aside, under the assumption that it will be able to fix them later (fair assumption, because they are known to be behind our promoted master); it will proceed to fix everything else, execute external hooks (change DNS etc.) and only then come back to the delayed replica. All the while, the process is audited.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Flapping ruins your day&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;Not only do you want some stall period between two failovers, you also want your team to respond to a failover and acknowledge it. Or clear up the stall period having verified the source of the problem. Or force the next failover even if it comes sooner than the stall period termination.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Binlog formats&lt;/h4&gt;
+&lt;p&gt;It is still not uncommon to have Statement Based Replication running. And then it is also not uncommon to have one or two slaves translating to Row Based Replication because of:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Some app that has to read ROW based format&lt;/li&gt;
+&lt;li&gt;Experimenting with RBR for purposes of upgrade&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You just can&#39;t promote such a RBR slave on top of SBR slaves; it wouldn&#39;t work. &lt;em&gt;Orchestrator&lt;/em&gt; is aware of such rules. I still need to integrate this particular consideration into the promotion algorithm.&lt;/p&gt;
+&lt;h4&gt;Versions&lt;/h4&gt;
+&lt;p&gt;Likewise, not all your slaves are of same version. You should not promote a newer version slave on top of an older version slave. Again, &lt;em&gt;orchestrator&lt;/em&gt; will not allow putting such a topology, and again, I still need to integrate this consideration into the promotion algorithm.&lt;/p&gt;
+&lt;h3&gt;In summary&lt;/h3&gt;
+&lt;p&gt;There is a long way for MaxScale failover to go. When you consider the simplest, all-MariaDB-GTID-equal-slaves small topology case, things are kept simple and probably sustainable. But issues like complex topologies, flapping, special slaves, different configuration, high availability, leadership, acknowledgements, and more, call for a more advanced solution.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>SQL mini hack of the day, inverted IN clause</title>
+      <link>/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause/</link>
+      <pubDate>Fri, 13 Nov 2015 17:28:09 +0000</pubDate>
+      
+      <guid>/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause/</guid>
+      <description>&lt;p&gt;We are used to issue queries with an &lt;strong&gt;IN&lt;/strong&gt; clause of the form:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;pre&gt;... where state in (&#39;started&#39;, &#39;completed&#39;, &#39;failed&#39;) ...&lt;/pre&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;However I&#39;ve had a few cases where I used an inverted format. Here&#39;s one use case followed by an inverted &lt;strong&gt;IN&lt;/strong&gt; clause.&lt;/p&gt;
+&lt;h3&gt;Dynamic query building&lt;/h3&gt;
+&lt;p&gt;Say we have this function:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;[code lang=&#34;golang&#34;]GetLaggingSlaves(clusterName string)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Which, based on whether given &lt;strong&gt;clusterName&lt;/strong&gt; is empty or not, would return list of all lagging slaves, or only those in the given cluster, respectively:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT hostname FROM database_instance WHERE slave_lag_seconds &amp;gt; 60&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;or&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT hostname FROM database_instance WHERE cluster_name = &#39;mycluster:3306&#39; AND slave_lag_seconds &amp;gt; 60&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To avoid SQL injection you would create a prepared statement, but you don&#39;t want to copy+paste everything, and so you build your query dynamically based on the value of &lt;strong&gt;clusterName&lt;/strong&gt;. You want to end up with either:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT hostname FROM database_instance WHERE slave_lag_seconds &amp;gt; ?&lt;/pre&gt;
+&lt;p&gt;&lt;strong&gt;, acceptableLag&lt;/strong&gt;&lt;/blockquote&gt;
+&lt;p&gt;or&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT hostname FROM database_instance WHERE cluster_name = ? AND slave_lag_seconds &amp;gt; ?&lt;/pre&gt;
+&lt;p&gt;&lt;strong&gt;, clusterName, acceptableLag&lt;/strong&gt;&lt;/blockquote&gt;
+&lt;p&gt;Dynamic query building is good practice, but a little pain (BTW I&#39;m designing a new, simple &amp;amp; non intrusive query builder for golang). Is there a way to just get away with one query that has it all?&lt;/p&gt;
+&lt;p&gt;This is one option:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT hostname FROM database_instance WHERE (cluster_name = ? OR ? = &#39;&#39;) AND slave_lag_seconds &amp;gt; ?&lt;/pre&gt;
+&lt;p&gt;&lt;strong&gt;,clusterName, clusterName, acceptableLag&lt;/strong&gt;&lt;/blockquote&gt;
+&lt;p&gt;and it is somewhat painful to list clusterName twice in the arguments list. This is where the inverted &lt;strong&gt;IN&lt;/strong&gt; clause kicks in. It will negate usage of an index, and may look strange at first glance, but as you get used to it it just becomes another pattern:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT hostname FROM database_instance WHERE ? IN (cluster_name, &#39;&#39;) AND slave_lag_seconds &amp;gt; ?&lt;/pre&gt;
+&lt;p&gt;&lt;strong&gt;, clusterName, acceptableLag&lt;/strong&gt;&lt;/blockquote&gt;
+&lt;p&gt;So when &lt;strong&gt;clusterName&lt;/strong&gt; is empty, all rows where &lt;strong&gt;slave_lag_seconds &amp;gt; acceptableLag&lt;/strong&gt; are fetched; when non empty, only those where &lt;strong&gt;cluster_name&lt;/strong&gt; equals our value.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Leader election using MySQL</title>
+      <link>/blog/mysql/leader-election-using-mysql/</link>
+      <pubDate>Wed, 14 Oct 2015 07:52:21 +0000</pubDate>
+      
+      <guid>/blog/mysql/leader-election-using-mysql/</guid>
+      <description>&lt;p&gt;Being a stateful, centralized datastore, MySQL can serve in negotiating leadership: a mechanism to elect a single service out of multiple services; moreover, a mechanism to promote a new leader should the existing leader cease to function.&lt;/p&gt;
+&lt;h3&gt;What of Zookeeper?&lt;/h3&gt;
+&lt;p&gt;Zookeeper makes for an excellent leader election mechanism. This is one of the most recognized uses for Zookeeper. It has HA via multiple nodes &amp;amp; quorum,  ephemeral nodes, all you need. To achieve similar benefits with MySQL you&#39;d need to use Galera or NDB Cluster; so why not use Zk?&lt;/p&gt;
+&lt;p&gt;The use case at hand is &lt;strong&gt;&lt;a href=&#34;https://github.com/outbrain/orchestrator&#34;&gt;orchestrator&lt;/a&gt;&lt;/strong&gt;, a multi-node, mostly stateless service that happens to use MySQL as backend datastore. Ir relies on MySQL to exist in backend. It already &lt;em&gt;expects it to be there&lt;/em&gt;. If the MySQL server is down, so is the service, effectively. In such case it doesn&#39;t hurt adding another dependency on MySQL; this does not reduce HA. You need to take care of MySQL HA anyhow so there&#39;s no additional cost. In fact, going to Zookeeper makes the additional cost as you introduce a new component to the system that can be avoided.&lt;/p&gt;
+&lt;h3&gt;Terms of the solution&lt;/h3&gt;
+&lt;p&gt;Our proposed solution offers:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Single leader election out of multiple nodes&lt;/li&gt;
+&lt;li&gt;Leader actively reaffirms its leadership periodically&lt;/li&gt;
+&lt;li&gt;Timeout based re-election: decision to re-elect new leader based on the fact current leader has not reaffirmed its leadership over X seconds&lt;/li&gt;
+&lt;li&gt;A way to forcibly assume leadership for a specific node&lt;/li&gt;
+&lt;li&gt;A way to forcibly call for re-elections by demoting existing leader&lt;/li&gt;
+&lt;li&gt;A node/service can easily tell whether it&#39;s the leader or not&lt;/li&gt;
+&lt;li&gt;Anyone can tell who the leader is&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;SQL solution&lt;/h3&gt;
+&lt;p&gt;The solution is composed of a single table and a set of queries which implement the above offers. We assume a service can uniquely identify itself; this is easy to achieve:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If services are running from different hosts (as should be the case, this is service HA), use hostname for ID
+&lt;ul&gt;
+&lt;li&gt;But what if the service restarts? Are you good with calling this &#34;the same service&#34; or is this now a new service running on the same host?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;In such case use combination of hostname &amp;amp; OS process ID
+&lt;ul&gt;
+&lt;li&gt;Or generate a random token upon startup&lt;/li&gt;
+&lt;li&gt;Or use startup timestamp&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Whichever solution you pick, make sure it is human readable, such that it is easy to tell &lt;em&gt;which service is the leader&lt;/em&gt;. This helps operations. We note this as &lt;strong&gt;service_id&lt;/strong&gt;&lt;/p&gt;
+&lt;h4&gt;Table&lt;/h4&gt;
+&lt;p&gt;The following table will have a single row; the &lt;strong&gt;service_id&lt;/strong&gt; in that row is the active leader.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;
+CREATE TABLE service_election (
+  anchor tinyint(3) unsigned NOT NULL,
+  service_id varchar(128) NOT NULL,
+  last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (anchor)
+) ENGINE=InnoDB
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Attempt election&lt;/h4&gt;
+&lt;p&gt;&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;All services issue the following, periodically. Say every service issues this once per second:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;insert ignore into service_election (
+	anchor, service_id, last_seen_active
+) values (
+	1, &#39;my_service_number_7&#39;, now()
+) on duplicate key update
+	service_id = if(last_seen_active &amp;amp;lt; now() - interval 20 second, values(service_id), service_id),
+	last_seen_active = if(service_id = values(service_id), values(last_seen_active), last_seen_active)
+;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;Replace &lt;strong&gt;&#39;my_service_number_7&#39;&lt;/strong&gt; with specific &lt;strong&gt;service_id&lt;/strong&gt; per service.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;The above is the most complex query in our solution; breakdown:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Assume timeout is set for &lt;strong&gt;20&lt;/strong&gt; seconds&lt;/li&gt;
+&lt;li&gt;The first ever service (&lt;strong&gt;my_service_number_7&lt;/strong&gt;) succeeds in registering (inserting its own &lt;strong&gt;service_id&lt;/strong&gt; into the table)&lt;/li&gt;
+&lt;li&gt;The next time this service issues the query, it finds that it is already the owner, hence updates &lt;strong&gt;last_seen_active&lt;/strong&gt;.
+&lt;ul&gt;
+&lt;li&gt;And while it is alive and keeps on polling, it remains the leader.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Immediately following, another service (&lt;strong&gt;my_service_number_12&lt;/strong&gt;) does not update anything: since &lt;strong&gt;last_seen_active &amp;lt; now() - interval 20 second&lt;/strong&gt; is &lt;strong&gt;false&lt;/strong&gt;, &lt;strong&gt;service_id&lt;/strong&gt; is unchanged, nor is &lt;strong&gt;last_seen_active&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Assuming said service (&lt;strong&gt;my_service_number_7&lt;/strong&gt;) has died and hasn&#39;t injected anything in the last &lt;strong&gt;20&lt;/strong&gt; seconds, a different service will inject its own &lt;strong&gt;service_id&lt;/strong&gt; as well as update &lt;strong&gt;last_seen_active&lt;/strong&gt;. It will become the leader.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Forcibly assume leadership&lt;/h4&gt;
+&lt;p&gt;Make a certain service the leader:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;replace into service_election (
+        anchor, service_id, last_seen_active
+    ) values (
+        1, &#39;my_service_number_12&#39;, now()
+    )
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The next time &lt;strong&gt;my_service_number_12&lt;/strong&gt; attempts to register its own leadership, it finds out it&#39;s &lt;em&gt;already&lt;/em&gt; the leader and updates &lt;strong&gt;last_seen_active&lt;/strong&gt;.&lt;/p&gt;
+&lt;h4&gt;Force re-elections&lt;/h4&gt;
+&lt;p&gt;The next service to attempt election will succeed after this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;delete from service_election;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Am I the leader?&lt;/h4&gt;
+&lt;p&gt;A service can query as follows:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;select count(*) as is_leader from service_election where anchor=1 and service_id=&#39;my_service_number_7&#39;;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Who is the leader?&lt;/h4&gt;
+&lt;p&gt;This is of course very simple:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;select max(service_id) as leader from service_election where anchor=1;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h3&gt;What of GET_LOCK()?&lt;/h3&gt;
+&lt;p&gt;&lt;a href=&#34;https://dev.mysql.com/doc/refman/5.6/en/miscellaneous-functions.html#function_get-lock&#34;&gt;GET_LOCK()&lt;/a&gt; allows one to acquire a helper-lock of arbitrary name; this lock is reserved as long as the connection that acquired it lives. No other connection can acquire lock of same name.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT GET_LOCK(&amp;quot;my_service_leadership&amp;quot;, 0)&lt;/pre&gt;&lt;br /&gt;
+Returns &lt;strong&gt;1&lt;/strong&gt; on success, &lt;strong&gt;0&lt;/strong&gt; on failure to obtain lock.&lt;/blockquote&gt;
+&lt;p&gt;This supposedly makes a much simpler leader election mechanism. However I don&#39;t like it for the following reasons:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You must allocate a dedicated connection that lives for the duration of your service
+&lt;ul&gt;
+&lt;li&gt;This doesn&#39;t play too well with ORMs or typical connection pools&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;There is no visibility (&amp;lt; MySQL 5.7) into &lt;em&gt;who&lt;/em&gt; is holding the lock. You only know that it&#39;s being held.&lt;/li&gt;
+&lt;li&gt;If your service hangs (but does not die), the lock is still being held. There is no &#34;keepalive&#34; requirement on the lock&#39;s side.&lt;/li&gt;
+&lt;/ul&gt;</description>
+    </item>
+    
+  </channel>
+</rss>
