@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.16" />
 
-  <title>gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more &middot; code.openark.org</title>
+  <title>Three wishes for a new year &middot; code.openark.org</title>
 
   
   
@@ -208,7 +208,7 @@
 </div>
 
 <div class="header">
-  <h1>gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more</h1>
+  <h1>Three wishes for a new year</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -217,7 +217,7 @@
 
   <div>
 
-    <time>06 Sep 2016</time>
+    <time>28 Sep 2016</time>
   </div>
 
   
@@ -244,9 +244,15 @@
           
             <a class="post-taxonomy-tag" href="/blogtags/gh-ost">gh-ost</a>&nbsp;&#47;
           
-            <a class="post-taxonomy-tag" href="/blogtags/new-features">New Features</a>&nbsp;&#47;
+            <a class="post-taxonomy-tag" href="/blogtags/gtid">GTID</a>&nbsp;&#47;
           
-            <a class="post-taxonomy-tag" href="/blogtags/open-source">Open Source</a>
+            <a class="post-taxonomy-tag" href="/blogtags/operations">operations</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/replication">replication</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/opinions">Opinions</a>
           
         </span>
       
@@ -256,55 +262,41 @@
 </div>
 
 
-  <p><a href="https://github.com/github/gh-ost">gh-ost</a> version <a href="https://github.com/github/gh-ost/releases/tag/v1.0.17">1.0.17</a> is now released, with various additions and fixes. Here are some notes of interest:</p>
-<h3>Hooks</h3>
-<p><code>gh-ost</code> now supports <a href="https://github.com/github/gh-ost/blob/master/doc/hooks.md">hooks</a>. These are your own executables that <code>gh-ost</code> will invoke at particular points of interest (validation pass, about to cut-over, success, failure, status, etc.)</p>
-<p><code>gh-ost</code> will set various environment variables for your executables to pick up, passing along such information as migrated/<em>ghost</em> table name, elapsed time, processed rows, migrated host etc.</p>
-<h3>Sub-second lag control</h3>
-<p>At GitHub we're very strict about replication lag. We keep it well under <code>1</code> second at most times. <code>gh-ost</code> can now identify <a href="https://github.com/github/gh-ost/blob/master/doc/subsecond-lag.md">sub-second lag on replicas</a> (well, you need to supply with the right query). Our current production migrations are set by default with <code>--max-lag-millis=500</code> or less, and our most intensive migrations keep replication lag well below <code>1sec</code> or even below <code>500ms</code></p>
-<h3>No SUPER</h3>
-<p>The <code>SUPER</code> privilege is required to <code>set global binlog_format='ROW'</code> and for <code>STOP SLAVE; START SLAVE;</code></p>
-<p>If you <em>know</em> your replica has RBR, you can pass <code>--assume-rbr</code> and skips those steps.</p>
-<h3>RDS</h3>
-<p>Hooks + No Super = RDS, as seems to be the case. For <code>--test-on-replica</code> you will need to supply your own <code>gh-ost-on-stop-replication</code> hook, to stop your RDS replica at cut-over phase. See <a href="https://github.com/github/gh-ost/issues/163#issuecomment-244694616">this tracking issue</a><!--more--></p>
-<h3>master-master</h3>
-<p>While active-active are still not supported, you now have greater control over master-master topologies by being able to explicitly pick your master (as <code>gh-ost</code> arbitrarily picks one of the co-masters). Do so by passing <code>--assume-master-host</code>. See <a href="https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md">cheatsheet</a>.</p>
-<h3>tungsten replicator</h3>
-<p>Similarly, <code>gh-ost</code> cannot crawl your <code>tungsten</code> topology, and you are able to specify <code>--tungsten --assume-master-host=the.master.com</code>. See <a href="https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md">cheatsheet</a>.</p>
-<h3>Concurrent-rowcount</h3>
-<p><code>--exact-rowcount</code> is awesomeness, keeping quite accurate estimate of progress. With <code>--concurrent-rowcount</code> we begin migration with a rough estimate, and execute <code>select count(*) from your_table</code> in parallel, updating our estimate later on throughout the migration</p>
-<h3>Stricter, safer</h3>
-<p><code>gh-ost</code> works in <code>STRICT_ALL_TABLES</code> mode, meaning it would fail rather than set the wrong value to a column.</p>
-<p>In addition to unit-testing and production continuous test, a set of <a href="https://github.com/github/gh-ost/blob/master/doc/local-tests.md">local tests</a> is growing, hopefully to run as CI tests later on.</p>
-<h3>Fixed problems</h3>
-<p>Fixed <code>time_zone</code> related bug, high <code>unsigned</code> values bug; added strict check for triggers, relaxed config file parsing, and more. Thank you to community contributors for PRs, from <code>ipv6</code> to typos!</p>
-<h3>Known issues</h3>
-<p>Issues coming and going at all times -- thank you for reporting Issues!</p>
-<p>We have a confirmed <a href="https://github.com/github/gh-ost/issues/226">bug with non-UTF charsets</a> at this time. Some other minor issues and feature requests are open -- we'll take them as we go along.</p>
-<h3>Feedback requests</h3>
-<p>We are not testing <code>gh-ost</code> on RDS ourselves. We appreciate community feedback on <a href="https://github.com/github/gh-ost/issues/163">this tracking issue</a>.</p>
-<p>We are not testing <code>gh-ost</code> on Galera/XtraDB cluster ourselves. We appreciate community feedback on <a href="https://github.com/github/gh-ost/issues/224">this tracking issue</a>.</p>
-<p>We value submitted Issues and questions.</p>
-<h3>Speaking</h3>
-<p>We will be presenting <code>gh-ost</code> in the next month:</p>
+  <p>(Almost) another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Relaxed GTID constraints</li>
+</ol>
+<p>I'm still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? <code>gh-ost</code>&nbsp;has to write something to the binary log. Thus, it "corrupts" the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but...</p>
+<p>I understand the idea and need for the <code>Executed GTID Set</code>. It will&nbsp;certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a <code>flush tables with read lock</code>&nbsp;without disabling <code>sql_log_bin</code>. Things just happen.</p>
+<p>For that, I would like to suggest GTID control levels, such as:</p>
+<ol>
+<li><em>Strict</em>: same as Oracle's existing&nbsp;implementation. Executed sets, purged sets, whatnot.</li>
+<li><em>Last executed</em>: a mode where the only thing that counts is the last executed GTID value. If I repoint replica,&nbsp;all it needs to check is "hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don't care about comparing executed and purged sets, I will trust you and keep running from that point on"</li>
+<li><em>Declarative</em>: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.</li>
+</ol>
+<p>I realize Oracle MySQL GTID is out for some over 3 years now, but I'm sorry - I still have reservations and see&nbsp;use cases where I fear it will not serve me right.</p>
+<p>How about my previous years wishes? World peace and good health never came through, however:</p>
 <ul>
-<li>I will be <a href="http://githubuniverse.com/program/sessions/#gh-ost">presenting gh-ost at GitHub Universe</a>, Sep. 14th</li>
-<li>Tom Krouper will be <a href="https://datalayer.com/">presenting gh-ost at DataLayer</a>, Seattle, Sep 28th</li>
-<li>Tom Krouper and myself will be <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">presenting gh-ost at PerconaLive</a>, Amsterdam, Oct 5th</li>
+<li>My <a href="http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-2015">2015 wish</a> for "decent, operations friendly built in online table refactoring" was unmet, however <code>gh-ost</code>&nbsp;is a thing now and exceeds my expectations. No, really. Please come see <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">Tom &amp; myself present gh-ost</a> and how it changed our migration paradigm.</li>
+<li>My <a href="http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-201">2012 wish</a> for "decent, long waited for, implementation of <a href="http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function">Window Functions</a> (aka Analytic Functions) for MySQL" was met by&nbsp;MariaDB's <a href="https://mariadb.com/kb/en/mariadb/window-functions/">window functions</a>.<br>
+Not strictly Window Functions, but Oracle MySQL 8.0 will <a href="http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/">support CTE</a> (hierarchial/recursive), worth a mention.</li>
 </ul>
-<p>Hope to see you there, and thank you again to all contributors!</p>
+<p>See you in Amsterdam!</p>
+
 
   
 <div class="prev-next-post pure-g">
   <div class="pure-u-1-24" style="text-align: left;">
     
-    <a href="/blog/2016/08/11/mysql-vs-postgresql-gh-ost-perspective/"><i class="fa fa-chevron-left"></i></a>
+    <a href="/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more"><i class="fa fa-chevron-left"></i></a>
     
   </div>
   <div class="pure-u-10-24">
     
     <nav class="prev">
-      <a href="/blog/2016/08/11/mysql-vs-postgresql-gh-ost-perspective/">MySQL vs. PostgreSQL, gh-ost perspective</a>
+      <a href="/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more">gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more</a>
     </nav>
     
   </div>
@@ -313,14 +305,8 @@
   </div>
   <div class="pure-u-10-24">
     
-    <nav class="next">
-      <a href="/blog/Three-wishes-for-a-new-year/Three-wishes-for-a-new-year/">Three wishes for a new year</a>
-    </nav>
-    
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
-    
-    <a href="/blog/Three-wishes-for-a-new-year/Three-wishes-for-a-new-year/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>
