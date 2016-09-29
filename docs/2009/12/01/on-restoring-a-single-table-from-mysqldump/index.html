@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>On restoring a single table from mysqldump &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>On restoring a single table from mysqldump</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>01 Dec 2009</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/backup">Backup</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/books">Books</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/mysqldump">mysqldump</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/performance">Performance</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/scripts">scripts</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Following <a href="http://everythingmysql.ning.com/profiles/blogs/restore-one-table-from-an-all">Restore one table from an ALL database dump</a> and <a href="http://gtowey.blogspot.com/2009/11/restore-single-table-from-mysqldump.html">Restore a Single Table From mysqldump</a>, I would like to add my own thoughts and comments on the subject.</p>
+<p>I also wish to note performance issues with the two suggested solutions, and offer improvements.</p>
+<h4>Problem relevance</h4>
+<p>While the problem is interesting, I just want to note that it is relevant in very specific database dimensions. Too small - and it doesn't matter how you solve it (e.g. just open vi/emacs and copy+paste). Too big - and it would not be worthwhile to restore from <em>mysqldump</em> anyway. I would suggest that the problem is interesting in the whereabouts of a few dozen GB worth of data.</p>
+<h4>Problem recap</h4>
+<p>Given a dump file (generated by mysqldump), how do you restore a single table, without making any changes to other tables?</p>
+<p>Let's review the two referenced solutions. I'll be using the <a href="http://dev.mysql.com/doc/employee/en/employee.html">employees db</a> on <a href="https://launchpad.net/mysql-sandbox">mysql-sandbox</a> for testing. I'll choose a very small table to restore: <strong>departments</strong> (only a few rows in this table).</p>
+<h4>Security based solution</h4>
+<p><a href="http://everythingmysql.ning.com/profiles/blogs/restore-one-table-from-an-all"><strong>Chris</strong></a> offers to create a special purpose account, which will only have write (CREATE, INSERT, etc.) privileges on the particular table to restore. Cool hack! But, I'm afraid, not too efficient, for two reasons:<span id="more-1630"></span></p>
+<ol>
+<li>MySQL needs to process all irrelevant queries (ALTER, INSERT, ...) only to disallow them due to access violation errors.</li>
+<li>Assuming restore is from remote host, we overload the network with all said irrelevant queries.</li>
+</ol>
+<p>Just how inefficient? Let's time it:</p>
+<blockquote>
+<pre>mysql&gt; grant usage on *.* to 'restoreuser'@'localhost';
+mysql&gt; grant select on *.* to 'restoreuser'@'localhost';
+mysql&gt; grant all on employees.departments to 'restoreuser'@'localhost';
+
+$ time mysql --user=restoreuser --socket=/tmp/mysql_sandbox21701.sock --force employees &lt; /tmp/employees.sql
+...
+ERROR 1142 (42000) at line 343: INSERT command denied to user 'restoreuser'@'localhost' for table 'titles'
+ERROR 1142 (42000) at line 344: ALTER command denied to user 'restoreuser'@'localhost' for table 'titles'
+...
+(lot's of these messages)
+...
+
+real&nbsp;&nbsp;&nbsp; <strong>0m31.945s</strong>
+user&nbsp;&nbsp;&nbsp; 0m6.328s
+sys&nbsp;&nbsp;&nbsp;&nbsp; 0m0.508s</pre>
+</blockquote>
+<p>So, at about <strong>30</strong> seconds to restore a 9 rows table.</p>
+<h4>Text filtering based solution.</h4>
+<p><a href="http://gtowey.blogspot.com/2009/11/restore-single-table-from-mysqldump.html"><strong>gtowey</strong></a> offers parsing the dump file beforehand:</p>
+<ul>
+<li>First, parse with <em>grep</em>, to detect rows where tables are referenced within dump file</li>
+<li>Second, parse with <em>sed</em>, extracting relevant rows.</li>
+</ul>
+<p>Let's time this one:</p>
+<blockquote>
+<pre>$ time grep -n 'Table structure' /tmp/employees.sql
+23:-- Table structure for table `departments`
+48:-- Table structure for table `dept_emp`
+89:-- Table structure for table `dept_manager`
+117:-- Table structure for table `employees`
+161:-- Table structure for table `salaries`
+301:-- Table structure for table `titles`
+
+real&nbsp;&nbsp;&nbsp; <strong>0m0.397s</strong>
+user&nbsp;&nbsp;&nbsp; 0m0.232s
+sys&nbsp;&nbsp;&nbsp;&nbsp; 0m0.164s
+
+$ time sed -n 23,48p /tmp/employees.sql | ./use employees
+
+real&nbsp;&nbsp;&nbsp; <strong>0m0.562s</strong>
+user&nbsp;&nbsp;&nbsp; 0m0.380s
+sys&nbsp;&nbsp;&nbsp;&nbsp; 0m0.176s</pre>
+</blockquote>
+<p>Much faster: about <strong>1</strong> second, compared to <strong>30</strong> seconds from above.</p>
+<p>Nevertheless, I find two issues here:</p>
+<ol>
+<li>A correctness problem: this solution somewhat assumes that there's only a single table with desired name. I say "somewhat" since it leaves this for the user.</li>
+<li>An efficiency problem: it reads the dump file <em>twice</em>. First parsing it with <em>grep</em>, then with <em>sed</em>.</li>
+</ol>
+<h4>A third solution</h4>
+<p><em>sed</em> is much stronger than presented. In fact, the inquiry made by <em>grep</em> in gtowey's solution can be easily handled by <em>sed</em>:</p>
+<blockquote>
+<pre>$ time sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p" /tmp/employees.sql | ./use employees
+
+real&nbsp;&nbsp;&nbsp; <strong>0m0.573s</strong>
+user&nbsp;&nbsp;&nbsp; 0m0.416s
+sys&nbsp;&nbsp;&nbsp;&nbsp; 0m0.152s</pre>
+</blockquote>
+<p>So, the <strong>"/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p"</strong> part tells <em>sed</em> to only print those rows starting from the <strong>departments</strong> table structure, and ending in the next table structure (this is for clarity: had department been the last table, there would not be a next table, but we could nevertheless solve this using other anchors).</p>
+<p>And, we only do it in <strong>0.57</strong> seconds: about half the time of previous attempt.</p>
+<p>Now, just to be more correct, we only wish to consider the <strong>employees.department</strong> table. So, <em>assuming</em> there's more than one database dumped (and, by consequence, <strong>USE</strong> statements in the dump-file), we use:</p>
+<blockquote>
+<pre>cat /tmp/employees.sql | sed -n "/^USE \`employees\`/,/^USE \`/p" | sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p" | ./use employees</pre>
+</blockquote>
+<h4>Further notes</h4>
+<ul>
+<li>All tests used warmed-up caches.</li>
+<li>The sharp eyed readers would notice that <strong>departments</strong> is the first table in the dump file. Would that give an unfair advantage to the parsing-based restore methods? The answer is no. I've created an <strong>xdepartments</strong> table, to be located at the end of the dump. The difference in time is neglectful and inconclusive; we're still at ~0.58-0.59 seconds. The effect will be more visible on really large dumps; but then, so would the security-based effects.</li>
+</ul>
+<p>[<strong>UPDATE</strong>: see also following similar post: <a href="http://blog.tsheets.com/2008/tips-tricks/extract-a-single-table-from-a-mysqldump-file.html">Extract a Single Table from a mysqldump File</a>]</p>
+<h4>Conclusion</h4>
+<p><a href="http://www.amazon.com/Classic-Shell-Scripting-Arnold-Robbins/dp/0596005954/ref=sr_1_1"><img class="alignright" title="classic-shell-scripting" src="http://code.openark.org/blog/wp-content/uploads/2009/12/classic-shell-scripting.png" alt="classic-shell-scripting" width="144" height="189" scale="0"></a>Its is always best to test on large datasets, to get a feel on performance.</p>
+<p>It's best to save MySQL the trouble of parsing &amp; ignoring statements. Scripting utilities like <em>sed</em>, <em>awk</em> &amp; <em>grep</em> have been around for ages, and are well optimized. They excel at text processing.</p>
+<p>I've used <em>sed</em> many times in transforming dump outputs; for example, in converting MyISAM to InnoDB tables; to convert Antelope InnoDB tables to Barracuda format, etc. grep &amp; awk are also very useful.</p>
+<p>May I recommend, at this point, reading <a href="http://www.amazon.com/Classic-Shell-Scripting-Arnold-Robbins/dp/0596005954/ref=sr_1_1">Classic Shell Scripting</a>, a very easy to follow book, which lists the most popular command line utilities like <em>grep</em>, <em>sed</em>, <em>awk</em>, <em>sort</em>, (countless more) and shell scripting in general. While most of these utilities are well known, the book excels in providing suprisingly practical, simple solution to common tasks.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2009/11/13/questions-or-queries/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2009/11/13/questions-or-queries/">questions or queries?</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2009/12/08/useful-temporal-functions-queries/">Useful temporal functions &amp; queries</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2009/12/08/useful-temporal-functions-queries/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

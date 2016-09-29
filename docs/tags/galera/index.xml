@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Galera on code.openark.org</title>
+    <link>/blog/tags/galera/</link>
+    <description>Recent content in Galera on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Mon, 17 Dec 2012 09:00:18 +0000</lastBuildDate>
+    <atom:link href="/blog/tags/galera/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Notes on &#34;5 Tips for migrating your MySQL server to a Galera Cluster&#34;</title>
+      <link>/blog/2012/12/17/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster/</link>
+      <pubDate>Mon, 17 Dec 2012 09:00:18 +0000</pubDate>
+      
+      <guid>/blog/2012/12/17/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster/</guid>
+      <description>&lt;p&gt;This post comes as response to &lt;a href=&#34;http://www.codership.com/content/5-tips-migrating-your-mysql-server-galera-cluster&#34;&gt;5 Tips for migrating your MySQL server to a Galera Cluster&lt;/a&gt; by Henrik Ingo (Galera), which is a good read. This post is a bit lengthy which is one of the reasons why I didn&#39;t just comment on said post.&lt;/p&gt;
+&lt;p&gt;The Galera talk in London was indeed well crowded, judging from my own chair. I think there is an obvious interest in Galera, as well as a general thirst for information from real-life experience. I am personally very interested in production stories; either &#34;war stories&#34; or &#34;peace stories&#34; - anything to shed more light on the adoption of this technology.&lt;/p&gt;
+&lt;p&gt;For disclosure, I have not tried Galera myself as yet. Not on production nor on staging machines. But here&#39;s a couple thoughts on Henrik&#39;s post:&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Primary keys&lt;/h4&gt;
+&lt;p&gt;I think this is a classic &#34;emerging technology&#34; issue. The technology is designed to work with a specific configuration. In our case: InnoDB tables that all have a PRIMARY KEY. And it makes sense, and it&#39;s good practice anyway, but as it happens people &lt;em&gt;do&lt;/em&gt; forget or neglect to create PRIMARY KEYs on their tables.&lt;/p&gt;
+&lt;p&gt;An emerging technology would want to avoid poor experience (modified values for PK, replication failure) by avoiding the problem in the first place. In my view, Galera should simply refuse to work with InnoDB tables that do not have a PRIMARY KEY. This could work out in several ways:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Live: cease to replicate (better than replicate wrong info)&lt;/li&gt;
+&lt;li&gt;Better yet: refuse to start the server (much as InnoDB will refuse to start if the transaction log size differs from the size indicated in the config file)&lt;/li&gt;
+&lt;li&gt;Live &amp;amp; better: refuse to create an InnoDB table without a PRIMARY KEY, or refuse INSERTs into such tables&lt;/li&gt;
+&lt;li&gt;Offline: provide with an initial &#34;review_my_database_and_see_if_it_will_work_just_fine_with_galera&#34; shell/Perl/install script.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Number 4 is easiest to begin with, I suppose; is OK for many people to run once, and could detect a variety of problems.&lt;/p&gt;
+&lt;h4&gt;Events and Triggers&lt;/h4&gt;
+&lt;p&gt;I reject the notion of not using triggers because you don&#39;t know how they will behave. Either Galera supports triggers - in which case you should loudly acknowledge that triggers are &lt;em&gt;just fine&lt;/em&gt;, or it does not, in which case you should loudly exclaim &lt;em&gt;&#34;this won&#39;t work&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Triggers have many downsides, performance impact is, for me, the worst of them. However, I don&#39;t understand the question &lt;em&gt;&#34;do you actually know what they will do when you run them in a multi-master cluster? For that matter, do you know what they do on a master-slave cluster?&#34;&lt;/em&gt;. Does the question refer to Galera cluster? Well, I don&#39;t really know the math behind Galera, either. Does that mean I should not use Galera? Or does the question relate to standard MySQL replication? In which case - yes, it&#39;s in the docs.&lt;/p&gt;
+&lt;p&gt;Instructing the users to avoid certain features because &#34;it&#39;s dark out there&#34; is not the right way. &lt;em&gt;[UPDATE: please see Henrik&#39;s comment]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Also&lt;/h4&gt;
+&lt;p&gt;I should also note the very good post by Marco Tusa: &lt;a href=&#34;http://www.tusacentral.net/joomla/index.php/mysql-blogs/146-mysql-ndb-a-mysql-with-galera-why-we-should-not-compare-them&#34;&gt;MySQL Ndb &amp;amp; MySQL with Galera why we should not compare them.&lt;/a&gt; Marco rejects the comparison between NDB Cluster and Galera for many technical reasons. However there is one level of comparison that is not technical: the desire to be able to query any server out of N servers in a group, and to have consistent results, as well as the desire to allow for one server to crash without worrying about immediate actions like failovers, decision making, lost data etc. This level of comparison should not be taken lightly; this is the &lt;em&gt;&#34;what people actually want, without the gory details&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;I&#39;m looking forward to learning more about Galera. While schedule is not completely finalized yet, I think it&#39;s safe to slip the word that you can find some informative talks in the &lt;a href=&#34;http://www.percona.com/live/mysql-conference-2013/&#34;&gt;next Percona Live&lt;/a&gt; conference in Santa Clara, April (no plug intended though happy to plug).&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>06 Sep 2016</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/gh-ost">gh-ost</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/new-features">New Features</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/open-source">Open Source</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p><a href="https://github.com/github/gh-ost">gh-ost</a> version <a href="https://github.com/github/gh-ost/releases/tag/v1.0.17">1.0.17</a> is now released, with various additions and fixes. Here are some notes of interest:</p>
+<h3>Hooks</h3>
+<p><code>gh-ost</code> now supports <a href="https://github.com/github/gh-ost/blob/master/doc/hooks.md">hooks</a>. These are your own executables that <code>gh-ost</code> will invoke at particular points of interest (validation pass, about to cut-over, success, failure, status, etc.)</p>
+<p><code>gh-ost</code> will set various environment variables for your executables to pick up, passing along such information as migrated/<em>ghost</em> table name, elapsed time, processed rows, migrated host etc.</p>
+<h3>Sub-second lag control</h3>
+<p>At GitHub we're very strict about replication lag. We keep it well under <code>1</code> second at most times. <code>gh-ost</code> can now identify <a href="https://github.com/github/gh-ost/blob/master/doc/subsecond-lag.md">sub-second lag on replicas</a> (well, you need to supply with the right query). Our current production migrations are set by default with <code>--max-lag-millis=500</code> or less, and our most intensive migrations keep replication lag well below <code>1sec</code> or even below <code>500ms</code></p>
+<h3>No SUPER</h3>
+<p>The <code>SUPER</code> privilege is required to <code>set global binlog_format='ROW'</code> and for <code>STOP SLAVE; START SLAVE;</code></p>
+<p>If you <em>know</em> your replica has RBR, you can pass <code>--assume-rbr</code> and skips those steps.</p>
+<h3>RDS</h3>
+<p>Hooks + No Super = RDS, as seems to be the case. For <code>--test-on-replica</code> you will need to supply your own <code>gh-ost-on-stop-replication</code> hook, to stop your RDS replica at cut-over phase. See <a href="https://github.com/github/gh-ost/issues/163#issuecomment-244694616">this tracking issue</a><!--more--></p>
+<h3>master-master</h3>
+<p>While active-active are still not supported, you now have greater control over master-master topologies by being able to explicitly pick your master (as <code>gh-ost</code> arbitrarily picks one of the co-masters). Do so by passing <code>--assume-master-host</code>. See <a href="https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md">cheatsheet</a>.</p>
+<h3>tungsten replicator</h3>
+<p>Similarly, <code>gh-ost</code> cannot crawl your <code>tungsten</code> topology, and you are able to specify <code>--tungsten --assume-master-host=the.master.com</code>. See <a href="https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md">cheatsheet</a>.</p>
+<h3>Concurrent-rowcount</h3>
+<p><code>--exact-rowcount</code> is awesomeness, keeping quite accurate estimate of progress. With <code>--concurrent-rowcount</code> we begin migration with a rough estimate, and execute <code>select count(*) from your_table</code> in parallel, updating our estimate later on throughout the migration</p>
+<h3>Stricter, safer</h3>
+<p><code>gh-ost</code> works in <code>STRICT_ALL_TABLES</code> mode, meaning it would fail rather than set the wrong value to a column.</p>
+<p>In addition to unit-testing and production continuous test, a set of <a href="https://github.com/github/gh-ost/blob/master/doc/local-tests.md">local tests</a> is growing, hopefully to run as CI tests later on.</p>
+<h3>Fixed problems</h3>
+<p>Fixed <code>time_zone</code> related bug, high <code>unsigned</code> values bug; added strict check for triggers, relaxed config file parsing, and more. Thank you to community contributors for PRs, from <code>ipv6</code> to typos!</p>
+<h3>Known issues</h3>
+<p>Issues coming and going at all times -- thank you for reporting Issues!</p>
+<p>We have a confirmed <a href="https://github.com/github/gh-ost/issues/226">bug with non-UTF charsets</a> at this time. Some other minor issues and feature requests are open -- we'll take them as we go along.</p>
+<h3>Feedback requests</h3>
+<p>We are not testing <code>gh-ost</code> on RDS ourselves. We appreciate community feedback on <a href="https://github.com/github/gh-ost/issues/163">this tracking issue</a>.</p>
+<p>We are not testing <code>gh-ost</code> on Galera/XtraDB cluster ourselves. We appreciate community feedback on <a href="https://github.com/github/gh-ost/issues/224">this tracking issue</a>.</p>
+<p>We value submitted Issues and questions.</p>
+<h3>Speaking</h3>
+<p>We will be presenting <code>gh-ost</code> in the next month:</p>
+<ul>
+<li>I will be <a href="http://githubuniverse.com/program/sessions/#gh-ost">presenting gh-ost at GitHub Universe</a>, Sep. 14th</li>
+<li>Tom Krouper will be <a href="https://datalayer.com/">presenting gh-ost at DataLayer</a>, Seattle, Sep 28th</li>
+<li>Tom Krouper and myself will be <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">presenting gh-ost at PerconaLive</a>, Amsterdam, Oct 5th</li>
+</ul>
+<p>Hope to see you there, and thank you again to all contributors!</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2016/08/11/mysql-vs-postgresql-gh-ost-perspective/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2016/08/11/mysql-vs-postgresql-gh-ost-perspective/">MySQL vs. PostgreSQL, gh-ost perspective</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/Three-wishes-for-a-new-year/Three-wishes-for-a-new-year/">Three wishes for a new year</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/Three-wishes-for-a-new-year/Three-wishes-for-a-new-year/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

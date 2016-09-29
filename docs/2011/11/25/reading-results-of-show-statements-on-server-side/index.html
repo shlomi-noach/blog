@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Reading results of SHOW statements, on server side &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Reading results of SHOW statements, on server side</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>25 Nov 2011</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/common_schema">common_schema</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/hacks">Hacks</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/information_schema">INFORMATION_SCHEMA</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p><strong>SHOW</strong> statements are show stoppers on server side. While clients can get a <a href="http://dev.mysql.com/doc/refman/5.1/en/show.html">SHOW statement</a> as a result set just as any normal <strong>SELECT</strong>, things are not as such on server side.</p>
+<p>On server side, that is, from within MySQL itself, one <em>cannot</em>:</p>
+<blockquote>
+<pre>SELECT `Database` FROM (SHOW DATABASES);</pre>
+</blockquote>
+<p>One <em>cannot</em>:</p>
+<blockquote>
+<pre>DECLARE show_cursor CURSOR FOR SHOW TABLES;</pre>
+</blockquote>
+<p>One <em>cannot</em>:</p>
+<blockquote>
+<pre>SHOW TABLES INTO OUTFILE '/tmp/my_file.txt';</pre>
+</blockquote>
+<p>So it is impossible to get the results with a query; impossible to get the results from a stored routine; impossible to get the results by file reading...</p>
+<h4>Bwahaha! A hack!</h4>
+<p>For some <strong>SHOW</strong> statements, there is a way around this. I've been banging my head against the wall for weeks now on this. Now I have a partial solution: I'm able to read <strong>SHOW</strong> output for several <strong>SHOW</strong> statements. Namely, those <strong>SHOW</strong> statements <a href="http://dev.mysql.com/doc/refman/5.1/en/extended-show.html">which allow a LIKE or a WHERE</a> clause.</p>
+<p>For example, most are familiar with the following syntax:</p>
+<blockquote>
+<pre>USE mysql;
+SHOW TABLE STATUS LIKE 'user';</pre>
+</blockquote>
+<p>However not so many know that any <strong>SHOW</strong> statement which accepts <strong>LIKE</strong>, can also accept <strong>WHERE</strong>:<!--more--></p>
+<blockquote>
+<pre>SHOW TABLE STATUS WHERE Name='user'\G
+*************************** 1. row ***************************
+           Name: user
+         Engine: MyISAM
+        Version: 10
+     Row_format: Dynamic
+           Rows: 17
+ Avg_row_length: 69
+    Data_length: 1184
+Max_data_length: 281474976710655
+   Index_length: 2048
+      Data_free: 0
+ Auto_increment: NULL
+    Create_time: 2010-10-03 08:23:48
+    Update_time: 2011-07-30 19:31:00
+     Check_time: NULL
+      Collation: utf8_bin
+       Checksum: NULL
+ Create_options:
+        Comment: Users and global privileges</pre>
+</blockquote>
+<p>It's not just about "<strong>Name</strong>". I can filter using any column I like:</p>
+<blockquote>
+<pre>SHOW TABLE STATUS WHERE Rows &gt; 1000;
+SHOW TABLE STATUS WHERE Rows &gt; 1000 AND Index_length &gt; 65536;</pre>
+</blockquote>
+<p>etc.</p>
+<p>If you've been to my talk on <a href="http://www.percona.com/live/london-2011/session/programmatic-queries-things-you-can-code-with-sql/">Programmatic Queries: things you can code with SQL</a>, you have a good guess as for where I'm taking this.</p>
+<h4>Where there's WHERE, there's code</h4>
+<p>I can write code within the <strong>WHERE</strong> clause. Specifically, I can work with user defined variables. Shall we cut to the point and provide with an example?</p>
+<blockquote>
+<pre>mysql&gt; SET @databases := '';
+
+mysql&gt; SHOW DATABASES WHERE (@databases := CONCAT(@databases, `Database`, ',')) IS NULL;
+
+mysql&gt; SELECT @databases;
++-------------------------------------------------------------------+
+| @databases                                                        |
++-------------------------------------------------------------------+
+| information_schema,common_schema,mycheckpoint,mysql,sakila,world, |
++-------------------------------------------------------------------+</pre>
+</blockquote>
+<p>Let's discuss the above. We:</p>
+<ul>
+<li>Set a user variables called <strong>@databases</strong> to an empty text</li>
+<li>Iterate through the <strong>SHOW DATABASES</strong> rowset. The <strong>WHERE</strong> clause is always <em>false</em> (the expression is in fact <strong>NOT NULL</strong> for all rows), so rows are not printed out, and we get an empty result set (we're not really interested in a result set here, since there's no way to read it anyhow).</li>
+<li>However we do take care to "remember" the value we visit, by concatenating the <strong>`Database`</strong> column value.</li>
+<li>We end up with a delimited string of database names. You'll forgive the ending <strong>','</strong>. This is just a simple example, it is of no importance.</li>
+</ul>
+<h4>Further notes</h4>
+<p>What can we do with the concatenated list of database names? Whatever we want to. We can parse it again, <strong>INSERT</strong> it <strong>INTO</strong> some table, save to file, iterate, what have you!</p>
+<p>We can wrap the above in a stored routine. Alas, not with a stored function, since the <strong>SHOW</strong> command, although returns with an empty result set, does return with a result set, not allowed withing functions.<strong></strong></p>
+<h4>Limitations</h4>
+<ul>
+<li>Sadly, <strong>SHOW SLAVE STATUS</strong>, <strong>SHOW MASTER LOGS</strong> etc., do not support <strong>LIKE</strong> or <strong>WHERE</strong> syntax. Bummer.</li>
+<li>Stored functions, as just mentioned, cannot utilize this hack. Hey, I'm still working on this!</li>
+</ul>
+<h4>To what use?</h4>
+<p>Originally I wanted to avoid the time &amp; locking it takes for <strong>INFORMATION_SCHEMA</strong> queries, such as on <strong>TABLES</strong>, <strong>COLUMNS</strong>, etc. Ironically, in a few days apart I've found <em>another</em> interesting solution (well, two, actually) to manage reads from <strong>INFORMATION_SCHEMA</strong> with less overhead than in normal use. I'll talk about that another time; am about to use this in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>.</p>
+<h4>Further notes</h4>
+<p>I met <a href="http://rpbouman.blogspot.com/">Roland</a> in <a href="http://www.percona.com/live/london-2011/">London</a>, and he liked the solution. As <a href="http://www.mysqlperformanceblog.com/author/baron/">Baron</a> joined, Roland said: "Baron, do you know Shlomi devised a method to read the output of <strong>SHOW</strong> commands?"</p>
+<p>And Baron said: "Without using files? Then a <strong>SHOW</strong> statement can have a <strong>WHERE</strong> clause, in which case you can use a variable", and went on looking for his wife.</p>
+<p>And we remained speechless.</p>
+<p>[UPDATE: I've manually changed timestamp of this post due to failure in its aggregation in planet.mysql, being a major source of incoming traffic to this site]</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2011/11/22/xfce-is-the-new-gnome-2/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2011/11/22/xfce-is-the-new-gnome-2/">Xfce is the new Gnome 2</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2011/11/29/percona-live-mysql-conference-and-expo-2012-a-note-on-proposals/">Percona Live: MySQL Conference And Expo 2012 - a note on proposals</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2011/11/29/percona-live-mysql-conference-and-expo-2012-a-note-on-proposals/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

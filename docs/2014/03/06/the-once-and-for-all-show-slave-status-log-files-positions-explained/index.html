@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>The &#34;once and for all&#34; SHOW SLAVE STATUS log files &amp; positions explained &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>The &#34;once and for all&#34; SHOW SLAVE STATUS log files &amp; positions explained</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>06 Mar 2014</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/replication">Replication</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>True, GTID is upon us whether via MySQL 5.6 or Tungsten Replicator (and wasn't it in Google Patches since 2009?).</p>
+<p>But some of us are still using standard replication with MySQL 5.5, and the "what's with all these binary log files and positions" question is ever erupting. The output of <strong>SHOW SLAVE STATUS</strong> confuses people new to it. It confuses me time and again.</p>
+<p>So here's the semi visual guide to interpreting the <strong>SHOW SLAVE STATUS</strong>.</p>
+<h4>About binary logs and relay logs</h4>
+<p>A master writes binary logs. These are typically and conventionally called <strong>mysql-bin.#####</strong> or <strong>mysqld-bin.#####</strong> (replace ##### with digits).</p>
+<p>A slave connects to its master, and reads entries from the master's binary logs. The slave writes those entries into its own relay logs. These are typically and conventionally called <strong>mysql-relay.#####</strong> or <strong>mysqld-relay.#####</strong> (replace ##### with digits).</p>
+<p>There is nothing at all that connects the name or number of a slave's relay log with the master's binary log. There is nothing at all that connects the position within the relay log with the position within the master binary log. Files are flushed/rotated; have different size configuration; are re-created. However the slave does keep track on the current relay-log entry: it knows what's the matching entry on the master's binary logs. This is an important piece of information.</p>
+<p>While the slave fetches entries and writes them into the relay log (via the <strong>IO_THREAD</strong>), it also reads the relay log to replay those entries (via the <strong>SQL_THREAD</strong>).</p>
+<p>And so at each point in time we are interested in the following "coordinates":</p>
+<ul>
+<li>What are we fetching from the master? Which file are we fetching and from which position?</li>
+<li>Where are we writing this to? (This is implicitly the latest relay log file and its size)</li>
+<li>What's the position of currently executing slave query, in relay-log coordinates? As the slave lags these coordinates are farther (smaller) than the written-to position.</li>
+<li>What's the position of currently executing slave query, in master binary-log coordinates? This information really tells us how far apart we are from the master.<!--more--></li>
+</ul>
+<p>How do we interpret the above from <strong>SHOW SLAVE STATUS</strong> output? Take the following two images as guidelines. The first presents an up-to-date slave, the second presents a lagging slave.</p>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/03/slave_status_explained_uptodate.png"><img class="alignnone size-full wp-image-6734" alt="slave_status_explained_uptodate" src="/blog/assets/slave_status_explained_uptodate.png" width="677" height="636" /></a></blockquote>
+<blockquote><a href="http://code.openark.org/blog/wp-content/uploads/2014/03/slave_status_explained_lagging.png"><img class="alignnone size-full wp-image-6735" alt="slave_status_explained_lagging" src="/blog/assets/slave_status_explained_lagging.png" width="677" height="636" /></a></blockquote>
+<p>Hopefully this "once and for all" explanation will last a couple weeks.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2014/02/09/mysql-community-awards-2014-call-for-nominations/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2014/02/09/mysql-community-awards-2014-call-for-nominations/">MySQL Community Awards 2014: Call for Nominations!</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2014/03/06/mycheckpoint-discontinued/">mycheckpoint, discontinued</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2014/03/06/mycheckpoint-discontinued/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

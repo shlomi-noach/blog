@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Do we need sql_mode? &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Do we need sql_mode?</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>08 Jan 2009</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/configuration">Configuration</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/installation">Installation</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql_mode">sql_mode</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>sql_mode must be one of the most elusive issues in setting up a MySQL database. It is also responsible for difficulties in migration, upgrading and securing of databases.</p>
+<p>MySQL usually has little issues with migrating database from one machine to another, one version to another, one OS to another, one architecture to another. If we're not sure, we can always migrate using mysqldump's logical dump, right?</p>
+<p>Not entirely right. The elusive sql_mode (empty by default) may affect out backup+restore, may affect our application behavior, may affect our data integrity.<!--more--></p>
+<ul>
+<li>Did we remember to set NO_AUTO_CREATE_USER? Oh dear, we have some users without passwords.</li>
+<li>Did we remember to set NO_AUTO_VALUE_ON_ZERO? Oh dear, we've dumped our database for backup, restored, but AUTO_INCREMENT values <a title="Mind the SQL_MODE when running ALTER TABLE" href="http://www.pythian.com/blogs/1422/draft-mind-the-sql_mode-when-running-alter-table">have changed</a>!</li>
+<li>Did we set STRICT_ALL_TABLES? How do we know if the 255 value in our TINYINT really stands for 255 or if it was a truncated 299?</li>
+<li>Do we allow selecting non aggregated columns in GROUP BY? Did we set ONLY_FULL_GROUP_BY? Will our application crash now?</li>
+<li>Our old database has zero for empty date values (columns are NOT NULL). But what settings do we have for NO_ZERO_IN_DATE on our new installation? Will import fail?</li>
+<li>And how did the NULL get in? Was it because we divided by zero, and forgot to set ERROR_FOR_DIVISION_BY_ZERO? How can we tell?</li>
+</ul>
+<p>The fact is: two mysql instances, same version, same OS and architecture, with different sql modes - can be incompatible!</p>
+<p>As said, the sql_mode is empty by default. This is very non-strict. But more than that: it can be changed even while the database is running; even on a per connection basis.</p>
+<p>Setting sql_mode should be one of the first things to do after installation. The usual manuals talk about setting the innodb_buffer_pool_size and the query_cache_size, when sql_mode will dictate the nature of your database and application on an entirely grander scale.</p>
+<p>I think it would be best if MySQL chooses a desired set of sql modes (like 'TRADITIONAL'), then make it the default. I further believe it would be best if MySQL would not allow changes to sql_mode. Not globally and certainly not per session. Choosing the stricter mode is better, I believe: errors such as overflow values should be reported to the application, not just swiped under the carpet.</p>
+<p>Backward compatibility? Indeed a problem (inherent to the very existence of sql_mode). Perhaps allow one setting per installation. Perhaps just <a title="My advice to MySQL" href="http://jpipes.com/index.php?/archives/276-My-advice-to-MySQL.html">go for it</a>.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2009/01/05/triggers-use-case-compilation-part-i/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2009/01/05/triggers-use-case-compilation-part-i/">Triggers Use Case Compilation, Part I</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2009/01/11/sql_mode-a-suggestion/">sql_mode: a suggestion</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2009/01/11/sql_mode-a-suggestion/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

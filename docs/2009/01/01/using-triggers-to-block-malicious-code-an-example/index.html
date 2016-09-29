@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Using triggers to block malicious code: an example &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Using triggers to block malicious code: an example</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>01 Jan 2009</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/security">Security</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/triggers">Triggers</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Web applications face constant exploitation attempts. Those with a user base must keep their users' private data, well... private.</p>
+<p>While the MySQL security model allows restricting users access to databases, tables and even columns, it has no built in feature for restricting the rows access within the given table.</p>
+<p>One cannot allow a user to only update rows 0 through 99, but restrict that user from updating rows 100 to 199. Such restrictions are usually managed in the application level, by adding a necessary "... AND filtering_column = some_value..."</p>
+<p>Many web application have the notion of an 'admin' account, or several such accounts, which provide greater control over the application. The 'admin' account is one account to which many attacks are targeted. One such attack is an attempt to modify the admin's password, such that the attacker can later log in with and access restricted data.<!--more--></p>
+<p>Assume the following table:</p>
+<blockquote>
+<pre><strong>CREATE TABLE </strong>my_users (
+  ID <strong>INT NOT NULL AUTO_INCREMENT PRIMARY KEY</strong>,
+  username <strong>VARCHAR</strong>(32) <strong>CHARSET </strong>ascii <strong>NOT NULL</strong>,
+  password <strong>VARCHAR</strong>(32) <strong>CHARSET </strong>ascii <strong>NOT NULL COLLATE</strong> ascii_bin,
+  <strong>UNIQUE KEY</strong>(username)
+);</pre>
+</blockquote>
+<p>Let us also assume we are somewhat careful, so that the passwords are not plaintext, but rather encoded with MD5.</p>
+<blockquote>
+<pre><strong>INSERT INTO</strong> my_users (username, password) <strong>VALUES</strong>
+  ('admin', MD5('qwerty')) ; <span style="color: #008000;">-- Safe password as can be found!</span>
+<strong>INSERT INTO</strong> my_users (username, password) <strong>VALUES</strong>
+  ('alice', MD5('123456')) ; <span style="color: #008000;">-- Safer yet!</span>
+
+<strong>SELECT </strong>* <strong>FROM </strong>my_users;
++----+----------+----------------------------------+
+| ID | username | password                         |
++----+----------+----------------------------------+
+|  1 | admin    | d8578edf8458ce06fbc5bb76a58c5ca4 |
+|  2 | alice    | e10adc3949ba59abbe56e057f20f883e |
++----+----------+----------------------------------+
+2 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>An attacker will try to set the password for the admin account using security holes in the web application. The web application may execute the following query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>my_users <strong>SET </strong>password=MD5('att@cker!') <strong>WHERE </strong>username='admin';</pre>
+</blockquote>
+<p>The issued query is valid, and should generally be allowed. However, we may decide to block changes to the specific 'admin' row, in the following manner:</p>
+<blockquote>
+<pre><code>DELIMITER $$
+DROP TRIGGER IF EXISTS my_users_bu $$
+CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
+FOR EACH ROW
+BEGIN
+  IF (NEW.username='admin') THEN
+    SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
+  END IF;
+END $$
+DELIMITER ;</code></pre>
+</blockquote>
+<p>Let's try running again the query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>my_users <strong>SET </strong>password=MD5('att@cker!') <strong>WHERE </strong>username='admin';
+
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.Cannot modify admin data!' doesn't exist</span></pre>
+</blockquote>
+<p>The query fails, since the <strong>BEFORE UPDATE</strong> trigger fails.<br />
+We can tweak the trigger to only allow specific users to modify the row:</p>
+<blockquote>
+<pre><code>DELIMITER $$
+DROP TRIGGER IF EXISTS my_users_bu $$
+CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
+FOR EACH ROW
+BEGIN
+  IF (NEW.username='admin' AND USER() != 'root@localhost') THEN
+    SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
+  END IF;
+END $$
+DELIMITER ;</code></pre>
+</blockquote>
+<p>This way it is possible for the root user to modify the password at will. We can further tweak the trigger to INSERT INTO some log table. The information we may wish to register is USER(), the CURRENT_TIMESTAMP(), old password and new password, and perhaps the CONNECTION_ID(). More data means more means to locate the security breach, and monitoring the log table allows for immediate response for such an attempt.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2008/12/17/replace-into-think-twice/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2008/12/17/replace-into-think-twice/">REPLACE INTO: think twice</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2009/01/05/triggers-use-case-compilation-part-i/">Triggers Use Case Compilation, Part I</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2009/01/05/triggers-use-case-compilation-part-i/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

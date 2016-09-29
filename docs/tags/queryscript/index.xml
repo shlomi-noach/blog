@@ -1,0 +1,1315 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Queryscript on code.openark.org</title>
+    <link>/blog/tags/queryscript/</link>
+    <description>Recent content in Queryscript on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Thu, 06 Feb 2014 10:32:17 +0000</lastBuildDate>
+    <atom:link href="/blog/tags/queryscript/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Why delegating code to MySQL Stored Routines is poor engineering practice</title>
+      <link>/blog/2014/02/06/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/</link>
+      <pubDate>Thu, 06 Feb 2014 10:32:17 +0000</pubDate>
+      
+      <guid>/blog/2014/02/06/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/</guid>
+      <description>&lt;p&gt;I happen to use stored routines with MySQL. In fact, my open source project &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt; heavily utilizes them. DBA-wise, I think they provide with a lot of power (alas, the ANSI:SQL 2003 syntax feels more like COBOL than a sane programming language, which is why I use &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt; instead).&lt;/p&gt;
+&lt;p&gt;However I wish to discuss the use of stored routines as integral part of your application code, which I discourage.&lt;/p&gt;
+&lt;p&gt;The common discussion on whether to user or not use stored routines typically revolves around data transfer (with stored routines you transfer less data since it&#39;s being processed on server side), security (with stored routines you can obfuscate/hide internal datasets, and provide with limited and expected API) and performance (with MySQL this is not what you would expect, as routines are interpreted &amp;amp; their queries re-evaluated, as opposed to other RDBMS you may be used to).&lt;/p&gt;
+&lt;p&gt;But I wish to discuss the use of stored routines from an engineering standpoint. The first couple of points I raise are cultural/behavioural.&lt;/p&gt;
+&lt;h4&gt;2nd grade citizens&lt;/h4&gt;
+&lt;p&gt;Your stored routines are not likely to integrate well with your IDE. While your Java/Scala/PHP/Ruby/whatnot code comfortably lies within your home directory, the stored routines live in their own space: a database container. They&#39;re not as visible to you as your standard code. Your IDE is unaware of their existence and is unlikely to have the necessary plugin/state of mind to be able to view these.&lt;/p&gt;
+&lt;p&gt;This leads to difficulty in maintaining the code. People typically resort to using some SQL-oriented GUI tool such as MySQL Workbench, SequelPro or other, commercial tools. But these tools, while make it easy to edit your routine code, do not integrate (well?) with your source control. I can&#39;t say I&#39;ve used all GUI tools; but how many of them will have Git/SVN/Mercurial connectors? How many of them will keep local history changes once you edit a routine? I&#39;m happy to get introduced to such a tool.&lt;/p&gt;
+&lt;p&gt;Even with such integration, you&#39;re split between two IDEs. And if you&#39;re the command line enthusiast, well, you can&#39;t just &lt;strong&gt;svn ci -m &#34;fixed my stored procedure bug&#34;&lt;/strong&gt;. Your code is simply not in your trunk directory.&lt;/p&gt;
+&lt;p&gt;It &lt;em&gt;can&lt;/em&gt; be done. You &lt;em&gt;could&lt;/em&gt; maintain the entire routine code from within your source tree, and hats off to all those who do it. Most will not. See later on about deployments for more on this.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Testing&lt;/h4&gt;
+&lt;p&gt;While engineers are keen on writing unit tests for every class and method they create, they are less keen on doing the same for stored routines. This is an observation, having seen many instalments. And I can tell you why: your stored routine testing will not integrate well with your JUnit/PHPUnit/...&lt;/p&gt;
+&lt;p&gt;There are testing frameworks for databases, and indeed I hacked my own mini unit testing code with &lt;em&gt;common_schema&lt;/em&gt;. But it&#39;s a &lt;em&gt;different&lt;/em&gt; testing framework. You might also have realized by now that testing databases is somewhat different. It &lt;em&gt;can&lt;/em&gt; be done, and hats off again to those that implement it as common practice. Many don&#39;t. Database are often more heavyweight to test. Not all operations done by routines are easily rolled back, which leads to having to rebuild the entire dataset before tests. This in itself leads to longer test periods and a need for multiple test databases so as to allow for concurrent builds.&lt;/p&gt;
+&lt;p&gt;How many companies practice both version control and unit testing over their routine code? I believe not many (and am happy to hear about those who do). To be more direct, of all the companies I ever consulted to: &lt;em&gt;I have never seen one that does both&lt;/em&gt;.&lt;/p&gt;
+&lt;h4&gt;Debugging&lt;/h4&gt;
+&lt;p&gt;MySQL stored routines have built in debugging capabilities. To debug your routines, you will have to use one of two methods:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Simulate your routine code (ie mimic their execution on top of some interpreter). There are tools to do that. For me this is a complete NO GO and utterly untrustworthy. You can mimic what you think is how the routine should behave, but never they full behaviour. While developing &lt;em&gt;common_schema&lt;/em&gt; I came upon plenty weird behaviour, some of it bugs, that you just can&#39;t build into your emulation.&lt;/li&gt;
+&lt;li&gt;Inject debugging code into your routine code. I do that with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html&#34;&gt;RDebug&lt;/a&gt;. You can do breakpoints, step into, step out, most of the interesting stuff. Other tools do that as well. It is not the right way to go: you&#39;re essentially modifying your code, placing more locks, communicating, and losing some functionality. It is a necessary evil solution for a necessary evil programming method... How good can that be?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The right way to go would be to have debugging API built into the MySQL server.&lt;/p&gt;
+&lt;p&gt;But, wait, that would still be next to worthless, since our discussion is over programming with stored routines: letting your application call upon stored routines in your database. Until the day where I could use my IntelliJ debugger to step from my java method which calls upon a stored procedure, and into the stored procedure itself, debugging your code is completely detached from your stored routine debugging.&lt;/p&gt;
+&lt;h4&gt;Refactoring &amp;amp; deploying&lt;/h4&gt;
+&lt;p&gt;Say you wanted to add a column to your table: you would go ahead and add it, and perhaps populate it. You would then modify your application code to support this new column, and deploy. Say you wanted to drop a table column. You would first deploy changes to your application code that ignore said column, and once the code is in place you would go and actually make the DROP.&lt;/p&gt;
+&lt;p&gt;How do you do the same with a stored routine? Support your routine accepts two parameters, and you wish to add a third?&lt;/p&gt;
+&lt;p&gt;There is no support for optional parameters. Your routine either accepts two parameters or three. Your application code will have to provide the exact number of parameters. You will have to deploy &lt;em&gt;both your SQL changes and your application changes at the same time&lt;/em&gt;. This is by definition impossible, unless you are OK with a &lt;em&gt;stop the world approach&lt;/em&gt;, which is unlikely in production.&lt;/p&gt;
+&lt;h4&gt;Code constraints&lt;/h4&gt;
+&lt;p&gt;One solution to the above is to create a new routines. Somehow &#34;overload&#34; it. But you can&#39;t overload a stored routine; you&#39;ll have to create a routine by a new name. This will allow you to slowly and smoothly migrate between the two.&lt;/p&gt;
+&lt;p&gt;Ahem, smoothly? How easy is it to find all invocations of a certain routines from your code? It will be typically lie in some String, or within some XML config file. There is no safe &#34;find references to this procedure&#34; IDE mechanism. There is no constraint in your IDE that will tell you &#34;there is no such procedure&#34; if you misspell the name.&lt;/p&gt;
+&lt;h4&gt;Trash bin&lt;/h4&gt;
+&lt;p&gt;Suppose you overcame the above. You now have two routines. You need to remember to DROP the old one, right? Will you?&lt;/p&gt;
+&lt;p&gt;When presenting &lt;em&gt;common_schema&lt;/em&gt;, a common question I ask the audience is as follows:&lt;/p&gt;
+&lt;blockquote&gt;Suppose I accessed your database and listed the entire set of stored functions and procedures. How many of them are you not even sure are in use anymore? How many of them you think you can DROP, but are too afraid to, and keep them in &lt;em&gt;just in case&lt;/em&gt;?&lt;/blockquote&gt;
+&lt;p&gt;I wouldn&#39;t commonly ask that question had it not always provides a common nodding and smiling in the audience. People forget to drop their routines, and then forget about them, and are never sure whether they are used (your IDE doesn&#39;t easily tell you that, remember? Sure, you can grep around; that&#39;s not what most engineers would do). And those routines pile up to become trash.&lt;/p&gt;
+&lt;h4&gt;Data or code?&lt;/h4&gt;
+&lt;p&gt;Last but not least: a stored routine is a piece of code, right? Well, as far as the database is concerned, it&#39;s really a piece of data. It&#39;s located within a schema. It&#39;s &lt;em&gt;stored&lt;/em&gt;. It is an integral part of your data set: when you back up your &lt;em&gt;data&lt;/em&gt;, you&#39;re most likely to backup the &lt;em&gt;code&lt;/em&gt; as well. When you restore, you&#39;re likely to restore &lt;em&gt;both&lt;/em&gt;. There are obvious advantages to that, DB-wise. Or should I say, DBA-wise. Engineering-wise? Does a database-restore operation count as code deployment? We can argue over beer.&lt;/p&gt;
+&lt;h4&gt;Final notes&lt;/h4&gt;
+&lt;p&gt;Having said all that: yes, I&#39;m using an occasional stored routine. I see these occasions as a necessary evil, and sometimes it&#39;s just the correct solution.&lt;/p&gt;
+&lt;p&gt;I&#39;m happy to know what methods have been developed out there to overcome the above, please share; and please feel free to contradict the above.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Converting an OLAP database to TokuDB, part 1</title>
+      <link>/blog/2013/09/03/converting-an-olap-database-to-tokudb-part-1/</link>
+      <pubDate>Tue, 03 Sep 2013 09:04:12 +0000</pubDate>
+      
+      <guid>/blog/2013/09/03/converting-an-olap-database-to-tokudb-part-1/</guid>
+      <description>&lt;p&gt;This is the first in a series of posts describing my impressions of converting a large OLAP server to TokuDB. There&#39;s a lot to tell, and the experiment is not yet complete, so this is an ongoing blogging. In this post I will describe the case at hand and out initial reasons for looking at TokuDB.&lt;/p&gt;
+&lt;p&gt;Disclosure: I have no personal interests and no company interests; we did get friendly, useful and free advice from Tokutek engineers. TokuDB is open source and free to use, though commercial license is also available.&lt;/p&gt;
+&lt;h4&gt;The case at hand&lt;/h4&gt;
+&lt;p&gt;We have a large and fast growing DWH MySQL setup. This data warehouse is but one component in a larger data setup, which includes Hadoop, Cassandra and more. For online dashboards and most reports, MySQL is our service. We populate this warehouse mainly via Hive/Hadoop. Thus, we have an hourly load of data from Hive, as well as a larger daily load.&lt;/p&gt;
+&lt;p&gt;There are some updates on the data, but the majority of writes are just &lt;strong&gt;mysqlimport&lt;/strong&gt;s of Hive queries.&lt;/p&gt;
+&lt;p&gt;Usage of this database is OLAP: no concurrency issues here; we have some should-be-fast-running queries issued by our dashboards, as well as ok-to-run-longer queries issued for reports.&lt;/p&gt;
+&lt;p&gt;Our initial and most burning trouble is with size. Today we use &lt;strong&gt;COMPRESSED&lt;/strong&gt; InnoDB tables (&lt;strong&gt;KEY_BLOCK_SIZE&lt;/strong&gt; is default, i.e. &lt;strong&gt;8&lt;/strong&gt;). Our data volume sums right now at about &lt;strong&gt;2TB&lt;/strong&gt;. I happen to know this translates as &lt;strong&gt;4TB&lt;/strong&gt; of uncompressed data.&lt;/p&gt;
+&lt;p&gt;However growth of data is accelerating. A year ago we would capture a dozen GB per month. Today it is a &lt;strong&gt;100GB&lt;/strong&gt; per month, and by the end of this year it may climb to &lt;strong&gt;150GB&lt;/strong&gt; per month or more.&lt;/p&gt;
+&lt;p&gt;Our data is not sharded. We have a simple replication topology of some &lt;strong&gt;6&lt;/strong&gt; servers. Machines are quite generous as detailed following. And yet, we will be running out of resources shortly: disk space (total &lt;strong&gt;2.7TB&lt;/strong&gt;) is now running low and is expected to run out in about six months. One of my first tasks in Outbrain is to find a solution to our DWH growth problem. The solution could be sharding; it could be a commercial DWH product; anything that works.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;The approach we experiment with&lt;/h4&gt;
+&lt;p&gt;It was at my initial interview that I suggested &lt;a href=&#34;http://www.tokutek.com/products/tokudb-for-mysql/&#34;&gt;TokuDB&lt;/a&gt; might be a good solution, with the primary reason of being so good with compression. And we decided to experiment with this simple (setup-wise) solution of compression. If we could compress the data even by &lt;strong&gt;50%&lt;/strong&gt;, that would buy us considerable time. And it&#39;s the simplest approach as we would need to change nothing at the application side, nor add additional frameworks.&lt;/p&gt;
+&lt;p&gt;Of course, we were already using InnoDB &lt;strong&gt;COMPRESSED&lt;/strong&gt; tables. How about just improving the compression? And here I thought to myself: we can try &lt;strong&gt;KEY_BLOCK_SIZE=4&lt;/strong&gt;, which I know would generally compress by &lt;strong&gt;50%&lt;/strong&gt; as compared to &lt;strong&gt;KEY_BLOCK_SIZE=8&lt;/strong&gt; (not always, but in many use cases). We&#39;re already using InnoDB so this isn&#39;t a new beast; it will be &#34;more of the same&#34;. It would work.&lt;/p&gt;
+&lt;p&gt;I got myself a dedicated machine: a slave in our production topology I am free to play with. I installed TokuDB &lt;strong&gt;7.0.1&lt;/strong&gt;, later upgraded to &lt;strong&gt;7.0.3&lt;/strong&gt;, based on MySQL &lt;strong&gt;5.5.30&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;The machine is a Dell Inc. &lt;strong&gt;PowerEdge R510&lt;/strong&gt; machine, with &lt;b&gt;16&lt;/b&gt; CPUs @ &lt;b&gt;2.1 GHz&lt;/b&gt; and &lt;b&gt;126 GiB&lt;/b&gt; RAM, &lt;b&gt;16 GiB&lt;/b&gt; Swap. OS is CentOS &lt;strong&gt;5.7&lt;/strong&gt;,  kernel &lt;strong&gt;2.6.18&lt;/strong&gt;. We have RAID &lt;strong&gt;10&lt;/strong&gt; over local &lt;strong&gt;10k&lt;/strong&gt; RPM SAS disks (10x&lt;strong&gt;600GB&lt;/strong&gt; disks)&lt;/p&gt;
+&lt;h4&gt;How to compare InnoDB &amp;amp; TokuDB?&lt;/h4&gt;
+&lt;p&gt;&lt;strong&gt;2TB&lt;/strong&gt; of compressed data (for absolute measurement I consider it to be a &lt;strong&gt;4TB&lt;/strong&gt; worth of data) is quite a large setup. How do I do the comparison? I don&#39;t even have too much disk space here...&lt;/p&gt;
+&lt;p&gt;We have tables of various size. Our largest is in itself &lt;strong&gt;1TB&lt;/strong&gt; (&lt;strong&gt;2TB&lt;/strong&gt; uncompressed) - half of the entire volume. The rest ranging &lt;strong&gt;330GB&lt;/strong&gt;, &lt;strong&gt;140GB&lt;/strong&gt;, &lt;strong&gt;120GB&lt;/strong&gt;, &lt;strong&gt;90GB&lt;/strong&gt;, &lt;strong&gt;50GB&lt;/strong&gt; and below. We have &lt;strong&gt;MONTH&lt;/strong&gt;ly partitioning schemes on most tables and obviously on our larger tables.&lt;/p&gt;
+&lt;p&gt;For our smaller tables, we could just &lt;strong&gt;CREATE TABLE test_table LIKE small_table&lt;/strong&gt;, populating it and comparing compression. However, the really interesting question (and perhaps the only interesting question compression-wise) is how well would our larger (and specifically largest) tables would compress.&lt;/p&gt;
+&lt;p&gt;Indeed, for our smaller tables we saw between &lt;strong&gt;20%&lt;/strong&gt; to &lt;strong&gt;70%&lt;/strong&gt; reduction in size when using stronger InnoDB compression: &lt;strong&gt;KEY_BLOCK_SIZE=4/2/1&lt;/strong&gt;. How well would that work on our larger tables? How much slower would it be?&lt;/p&gt;
+&lt;p&gt;We know MySQL partitions are implemented by actual &lt;em&gt;independent&lt;/em&gt; tables. Our testing approach was: let&#39;s build a test_table from a one month worth of data (== one single partition) of our largest table. We tested:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The time it takes to load the entire partition (about &lt;strong&gt;120M&lt;/strong&gt; rows, &lt;strong&gt;100GB COMPRESSED&lt;/strong&gt; data as seen on &lt;strong&gt;.idb&lt;/strong&gt; file)&lt;/li&gt;
+&lt;li&gt;The time it would take to load a single day&#39;s worth of data from Hive/Hadoop (loading real data, as does our nightly import)&lt;/li&gt;
+&lt;li&gt;The time it would take for various important &lt;strong&gt;SELECT&lt;/strong&gt; query to execute on this data.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;InnoDB vs. TokuDB comparison&lt;/h4&gt;
+&lt;p&gt;In this post I will only describe our impressions of compression size. I have a lot to say about TokuDB vs InnoDB partitioning and queries; this will wait till later post.&lt;/p&gt;
+&lt;p&gt;So here goes:&lt;/p&gt;
+&lt;table border=&#34;0&#34; cellspacing=&#34;0&#34;&gt;
+&lt;colgroup width=&#34;85&#34;&gt;&lt;/colgroup&gt;
+&lt;colgroup width=&#34;155&#34;&gt;&lt;/colgroup&gt;
+&lt;colgroup width=&#34;152&#34;&gt;&lt;/colgroup&gt;
+&lt;colgroup width=&#34;147&#34;&gt;&lt;/colgroup&gt;
+&lt;colgroup width=&#34;141&#34;&gt;&lt;/colgroup&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#E6E6E6&#34; height=&#34;31&#34;&gt;&lt;b&gt;Engine&lt;/b&gt;&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#E6E6E6&#34;&gt;&lt;b&gt;Compression&lt;/b&gt;&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#E6E6E6&#34;&gt;&lt;b&gt;Time to Insert 1 month&lt;/b&gt;&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#E6E6E6&#34;&gt;&lt;b&gt;Table size (optimized)&lt;/b&gt;&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#E6E6E6&#34;&gt;&lt;b&gt;Time to import 1 day&lt;/b&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34; height=&#34;17&#34;&gt;InnoDB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;8k&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;&lt;strong&gt;10.5h&lt;/strong&gt;&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;58GB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;&lt;b&gt;32m&lt;/b&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34; height=&#34;17&#34;&gt;InnoDB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;4k&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;48h&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;33GB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;unknown (too long)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34; height=&#34;17&#34;&gt;TokuDB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;quicklz&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;14h&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;17GB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;40m&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34; height=&#34;17&#34;&gt;TokuDB&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;lzma (small/aggresive)&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;15h&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;&lt;b&gt;7.5GB&lt;/b&gt;&lt;/td&gt;
+&lt;td align=&#34;LEFT&#34; bgcolor=&#34;#FFFFCC&#34;&gt;42m&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Some comments and insights:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Each test was performed 3-4 times. There were no significant differences on the various cycles.&lt;/li&gt;
+&lt;li&gt;The &lt;strong&gt;1&lt;/strong&gt; month insert was done courtesy &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;QueryScript split&lt;/a&gt;,  &lt;strong&gt;5,000&lt;/strong&gt; rows at a time, no throttling.&lt;/li&gt;
+&lt;li&gt;The &lt;strong&gt;1&lt;/strong&gt; day import via &lt;em&gt;mysqlimport&lt;/em&gt;. There were multiple files imported. Each file is sorted by &lt;strong&gt;PRIMARY KEY ASC&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Isn&#39;t it nice to know that your &lt;strong&gt;100GB&lt;/strong&gt; InnoDB table actually fits within &lt;strong&gt;58GB&lt;/strong&gt; when rebuilt?&lt;/li&gt;
+&lt;li&gt;For InnoDB &lt;strong&gt;flush_logs_at_trx_commit=2&lt;/strong&gt;, &lt;strong&gt;flush_method=O_DIRECT&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;I used default configuration to TokuDB -- touched nothing. More on this in later post.&lt;/li&gt;
+&lt;li&gt;InnoDB &lt;strong&gt;4k&lt;/strong&gt; was &lt;em&gt;prohibitively&lt;/em&gt; slow to load data. It was so slow so as to be unacceptable. For the 1 day load it took &lt;strong&gt;1&lt;/strong&gt; hour for a mere &lt;strong&gt;20%&lt;/strong&gt; of data to load. &lt;strong&gt;1&lt;/strong&gt; hour was already marginal for our requirements; waiting for &lt;strong&gt;5&lt;/strong&gt; hours was out of the question. I tested several times, never got to wait for completion. Did I say it would just be &#34;more of the same&#34;? &lt;strong&gt;4k&lt;/strong&gt; turned to be &#34;not an option&#34;.&lt;/li&gt;
+&lt;li&gt;I saw almost no difference in load time between the two TokuDB compression formats. Both somewhat (30%) longer than InnoDB to load, but comparable.&lt;/li&gt;
+&lt;li&gt;TokuDB compression: nothing short of &lt;em&gt;amazing&lt;/em&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;With InnoDB &lt;strong&gt;4k&lt;/strong&gt; being &#34;not an option&#34;, and with both TokuDB compressions being similar in load time yet so different in compression size, we are left with the following conclusion: if we want to compress more than our existing 8k (and we have to) - TokuDB&#39;s &lt;em&gt;agressive compression&lt;/em&gt; (aka small, aka lzma) is our only option.&lt;/p&gt;
+&lt;h4&gt;Shameless plug&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt; turned to be quite the &#34;save the day&#34; tool here. Not only did we use it to extract 100GB of data from a large dataset and load it onto our tables, it also helped out in the ALTER process for TokuDB: at this time (&amp;lt;=&lt;strong&gt; 7.0.4&lt;/strong&gt;) TokuDB still has a bug with &lt;strong&gt;KEY_BLOCK_SIZE&lt;/strong&gt;: when this option is found in table definition, it impacts TokuDB&#39;s indexes by bloating them. This is how &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html&#34;&gt;sql_alter_table_tokudb&lt;/a&gt; was born. Hopefully it will be redundant shortly.&lt;/p&gt;
+&lt;h4&gt;More to come&lt;/h4&gt;
+&lt;p&gt;Was our test fair? Should we have configure TokuDB differently? Is loading via small &lt;strong&gt;5,000&lt;/strong&gt; row chunks the right way?&lt;/p&gt;
+&lt;p&gt;In the next post I will describe the process of migrating our 4TB worth of data to TokuDB, pitfalls, issues, party crushers, sport spoilers, configuration, recovery, cool behaviour and general advice you should probably want to embrace. At later stage I&#39;ll describe how our DWH looks after migration. Finally I&#39;ll share some (ongoing) insights on performance.&lt;/p&gt;
+&lt;p&gt;You&#39;ll probably want to know &#34;How much is (non compressed) &lt;strong&gt;4TB&lt;/strong&gt; of data worth in TokuDB?&#34; Let&#39;s keep the suspense :)&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema 2.2: better QueryScript isolation &amp; cleanup; TokuDB; table_rotate, split params</title>
+      <link>/blog/2013/08/13/common_schema-2-2-better-queryscript-isolation-tokudb-table_rotate-split-params/</link>
+      <pubDate>Tue, 13 Aug 2013 05:39:12 +0000</pubDate>
+      
+      <guid>/blog/2013/08/13/common_schema-2-2-better-queryscript-isolation-tokudb-table_rotate-split-params/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;&lt;strong&gt;common_schema 2.2&lt;/strong&gt;&lt;/a&gt; is released. This is shortly after the 2.1 release; it was only meant as bug fixes release but some interesting things came up, leading to new functionality.&lt;/p&gt;
+&lt;p&gt;Highlights of the &lt;strong&gt;2.2&lt;/strong&gt; release:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Better QueryScript isolation &amp;amp; cleanup: isolation improved across replication topology, cleanup done even on error&lt;/li&gt;
+&lt;li&gt;Added &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_views.html&#34;&gt;TokuDB related views&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt; with &#34;index&#34; hint (Ike, this is for you)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_rotate.html&#34;&gt;&lt;strong&gt;table_rotate()&lt;/strong&gt;&lt;/a&gt;: a &lt;em&gt;logrotate&lt;/em&gt;-like mechanism for tables&lt;/li&gt;
+&lt;li&gt;better throw()&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Drill down:&lt;/p&gt;
+&lt;h4&gt;Better QueryScript isolation &amp;amp; cleanup&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;2.1&lt;/strong&gt; introduced persistent tables for QueryScript. This also introduced the problem of isolating concurrent scripts, all reading from and writing to shared tables. In &lt;strong&gt;2.1&lt;/strong&gt; isolation was based on session id. However although unique per machine, collisions were possible across replication topology: a script could be issued on master, another on slave (I have such use cases) and both use same (local) session id.&lt;/p&gt;
+&lt;p&gt;With 2.2 isolation is based on server_id &amp;amp; session id combination; this is unique across a replication topology.&lt;/p&gt;
+&lt;p&gt;Until &lt;strong&gt;2.1&lt;/strong&gt;, QueryScript used temporary tables. This meant any error would just break the script, and the tables were left (isolated as they were, and auto-destroyed in time). With persistent tables a script throwing an error meant legacy code piling up. With &lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;2.2&lt;/strong&gt; and on MySQL &amp;gt;= &lt;strong&gt;5.5&lt;/strong&gt; all exceptions are caught, cleanup is made, leaving exceptions to be &lt;strong&gt;RESIGNAL&lt;/strong&gt;led.&lt;/p&gt;
+&lt;h4&gt;TokuDB views&lt;/h4&gt;
+&lt;p&gt;A couple TokuDB related views help out in converting to TokuDB and in figuring out tables status on disk:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html&#34;&gt;&lt;strong&gt;sql_alter_table_tokudb&lt;/strong&gt;&lt;/a&gt; will help you out to generate the complex ALTER statement to TokuDB engine if you happen to used COMPRESSED InnoDB tables with KEY_BLOCK_SIZE specified. The view generates a complex DROP KEYs &amp;amp; ADD KEYs statementl this is due to bug ...&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_file_map.html&#34;&gt;&lt;strong&gt;tokudb_file_map&lt;/strong&gt;&lt;/a&gt; simplifies the &lt;strong&gt;INFORMATION_SCHEMA.Tokudb_file_map&lt;/strong&gt; table: the original view is not normalized and is difficult to interpret and follow when your table had many indexes or is partitioned (I will write more on this shortly). with &lt;em&gt;common_schema&lt;/em&gt;&#39;s &lt;strong&gt;tokudb_file_map&lt;/strong&gt; you get, per table, the list of files representing that table, along with a couple Shell commands to tell you &lt;em&gt;the thing you want to know most&lt;/em&gt;: &#34;what is the size of my TokuDB table on disk?&#34;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;split&lt;/h4&gt;
+&lt;p&gt;QueryScript&#39;s &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt; device now supports the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters&#34;&gt;&#34;&lt;strong&gt;index&lt;/strong&gt;&#34; parameter&lt;/a&gt; (or &lt;em&gt;hint&lt;/em&gt;), which instructs the split() operation to use an explicitly named index. If used, the index must exist and must be UNIQUE.&lt;/p&gt;
+&lt;h4&gt;table_rotate()&lt;/h4&gt;
+&lt;p&gt;Rotate your tables a-la logrotate with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_rotate.html&#34;&gt;&lt;strong&gt;table_rotate()&lt;/strong&gt;&lt;/a&gt;: generate a new, identical, empty table, version your table, pushing older versions along the line; optionally drop older versions. You get the picture. Got some nice use case behind this on cleaning up a test database.&lt;/p&gt;
+&lt;h4&gt;throw()&lt;/h4&gt;
+&lt;p&gt;On MySQL &amp;gt;= &lt;strong&gt;5.5&lt;/strong&gt; &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/throw.html&#34;&gt;&lt;strong&gt;throw()&lt;/strong&gt;&lt;/a&gt; uses SIGNAL. No more weird &lt;em&gt;&#34;table `Unknown column &#39;$t&#39; in &#39;field list&#39;` does not exist&#34;&lt;/em&gt; messages. Just plain old:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;ERROR 1054 (42S22): Unknown column &#39;$t&#39; in &#39;field list&#39;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Get it&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is free and open source. It is licensed under GPL v2. This is where you can &lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;find and download latest common_schema release&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Your input is welcome! Please submit your bugs, or otherwise share your experience with &lt;em&gt;common_schema&lt;/em&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema roadmap thoughts</title>
+      <link>/blog/2013/07/22/common_schema-roadmap-thoughts/</link>
+      <pubDate>Mon, 22 Jul 2013 14:36:08 +0000</pubDate>
+      
+      <guid>/blog/2013/07/22/common_schema-roadmap-thoughts/</guid>
+      <description>&lt;p&gt;I&#39;m happy with &lt;strong&gt;&lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt;&lt;/strong&gt;; it is in fact a tool I use myself on an almost daily basis. I&#39;m also happy to see that it gains traction; which is why I&#39;m exposing a little bit of my thoughts on general future development. I&#39;d love to get feedback.&lt;/p&gt;
+&lt;h4&gt;Supported versions&lt;/h4&gt;
+&lt;p&gt;At this moment, &lt;em&gt;common_schema&lt;/em&gt; supports MySQL &amp;gt;= &lt;strong&gt;5.1&lt;/strong&gt;, all variants. This includes &lt;strong&gt;5.5&lt;/strong&gt;, &lt;strong&gt;5.6&lt;/strong&gt;, MySQL, Percona Server &amp;amp; MariaDB.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;5.1&lt;/strong&gt; is today past end of line, and I&#39;m really missing the &lt;strong&gt;SIGNAL&lt;/strong&gt;/&lt;strong&gt;RESIGNAL&lt;/strong&gt; syntax that I would like to use; I can do in the meanwhile with version-specific code such as &lt;strong&gt;/*!50500 ... */&lt;/strong&gt;. Nevertheless, I&#39;m wondering whether I will eventually have to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Support different branches of &lt;em&gt;common_schema&lt;/em&gt; (one that supports &lt;strong&gt;5.1&lt;/strong&gt;, one that supports &amp;gt;= &lt;strong&gt;5.5&lt;/strong&gt;)&lt;/li&gt;
+&lt;li&gt;Stop support for &lt;strong&gt;5.1&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Of course community-wise, the former is preferred; but I have limited resources, so I would like to make a quick poll here:&lt;/p&gt;
+&lt;p&gt;[poll id=&#34;3&#34;]&lt;/p&gt;
+&lt;p&gt;I&#39;ll use the poll&#39;s results as a &lt;em&gt;vague idea of what people use and want&lt;/em&gt;. Or please use comments below to sound your voice!&lt;/p&gt;
+&lt;h4&gt;rdebug&lt;/h4&gt;
+&lt;p&gt;This was a crazy jump at providing a &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html&#34;&gt;stored routine debugger and debugging API&lt;/a&gt;. From some talk I made I don&#39;t see this getting traction. For the time being, I don&#39;t see that I will concentrate my efforts on this. Actually it is almost complete. You can step-into, step-out, step-over, set breakpoints, read variables, modify variables -- it&#39;s pretty cool.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;But someone will eventually have to write a GUI front-end for this (eclipse/IntelliJ/whatever); I know not many will use a command line approach for a debugger. I also know I&#39;m not going to write the GUI front-end. So the API is there, let&#39;s see how it rolls.&lt;/p&gt;
+&lt;h4&gt;QueryScript&lt;/h4&gt;
+&lt;p&gt;I will keep on improving &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;&lt;strong&gt;QueryScript&lt;/strong&gt;&lt;/a&gt;, and in particular split, error handling, and otherwise simplification of common tasks. I have no doubt QueryScript goes the right way: I just see how easy it is to solve complex problems with a QueryScript one-liner. Other bullets on my TODO for QueryScript:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Script tracking (a semi-debugging mechanism, which allows one to recognize status of script)&lt;/li&gt;
+&lt;li&gt;Message passing to scripts (again, a semi-debugger approach)&lt;/li&gt;
+&lt;li&gt;Error recovery; ability to resume script from point of failure or point of suspension. I have plenty use cases for that.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;performance_schema&lt;/h4&gt;
+&lt;p&gt;I will most probably include parts of Mark Leith&#39;s &lt;a href=&#34;http://www.markleith.co.uk/ps_helper/&#34;&gt;&lt;strong&gt;ps_helper&lt;/strong&gt;&lt;/a&gt;, which is released under &lt;a href=&#34;http://www.wtfpl.net/&#34;&gt;a permissive license&lt;/a&gt;, and otherwise draw ideas from his work. I&#39;m happy to learn parts of &lt;em&gt;ps_helper&lt;/em&gt; were influenced by &lt;em&gt;common_schema&lt;/em&gt; itself.&lt;/p&gt;
+&lt;h4&gt;Hosting&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; will most probably move out of Google Code; by Jan 2014 there will no longer be a &#34;Downloads&#34; section, and I really, &lt;em&gt;really&lt;/em&gt;, want there to be a &lt;em&gt;&#34;Downloads&#34;&lt;/em&gt; section.&lt;/p&gt;
+&lt;p&gt;I could go LaunchPad, GitHub, BitBucket (they don&#39;t have &lt;em&gt;&#34;Downloads&#34;&lt;/em&gt; sections, either, do they?), other; any advice?&lt;/p&gt;
+&lt;h4&gt;World domination&lt;/h4&gt;
+&lt;p&gt;Yep. This is still &lt;em&gt;common_schema&lt;/em&gt;&#39;s goal. More seriously, I would want to see it installed on every single MySQL server instance. Then I would control your fate. bwahahaha!&lt;/p&gt;
+&lt;p&gt;Even more seriously, if you are a happy user, please do pass the word. I can only blog so much and present so much; there are no financing resources for this project, and I need all the help I can get in promoting &lt;em&gt;common_schema&lt;/em&gt;. Thank you!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema 2.1 released: advanced &amp; improved split(), persistent script tables, more schema analysis, and (ahem) charts!</title>
+      <link>/blog/2013/07/17/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts/</link>
+      <pubDate>Wed, 17 Jul 2013 20:57:06 +0000</pubDate>
+      
+      <guid>/blog/2013/07/17/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;&lt;strong&gt;common_schema 2.1&lt;/strong&gt;&lt;/a&gt; is released! &lt;em&gt;common_schema&lt;/em&gt; is your free &amp;amp; open source companion schema within your MySQL server, providing with a function library, scripting capabilities, powerful routines and ready-to-apply information and recommendations.&lt;/p&gt;
+&lt;p&gt;New and noteworthy in version &lt;strong&gt;2.1&lt;/strong&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Better &lt;em&gt;QueryScript&#39;&lt;/em&gt;s &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split()&lt;/strong&gt;&lt;/a&gt; functionality&lt;/li&gt;
+&lt;li&gt;Persistent tables for QueryScript: no long held temporary tables&lt;/li&gt;
+&lt;li&gt;Index creation analysis, further range partition analysis&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/grant_access.html&#34;&gt;&lt;strong&gt;grant_access()&lt;/strong&gt;&lt;/a&gt;: allow everyone to use &lt;em&gt;common_schema&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;Ascii charts, google charts&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;debugged_routines&lt;/strong&gt;: show routines with debug code&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Other minor enhancements and bugfixes not listed.&lt;/p&gt;
+&lt;p&gt;Here&#39;s a breakdown of the above:&lt;/p&gt;
+&lt;h4&gt;split() enhancements&lt;/h4&gt;
+&lt;p&gt;&lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;split&lt;/a&gt;&lt;/strong&gt; is one of those parts of &lt;em&gt;common_schema&lt;/em&gt; that (should) appeal to every DBA. Break a huge transaction automagically into smaller chunks, and don&#39;t worry about how it&#39;s done. If you like, throttle execution, or print progress, or...&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; enhancements include:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;A much better auto-detection-and-selection of the chunking index. &lt;em&gt;split&lt;/em&gt; now consults all columns covered by the index, and uses realistic heuristics to decide which &lt;strong&gt;UNIQUE KEY&lt;/strong&gt; on your table is best for the chunking process. A couple bugs are solved on the way; &lt;em&gt;split&lt;/em&gt; is much smarter now.&lt;/li&gt;
+&lt;li&gt;Better support for multi-column chunking keys. You may now utilize the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters&#34;&gt;&lt;strong&gt;start&lt;/strong&gt;/&lt;strong&gt;stop&lt;/strong&gt; parameters&lt;/a&gt; even on multi column keys, passing a comma delimited of values for the &lt;em&gt;split&lt;/em&gt; operation to start/end with, respectively. Also fixed issue for nonexistent &lt;strong&gt;start/stop&lt;/strong&gt; values, which are now valid: &lt;em&gt;split&lt;/em&gt; will just keep to the given range.&lt;/li&gt;
+&lt;li&gt;split no longer requires a temporary table open through the duration of its operation. See next section.&lt;!--more--&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Persistent script tables&lt;/h4&gt;
+&lt;p&gt;QueryScript used to use several temporary tables for its operation. Thus, a script could hold open two or three temporary tables for the entire execution duration. For long &lt;em&gt;split&lt;/em&gt; operations, for example, this could mean hours and days.&lt;/p&gt;
+&lt;p&gt;Temporary tables are nice and quick to respond (well, MyISAM tables are, until MySQL &lt;strong&gt;5.7&lt;/strong&gt; is out), but make for an inherent problem: stopped slaves must not shut down nor restart when replication has an open temporary table. Why? Well, because the slave forgets about the temporary tables. When it resumes operation, it will not recognize DML issued against those tables it has forgotten. That&#39;s why &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-prepare-shutdown.html&#34;&gt;oak-prepare-shutdown&lt;/a&gt; is so good for slaves.&lt;/p&gt;
+&lt;p&gt;When temporary tables are short-lived, this is typically not an issue. But if you are not allowed to restart your slave throughout a 24 hour operation, that&#39;s a limitation.&lt;/p&gt;
+&lt;p&gt;As of &lt;strong&gt;2.1&lt;/strong&gt;, QueryScript does not require long held temporary tables. In fact, typical scripts do not create &lt;em&gt;any&lt;/em&gt; temporary tables. A &lt;em&gt;split&lt;/em&gt; operation creates and immediately drops a series of temporary tables. These are dropped even before actual &lt;em&gt;split&lt;/em&gt; operation begins. All tables operated on are persistent &lt;strong&gt;InnoDB&lt;/strong&gt; tables.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Result&lt;/em&gt;: safer script replication. There&#39;s another nice side effect I may take advantage of in a later release: ability to monitor and control flow of concurrent scripts.&lt;/p&gt;
+&lt;h4&gt;Schema analysis&lt;/h4&gt;
+&lt;p&gt;Two noteworthy additions to schema analysis views:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table.html&#34;&gt;&lt;strong&gt;sql_alter_table&lt;/strong&gt;&lt;/a&gt; now includes the &lt;strong&gt;sql_drop_keys&lt;/strong&gt; &amp;amp; &lt;strong&gt;sql_add_keys&lt;/strong&gt; columns. For each table, you get the SQL statements to create and drop the existing indexes. I developed this when I hit &lt;a href=&#34;https://groups.google.com/d/msg/tokudb-user/hLlHwlp2AL0/nvNlUCzhxAwJ&#34;&gt;this problem&lt;/a&gt; with TokuDB.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_range_partitions.html&#34;&gt;&lt;strong&gt;sql_range_partitions&lt;/strong&gt;&lt;/a&gt; now includes the &lt;strong&gt;count_past_partitions&lt;/strong&gt; &amp;amp; &lt;strong&gt;count_future_partitions&lt;/strong&gt;; when your table is partitioned by some type of time range, these views tell you how many partitions are in the past, and how many are to be written to in the future. This turns useful when you want to rotate or otherwise set a retention policy for your range partitions.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;grant_access()&lt;/h4&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/grant_access.html&#34;&gt;&lt;strong&gt;grant_access()&lt;/strong&gt;&lt;/a&gt; routine &lt;strong&gt;GRANT&lt;/strong&gt;s all accounts on your server with &lt;strong&gt;SELECT&lt;/strong&gt; &amp;amp; &lt;strong&gt;EXECUTE&lt;/strong&gt; privileges on &lt;em&gt;common_schema&lt;/em&gt;. This is a quick complementary to the installation process (though you have to invoke it yourself; it&#39;s up to you).&lt;/p&gt;
+&lt;h4&gt;Ascii/google line charts&lt;/h4&gt;
+&lt;p&gt;Laugh all you want! And find how cool it is to get (poor man&#39;s) instant charting like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;line_chart&lt;/strong&gt;(&#39;select ts, com_insert_psec, com_update_psec from mycheckpoint.sv_hour limit 100&#39;, &#39;insert per second, update per second&#39;) ;
++---------+------------------------------------------------------------------------------------------------------+
+| y_scale | chart                                                                                                |
++---------+------------------------------------------------------------------------------------------------------+
+| 162     | -#-------------------------------------------------------------------------------------------------- |
+| 152     | ---------------------------------------------------------------------------------------------------- |
+| 143     | ---------------------------------------------------------------------------------------------------- |
+| 134     | ---------------------------------------------------------------------------------------------------- |
+| 124     | ---------------------------------------------------------------------------------------------------- |
+| 115     | ------------------------------------------------------------#--------------------------------------- |
+| 106     | ---------------------------------------------------------------------------------------------------- |
+| 96      | -*-------------------------------------------------------------------------------------------------- |
+| 87      | ---------------------------------#-------------------------#---------------------------------------- |
+| 77      | ---------------------------------------------------------------------------------#------------------ |
+| 68      | ---------------------------------------------------------------------------#------------------------ |
+| 59      | #-------------------------------#------------------------------------------------------------------- |
+| 49      | ---##------#-#-##-#-#--#--###----------------##---------------------------------#-----#---###------- |
+| 40      | --#------#--#-#--#-#-##-##----##--###########--######--------#############-*#-##--####-###---####### |
+| 31      | *-**--#-#-*-**-**------**--**#-****-**-*****-*******-#---#-*------------**---#--*------------------- |
+| 21      | ----*#*#*--*--*--******--**--**----*--*-----*-------**#*#**-************--#-****-******************* |
+| 12      | -----*-*-*--------------------------------------------*-*-----------------*------------------------- |
+|         | v::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::v |
+|         | 2010-10-06 20:00:00                                                              2010-10-10 23:00:00 |
+|         |     # insert per second                                                                              |
+|         |     * update per second                                                                              |
++---------+------------------------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;You can get the same in &lt;a href=&#34;https://developers.google.com/chart/image/&#34;&gt;Google Image Charts&lt;/a&gt; format. Yes, it&#39;s deprecated (and has been for a year -- it&#39;s still working)&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;google_line_chart&lt;/strong&gt;(&#39;select ts, com_insert_psec, com_update_psec from mycheckpoint.sv_hour limit 100&#39;, &#39;insert per second, update per second&#39;) \G
+
+google_chart_url: &lt;a href=&#34;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06%2020:00:00||||||||||||||||||||||||2010-10-07%2020:00:00|||||||||||||||||||||||||2010-10-08%2021:00:00|||||||||||||||||||||||||2010-10-09%2022:00:00|||||||||||||||||||||||||2010-10-10%2023:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert%20per%20second|update%20per%20second&amp;amp;chdlp=b&#34;&gt;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06%2020:00:00||||||||||||||||||||||||2010-10-07%2020:00:00|||||||||||||||||||||||||2010-10-08%2021:00:00|||||||||||||||||||||||||2010-10-09%2022:00:00|||||||||||||||||||||||||2010-10-10%2023:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert%20per%20second|update%20per%20second&amp;amp;chdlp=b&lt;/a&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above translates into the following image:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06 20:00:00||||||||||||||||||||||||2010-10-07 20:00:00|||||||||||||||||||||||||2010-10-08 21:00:00|||||||||||||||||||||||||2010-10-09 22:00:00|||||||||||||||||||||||||2010-10-10 23:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert per second|update per second&amp;amp;chdlp=b&#34;&gt;&lt;img class=&#34;aligncenter&#34; alt=&#34;&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=800x350&amp;amp;chtt=SQL+chart+by+common_schema&amp;amp;chxt=x,y&amp;amp;chxr=1,11.9,161.7&amp;amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chxl=0:|2010-10-06 20:00:00||||||||||||||||||||||||2010-10-07 20:00:00|||||||||||||||||||||||||2010-10-08 21:00:00|||||||||||||||||||||||||2010-10-09 22:00:00|||||||||||||||||||||||||2010-10-10 23:00:00&amp;amp;chg=1.010101010,25,1,2,0,0&amp;amp;chco=ff8c00,4682b4&amp;amp;chdl=insert per second|update per second&amp;amp;chdlp=b&#34; width=&#34;800&#34; height=&#34;350&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;Throw you own query in. Make &lt;strong&gt;1st&lt;/strong&gt; column your ordering column, &lt;strong&gt;2nd&lt;/strong&gt; [, &lt;strong&gt;3rd&lt;/strong&gt;...] value columns. Provide your own legend. Watch it instantly. And laugh all you want.&lt;/p&gt;
+&lt;p&gt;Read more about &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/charting_routines.html&#34;&gt;common_schema&#39;s charting routines&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;debugged_routines&lt;/h4&gt;
+&lt;p&gt;The new &lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/debugged_routines.html&#34;&gt;debugged_routines&lt;/a&gt;&lt;/strong&gt; view shows you which routines are currently &#34;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug_compile_routine.html&#34;&gt;compiled with debug mode&lt;/a&gt;&#34;.&lt;/p&gt;
+&lt;p&gt;I will write more on the state of &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html&#34;&gt;&lt;strong&gt;rdebug&lt;/strong&gt;&lt;/a&gt; in a future post.&lt;/p&gt;
+&lt;h4&gt;Try it, get it&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;2.1&lt;/strong&gt; comes with over &lt;strong&gt;500&lt;/strong&gt; tests and fast growing.&lt;/li&gt;
+&lt;li&gt;It supports MySQL &lt;strong&gt;5.1&lt;/strong&gt;, &lt;strong&gt;5.5&lt;/strong&gt;, &lt;strong&gt;5.6&lt;/strong&gt;, Percona Server and MariaDB.&lt;/li&gt;
+&lt;li&gt;It has superb documentation (may I say so?) with a lot of examples &amp;amp; drill down into edge cases.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You are &lt;strong&gt;&lt;a href=&#34;https://code.google.com/p/common-schema/&#34;&gt;free to download&lt;/a&gt;&lt;/strong&gt; and use it.&lt;/p&gt;
+&lt;p&gt;Your feedback is welcome! Indeed, many of this version&#39;s improvements originated with community feedback.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>opeark-kit revision 196 released</title>
+      <link>/blog/2013/05/07/opeark-kit-revision-196-released/</link>
+      <pubDate>Tue, 07 May 2013 07:47:22 +0000</pubDate>
+      
+      <guid>/blog/2013/05/07/opeark-kit-revision-196-released/</guid>
+      <description>&lt;p&gt;This is a long due maintenance release of &lt;a href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;&lt;strong&gt;openark-kit&lt;/strong&gt;.&lt;/a&gt; This release includes bugfixes and some enhancements, mainly to &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html&#34;&gt;oak-online-alter-table&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;oak-online-alter-table&lt;/em&gt; Changes / bug fixes include:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Support for keyword-named columns&lt;/li&gt;
+&lt;li&gt;Use of FORCE INDEX due to lack of MySQL&#39;s ability for figure out the chunking key at all times&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;--sleep-ratio&lt;/strong&gt; option added; allows for sleep time proportional to execution time (as opposed to constant sleep time with &lt;strong&gt;--sleep&lt;/strong&gt;)&lt;/li&gt;
+&lt;li&gt;Support for chunk-retry (in case of deadlock) via &lt;strong&gt;--max-lock-retries&lt;/strong&gt;)&lt;/li&gt;
+&lt;li&gt;Fixed order of cleanup&lt;/li&gt;
+&lt;li&gt;Fixed bug with verbose messages with non-integer chunking key&lt;/li&gt;
+&lt;li&gt;Fixed bug with single-row tables (people, no need for this tool for single row tables :))&lt;/li&gt;
+&lt;li&gt;Friendly verbose messages to remind you what&#39;s being executed&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;oak-chunk-update&lt;/em&gt; changes includes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Verbosing query comment if exists (friendly printing of what&#39;s being executed)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;(Do check out &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;QueryScript&#39;s split()&lt;/a&gt;; it&#39;s a simple, server side solution which works almost same way as &lt;em&gt;oak-chunk-update&lt;/em&gt;)&lt;/p&gt;
+&lt;p&gt;More issues and changes not listed here.&lt;/p&gt;
+&lt;h4&gt;Download&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;openark-kit&lt;/em&gt; is released under the new BSD license, and is freely available.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;Download latest openark-kit revision (#196)&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Browse &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html&#34;&gt;openark-kit documentation&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema: 1.3: security goodies, parameterized split(), json-to-xml, query checksum</title>
+      <link>/blog/2013/01/14/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum/</link>
+      <pubDate>Mon, 14 Jan 2013 08:25:07 +0000</pubDate>
+      
+      <guid>/blog/2013/01/14/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum/</guid>
+      <description>&lt;p&gt;common_schema &lt;strong&gt;1.3&lt;/strong&gt; is released and is &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;available for download&lt;/a&gt;. New and noteworthy in this version:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Parameterized &lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;split()&lt;/a&gt;&lt;/strong&gt;: take further control over huge transactions by breaking them down into smaller chunks, now manually tunable if needed&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html&#34;&gt;&lt;strong&gt;duplicate_grantee()&lt;/strong&gt;&lt;/a&gt;: copy+paste existing accounts along with their full set of privileges&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html&#34;&gt;&lt;strong&gt;similar_grants&lt;/strong&gt;&lt;/a&gt;: find which accounts share the exact same set of privileges (i.e. have the same &lt;em&gt;role&lt;/em&gt;)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/json_to_xml.html&#34;&gt;&lt;strong&gt;json_to_xml()&lt;/strong&gt;&lt;/a&gt;: translate any valid JSON object into its equivalent XML form&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/extract_json_value.html&#34;&gt;&lt;strong&gt;extract_json_value()&lt;/strong&gt;&lt;/a&gt;: use XPath notation to extract info from JSON data, just as you would from XML&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_checksum.html&#34;&gt;&lt;strong&gt;query_checksum()&lt;/strong&gt;&lt;/a&gt;: given a query, calculate a checksum on the result set&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/random_hash.html&#34;&gt;&lt;strong&gt;random_hash()&lt;/strong&gt;&lt;/a&gt;: get a 40 hexadecimal digits random hash, using a reasonably large changing input&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let&#39;s take a closer look at the above:&lt;/p&gt;
+&lt;h4&gt;Parameterized split()&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt; takes your bulk query and automagically breaks it down into smaller pieces. So instead of one huge &lt;strong&gt;UPDATE&lt;/strong&gt; or &lt;strong&gt;DELETE&lt;/strong&gt; or &lt;strong&gt;INSERT..SELECT&lt;/strong&gt; transaction, you get many smaller transactions, each with smaller impact on I/O, locks, CPU.&lt;/p&gt;
+&lt;p&gt;As of &lt;strong&gt;1.3&lt;/strong&gt;, &lt;em&gt;split()&lt;/em&gt; gets more exposed: you can have some control on its execution, and you also get a lot of very interesting info during operation.&lt;/p&gt;
+&lt;p&gt;Here&#39;s an example of &lt;em&gt;split()&lt;/em&gt; control:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;set @script := &#34;
+  &lt;strong&gt;split&lt;/strong&gt;({&lt;em&gt;start&lt;/em&gt;:7015, &lt;em&gt;step&lt;/em&gt;:2000} : &lt;span style=&#34;color: #3366ff;&#34;&gt;UPDATE sakila.rental SET return_date = return_date + INTERVAL 1 DAY&lt;/span&gt;) 
+    &lt;strong&gt;throttle&lt;/strong&gt; 1;
+&#34;;
+call common_schema.run(@script);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;In the above we choose a split size of 2,000 rows at a time; but we also choose to only start with &lt;strong&gt;7015&lt;/strong&gt;, skipping all rows prior to that value. Just what is that value? It depends on the splitting key (and see next example for just that); but in this table we can safely assume this is the &lt;strong&gt;rental_id&lt;/strong&gt; &lt;strong&gt;PRIMARY KEY&lt;/strong&gt; of the table.&lt;/p&gt;
+&lt;p&gt;You don&#39;t &lt;em&gt;have to&lt;/em&gt; use these control &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters&#34;&gt;parameters&lt;/a&gt;. But they can save you some time and effort.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;And, look at some interesting info about the &lt;em&gt;splitting&lt;/em&gt; process:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;set @script := &#34;
+  &lt;strong&gt;split&lt;/strong&gt;(&lt;span style=&#34;color: #339966;&#34;&gt;sakila.film_actor&lt;/span&gt;) 
+    &lt;span style=&#34;color: #3366ff;&#34;&gt;&lt;strong&gt;select&lt;/strong&gt;&lt;/span&gt; $split_columns &lt;span style=&#34;color: #3366ff;&#34;&gt;as columns&lt;/span&gt;, $split_range_start &lt;span style=&#34;color: #3366ff;&#34;&gt;as range_start&lt;/span&gt;, $split_range_end &lt;span style=&#34;color: #3366ff;&#34;&gt;as range_end&lt;/span&gt;
+&#34;;
+call common_schema.run(@script);
++----------------------+-------------+------------+
+| columns              | range_start | range_end  |
++----------------------+-------------+------------+
+| `actor_id`,`film_id` | &#39;1&#39;,&#39;1&#39;     | &#39;39&#39;,&#39;293&#39; |
++----------------------+-------------+------------+
+
++----------------------+-------------+------------+
+| columns              | range_start | range_end  |
++----------------------+-------------+------------+
+| `actor_id`,`film_id` | &#39;39&#39;,&#39;293&#39;  | &#39;76&#39;,&#39;234&#39; |
++----------------------+-------------+------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | &#39;76&#39;,&#39;234&#39;  | &#39;110&#39;,&#39;513&#39; |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | &#39;110&#39;,&#39;513&#39; | &#39;146&#39;,&#39;278&#39; |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | &#39;146&#39;,&#39;278&#39; | &#39;183&#39;,&#39;862&#39; |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | &#39;183&#39;,&#39;862&#39; | &#39;200&#39;,&#39;993&#39; |
++----------------------+-------------+-------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;In the above you get to be told exactly how table splitting occurs: you are being told what columns are used to split the table, and what range of values is used in each step. There&#39;s more to it: read the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;split() documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;similar_grants&lt;/h4&gt;
+&lt;p&gt;Out of your &lt;strong&gt;100&lt;/strong&gt; different grants, which ones share the exact same set of privileges? MySQL has non notion of &lt;em&gt;roles&lt;/em&gt;, but that doesn&#39;t mean the notion does not exist. Multiple accounts share the same restrictions and privileges. Use &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html&#34;&gt;&lt;strong&gt;similar_grants&lt;/strong&gt;&lt;/a&gt; to find out which. You might just realize there&#39;s a few redundant accounts in your system.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM similar_grants;
++-------------------------------+----------------+-------------------------------------------------------+
+| sample_grantee                | count_grantees | similar_grantees                                      |
++-------------------------------+----------------+-------------------------------------------------------+
+| &#39;root&#39;@&#39;127.0.0.1&#39;            |              3 | &lt;span style=&#34;color: #3366ff;&#34;&gt;&#39;root&#39;@&#39;127.0.0.1&#39;&lt;/span&gt;,&lt;span style=&#34;color: #0000ff;&#34;&gt;&#39;root&#39;@&#39;myhost&#39;&lt;/span&gt;,&lt;span style=&#34;color: #333399;&#34;&gt;&#39;root&#39;@&#39;localhost&#39;&lt;/span&gt; |
+| &#39;repl&#39;@&#39;10.%&#39;                 |              2 | &lt;span style=&#34;color: #008000;&#34;&gt;&#39;repl&#39;@&#39;10.%&#39;&lt;/span&gt;,&lt;span style=&#34;color: #808000;&#34;&gt;&#39;replication&#39;@&#39;10.0.0.%&#39;&lt;/span&gt;                |
+| &#39;apps&#39;@&#39;%&#39;                    |              1 | &#39;apps&#39;@&#39;%&#39;                                            |
+| &#39;gromit&#39;@&#39;localhost&#39;          |              1 | &#39;gromit&#39;@&#39;localhost&#39;                                  |
+| &#39;monitoring_user&#39;@&#39;localhost&#39; |              1 | &#39;monitoring_user&#39;@&#39;localhost&#39;                         |
++-------------------------------+----------------+-------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;duplicate_grantee()&lt;/h4&gt;
+&lt;p&gt;Provide an existing account, and name your new, exact duplicate account. The complete set of privileges is copied, and so is the password. &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html&#34;&gt;&lt;strong&gt;duplicate_grantee()&lt;/strong&gt;&lt;/a&gt; is your Copy+Paste of MySQL accounts.&lt;/p&gt;
+&lt;p&gt;Let&#39;s begin with some pre-existing account and see how it duplicates:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; show grants for &lt;span style=&#34;color: #000080;&#34;&gt;&#39;world_user&#39;@&#39;localhost&#39;&lt;/span&gt;;
++------------------------------------------------------------------------------------------------------------------------+
+| Grants for world_user@localhost                                                                                        |
++------------------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO &#39;world_user&#39;@&#39;localhost&#39; IDENTIFIED BY PASSWORD &#39;*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9&#39;      |
+| GRANT ALL PRIVILEGES ON `world`.* TO &#39;world_user&#39;@&#39;localhost&#39;                                                          |
+| GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `sakila`.`get_customer_balance` TO &#39;world_user&#39;@&#39;localhost&#39; WITH GRANT OPTION |
++------------------------------------------------------------------------------------------------------------------------+
+
+mysql&amp;gt; call &lt;strong&gt;duplicate_grantee&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#39;world_user@localhost&#39;&lt;/span&gt;, &lt;span style=&#34;color: #000080;&#34;&gt;&#39;copied_user@10.0.0.%&#39;&lt;/span&gt;);
+Query OK, 0 rows affected (0.06 sec)
+
+mysql&amp;gt; show grants for &lt;span style=&#34;color: #000080;&#34;&gt;&#39;copied_user&#39;@&#39;10.0.0.%&#39;&lt;/span&gt;;
++------------------------------------------------------------------------------------------------------------------------+
+| Grants for copied_user@10.0.0.%                                                                                        |
++------------------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO &#39;copied_user&#39;@&#39;10.0.0.%&#39; IDENTIFIED BY PASSWORD &#39;*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9&#39;      |
+| GRANT ALL PRIVILEGES ON `world`.* TO &#39;copied_user&#39;@&#39;10.0.0.%&#39;                                                          |
+| GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `sakila`.`get_customer_balance` TO &#39;copied_user&#39;@&#39;10.0.0.%&#39; WITH GRANT OPTION |
++------------------------------------------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The routine is quite relaxed in grantee format. &lt;strong&gt;copied_user@10.0.0.%&lt;/strong&gt;, &lt;strong&gt;copied_user@&#39;10.0.0.%&#39;&lt;/strong&gt; and &lt;strong&gt;&#39;copied_user&#39;@&#39;10.0.0.%&#39;&lt;/strong&gt; are all just fine, and represent the same account. Saves trouble with all that quoting.&lt;/p&gt;
+&lt;h4&gt;json_to_xml()&lt;/h4&gt;
+&lt;p&gt;JSON is becoming increasingly popular in storing dynamically-structured data. XML&#39;s tags overhead and its human unfriendliness make it less popular today. However, the two share similar concepts, and conversion between the two is possible. &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/json_to_xml.html&#34;&gt;&lt;strong&gt;json_to_xml()&lt;/strong&gt;&lt;/a&gt; will translate your valid JSON data into its equivalent XML format. The rules are simple (all-nodes-and-data, no attributes, arrays as repeating nodes, objects as subnodes) and the results are valid XML objects.&lt;/p&gt;
+&lt;p&gt;Sample data taken from &lt;a href=&#34;http://json.org/example.html&#34;&gt;json.org&lt;/a&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SET @json := &#39;
+&lt;span style=&#34;color: #000080;&#34;&gt;{
+  &#34;menu&#34;: {
+    &#34;id&#34;: &#34;file&#34;,
+    &#34;value&#34;: &#34;File&#34;,
+    &#34;popup&#34;: {
+      &#34;menuitem&#34;: [
+        {&#34;value&#34;: &#34;New&#34;, &#34;onclick&#34;: &#34;CreateNewDoc()&#34;},
+        {&#34;value&#34;: &#34;Open&#34;, &#34;onclick&#34;: &#34;OpenDoc()&#34;},
+        {&#34;value&#34;: &#34;Close&#34;, &#34;onclick&#34;: &#34;CloseDoc()&#34;}
+      ]
+    }
+  }
+}&lt;/span&gt;
+&#39;;
+
+mysql&amp;gt; SELECT &lt;strong&gt;json_to_xml(@json)&lt;/strong&gt; AS &lt;strong&gt;xml&lt;/strong&gt; \G
+*************************** 1. row ***************************
+&lt;strong&gt;xml:&lt;/strong&gt; &amp;lt;menu&amp;gt;&amp;lt;id&amp;gt;file&amp;lt;/id&amp;gt;&amp;lt;value&amp;gt;File&amp;lt;/value&amp;gt;&amp;lt;popup&amp;gt;&amp;lt;menuitem&amp;gt;&amp;lt;value&amp;gt;New&amp;lt;/value&amp;gt;&amp;lt;onclick&amp;gt;CreateNewDoc()&amp;lt;/onclick&amp;gt;&amp;lt;/menuitem&amp;gt;&amp;lt;menuitem&amp;gt;&amp;lt;value&amp;gt;Open&amp;lt;/value&amp;gt;&amp;lt;onclick&amp;gt;OpenDoc()&amp;lt;/onclick&amp;gt;&amp;lt;/menuitem&amp;gt;&amp;lt;menuitem&amp;gt;&amp;lt;value&amp;gt;Close&amp;lt;/value&amp;gt;&amp;lt;onclick&amp;gt;CloseDoc()&amp;lt;/onclick&amp;gt;&amp;lt;/menuitem&amp;gt;&amp;lt;/popup&amp;gt;&amp;lt;/menu&amp;gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Beautified form of the above result:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&amp;lt;menu&amp;gt;
+  &amp;lt;id&amp;gt;file&amp;lt;/id&amp;gt;
+  &amp;lt;value&amp;gt;File&amp;lt;/value&amp;gt;
+  &amp;lt;popup&amp;gt;
+    &amp;lt;menuitem&amp;gt;
+      &amp;lt;value&amp;gt;New&amp;lt;/value&amp;gt;
+      &amp;lt;onclick&amp;gt;CreateNewDoc()&amp;lt;/onclick&amp;gt;
+    &amp;lt;/menuitem&amp;gt;
+    &amp;lt;menuitem&amp;gt;
+      &amp;lt;value&amp;gt;Open&amp;lt;/value&amp;gt;
+      &amp;lt;onclick&amp;gt;OpenDoc()&amp;lt;/onclick&amp;gt;
+    &amp;lt;/menuitem&amp;gt;
+    &amp;lt;menuitem&amp;gt;
+      &amp;lt;value&amp;gt;Close&amp;lt;/value&amp;gt;
+      &amp;lt;onclick&amp;gt;CloseDoc()&amp;lt;/onclick&amp;gt;
+    &amp;lt;/menuitem&amp;gt;
+  &amp;lt;/popup&amp;gt;
+&amp;lt;/menu&amp;gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Note that linked examples page uses sporadically invented attributes; &lt;em&gt;common_schema&lt;/em&gt; prefers using well-defined nodes.&lt;/p&gt;
+&lt;h4&gt;extract_json_value()&lt;/h4&gt;
+&lt;p&gt;Which means things you can do with XML can also be done with JSON. XPath is a popular extraction DSL, working not only for XML but also for Object Oriented structures (see Groovy&#39;s nice integration of XPath into the language, or just commons-beans for conservative approach). JSON is a perfect data store for XPath expressions; by utilizing the translation between JSON and XML, one is now easily able to extract value from JSON (using same example as above):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;extract_json_value&lt;/strong&gt;(@json, &lt;span style=&#34;color: #000080;&#34;&gt;&#39;//id&#39;&lt;/span&gt;) AS result;
++--------+
+| result |
++--------+
+| file   |
++--------+
+
+mysql&amp;gt; SELECT &lt;strong&gt;extract_json_value&lt;/strong&gt;(@json, &lt;span style=&#34;color: #000080;&#34;&gt;&#39;count(/menu/popup/menuitem)&#39;&lt;/span&gt;) AS count_items;
++-------------+
+| count_items |
++-------------+
+| 3           |
++-------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Implementations of &lt;strong&gt;json_to_xml()&lt;/strong&gt; and &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/extract_json_value.html&#34;&gt;&lt;strong&gt;extract_json_value()&lt;/strong&gt;&lt;/a&gt; are CPU intensive. There is really just one justification for having these written in Stored Procedures: their lack in the standard MySQL function library. This is reason enough. Just be aware; test with &lt;a href=&#34;http://dev.mysql.com/doc/refman/5.5/en/information-functions.html#function_benchmark&#34;&gt;BENCHMARK()&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;query_checksum()&lt;/h4&gt;
+&lt;p&gt;It looks like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;query_checksum&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#39;select id from world.City where id in (select capital from world.Country) order by id&#39;&lt;/span&gt;);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 5f35070b90b0c079ba692048c51a89fe |
++----------------------------------+
+
+mysql&amp;gt; call &lt;strong&gt;query_checksum&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#39;select capital from world.Country where capital is not null order by capital&#39;&lt;/span&gt;);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 5f35070b90b0c079ba692048c51a89fe |
++----------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The two queries above yield with the same result set. As consequence, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_checksum.html&#34;&gt;&lt;strong&gt;query_checksum()&lt;/strong&gt;&lt;/a&gt; produces the same checksum value for both. The next query produces a different result set, hence a different checksum:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call &lt;strong&gt;query_checksum&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#39;select id from world.City where id in (select capital from world.Country) order by id limit 10&#39;&lt;/span&gt;);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 997079c2dfca34ba87ae44ed8965276e |
++----------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The routine actually invokes the given queries (modifying them a bit along the way) and uses a deterministic incremental checksum to get the final result.&lt;/p&gt;
+&lt;p&gt;Its use? As a handy built-in mechanism for comparing your table data. This is meant for relatively small result sets - not for your &lt;strong&gt;20GB&lt;/strong&gt; table. Inspired by Baron&#39;s &lt;a href=&#34;http://www.xaprb.com/blog/2009/03/25/mysql-command-line-tip-compare-result-sets/&#34;&gt;old trick&lt;/a&gt;, and works on server side (Windows/GUI/automated clients to benefit).&lt;/p&gt;
+&lt;h4&gt;random_hash()&lt;/h4&gt;
+&lt;p&gt;Random hashes come handy. The naive way to produce them is by executing something like &lt;strong&gt;SELECT SHA1(RAND())&lt;/strong&gt;. However the &lt;strong&gt;RAND()&lt;/strong&gt; function just doesn&#39;t provide enough plaintext for the hash function. The &lt;strong&gt;SHA&lt;/strong&gt;/&lt;strong&gt;MD5&lt;/strong&gt; functions expect a textual input, and produce a &lt;strong&gt;160&lt;/strong&gt;/&lt;strong&gt;128&lt;/strong&gt; bit long hash. The maximum char length of a &lt;strong&gt;RAND()&lt;/strong&gt; result is &lt;strong&gt;20&lt;/strong&gt; characters or so, and these are limited to the &lt;strong&gt;0-9&lt;/strong&gt; digits. So at about &lt;strong&gt;10^20&lt;/strong&gt; options for input, which is about &lt;strong&gt;64&lt;/strong&gt; bit. Hmmmm. a 64 bit input to generate a &lt;strong&gt;160&lt;/strong&gt; bit output? I don&#39;t think so! &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/random_hash.html&#34;&gt;&lt;strong&gt;random_hash()&lt;/strong&gt;&lt;/a&gt; provides additional input in the form of your current status (at about 830 characters) as well as &lt;strong&gt;RAND()&lt;/strong&gt;, &lt;strong&gt;SYSDATE()&lt;/strong&gt; and server ID.&lt;/p&gt;
+&lt;h4&gt;Bugfixes&lt;/h4&gt;
+&lt;p&gt;Any bugfix adds at least one test; typically more. Currently with over &lt;strong&gt;470&lt;/strong&gt; tests, &lt;em&gt;common_schema&lt;/em&gt; is built to work.&lt;/p&gt;
+&lt;h4&gt;Get common_schema&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;1.3&lt;/strong&gt; is available under the permissive New BSD License. &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;Find the latest download here&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;If you like to support &lt;em&gt;common_schema&lt;/em&gt;, I&#39;m always open for ideas and contributions. Or you can just spread the word!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema over traditional scripts</title>
+      <link>/blog/2012/12/12/common_schema-over-traditional-scripts/</link>
+      <pubDate>Wed, 12 Dec 2012 13:55:44 +0000</pubDate>
+      
+      <guid>/blog/2012/12/12/common_schema-over-traditional-scripts/</guid>
+      <description>&lt;p&gt;If you are familiar with both &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt; and &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema&lt;/a&gt;, you&#39;ll notice I&#39;ve incorporated some functionality already working in &lt;em&gt;openark kit&lt;/em&gt; into &lt;em&gt;common_schema&lt;/em&gt;, essentially rewriting what used to be a Python script into SQL/&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;What was my reasoning for rewriting good code? I wish to explain that, and provide with a couple examples.&lt;/p&gt;
+&lt;p&gt;I&#39;m generally interested in pushing as much functionality into the MySQL server. When using an external script, one:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Needs the right dependencies (OS, Perl/Python version, Perl/Python modules).&lt;/li&gt;
+&lt;li&gt;Needs to provide with connection params,&lt;/li&gt;
+&lt;li&gt;Needs to get acquainted with a lot of command line options,&lt;/li&gt;
+&lt;li&gt;Is limited by whatever command line options are provided.&lt;/li&gt;
+&lt;li&gt;Has to invoke that script (duh!) to get the work done.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This last bullet is not so trivial: it means you can&#39;t work some operation with your favorite GUI client, because it has no notion of your Perl script; does not run on the same machine where your Python code resides; simply can&#39;t run those scripts for you.&lt;/p&gt;
+&lt;p&gt;With server-side code, functionality is accessible via any client. You run your operation via a query (e.g. &lt;strong&gt;CALL some_procedure&lt;/strong&gt;). That can be done from your GUI client, your command line client, your event scheduler, your cronjob, all equally. You only need access to your MySQL server, which is trivial.&lt;/p&gt;
+&lt;p&gt;Of course, server side scripting is &lt;a href=&#34;http://code.openark.org/blog/mysql/things-that-cant-and-some-that-can-be-done-from-within-a-mysql-stored-routine&#34;&gt;limited&lt;/a&gt;. Some stuff simply can&#39;t be written solely on server side. If you want to consult your replicating slave; gracefully take action on user&#39;s &lt;strong&gt;Ctrl+C&lt;/strong&gt;, send data over the web, you&#39;ll have to do it with an external tool. There are actually a lot of surprising limitations to things one would assume &lt;em&gt;are&lt;/em&gt; possible on server side. You may already know how frustrated I am by the fact one can &lt;a href=&#34;http://code.openark.org/blog/mysql/reading-results-of-show-statements-on-server-side&#34;&gt;hardly&lt;/a&gt; get info from &lt;strong&gt;SHOW&lt;/strong&gt; commands.&lt;/p&gt;
+&lt;h4&gt;But, when it works, it shines&lt;/h4&gt;
+&lt;p&gt;Let&#39;s review a couple examples. The first one is nearly trivial. The second less so.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Example: getting AUTO_INCREMENT &#34;free space&#34;&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;openark kit&lt;/em&gt; offers &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-show-limits.html&#34;&gt;oak-show-limits&lt;/a&gt;. It&#39;s a tool that tells you if any of your &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; columns are running out of space (and so you might want to &lt;strong&gt;ALTER&lt;/strong&gt; that &lt;strong&gt;INT&lt;/strong&gt; to &lt;strong&gt;BIGINT&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;It&#39;s a very simple Python script. It gets your &lt;strong&gt;MAX(auto_increment_column) FROM tables_with_auto_increment&lt;/strong&gt;, and compares that &lt;strong&gt;MAX&lt;/strong&gt; value to the column type. It pre-computes:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;max_values[&#39;tinyint&#39;] = 2**8
+max_values[&#39;smallint&#39;] = 2**16
+max_values[&#39;mediumint&#39;] = 2**24
+max_values[&#39;int&#39;] = 2**32
+max_values[&#39;bigint&#39;] = 2**64&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;takes care of &lt;strong&gt;SIGNED/UNSIGNED&lt;/strong&gt;, and does the math. Why is this tool such a perfect candidate for &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/auto_increment_columns.html&#34;&gt;replacement on server side&lt;/a&gt;? For two reasons.&lt;/p&gt;
+&lt;p&gt;First, It turns out it takes very little effort to &lt;a href=&#34;http://code.openark.org/blog/mysql/checking-for-auto_increment-capacity-with-single-query&#34;&gt;build a query&lt;/a&gt; which does the same. In which case it is also easy to build a view which provides the same.&lt;/p&gt;
+&lt;p&gt;Second, there&#39;s this thing with command line arguments. The &lt;em&gt;openark&lt;/em&gt; tool provides with &lt;strong&gt;--threshold&lt;/strong&gt; (only output those columns where capacity is larger than &lt;strong&gt;x%&lt;/strong&gt;), &lt;strong&gt;--database&lt;/strong&gt; (only scan given database), &lt;strong&gt;--table&lt;/strong&gt; (only for tables matching name), &lt;strong&gt;--column&lt;/strong&gt; (only for columns matching name).&lt;/p&gt;
+&lt;p&gt;I don&#39;t like this. See, the above is essentially an extra layer for saying:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; auto_increment_ratio &amp;gt;= x&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; table_schema = ...&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; table_name = ...&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; column_name = ...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The command line arguments each take the role of some &lt;strong&gt;WHERE/AND&lt;/strong&gt; condition.Wow, what a &lt;strong&gt;1-1&lt;/strong&gt; mapping. How about if I wanted the results sorted in some specific order? I would have to add a command line argument for that! How about only listing the &lt;strong&gt;SIGNED&lt;/strong&gt; columns? I would have to add a command line argument for that, too! How about showing top &lt;strong&gt;10&lt;/strong&gt;? Yes, another command line argument!&lt;/p&gt;
+&lt;p&gt;Some of the above can be solved via shell scripting (&lt;strong&gt;sort -k 3 -n&lt;/strong&gt;, &lt;strong&gt;head -n 10&lt;/strong&gt;, etc.). But, hey, we&#39;re OK with SQL, aren&#39;t we? Why add now these &lt;em&gt;two extra layers&lt;/em&gt;? Get to know all the command line options, get to script it? I love scripting, but this is an abuse.&lt;/p&gt;
+&lt;p&gt;So it makes much more sense, in my opinion, to &lt;strong&gt;SELECT * FROM auto_increment_columns WHERE table_schema=&#39;my_db&#39; AND auto_increment_ratio &amp;gt;= 0.8 ORDER BY auto_increment_ratio DESC LIMIT 10&lt;/strong&gt;. It doesn&#39;t require SQL-fu skills, just basic SQL skills which every DBA and DB user are expected to have. And it allows one to work from whatever environment one feels comfortable with. Heck, with your GUI editor you can probably get off with it by right-clicking and left-clicking your mouse buttons, never typing one character.&lt;/p&gt;
+&lt;h4&gt;Example: blocking user accounts&lt;/h4&gt;
+&lt;p&gt;The above mapped very easily to a query, and was just a read-only query. What if we had to modify data? &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-block-account.html&#34;&gt;oak-block-accounts&lt;/a&gt; is a tool which allows one to block grantees from logging in, then releasing them later on. &lt;em&gt;common_schema&lt;/em&gt; offers &lt;a href=&#34;common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_accounts.html&#34;&gt;sql_accounts&lt;/a&gt; and &lt;a href=&#34;file:///home/shlomi/workspace/common_schema/doc/html/eval.html&#34;&gt;eval()&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Let&#39;s skip the command line arguments issue, as it is identical to the above. How should we best provide with &#34;taking action&#34; interface? A script would have no problem to first &lt;strong&gt;SELECT&lt;/strong&gt; stuff, then &lt;strong&gt;UPDATE&lt;/strong&gt;, or &lt;strong&gt;SET PASSWORD&lt;/strong&gt;, or &lt;strong&gt;DROP&lt;/strong&gt; etc. How easy is it to do the same on server side?&lt;/p&gt;
+&lt;p&gt;The immediate solution is to write a stored procedure to do that. I reject the idea. Why? Because the procedure would look like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;PROCEDURE block_account(user VARCHAR(64), host VARCHAR(64), only_if_empty_password BOOL, ...);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Can you see where I&#39;m getting at? Doing the above re-introduces command line options, this time disguised as procedure parameters. We would again have to list all available filtering methods, only this time things are worse: since stored procedures have no such notion as overloading, and change to the params will break compatibility. Once we introduce this routine, we&#39;re stuck with it.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; tries to stay away as far as it can from this pitfall. It presents another solution: the &lt;em&gt;view&lt;/em&gt; solution. Just as with &lt;em&gt;auto_increment_columns&lt;/em&gt;, &lt;strong&gt;SELECT&lt;/strong&gt; your way to get the right rows. But this time, the result is a SQL query:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;sql_block_account&lt;/strong&gt; FROM &lt;strong&gt;sql_accounts&lt;/strong&gt; &lt;strong&gt;WHERE USER = &#39;gromit&#39;&lt;/strong&gt;;
++-------------------------------------------------------------------------------------+
+| sql_block_account                                                                   |
++-------------------------------------------------------------------------------------+
+| SET PASSWORD FOR &#39;gromit&#39;@&#39;localhost&#39; = &#39;752AA50E562A6B40DE87DF0FA69FACADD908EA32*&#39; |
++-------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Do your own &lt;strong&gt;WHERE&lt;/strong&gt;/&lt;strong&gt;AND&lt;/strong&gt; combination in SQL. But, how to take action? Our view cannot take the actual action for us!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;eval()&lt;/em&gt; is at the core of many common_schema operations, like this one:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CALL &lt;strong&gt;eval&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#34;SELECT &lt;strong&gt;sql_block_account&lt;/strong&gt; FROM &lt;strong&gt;sql_accounts WHERE USER = &#39;gromit&#39;&lt;/strong&gt;&#34;&lt;/span&gt;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;strong&gt;SET PASSWORD&lt;/strong&gt; query just got evaluated. Meaning it was executed. &lt;em&gt;eval()&lt;/em&gt; is a very powerful solution.&lt;/p&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;I prefer stuff on server side. It requires basic SQL skills (or a smart GUI editor), and allows you easy access to a lot of functionality, removing dependency requirements. It is not always possible, and external scripts can do miracles not possible on server side, but server side scripting has its own miracles.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Purging old rows with QueryScript: three use cases</title>
+      <link>/blog/2012/11/14/purging-old-rows-with-queryscript-three-use-cases/</link>
+      <pubDate>Wed, 14 Nov 2012 11:15:35 +0000</pubDate>
+      
+      <guid>/blog/2012/11/14/purging-old-rows-with-queryscript-three-use-cases/</guid>
+      <description>&lt;p&gt;Problem: you need to purge old rows from a table. This may be your weekly/monthly cleanup task. The table is large, the amount of rows to be deleted is large, and doing so in one big &lt;strong&gt;DELETE&lt;/strong&gt; is too heavy.&lt;/p&gt;
+&lt;p&gt;You can use &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html&#34;&gt;oak-chunk-update&lt;/a&gt; or &lt;a href=&#34;http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html&#34;&gt;pt-archiver&lt;/a&gt; to accomplish the task. You can also use server side scripting with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt;, offering a very simple syntax with no external scripting, dependencies and command line options.&lt;/p&gt;
+&lt;p&gt;I wish to present three cases of row deletion, with three different solutions. In all cases we assume some &lt;strong&gt;TIMESTAMP&lt;/strong&gt; column exists in table, by which we choose to purge the row. In all cases we assume we wish to purge rows older than &lt;strong&gt;1&lt;/strong&gt; month.&lt;/p&gt;
+&lt;p&gt;We assume the naive query is this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DELETE FROM my_schema.my_table WHERE row_timestamp &amp;lt; CURDATE() - INTERVAL 1 MONTH&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Case 1: TIMESTAMP column is indexed&lt;/h4&gt;
+&lt;p&gt;I almost always index a timestamp column, if only for being able to quickly purge data (but usually also to slice data by date). In this case where the column is indexed, it&#39;s very easy to figure out which rows are older than &lt;strong&gt;1&lt;/strong&gt; month.&lt;/p&gt;
+&lt;p&gt;We break the naive query into smaller parts, and execute these in sequence:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;while (&lt;span style=&#34;color: #000080;&#34;&gt;&lt;strong&gt;DELETE FROM&lt;/strong&gt; my_schema.my_table &lt;strong&gt;WHERE&lt;/strong&gt; row_timestamp &amp;lt; CURDATE() - INTERVAL 1 MONTH &lt;strong&gt;ORDER BY&lt;/strong&gt; row_timestamp &lt;strong&gt;LIMIT&lt;/strong&gt; 1000&lt;/span&gt;)
+  throttle 1;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;How does the above work?&lt;/p&gt;
+&lt;p&gt;QueryScript accepts a &lt;strong&gt;DELETE&lt;/strong&gt; statement as a conditional expression in a while loop. The expression evaluates to &lt;strong&gt;TRUE&lt;/strong&gt; when the &lt;strong&gt;DELETE&lt;/strong&gt; affects rows. Once the &lt;strong&gt;DELETE&lt;/strong&gt; ceases to affect rows (when no more rows match the &lt;strong&gt;WHERE&lt;/strong&gt; condition), the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_while.html&#34;&gt;&lt;strong&gt;while&lt;/strong&gt;&lt;/a&gt; loop terminates.&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_throttle.html&#34;&gt;&lt;strong&gt;throttle&lt;/strong&gt;&lt;/a&gt; command allows us to play &lt;em&gt;nice&lt;/em&gt;: by throttling we increase the total runtime through sleeping in between loop iterations.&lt;/p&gt;
+&lt;h4&gt;Case 2: TIMESTAMP column is not indexed, and there is no heuristic for matching rows&lt;/h4&gt;
+&lt;p&gt;This case is hardest to tackle by means of optimization: there is no index, and we cannot assume or predict anything about the distribution of old rows. We must therefore scan the entire table so as to be able to purge old rows.&lt;/p&gt;
+&lt;p&gt;This &lt;em&gt;does not&lt;/em&gt; mean we have to do one huge full table scan. As long as we have some way to split the table, we are still good. We can utilize the &lt;strong&gt;PRIMARY KEY&lt;/strong&gt; or another &lt;strong&gt;UNIQUE KEY&lt;/strong&gt; so as to break the table into smaller, distinct parts, and work our way on these smaller chunks:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (&lt;span style=&#34;color: #000080;&#34;&gt;DELETE FROM my_schema.my_table WHERE row_timestamp &amp;lt; CURDATE() - INTERVAL 1 MONTH&lt;/span&gt;)
+  throttle 1;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt; statement will automagically calculate the chunks and inject filtering conditions onto the query, such that each execution of the query relates to a distinct set of rows.&lt;/p&gt;
+&lt;h4&gt;Case 3: TIMESTAMP column not indexed, but known to be monotonic&lt;/h4&gt;
+&lt;p&gt;This is true for many tables. Rows with &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; columns and &lt;strong&gt;TIMESTAMP&lt;/strong&gt; columns are created with &lt;strong&gt;CURRENT_TIMESTAMP&lt;/strong&gt; values. This makes for a monotonic function: as the &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; grows, so does the &lt;strong&gt;TIMESTAMP&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;This makes for the following observation: it we iterate the table row by row, and reach a point where the current row is not old, then we can stop looking. Timestamps will only increase by value, which means further rows only turn to be &lt;em&gt;newer&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;With this special case at hand, we can:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (&lt;span style=&#34;color: #000080;&#34;&gt;&lt;strong&gt;&lt;/strong&gt;DELETE FROM my_schema.my_table WHERE row_timestamp &amp;lt; CURDATE() - INTERVAL 1 MONTH&lt;/span&gt;) {
+  if (&lt;strong&gt;$split_rowcount&lt;/strong&gt; = 0)
+    break;
+  throttle 1;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; is a looping device, and a &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_break.html&#34;&gt;&lt;strong&gt;break&lt;/strong&gt;&lt;/a&gt; statement works on &lt;em&gt;split&lt;/em&gt; just as on a &lt;strong&gt;while&lt;/strong&gt; statement.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; provides with magic variables which describe current chunk status. &lt;strong&gt;$split_rowcount&lt;/strong&gt; relates to the number of rows affected by last chunk query. No more rows affected? This means we&#39;ve hit recent rows, and we do not expect to find old rows any further. We can stop looking.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema 1.2: security, partition management, processes, QueryScript goodies</title>
+      <link>/blog/2012/11/13/common_schema-1-2-security-partition-management-processes-queryscript-goodies/</link>
+      <pubDate>Tue, 13 Nov 2012 14:25:38 +0000</pubDate>
+      
+      <guid>/blog/2012/11/13/common_schema-1-2-security-partition-management-processes-queryscript-goodies/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema&lt;/a&gt; &lt;strong&gt;1.2&lt;/strong&gt; is released! This version comes shortly after &lt;strong&gt;1.1&lt;/strong&gt;, yet contains quite a few interesting goodies:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Account blocking&lt;/li&gt;
+&lt;li&gt;Security audit&lt;/li&gt;
+&lt;li&gt;RANGE partition management&lt;/li&gt;
+&lt;li&gt;Slave status&lt;/li&gt;
+&lt;li&gt;Better blocking and idle transaction management&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;QueryScript &lt;/em&gt;goodies:
+&lt;ul&gt;
+&lt;li&gt;echo, report&lt;/li&gt;
+&lt;li&gt;while-otherwise statement; foreach-otherwise statement&lt;/li&gt;
+&lt;li&gt;Better variable scope handling&lt;/li&gt;
+&lt;li&gt;Complete support for variable expansion&lt;/li&gt;
+&lt;li&gt;Transaction support within QueryScript&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;More summary info and SQL statements in processlist-related views&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;A closer look at these follows:&lt;/p&gt;
+&lt;h4&gt;Account blocking&lt;/h4&gt;
+&lt;p&gt;A new view called &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_accounts.html&#34;&gt;&lt;strong&gt;sql_accounts&lt;/strong&gt;&lt;/a&gt;, inspired by &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-block-account.html&#34;&gt;oak-block-account&lt;/a&gt; (also see &lt;a href=&#34;http://code.openark.org/blog/mysql/blocking-user-accounts&#34;&gt;here&lt;/a&gt; and &lt;a href=&#34;http://code.openark.org/blog/mysql/pop-quiz-what-is-the-most-basic-privilege-an-account-can-be-assigned-with&#34;&gt;here&lt;/a&gt;) provides with the means of blocking use accounts (and releasing them, of course) without revoking their privileges. It offers the SQL statements to block an account (by modifying its password in a symmetric way) and to release an account (by modifying its password back to normal). It really works like a charm. Together with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/killall.html&#34;&gt;killall()&lt;/a&gt; and &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html&#34;&gt;sql_accounts&lt;/a&gt; this gives the administrator great control over accounts.&lt;/p&gt;
+&lt;h4&gt;Security audit&lt;/h4&gt;
+&lt;p&gt;Imported from &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-security-audit.html&#34;&gt;openark kit&lt;/a&gt;, and implemented via &lt;em&gt;QueryScript&lt;/em&gt;, the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/security_audit.html&#34;&gt;&lt;strong&gt;security_audit()&lt;/strong&gt;&lt;/a&gt; procedure will audit your accounts, passwords and general settings to find problems, pitfalls and security hazards. I will write more on this later.&lt;/p&gt;
+&lt;h4&gt;RANGE partition management&lt;/h4&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_range_partitions.html&#34;&gt;&lt;strong&gt;sql_range_partitions&lt;/strong&gt;&lt;/a&gt; view manages your &lt;strong&gt;RANGE&lt;/strong&gt; and &lt;strong&gt;RANGE COLUMNS&lt;/strong&gt; partitioned tables by providing with the SQL statements to drop oldest partitions and to create the next (in sequence) partitions. See my &lt;a href=&#34;http://code.openark.org/blog/mysql/your-magical-range-partitioning-maintenance-query&#34;&gt;earlier post&lt;/a&gt;.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Slave status&lt;/h4&gt;
+&lt;p&gt;This is a hack providing a minified version of &lt;strong&gt;SHOW SLAVE STATUS&lt;/strong&gt;, but as a &lt;em&gt;view&lt;/em&gt; (&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/slave_status.html&#34;&gt;&lt;strong&gt;slave_status&lt;/strong&gt;&lt;/a&gt;). It only provides with &lt;strong&gt;5&lt;/strong&gt; columns:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM slave_status \G
+*************************** 1. row ***************************
+ Slave_Connected_time: 82077
+     Slave_IO_Running: 1
+    Slave_SQL_Running: 1
+        Slave_Running: 1
+Seconds_Behind_Master: 5&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;For me, the &lt;strong&gt;Seconds_Behind_Master&lt;/strong&gt; is one critical value I am interested in getting using a query. So here it is.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;(Seconds_Behind_Master &amp;lt; 10) IS TRUE&lt;/strong&gt; AS slave_is_up_to_date FROM &lt;strong&gt;slave_status&lt;/strong&gt;;
++---------------------+
+| slave_is_up_to_date |
++---------------------+
+|                   1 |
++---------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;QueryScript goodies&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_while.html&#34;&gt;&lt;strong&gt;while-otherwise&lt;/strong&gt;&lt;/a&gt; statement: &lt;strong&gt;while (some_condition) { ... } otherwise { /* this gets executed if the while never performs a single iteration */ }&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_foreach.html&#34;&gt;&lt;strong&gt;foreach-otherwise&lt;/strong&gt;&lt;/a&gt; statement, likewise&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_echo.html&#34;&gt;&lt;strong&gt;echo&lt;/strong&gt;&lt;/a&gt;, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_report.html&#34;&gt;&lt;strong&gt;report&lt;/strong&gt;&lt;/a&gt; statements: echo your statements before applying them, or just echo your comments along the code. Generate a (beautified) report at the end of script execution (which is how security_audit() works).&lt;/li&gt;
+&lt;li&gt;Better variable scopes: now allowing variables of same name to be declared when their scopes do not overlap. This makes for the expected behavior a programmer would expect.&lt;/li&gt;
+&lt;li&gt;Complete variable expansion handling: expanded variables are now recognized anywhere within the script, including inside a while or &lt;strong&gt;foreach&lt;/strong&gt; expression.&lt;/li&gt;
+&lt;li&gt;Transactions are now handled by QueryScript and immediately delegated to MySQL. This completes the transaction management in QueryScript. Just &lt;strong&gt;start transaction&lt;/strong&gt;, &lt;strong&gt;commit&lt;/strong&gt; or &lt;strong&gt;rollback&lt;/strong&gt; at will.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;InnoDB idle transactions, blocking transactions&lt;/h4&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_transactions.html&#34;&gt;&lt;strong&gt;innodb_transactions&lt;/strong&gt;&lt;/a&gt; view now lists idle transactions, as well as their idle time. It also provides with the SQL statements to kill the query or connection for each transaction. This allows for a quick track or track-and-kill of idle transactions.&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_locked_transactions.html&#34;&gt;&lt;strong&gt;innodb_locked_transactions&lt;/strong&gt;&lt;/a&gt; view now offers the wait time and SQL statements for killing the query or connection of a blocking  transaction. This allows for a quick track or track-and-kill long time blocking transactions.&lt;/p&gt;
+&lt;p&gt;I will write more in depth on both in a future post.&lt;/p&gt;
+&lt;h4&gt;Processlist-related views&lt;/h4&gt;
+&lt;p&gt;The new &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_states.html&#34;&gt;&lt;strong&gt;processlist_states&lt;/strong&gt;&lt;/a&gt; view aggregates processlist by thread state. This view, and all other processlist views now provide with median or &lt;strong&gt;95%&lt;/strong&gt; median runtime for processes, in addition to the less informative AVG provided earlier.&lt;/p&gt;
+&lt;h4&gt;Get it!&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is free and licensed under the New BSD License. It is nothing but a SQL file, so you simply import it into your MySQL server. &lt;em&gt;common_schema&lt;/em&gt; installs on any MySQL &amp;gt;= &lt;strong&gt;5.1&lt;/strong&gt; server, including Percona Server and MariaDB, tested on &lt;strong&gt;5.1&lt;/strong&gt;, &lt;strong&gt;5.5&lt;/strong&gt; and &lt;strong&gt;5.6 RC&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;Go to common_schema download page&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>How common_schema installs itself</title>
+      <link>/blog/2012/09/11/how-common_schema-installs-itself/</link>
+      <pubDate>Tue, 11 Sep 2012 08:48:13 +0000</pubDate>
+      
+      <guid>/blog/2012/09/11/how-common_schema-installs-itself/</guid>
+      <description>&lt;p&gt;Up till &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt; version &lt;strong&gt;1.1&lt;/strong&gt;, the user would need to choose from distinct distribution files: an install compatible with MySQL &lt;strong&gt;5.1&lt;/strong&gt;, one compatible with InnoDB Plugin enabled servers, and one compatible with Percona Server. The difference between the three is the availability of certain &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt; tables.&lt;/p&gt;
+&lt;p&gt;With &lt;strong&gt;1.1&lt;/strong&gt;, this is no longer the case: &lt;em&gt;common_schema&lt;/em&gt; auto-detects the server and available feature set, and installs accordingly.&lt;/p&gt;
+&lt;h4&gt;Wait, isn&#39;t common_schema just a SQL file?&lt;/h4&gt;
+&lt;p&gt;Yes. It&#39;s not like there&#39;s an installer like &lt;em&gt;InstallShield&lt;/em&gt; or anything. Nevertheless, &lt;em&gt;common&lt;/em&gt;&lt;em&gt;_schema&lt;/em&gt; offers a smart way of conditional handling, which is uses in itself. It&#39;s called &lt;a href=&#34;http://www.queryscript.com/&#34;&gt;QueryScript&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is installed by importing the SQL file (via &lt;strong&gt;SOURCE&lt;/strong&gt; command; the &lt;em&gt;mysql&lt;/em&gt; client; your favorite GUI). This creates your usual tables, views and routines. But some of these routines make for an interpreter for &lt;em&gt;QueryScript&lt;/em&gt;. Somewhere along the installation process (remember - it&#39;s just a SQL import), &lt;em&gt;common_schema&lt;/em&gt; switches over to executing scripts to manage the installation. In particular, there are a few views which depend on optional tables, such as InnoDB Plugin&#39;s tables for &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt;.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;Consider the following &lt;strong&gt;CREATE VIEW&lt;/strong&gt; statement:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE OR REPLACE
+ALGORITHM = UNDEFINED
+SQL SECURITY INVOKER
+VIEW innodb_transactions_summary AS
+  SELECT 
+    COUNT(*) AS count_transactions,
+    IFNULL(SUM(trx_state = &#39;RUNNING&#39;), 0) AS running_transactions,
+    IFNULL(SUM(trx_requested_lock_id IS NOT NULL), 0) AS locked_transactions,
+    COUNT(DISTINCT trx_requested_lock_id) AS distinct_locks
+  FROM 
+    &lt;strong&gt;INFORMATION_SCHEMA.INNODB_TRX&lt;/strong&gt;
+  WHERE 
+    trx_mysql_thread_id != CONNECTION_ID()
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Such a statement would fail the import if the underlying tables (&lt;strong&gt;INFORMATION_SCHEMA.INNODB_TRX&lt;/strong&gt; in our example) do not actually exist. Which is why this &lt;strong&gt;CREATE&lt;/strong&gt; statement is not invoked just like that. It is wrapped within a script:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;set @script := &#34;
+  set &lt;strong&gt;@common_schema_innodb_plugin_expected := 0&lt;/strong&gt;;
+  &lt;strong&gt;try&lt;/strong&gt; {
+    set &lt;strong&gt;@common_schema_innodb_plugin_expected&lt;/strong&gt; := @common_schema_innodb_plugin_expected + 1; 
+
+    &lt;strong&gt;CREATE VIEW&lt;/strong&gt; ... (as above)
+
+    set &lt;strong&gt;@common_schema_innodb_plugin_installed&lt;/strong&gt; := @common_schema_innodb_plugin_installed + 1;
+  }
+  &lt;strong&gt;catch&lt;/strong&gt; {
+  }
+&#34;;
+
+call run(@script);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I really want to stress this: this is a &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_try_catch.html&#34;&gt;&lt;strong&gt;try-catch&lt;/strong&gt;&lt;/a&gt; statement running from within your MySQL server. &lt;em&gt;QueryScript&lt;/em&gt; accepts this statement and behaves very similarly to the way you are used to with your favorite programming language.&lt;/p&gt;
+&lt;p&gt;If the &lt;strong&gt;CREATE VIEW&lt;/strong&gt; cannot be fulfilled, an error is generated. But instead of failing the entire script, it is caught by the &lt;strong&gt;catch&lt;/strong&gt;clause; the &#34;&lt;strong&gt;set @common_schema_innodb_plugin_installed :=&lt;/strong&gt; ...&#34; line is never executed upon such error.&lt;/p&gt;
+&lt;p&gt;Upon &lt;strong&gt;CREATE VIEW&lt;/strong&gt; failure, &lt;strong&gt;@common_schema_innodb_plugin_installed&lt;/strong&gt; falls short of &lt;strong&gt;@common_schema_innodb_plugin_expected&lt;/strong&gt; and&lt;strong&gt; &lt;/strong&gt;. By the end of installation process, the two are compared, so as to determine the install success:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;+-----------------------------------------------------------+
+| complete                                                  |
++-----------------------------------------------------------+
+| - Base components: &lt;strong&gt;installed&lt;/strong&gt;                              |
+| - InnoDB Plugin components: &lt;strong&gt;installed&lt;/strong&gt;                     |
+| - Percona Server components: &lt;strong&gt;not installed&lt;/strong&gt;                |
+|                                                           |
+| Installation complete. Thank you for using common_schema! |
++-----------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Can&#39;t you just use &#34;mysql --force&#34;?&lt;/h4&gt;
+&lt;p&gt;So, one can import a SQL file using &lt;strong&gt;mysql --force&lt;/strong&gt;, which does nto break down on first sight of error, but continues to next statements.&lt;/p&gt;
+&lt;p&gt;True, but:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;I don&#39;t want to ask that of the user.&lt;/li&gt;
+&lt;li&gt;It won&#39;t give me a status on &lt;em&gt;what went wrong&lt;/em&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;By using &lt;em&gt;QueryScript&lt;/em&gt;&#39;s &lt;strong&gt;try-catch&lt;/strong&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;I can take alternate action on failure.&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;common_schema&lt;/em&gt; can (and does) inform the user at the end of installation process which components are installed and which are not.&lt;/li&gt;
+&lt;li&gt;It can (and does) write this info down to a &lt;em&gt;metadata&lt;/em&gt; table such that I can ask the user for that information when submitting a bug report.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Eat your own dog food!&lt;/em&gt;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>How common_schema split()s tables - internals</title>
+      <link>/blog/2012/09/06/how-common_schema-splits-tables-internals/</link>
+      <pubDate>Thu, 06 Sep 2012 07:25:07 +0000</pubDate>
+      
+      <guid>/blog/2012/09/06/how-common_schema-splits-tables-internals/</guid>
+      <description>&lt;p&gt;This post exposes some of the internals, and the SQL behind QueryScript&#39;s &lt;em&gt;split&lt;/em&gt;. &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;common_schema/QueryScript&lt;/a&gt; &lt;strong&gt;1.1&lt;/strong&gt; introduces the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt; statement, which auto-breaks a &#34;large&#34; query (one which operates on large tables as a whole or without keys) into smaller queries, and executes them in sequence.&lt;/p&gt;
+&lt;p&gt;This makes for easier transactions, less locks held, potentially (depending on the user) more idle time released back to the database. &lt;em&gt;split&lt;strong&gt;&lt;/strong&gt;&lt;/em&gt; has similar concepts to &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html&#34;&gt;oak-chunk-update&lt;/a&gt; and &lt;a href=&#34;http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html&#34;&gt;pt-archiver&lt;/a&gt;, but works differently, and implemented entirely in SQL on server side.&lt;/p&gt;
+&lt;p&gt;Take the following statement as example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (&lt;strong&gt;UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR&lt;/strong&gt;)
+  pass;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;It yields with (roughly) the following statements:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`inventory`.`inventory_id` &amp;gt; &#39;1&#39;)) OR ((`inventory`.`inventory_id` = &#39;1&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;1000&#39;)) OR ((`inventory`.`inventory_id` = &#39;1000&#39;))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`inventory`.`inventory_id` &amp;gt; &#39;1000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;2000&#39;)) OR ((`inventory`.`inventory_id` = &#39;2000&#39;))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`inventory`.`inventory_id` &amp;gt; &#39;2000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;3000&#39;)) OR ((`inventory`.`inventory_id` = &#39;3000&#39;))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`inventory`.`inventory_id` &amp;gt; &#39;3000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;4000&#39;)) OR ((`inventory`.`inventory_id` = &#39;4000&#39;))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`inventory`.`inventory_id` &amp;gt; &#39;4000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;4581&#39;)) OR ((`inventory`.`inventory_id` = &#39;4581&#39;))));&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;(I say &#34;roughly&#34; because internally there are user defined variables at play, but for convenience, I verbose the actual values as constants.)&lt;/p&gt;
+&lt;h4&gt;How does that work?&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; works on server side. There is no Perl script or anything. It must therefore use server-side operations to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Identify table to be split&lt;/li&gt;
+&lt;li&gt;Analyze the table in the first place, deciding how to split it&lt;/li&gt;
+&lt;li&gt;Analyze the query, deciding on how to rewrite it&lt;/li&gt;
+&lt;li&gt;Split the table (logically) into unique and distinct chunks&lt;/li&gt;
+&lt;li&gt;Work out the query on each such chunk&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Following is an internal look at how &lt;em&gt;common_schema&lt;/em&gt; does all the above.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Identifying the table&lt;/h4&gt;
+&lt;p&gt;When query operates on a single table, &lt;em&gt;split&lt;/em&gt; is able to parse the query&#39;s SQL and find out that table. When multiple tables are involved, &lt;em&gt;split&lt;/em&gt; requires user instruction: which table is it that the query should be split by?&lt;/p&gt;
+&lt;h4&gt;Analyzing the table&lt;/h4&gt;
+&lt;p&gt;Table analysis is done via a &lt;em&gt;similar&lt;/em&gt; method to &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/candidate_keys_recommended.html&#34;&gt;candidate_keys_recommended&lt;/a&gt;. It is almost identical, only it uses &lt;a href=&#34;http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html&#34;&gt;INFORMATION_SCHEMA optimizations&lt;/a&gt; to make the query short and lightweight. Simulating the analysis using &lt;strong&gt;candidate_keys_recommended&lt;/strong&gt;, we get:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; select * from candidate_keys_recommended where table_name=&#39;inventory&#39; \G
+*************************** 1. row ***************************
+          table_schema: sakila
+            table_name: inventory
+recommended_index_name: PRIMARY
+          has_nullable: 0
+            is_primary: 1
+ count_column_in_index: 1
+          column_names: inventory_id&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This is cool, simple and very easy to work with: we choose to split the table via the &lt;strong&gt;inventory_id&lt;/strong&gt; column, which is conveniently an integer. We&#39;ll soon see &lt;em&gt;split&lt;/em&gt; can handle complex cases as well.&lt;/p&gt;
+&lt;h4&gt;Analyzing the query&lt;/h4&gt;
+&lt;p&gt;This is done in part via Roland&#39;s &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_analysis_routines.html&#34;&gt;query_analysis_routines&lt;/a&gt;, and in part just parsing the query, looking for &lt;strong&gt;WHERE&lt;/strong&gt;,&lt;strong&gt; GROUP BY&lt;/strong&gt;, &lt;strong&gt;LIMIT&lt;/strong&gt; etc. clauses.&lt;/p&gt;
+&lt;p&gt;The nice part is injecting a &lt;strong&gt;WHERE&lt;/strong&gt; condition, which didn&#39;t appear in the original query. That &lt;strong&gt;WHERE&lt;/strong&gt; condition is what limits the query to a distinct chunk of rows.&lt;/p&gt;
+&lt;h4&gt;Splitting the table&lt;/h4&gt;
+&lt;p&gt;With a single &lt;strong&gt;INTEGER PRIMARY KEY&lt;/strong&gt; this sounds simple, right? Take rows &lt;strong&gt;1..1,000&lt;/strong&gt;, then &lt;strong&gt;1,001..2,000&lt;/strong&gt;, then &lt;strong&gt;2,001..3,000&lt;/strong&gt; etc.&lt;/p&gt;
+&lt;p&gt;Wrong: even with this simple scenario, things are much more complex. Are the numbers successive? What if there are holes? What if there is a &lt;strong&gt;1,000,000&lt;/strong&gt; gap between every two numbers? What if there are multiple holes of differing size and frequency?&lt;/p&gt;
+&lt;p&gt;And if we have two columns in our &lt;strong&gt;UNIQUE KEY&lt;/strong&gt;? What if one of them is textual, not an &lt;strong&gt;INTEGER&lt;/strong&gt;, the other a &lt;strong&gt;TIMESTAMP&lt;/strong&gt;, not an &lt;strong&gt;INTEGER&lt;/strong&gt; either?&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; doesn&#39;t work in that naive way. It makes no assumptions on the density of values. It only requires:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;some &lt;strong&gt;UNIQUE KEY&lt;/strong&gt; to work with,&lt;/li&gt;
+&lt;li&gt;which has no &lt;strong&gt;NULL&lt;/strong&gt; values.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Given the above, it uses &lt;em&gt;User Defined Variables&lt;/em&gt; to setup the chunks. With our single &lt;strong&gt;INTEGER&lt;/strong&gt; column, the minimum value is set like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;select 
+  inventory_id 
+from 
+  `sakila`.`inventory` 
+order by 
+  inventory_id ASC 
+limit 1  
+into @_split_column_variable_min_1
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This sets the first value of the first chunk. What value terminates this chunk? It is calculated like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;select 
+  inventory_id 
+from (
+  select 
+    inventory_id 
+  from 
+    `sakila`.`inventory` 
+  where 
+    (((`inventory`.`inventory_id` &amp;gt; @_split_column_variable_range_start_1)) OR ((`inventory`.`inventory_id` = @_split_column_variable_range_start_1))) and (((`inventory`.`inventory_id` &amp;lt; @_split_column_variable_max_1)) OR ((`inventory`.`inventory_id` = @_split_column_variable_max_1))) 
+  order by 
+    inventory_id ASC limit 1000 
+  ) sel_split_range  
+order by 
+  inventory_id DESC 
+limit 1  
+into @_split_column_variable_range_end_1
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Now there&#39;s a query you wouldn&#39;t want to work by hand, now would you?&lt;/p&gt;
+&lt;p&gt;The cool part here is that the above works well for any type of column; this doesn&#39;t have to be an &lt;strong&gt;INTEGER&lt;/strong&gt;. Dates, strings etc. are all just fine.&lt;/p&gt;
+&lt;p&gt;The above also works well for multiple columns, where the query gets more complicated (see following).&lt;/p&gt;
+&lt;h4&gt;Working out the query per chunk&lt;/h4&gt;
+&lt;p&gt;This part is the easy one, now that all the hard work is done. We know ho to manipulate the query, we know the lower and upper boundaries of the chunk, so we just fill in the values and execute.&lt;/p&gt;
+&lt;h4&gt;Multi-columns keys&lt;/h4&gt;
+&lt;p&gt;Consider a similar query on &lt;strong&gt;sakila.film_actor&lt;/strong&gt;, where the &lt;strong&gt;PRIMARY KEY&lt;/strong&gt; is a compound of two columns:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;split (UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR)
+  throttle 2;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The chunked queries will look like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`film_actor`.`actor_id` &amp;gt; &#39;1&#39;)) OR ((`film_actor`.`actor_id` = &#39;1&#39;) AND (`film_actor`.`film_id` &amp;gt; &#39;1&#39;)) OR ((`film_actor`.`actor_id` = &#39;1&#39;) AND (`film_actor`.`film_id` = &#39;1&#39;))) AND (((`film_actor`.`actor_id` &amp;lt; &#39;39&#39;)) OR ((`film_actor`.`actor_id` = &#39;39&#39;) AND (`film_actor`.`film_id` &amp;lt; &#39;293&#39;)) OR ((`film_actor`.`actor_id` = &#39;39&#39;) AND (`film_actor`.`film_id` = &#39;293&#39;))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`film_actor`.`actor_id` &amp;gt; &#39;39&#39;)) OR ((`film_actor`.`actor_id` = &#39;39&#39;) AND (`film_actor`.`film_id` &amp;gt; &#39;293&#39;))) AND (((`film_actor`.`actor_id` &amp;lt; &#39;76&#39;)) OR ((`film_actor`.`actor_id` = &#39;76&#39;) AND (`film_actor`.`film_id` &amp;lt; &#39;234&#39;)) OR ((`film_actor`.`actor_id` = &#39;76&#39;) AND (`film_actor`.`film_id` = &#39;234&#39;))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`film_actor`.`actor_id` &amp;gt; &#39;76&#39;)) OR ((`film_actor`.`actor_id` = &#39;76&#39;) AND (`film_actor`.`film_id` &amp;gt; &#39;234&#39;))) AND (((`film_actor`.`actor_id` &amp;lt; &#39;110&#39;)) OR ((`film_actor`.`actor_id` = &#39;110&#39;) AND (`film_actor`.`film_id` &amp;lt; &#39;513&#39;)) OR ((`film_actor`.`actor_id` = &#39;110&#39;) AND (`film_actor`.`film_id` = &#39;513&#39;))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`film_actor`.`actor_id` &amp;gt; &#39;110&#39;)) OR ((`film_actor`.`actor_id` = &#39;110&#39;) AND (`film_actor`.`film_id` &amp;gt; &#39;513&#39;))) AND (((`film_actor`.`actor_id` &amp;lt; &#39;146&#39;)) OR ((`film_actor`.`actor_id` = &#39;146&#39;) AND (`film_actor`.`film_id` &amp;lt; &#39;278&#39;)) OR ((`film_actor`.`actor_id` = &#39;146&#39;) AND (`film_actor`.`film_id` = &#39;278&#39;))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`film_actor`.`actor_id` &amp;gt; &#39;146&#39;)) OR ((`film_actor`.`actor_id` = &#39;146&#39;) AND (`film_actor`.`film_id` &amp;gt; &#39;278&#39;))) AND (((`film_actor`.`actor_id` &amp;lt; &#39;183&#39;)) OR ((`film_actor`.`actor_id` = &#39;183&#39;) AND (`film_actor`.`film_id` &amp;lt; &#39;862&#39;)) OR ((`film_actor`.`actor_id` = &#39;183&#39;) AND (`film_actor`.`film_id` = &#39;862&#39;))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR &lt;strong&gt;WHERE&lt;/strong&gt; ((((`film_actor`.`actor_id` &amp;gt; &#39;183&#39;)) OR ((`film_actor`.`actor_id` = &#39;183&#39;) AND (`film_actor`.`film_id` &amp;gt; &#39;862&#39;))) AND (((`film_actor`.`actor_id` &amp;lt; &#39;200&#39;)) OR ((`film_actor`.`actor_id` = &#39;200&#39;) AND (`film_actor`.`film_id` &amp;lt; &#39;993&#39;)) OR ((`film_actor`.`actor_id` = &#39;200&#39;) AND (`film_actor`.`film_id` = &#39;993&#39;))));&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;View the complete command to realize just how much more complex each query is, and how much more complex the chunking becomes. Here&#39;s how I evaluate the chunk&#39;s &#34;next range end&#34; variables:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;select 
+  actor_id, film_id 
+from (
+  select 
+    actor_id, film_id 
+  from 
+    `sakila`.`film_actor` 
+  where 
+    (((`film_actor`.`actor_id` &amp;gt; @_split_column_variable_range_start_1)) OR ((`film_actor`.
+`actor_id` = @_split_column_variable_range_start_1) AND (`film_actor`.`film_id` &amp;gt; @_split_column_variable_range_start_2))) and (((`film_actor`.`actor_id` &amp;lt; @_split_column_variable_max_1)) OR ((`film_actor`.`actor_id` = @_split_column_variable_max_1) AND (`film_actor`.`film_id` &amp;lt; @_split_column_variable_max_2)) OR ((`film_actor`.`actor_id` = @_split_column_variable_max_1) AND (`film_actor`.`film_id` = @_split_column_variable_max_2))) 
+  order by 
+    actor_id ASC, film_id ASC 
+  limit 1000 
+  ) sel_split_range  
+order by 
+  actor_id DESC, film_id DESC 
+limit 1  
+into @_split_column_variable_range_end_1, @_split_column_variable_range_end_2
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;By the way, you may recall that everything is done server side. The &lt;strong&gt;WHERE&lt;/strong&gt; condition for the chunked queries is in itself generated via SQL statement, and not too much by programmatic logic. Here&#39;s &lt;em&gt;part&lt;/em&gt; of the query which computes the limiting condition:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;  select
+    group_concat(&#39;(&#39;, partial_comparison, &#39;)&#39; order by n separator &#39; OR &#39;) as comparison
+  from (
+    select 
+      n,
+      group_concat(&#39;(&#39;, column_name, &#39; &#39;, if(is_last, comparison_operator, &#39;=&#39;), &#39; &#39;, variable_name, &#39;)&#39; order by column_order separator &#39; AND &#39;) as partial_comparison
+    from (
+      select 
+        n, CONCAT(mysql_qualify(split_table_name), &#39;.&#39;, mysql_qualify(column_name)) AS column_name,
+        case split_variable_type
+          when &#39;range_start&#39; then range_start_variable_name
+          when &#39;range_end&#39; then range_end_variable_name
+          when &#39;max&#39; then max_variable_name
+        end as variable_name,
+        _split_column_names_table.column_order, _split_column_names_table.column_order = n as is_last 
+      from 
+        numbers, _split_column_names_table 
+      where 
+        n between _split_column_names_table.column_order and num_split_columns 
+      order by n, _split_column_names_table.column_order
+    ) s1
+    group by n
+  ) s2
+  into return_value
+  ;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;There is a lot of complexity to &lt;em&gt;split&lt;/em&gt; to make it able to provide with as clean a syntax for the user as possible.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Table split(...) for the masses</title>
+      <link>/blog/2012/09/05/table-split-for-the-masses/</link>
+      <pubDate>Wed, 05 Sep 2012 07:04:05 +0000</pubDate>
+      
+      <guid>/blog/2012/09/05/table-split-for-the-masses/</guid>
+      <description>&lt;p&gt;(pun intended)&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt;&#39;s new &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt; statement (see &lt;a href=&#34;http://code.openark.org/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling&#34;&gt;release announcement&lt;/a&gt;) auto-splits complex queries over large tables into smaller ones: instead of issuing one huge query, &lt;em&gt;split&lt;/em&gt; breaks one&#39;s query into smaller queries, each working on a different set of rows (a chunk).&lt;/p&gt;
+&lt;p&gt;Thus, it is possible to avoid holding locks for long times, allowing for smaller transactions. It also makes for breathing space for the RDBMS, at times boosting operation speed, and at times prolonging operation speed at will.&lt;/p&gt;
+&lt;p&gt;In this post I show how &lt;em&gt;split&lt;/em&gt; exposes itself to the user, should the user wish so.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; can manage queries of the following forms:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;DELETE FROM table_name [WHERE]...&lt;/li&gt;
+&lt;li&gt;DELETE FROM table_name USING &amp;lt;multi table syntax&amp;gt; [WHERE]...&lt;/li&gt;
+&lt;li&gt;UPDATE table_name SET ... [WHERE]...&lt;/li&gt;
+&lt;li&gt;UPDATE &amp;lt;multiple tables&amp;gt; SET ... [WHERE]...&lt;/li&gt;
+&lt;li&gt;INSERT INTO some_table SELECT ... FROM &amp;lt;single or multiple tables&amp;gt; [WHERE]...&lt;/li&gt;
+&lt;li&gt;REPLACE INTO some_table SELECT ... FROM &amp;lt;single or multiple tables&amp;gt; [WHERE]...&lt;/li&gt;
+&lt;li&gt;SELECT ... FROM &amp;lt;multiple tables&amp;gt; [WHERE]...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The latter being a non-obvious one at first sight.&lt;/p&gt;
+&lt;h4&gt;Basically, it&#39; automatic&lt;/h4&gt;
+&lt;p&gt;You just say:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR)
+  throttle 2;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;And &lt;em&gt;split&lt;/em&gt; identifies &lt;strong&gt;sakila.inventory&lt;/strong&gt; as the table which needs to be split, and injects appropriate conditions so as to work on a subset of the rows, in multiple steps.&lt;/p&gt;
+&lt;p&gt;By the way, here&#39;s &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_execution.html&#34;&gt;how to execute a QueryScript code&lt;/a&gt; like the above.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;But you can drive in manual mode&lt;/h4&gt;
+&lt;p&gt;You can use the following syntax:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (sakila.inventory)
+{
+  -- No action taken, but this block of code
+  -- is executed per chunk of the table.
+  -- I wonder what can be done here?
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;split&lt;/em&gt; provides with &lt;em&gt;magic variables&lt;/em&gt;, which you can use in the action block. These are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;$split_step&lt;/strong&gt;: &lt;strong&gt;1&lt;/strong&gt;-based loop counter&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$split_rowcount&lt;/strong&gt;: number of rows affected in current chunk operation&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$split_total_rowcount&lt;/strong&gt;: total number of rows affected during this &lt;em&gt;split&lt;/em&gt; statement&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$split_total_elapsed_time&lt;/strong&gt;: number of seconds elapsed since beginning of this &lt;em&gt;split&lt;/em&gt; operation.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$split_clause&lt;/strong&gt;: &lt;em&gt;the&lt;/em&gt; magic variable: the filtering condition limiting rows to current chunk.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$split_table_schema&lt;/strong&gt;: the explicit or inferred schema of split table&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$split_table_name&lt;/strong&gt;: the explicit or inferred table being split&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;To illustrate, consider the following script:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (sakila.inventory)
+{
+  select &lt;strong&gt;$split_step&lt;/strong&gt; as step, &lt;strong&gt;$split_clause&lt;/strong&gt; as clause;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The output is this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;+------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                                                                    |
++------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|    1 | ((((`inventory`.`inventory_id` &amp;gt; &#39;1&#39;)) OR ((`inventory`.`inventory_id` = &#39;1&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;1000&#39;)) OR ((`inventory`.`inventory_id` = &#39;1000&#39;)))) |
++------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    2 | ((((`inventory`.`inventory_id` &amp;gt; &#39;1000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;2000&#39;)) OR ((`inventory`.`inventory_id` = &#39;2000&#39;)))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    3 | ((((`inventory`.`inventory_id` &amp;gt; &#39;2000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;3000&#39;)) OR ((`inventory`.`inventory_id` = &#39;3000&#39;)))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    4 | ((((`inventory`.`inventory_id` &amp;gt; &#39;3000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;4000&#39;)) OR ((`inventory`.`inventory_id` = &#39;4000&#39;)))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    5 | ((((`inventory`.`inventory_id` &amp;gt; &#39;4000&#39;))) AND (((`inventory`.`inventory_id` &amp;lt; &#39;4581&#39;)) OR ((`inventory`.`inventory_id` = &#39;4581&#39;)))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So you can get yourself a nice present: the SQL clause which filters the distinct chunks.&lt;/p&gt;
+&lt;h4&gt;A simple demo: what can the user do with &#34;manual mode&#34;?&lt;/h4&gt;
+&lt;p&gt;Normally, I would expect the user to use the automated version of &lt;em&gt;split&lt;/em&gt;. Let it do the hard work! But sometimes, you may wish to take control into your hands.&lt;/p&gt;
+&lt;p&gt;Consider an example: I wish to export a table into CSV file, but in chunks. &lt;a href=&#34;http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html&#34;&gt;pt-archiver&lt;/a&gt; does that. But it is also easily achievable with &lt;em&gt;split&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;split&lt;/strong&gt; (sakila.inventory) {
+  var &lt;strong&gt;$file_name&lt;/strong&gt; := QUOTE(CONCAT(&#39;/tmp/inventory_chunk_&#39;, &lt;strong&gt;$split_step&lt;/strong&gt;, &#39;.csv&#39;));
+  select * from sakila.inventory WHERE &lt;strong&gt;:${split_clause}&lt;/strong&gt; INTO OUTFILE &lt;strong&gt;:${file_name}&lt;/strong&gt;;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This script uses the powerful &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_variables.html&#34;&gt;variable expansion&lt;/a&gt; feature of QueryScript: it extracts the text behind &lt;strong&gt;&lt;/strong&gt;&lt;strong&gt;:${split_clause}&lt;/strong&gt; and plants it as part of the query. It does the same for &lt;strong&gt;&lt;/strong&gt;&lt;strong&gt;:${file_name}&lt;/strong&gt;, making a variable possible where MySQL would normally disallow one (the &lt;strong&gt;INTO OUTFILE&lt;/strong&gt; clause only accepts a constant string).&lt;/p&gt;
+&lt;p&gt;What do we get as result?&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;bash:/tmp$ ls -s1 inventory_chunk_*&lt;/strong&gt;
+32 inventory_chunk_1.csv
+32 inventory_chunk_2.csv
+32 inventory_chunk_3.csv
+32 inventory_chunk_4.csv
+20 inventory_chunk_5.csv&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;During the past months, and even as I developed &lt;em&gt;split&lt;/em&gt; for &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt;, I found myself using it more and more for my own purposes. As it evolved I realized how much more simple it makes these complex operations. Heck, it beats &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html&#34;&gt;oak-chunk-update&lt;/a&gt; in its ease of use. They both have their place, but &lt;em&gt;split&lt;/em&gt; is so much more intuitive and easy to write. And, no external scripts, no package dependencies.&lt;/p&gt;
+&lt;p&gt;I suggest that &lt;em&gt;split&lt;/em&gt; is a major tool for server side scripting, server maintenance, developer operations. &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;Check it out&lt;/a&gt;!&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema 1.1 released: split(), try-catch, killall(), profiling</title>
+      <link>/blog/2012/09/04/common_schema-1-1-released-split-try-catch-killall-profiling/</link>
+      <pubDate>Tue, 04 Sep 2012 08:15:25 +0000</pubDate>
+      
+      <guid>/blog/2012/09/04/common_schema-1-1-released-split-try-catch-killall-profiling/</guid>
+      <description>&lt;p&gt;I&#39;m very happy to announce the release of &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt;, version &lt;strong&gt;1.1&lt;/strong&gt; (revision &lt;strong&gt;300&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;This version boasts with compelling new features: innovative QueryScript syntax, libraries, views which add to your skills as a DBA, making some maintenance and management tasks a breeze.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;QueryScript, &lt;strong&gt;split&lt;/strong&gt; statement: automagically break long queries into smaller chunks, avoid long locks and reduce query/transaction overhead&lt;/li&gt;
+&lt;li&gt;QueryScript, &lt;strong&gt;try-catch&lt;/strong&gt; statement: just &lt;strong&gt;try { something; } catch { act_on_error; }&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;killall()&lt;/strong&gt;: quickly kill connections based on grantee/user/host information.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;profiling&lt;/strong&gt;/&lt;strong&gt;profiling_last&lt;/strong&gt;: utility views to assist in query profiling diagnostics&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;1 size fits all&lt;/strong&gt;: a single installer which auto-recognizes available server features and enables respective &lt;em&gt;common_schema&lt;/em&gt; features accordingly.&lt;/li&gt;
+&lt;li&gt;QueryScript performance boost&lt;/li&gt;
+&lt;li&gt;much much more...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Not familiar with &lt;em&gt;common_schema&lt;/em&gt;? It allows you to do stuff on server side, by selecting from views, calling upon useful routines or writing &lt;em&gt;easy-to-manage&lt;/em&gt; scripts.&lt;/p&gt;
+&lt;p&gt;I&#39;m suggesting that &lt;em&gt;common_schema&lt;/em&gt; should be a &lt;em&gt;really-should-have&lt;/em&gt; tool to accompany your MySQL install. Did I say &#34;tool&#34;? It&#39;s merely a &lt;em&gt;schema&lt;/em&gt;. But it makes for a great framework:&lt;/p&gt;
+&lt;p&gt;In &lt;a href=&#34;http://www.amazon.com/High-Performance-MySQL-Optimization-Replication/dp/1449314287/ref=dp_ob_title_bk&#34;&gt;High Performance MySQL, 3rd edition&lt;/a&gt;, Baron Schwartz describes &lt;em&gt;common_schema&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;The &lt;em&gt;common_schema&lt;/em&gt; is to MySQL as jQuery is to javaScript&lt;/blockquote&gt;
+&lt;p&gt;Reviewing highlights for version &lt;strong&gt;1.1&lt;/strong&gt;:&lt;/p&gt;
+&lt;h4&gt;QueryScript&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt; is a scripting language. It sees some major improvements here. I&#39;ve made some speed boosts by &lt;a href=&#34;http://code.openark.org/blog/mysql/on-stored-routines-and-dynamic-statements&#34;&gt;avoiding using temporary tables&lt;/a&gt;, and by using string parsing instead.&lt;/p&gt;
+&lt;p&gt;Without doubt the two most handy statements added to &lt;em&gt;QueryScript&lt;/em&gt; are:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html&#34;&gt;&lt;strong&gt;split&lt;/strong&gt;&lt;/a&gt;: automagically break a long query into smaller, distinct chunks, and execute those iteratively. Just write your query; &lt;em&gt;split&lt;/em&gt; will parse it, analyze it, rewrite it, break your table into parts, iterate your table and apply query for each chunk of rows. You can reduce lock time, avoid huge transactions and give your server room to breathe on operations such as massive updates of rows, transferring of rows between tables, massive purging of rows etc. Consider: the following query will execute &lt;strong&gt;1,000&lt;/strong&gt; rows at a time, and the script will throttle execution so as to sleep in between chunks. And you need know nothing about how it works internally (though it&#39;s quite interesting):&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;create table world.City_dup like world.City;
+split (insert into world.City_dup select * from world.City)
+{
+  throttle 2;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_try_catch.html&#34;&gt;&lt;strong&gt;try-catch&lt;/strong&gt;&lt;/a&gt;: if, like me, you are frustrated with stored routines way of handling errors, QueryScript now offers you familiar (yet enhanced) form of &lt;strong&gt;try something catch do_something_on_error&lt;/strong&gt;. It is limited in that you cant have a catch for particular error codes - MySQL &lt;a href=&#34;http://code.openark.org/blog/mysql/mysql-error-handling-on-server-side-a-no-go&#34;&gt;does not provide such info on server side&lt;/a&gt;. Nevertheless, consider:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;while (true)
+{
+  try
+  {
+    -- Attempt query which is expected to abort on deadlock:
+    UPDATE some_table SET some_column = 1 WHERE some_condition;
+    -- Got here? This means query is successful! We can leave now.
+    break;
+  }
+  catch
+  {
+    -- Apparently there was a deadlock. Rest, then loop again until succeeds
+    sleep 1;
+  }
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;QueryScript also adds:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_eval.html&#34;&gt;&lt;strong&gt;eval&lt;/strong&gt;&lt;/a&gt;: evaluate SQL statements on the fly. I&#39;ve got some very cool use cases already in production.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_sleep.html&#34;&gt;&lt;strong&gt;sleep&lt;/strong&gt;&lt;/a&gt;: just... sleep.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_pass.html&#34;&gt;&lt;strong&gt;pass&lt;/strong&gt;&lt;/a&gt;: similar to Python&#39;s pass statement, this statement does nothing and makes for a placeholder.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;QueryScript &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_variables.html&#34;&gt;variables&lt;/a&gt; now support:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Declare &amp;amp; assign syntax: &lt;strong&gt;var $sum := 0&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;New expansion syntax: &lt;strong&gt;DELETE FROM t LIMIT :${number_of_rows},&lt;/strong&gt; or&lt;strong&gt; CREATE TABLE customer_:${shard_number}_details&lt;br /&gt;
+&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Support for expanded variables in expressions, &lt;em&gt;throttle&lt;/em&gt;, &lt;em&gt;sleep&lt;/em&gt;, &lt;em&gt;throw&lt;/em&gt; statements.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Routines:&lt;/h4&gt;
+&lt;p&gt;Plenty of new routines. Most notable:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/killall.html&#34;&gt;&lt;strong&gt;killall()&lt;/strong&gt;&lt;/a&gt;: much like Unix &lt;em&gt;killall&lt;/em&gt; command, this routine kills connections based on names, rather than process IDs. Names are &lt;em&gt;grantee name&lt;/em&gt;, or just the &lt;em&gt;user&lt;/em&gt; part, or just the &lt;em&gt;host&lt;/em&gt; part. Which allows for quick killing of all connections coming from a specific user or host:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CALL killall(&#39;host3.analytics.mycompany.com&#39;);
+CALL killall(&#39;reporting_user&#39;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_exists.html&#34;&gt;&lt;strong&gt;table_exists()&lt;/strong&gt;&lt;/a&gt;: test for (isn&#39;t it clear?) table existence. This uses INFORMATION_SCHEMA optimizations: it&#39;s a lightweight query.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT table_exists(&#39;sakila&#39;, &#39;rental&#39;) AS does_it_exist;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We also have text manipulation routines: &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/encode_xml.html&#34;&gt;&lt;strong&gt;encode_xml()&lt;/strong&gt;&lt;/a&gt; and &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/decode_xml.html&#34;&gt;&lt;strong&gt;decode_xml()&lt;/strong&gt;&lt;/a&gt;, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/strip_urls.html&#34;&gt;&lt;strong&gt;strip_urls()&lt;/strong&gt;&lt;/a&gt;, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/prettify_message.html&#34;&gt;&lt;strong&gt;prettify_message()&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h4&gt;Views&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;Profiling views, inspired by &lt;a href=&#34;http://www.mysqlperformanceblog.com/2012/02/20/how-to-convert-show-profiles-into-a-real-profile/&#34;&gt;How to convert MySQL’s SHOW PROFILES into a real profile&lt;/a&gt;: &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_profiling.html&#34;&gt;&lt;strong&gt;query_profiling&lt;/strong&gt;&lt;/a&gt; &amp;amp; &lt;strong&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/last_query_profiling.html&#34;&gt;last_query_profiling&lt;/a&gt;:&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SET PROFILING := 1;
+
+mysql&amp;gt; SELECT COUNT(*) FROM sakila.nicer_but_slower_film_list INTO @dummy;
+
+mysql&amp;gt; SELECT * FROM last_query_profiling;
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+
+| QUERY_ID | STATE                | state_calls | state_sum_duration | state_duration_per_call | state_duration_pct | state_seqs |
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+
+|       41 | checking permissions |           5 |           0.000320 |            0.0000640000 |               0.33 | 5,6,7,8,9  |
+|       41 | cleaning up          |           1 |           0.000007 |            0.0000070000 |               0.01 | 31         |
+|       41 | closing tables       |           1 |           0.000016 |            0.0000160000 |               0.02 | 29         |
+|       41 | Copying to tmp table |           1 |           0.042363 |            0.0423630000 |              44.34 | 15         |
+|       41 | Creating tmp table   |           1 |           0.000123 |            0.0001230000 |               0.13 | 13         |
+|       41 | end                  |           1 |           0.000004 |            0.0000040000 |               0.00 | 23         |
+|       41 | executing            |           2 |           0.000014 |            0.0000070000 |               0.01 | 14,22      |
+|       41 | freeing items        |           2 |           0.000216 |            0.0001080000 |               0.23 | 25,27      |
+|       41 | init                 |           1 |           0.000012 |            0.0000120000 |               0.01 | 20         |
+|       41 | logging slow query   |           1 |           0.000004 |            0.0000040000 |               0.00 | 30         |
+|       41 | Opening tables       |           1 |           0.028909 |            0.0289090000 |              30.26 | 2          |
+|       41 | optimizing           |           2 |           0.000026 |            0.0000130000 |               0.03 | 10,21      |
+|       41 | preparing            |           1 |           0.000018 |            0.0000180000 |               0.02 | 12         |
+|       41 | query end            |           1 |           0.000004 |            0.0000040000 |               0.00 | 24         |
+|       41 | removing tmp table   |           3 |           0.000130 |            0.0000433333 |               0.14 | 18,26,28   |
+|       41 | Sending data         |           2 |           0.016823 |            0.0084115000 |              17.61 | 17,19      |
+|       41 | Sorting result       |           1 |           0.006302 |            0.0063020000 |               6.60 | 16         |
+|       41 | starting             |           1 |           0.000163 |            0.0001630000 |               0.17 | 1          |
+|       41 | statistics           |           1 |           0.000048 |            0.0000480000 |               0.05 | 11         |
+|       41 | System lock          |           1 |           0.000017 |            0.0000170000 |               0.02 | 3          |
+|       41 | Table lock           |           1 |           0.000018 |            0.0000180000 |               0.02 | 4          |
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; meta info is in the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/status.html&#34;&gt;&lt;strong&gt;status&lt;/strong&gt;&lt;/a&gt; view, which can be used, for example, in bug reports. It indicated version, revision, time and status of installation process.&lt;/p&gt;
+&lt;h4&gt;Installer&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; comes with an invisible installer. It&#39;s just a SQL file, imported via &lt;strong&gt;SOURCE&lt;/strong&gt; command or your favorite import method. But, once base components are installed, it activates itself to spawn a smart-mode install phase, where it checks upon existing MySQL server features, and adding respective &lt;em&gt;common_schema&lt;/em&gt; features. So, if InnoDB plugin is present, you get the InnoDB plugin views in &lt;em&gt;common_schema&lt;/em&gt;. If this is a Percona Server, you also get those related views. This makes for a single distribution file, as opposed to &lt;strong&gt;3&lt;/strong&gt; different distributions in previous versions.&lt;/p&gt;
+&lt;h4&gt;Documentation&lt;/h4&gt;
+&lt;p&gt;There are no compromises here. Documenting &lt;em&gt;common_schema&lt;/em&gt; takes more time than writing &amp;amp; testing it. But everything is well documented. You can read the documentation online, or &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;download&lt;/a&gt; a bundle, or call for &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/help.html&#34;&gt;&lt;strong&gt;help()&lt;/strong&gt;&lt;/a&gt; from within &lt;em&gt;common_schema&lt;/em&gt;: the documentation is internal, too.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;root@mysql-5.1.51&amp;gt; CALL help(&#39;try&#39;);
++--------------------------------------------------------------------------------+
+| help                                                                           |
++--------------------------------------------------------------------------------+
+| QueryScript Flow Control: try-catch statement                                  |
+|                                                                                |
+| SYNOPSIS                                                                       |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|        try                                                                     |
+|          statement;                                                            |
+|        catch                                                                   |
+|          statement;                                                            |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+| DESCRIPTION                                                                    |
+|                                                                                |
+| try-catch is an error handling flow control structure. Flow is determined      |
+| based on the appearance or non-appearance of execution errors.                 |
+| The try statement (or block of statements) is executed. If no error occurs, it |
+| completes, and the catch statement is never executed.                          |
+| If an error is detected within execution of the try statement, the try         |
+| statement is aborted at the point of error (i.e. all statements following the  |
+| point of error are discarded), and the catch statement (or block of            |
+| statements) is executed.                                                       |
+...
++--------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Tests&lt;/h4&gt;
+&lt;p&gt;With over &lt;strong&gt;350&lt;/strong&gt; tests and counting, &lt;em&gt;common_schema&lt;/em&gt; and &lt;em&gt;QueryScript&lt;/em&gt; are well tested. There are still tests to write, the cover is not complete, and I&#39;m working on it.&lt;/p&gt;
+&lt;h4&gt;Bugfixes&lt;/h4&gt;
+&lt;p&gt;Changed view definitions affected by &lt;a href=&#34;http://bugs.mysql.com/65388&#34;&gt;MySQL bug #65388&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Download&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;Download common_schema&lt;/a&gt;. You will find it is rich and smart.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>DELETE, don&#39;t INSERT</title>
+      <link>/blog/2012/06/27/delete-dont-insert/</link>
+      <pubDate>Wed, 27 Jun 2012 07:25:09 +0000</pubDate>
+      
+      <guid>/blog/2012/06/27/delete-dont-insert/</guid>
+      <description>&lt;p&gt;Have just read &lt;a href=&#34;http://blog.9minutesnooze.com/insert-delete/&#34;&gt;INSERT, Don’t DELETE&lt;/a&gt; by Aaron Brown, and have some lengthy response, which is why I write this post instead of commenting on said post.&lt;/p&gt;
+&lt;p&gt;I wish to offer my counter thought and suggest that &lt;strong&gt;DELETE&lt;/strong&gt;s are probably the better choice.&lt;/p&gt;
+&lt;p&gt;Aaron suggests that, when one wishes to purge rows from some table, a trick can be used: instead of &lt;strong&gt;DELETE&lt;/strong&gt;ing unwanted rows, one can &lt;strong&gt;INSERT&lt;/strong&gt; &#34;good&#34; rows into a new table, then switch over with &lt;strong&gt;RENAME&lt;/strong&gt; (but please read referenced post for complete details).&lt;/p&gt;
+&lt;p&gt;I respectfully disagree on several points discussed.&lt;/p&gt;
+&lt;h4&gt;Lockdown&lt;/h4&gt;
+&lt;p&gt;The fact one needs to block writes during the time of creation of new table is problematic: you need to essentially turn off parts of your application. The posts suggests one could use a slave - but this solution is far from being trivial as well. To switch over, you yet again need to turn off access to DB, even if for a short while.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;A switch over to a slave is quite a big deal, in my opinion, for the mere purpose of deletion of rows.&lt;/p&gt;
+&lt;h4&gt;DELETEs are easy&lt;/h4&gt;
+&lt;p&gt;The DELETEs are so much easier: the first thing to note is the following: &lt;em&gt;You don&#39;t actually have to delete all the rows *at once*&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;You just need to drop some rows, right? Why waste a huge transaction that takes minutes, when you can drop the rows by chunks, one at a time?&lt;br /&gt;
+For that, you can use either &lt;a href=&#34;http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html&#34;&gt;pt-archive&lt;/a&gt; from &lt;em&gt;Percona Toolkit&lt;/em&gt;, &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html&#34;&gt;oak-chunk-update&lt;/a&gt; from &lt;em&gt;openark-kit&lt;/em&gt;, or write a simple &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt; code with &lt;em&gt;common_schema&lt;/em&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;while (DELETE FROM title WHERE title &amp;lt;= &#39;g&#39; LIMIT 1000)
+{
+  throttle 1;
+}&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So, drop &lt;strong&gt;1,000&lt;/strong&gt; rows or so at a time, then sleep some time, etc. The total runtime is longer, but who cares? The impact can be reduced to be unnoticeable.&lt;/p&gt;
+&lt;h4&gt;Space reclaim&lt;/h4&gt;
+&lt;p&gt;You can use online table operations to rebuild your table and reclaim the disk space. Either see &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html&#34;&gt;oak-online-alter-table&lt;/a&gt; or &lt;a href=&#34;http://www.percona.com/doc/percona-toolkit/2.1/pt-online-schema-change.html&#34;&gt;pt-online-schema-change&lt;/a&gt;. Again, both work in small chunks, so no long stalls.&lt;/p&gt;
+&lt;p&gt;But more on this: my usual purge scenario shows that it is repetitive. You purge, data fills again, you purge again, and so on.&lt;/p&gt;
+&lt;p&gt;Which is why it doesn&#39;t make much sense to rebuild the table and reclaim the disk space: it just grows again to roughly same dimensions.&lt;br /&gt;
+For a one time operation (e.g. after neglect of cleanup for long time) -- yes, absolutely, do a rebuild and reclaim. For repetitive cleanup - I don&#39;t bother.&lt;/p&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;Aaron does make note at the end of his post that &lt;strong&gt;DELETE&lt;/strong&gt; operations can be done online, while the &lt;strong&gt;INSERT&lt;/strong&gt; trick requires downtime, and this is a fair assessment.&lt;/p&gt;
+&lt;p&gt;But just to make a point: none of the &lt;strong&gt;DELETE&lt;/strong&gt; timings are interesting. Since we are not concerned with deleting the rows in a given time (no &#34;press the red button&#34;), we can spread them over time and make the impact negligible. So not only is everything done online, it also goes unnoticed by the user. And this, I believe, is the major thing to consider.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

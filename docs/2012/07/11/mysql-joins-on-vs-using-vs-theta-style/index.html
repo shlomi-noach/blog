@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>MySQL joins: ON vs. USING vs. Theta-style &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>MySQL joins: ON vs. USING vs. Theta-style</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>11 Jul 2012</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/syntax">Syntax</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>What is the difference between the following three syntaxes?</p>
+<blockquote>
+<pre>SELECT * FROM film JOIN film_actor ON (film.film_id = film_actor.film_id)
+SELECT * FROM film JOIN film_actor USING (film_id)
+SELECT * FROM film, film_actor WHERE film.film_id = film_actor.film_id</pre>
+</blockquote>
+<p>The difference is mostly syntactic sugar, but with a couple interesting notes.</p>
+<p>To put names, the first two are called <strong>"ANSI-style"</strong> while the third is called <strong>"Theta-style"</strong>.</p>
+<h4>Theta style</h4>
+<p>On the <strong>FROM</strong> clause, tables are listed as if with Cartesian products, and the <strong>WHERE</strong> clause specifies how the join should take place.</p>
+<p>This is considered to be the "old" style. It is somewhat confusing to read. Consider the following query:<!--more--></p>
+<blockquote>
+<pre><strong>SELECT</strong> * <strong>FROM</strong> film, film_actor <strong>WHERE</strong> film.film_id = film_actor.film_id <strong>AND</strong> actor_id = 17 <strong>AND</strong> film.length &gt; 120</pre>
+</blockquote>
+<p>The above lists films over <strong>120</strong> minutes in length, in which actor <strong>#17</strong> plays. Never mind the results; what about the query? Being just one part of the <strong>WHERE</strong> clause, a one out of three elements in the <strong>AND</strong> expression, the join equation gets lost. It is difficult to find and isolate the terms which make for table joins as opposed to terms which filter out rows. In the above example it is still relatively easy to point out. How about a query with <strong>5</strong> tables and a <strong>20</strong> terms <strong>WHERE</strong> clause?</p>
+<h4>ANSI style: ON</h4>
+<p>With <strong>JOIN</strong> ... <strong>ON</strong>, one separates the join terms from the filtering terms. Rewriting the previous example:</p>
+<blockquote>
+<pre><strong>SELECT</strong> * <strong>FROM</strong> film <strong>JOIN</strong> film_actor <strong>ON</strong> (film.film_id = film_actor.film_id) <strong>WHERE</strong> actor_id = 17 <strong>AND</strong> film.length &gt; 120</pre>
+</blockquote>
+<p>It is quite clear now what belongs to what.</p>
+<p>Note: the parenthesis are not strictly required in the <strong>ON</strong> clause. I personally like to use them: it makes for an even greater distinction between query parts. SQL syntax is such a mess!</p>
+<h4>ANSI style: USING</h4>
+<p>Is the special case where we join tables on columns of the same name, we can make a shortcut and use <strong>USING</strong>:</p>
+<blockquote>
+<pre><strong>SELECT</strong> * <strong>FROM</strong> film <strong>JOIN</strong> film_actor <strong>USING</strong> (film_id) <strong>WHERE</strong> actor_id = 17 <strong>AND</strong> film.length &gt; 120</pre>
+</blockquote>
+<p>This time the parenthesis are required (I'm not sure why the difference on that part).</p>
+<p>This is mainly a nicety, less words to type, and a resulting prettified query. But also note a couple differences:</p>
+<h4>USING vs. ON</h4>
+<p>The following is valid:</p>
+<blockquote>
+<pre>SELECT film.title, film_id FROM film JOIN film_actor USING (film_id) WHERE actor_id = 17 AND film.length &gt; 120;</pre>
+</blockquote>
+<p>But the following is not:</p>
+<blockquote>
+<pre>SELECT film.title, film_id FROM film JOIN film_actor ON (film.film_id = film_actor.film_id) WHERE actor_id = 17 AND film.length &gt; 120;
+<strong>ERROR 1052 (23000): Column 'film_id' in field list is ambiguous</strong></pre>
+</blockquote>
+<p>Since <strong>USING</strong> "knows" the film_id column is shared between both tables, it doesn't mind if we ask it without specifying an exact table. It would be the same value anyway!</p>
+<p><strong>ON</strong> is not as smart and requires further clarifications: which table exactly do you want?</p>
+<p>And the above is actually the result of this interesting phenomena: when using <strong>USING</strong>, the column only appears <em>once</em> in the result set:</p>
+<blockquote>
+<pre>SELECT * FROM film JOIN film_actor USING (film_id) WHERE actor_id = 17 AND film.length &gt; 120 LIMIT 1\G
+*************************** 1. row ***************************
+             <strong>film_id</strong>: 96
+               title: BREAKING HOME
+         description: A Beautiful Display of a Secret Agent And a Monkey who must Battle a Sumo Wrestler in An Abandoned Mine Shaft
+        release_year: 2006
+         language_id: 1
+original_language_id: NULL
+     rental_duration: 4
+         rental_rate: 2.99
+              length: 169
+    replacement_cost: 21.99
+              rating: PG-13
+    special_features: Trailers,Commentaries
+         last_update: 2006-02-15 05:03:42
+            actor_id: 17
+         last_update: 2006-02-15 05:05:03</pre>
+</blockquote>
+<p>But joining on <strong>ON</strong>, we get this column <em>twice</em>:</p>
+<blockquote>
+<pre>SELECT * FROM film JOIN film_actor ON film.film_id = film_actor.film_id WHERE actor_id = 17 AND film.length &gt; 120 LIMIT 1\G
+*************************** 1. row ***************************
+             <strong>film_id</strong>: 96
+               title: BREAKING HOME
+         description: A Beautiful Display of a Secret Agent And a Monkey who must Battle a Sumo Wrestler in An Abandoned Mine Shaft
+        release_year: 2006
+         language_id: 1
+original_language_id: NULL
+     rental_duration: 4
+         rental_rate: 2.99
+              length: 169
+    replacement_cost: 21.99
+              rating: PG-13
+    special_features: Trailers,Commentaries
+         last_update: 2006-02-15 05:03:42
+            actor_id: 17
+             <strong>film_id</strong>: 96
+         last_update: 2006-02-15 05:05:03</pre>
+</blockquote>
+<h4>Behind the scenes</h4>
+<p>The news is that MySQL treats all in the exact same way. With the kind help of <strong>EXPLAIN EXTENDED</strong>, we see that:</p>
+<blockquote>
+<pre>EXPLAIN EXTENDED SELECT film.title, film_id FROM film JOIN film_actor <strong>USING</strong> (film_id) WHERE actor_id = 17 AND film.length &gt; 120\G
+*************************** 1. row ***************************
+...
+2 rows in set, 1 warning (0.00 sec)
+
+root@mysql-5.1.51&gt; SHOW WARNINGS\G
+*************************** 1. row ***************************
+  Level: Note
+   Code: 1003
+Message: select `sakila`.`film`.`title` AS `title`,`sakila`.`film`.`film_id` AS `film_id` 
+         from `sakila`.`film` join `sakila`.`film_actor` 
+         where (
+                 <strong>(`sakila`.`film`.`film_id` = `sakila`.`film_actor`.`film_id`)</strong> 
+                 and (`sakila`.`film_actor`.`actor_id` = 17) 
+                 and (`sakila`.`film`.`length` &gt; 120)
+               )</pre>
+</blockquote>
+<p>All queries are translated internally to <em>theta-style</em>.</p>
+<p>This post only discusses inner joins. With outer joins the situation is somewhat different. Read <a href="http://www.mysqldiary.com/mysql-left-join/">this post</a> for more insight.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2012/07/04/notes-on-row-based-replication/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2012/07/04/notes-on-row-based-replication/">Notes on row based replication</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2012/07/18/mysql-error-handling-on-server-side-a-no-go/">MySQL error handling on server side: a NO GO!</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2012/07/18/mysql-error-handling-on-server-side-a-no-go/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>MySQL security tasks easily solved with common_schema &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>MySQL security tasks easily solved with common_schema</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>17 Jan 2013</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/common_schema">common_schema</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/security">Security</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Here are three security tasks I handled, which I'm happy to say were easily solved with <em>common_schema</em>'s views and routines (with no prior planning). Two are so easy, that I actually now integrated them into <a href="http://code.google.com/p/common-schema">common_schema 1.3</a>:</p>
+<ul>
+<li>Duplicate a user (create new user with same privileges as another's)</li>
+<li>Find users with identical set of grants (same roles)</li>
+<li>Finding redundant users (users who only have privileges on non-existing objects); I was approached on this by <a href="http://sheeri.com/">Sheeri K. Cabral</a> from Mozilla.</li>
+</ul>
+<h4>Duplicate user</h4>
+<p>How would you duplicate a grantee? That's easy! Just get the SHOW GRANTS output, then do text search and replace: replace the existing account (e.g. <strong>'existing'@'localhost'</strong>) with the new account (e.g. <strong>'newcomer'@'localhost'</strong>).</p>
+<p>Ahem. And how would you get the output of <strong>SHOW GRANTS</strong>? That's right: you can't do this from within the server. You have to go outside the server, incoke mysql client, <em>sed</em> your way into it, then connect to MySQL again to invoke the GRANT query... Or you can do this by hand, of course, or you can use the new <a href="http://dev.mysql.com/doc/workbench/en/mysqluserclone.html">mysqluserclone</a> tool from MySQL utilities. Bottom line: you have to go outside the server. You can't directly do this with your favorite GUI tool unless it has this function integrated.</p>
+<p>But to have a truly automated, scriptable, server-side user-duplication you don't need to go far, since the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">sql_show_grants</a> view simulates a <strong>SHOW GRANTS</strong> output, but using plain old SQL. It produces the <strong>GRANT</strong> statement as SQL output. Which means you can <strong>REPLACE()</strong> the grantee. It's actually a one liner, but is such a common operation that I created the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html">duplicate_grantee()</a> function for convenience. Just:<!--more--></p>
+<blockquote>
+<pre>call duplicate_grantee(<strong>'existing@localhost', </strong><strong>'newcomer@localhost'</strong>);</pre>
+</blockquote>
+<p>(and yes, using a more relaxed form of grantee, allowing dropping of all these gory quotes).</p>
+<h4>Finding similar grantees</h4>
+<p>If the grants of an account are available via SQL, I'm also able to compare it with the grants of another account. I just need to ignore the account's name in itself. Since <em>sql_show_grants</em> normalizes the grants in expected order, this works well. Again, this is a simple query, but since it is of importance, I created a view for it: just <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html"><strong>SELECT * FROM similar_grants</strong></a> to find out about accounts sharing same set of privileges..</p>
+<h4>Drop redundant users</h4>
+<p>Sheeri approached me with the following problem (she authorized me to publicize): as she came to work for Mozilla, she inherited the databases to manage. When she reviewed them, she realized there were numerous accounts which were redundant. Redundant how? Well, obviously not being used, but moreover not having privileges on existing objects.</p>
+<p>She found out there were many accounts that only had privileges on non-existing schema, something like:</p>
+<blockquote>
+<pre>GRANT ALL PRIVILEGES ON <strong>penguin.*</strong> TO 'gromit'@'localhost'</pre>
+</blockquote>
+<p>Where the <strong>penguin</strong> schema does not exist anymore - it was some developer's test database. The developer long since not working there, the database long since DROPped.</p>
+<p>How do you quickly find and drop such accounts? Should we do crazy parsing on <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-show-grants.html">pt-show-grants</a> output? Any other method?</p>
+<p>Well, <em>common_schema</em> to the rescue: the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">sql_grants</a> view breaks the <strong>GRANT</strong> statement into domains (in fact, this is not a true explanation; it actually <em>builds</em> the <strong>GRANT</strong> statements per domain; but it's more convenient to view it as <em>breaking</em>). You actually get the different <strong>GRANT</strong> statement per account per domain: the <strong>GRANT</strong> the account has on <strong>*.*</strong>, the <strong>GRANT</strong> it has on <strong>world.*</strong>, the <strong>GRANT</strong> it has on <strong>sakila.*</strong>, the <strong>GRANT</strong> it has on ....</p>
+<p>Now this one is not entirely simple. Let me introduce the solution, then explain it. The way to find &amp; drop all such users is:</p>
+<blockquote>
+<pre>call <strong>eval</strong>(<span style="color: #000080;">"SELECT <strong>sql_revoke</strong> FROM <strong>sql_grants</strong> LEFT JOIN INFORMATION_SCHEMA.SCHEMATA ON(object_name = SCHEMA_NAME) WHERE priv_level_name='schema' AND DEFAULT_CHARACTER_SET_NAME IS NULL"</span>);
+call <strong>eval</strong>(<span style="color: #000080;">"SELECT <strong>sql_drop_user</strong> FROM <strong>sql_grants</strong> GROUP BY GRANTEE HAVING COUNT(*)=1 AND SUM(current_privileges='USAGE')=1"</span>);</pre>
+</blockquote>
+<p>Explanation:</p>
+<ol>
+<li>The <strong>LEFT JOIN</strong> query finds all <strong>GRANT</strong>s on non existing schemas.</li>
+<li>But we do more than that: we request the <strong>sql_revoke</strong> column which negates such <strong>GRANT</strong>s. <strong>sql_grants</strong> provides such info: the <strong>REVOKE</strong> statement for said <strong>GRANT</strong>s.</li>
+<li>We can actually evaluate the <strong>REVOKE</strong> statement via <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html"><strong>eval()</strong></a>. There! These privileges are now gone.</li>
+<li>Now that we have revoked privileges on non-existing domains, we should be left with accounts whose only privilege is <strong>USAGE</strong>. Any such account is redundant by definition, and should be dropped. The second query looks up such accounts.</li>
+<li>And, it asks for the <strong>sql_drop_user</strong> statement column for those accounts</li>
+<li>Finally, it evaluates the <strong>DROP USER</strong> statement via <em>eval()</em>.</li>
+</ol>
+<p>Here is the statements output without executing the <strong>eval()</strong>:</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SELECT <strong>sql_revoke</strong> FROM <strong>sql_grants</strong> LEFT JOIN INFORMATION_SCHEMA.SCHEMATA ON(object_name = SCHEMA_NAME) WHERE  priv_level_name='schema'  AND DEFAULT_CHARACTER_SET_NAME IS NULL;
++-----------------------------------------------------------------+
+| sql_revoke                                                      |
++-----------------------------------------------------------------+
+| REVOKE INSERT, SELECT ON `not_here`.* FROM 'gromit'@'localhost' |
++-----------------------------------------------------------------+
+
+root@mysql-5.1.51&gt; SELECT <strong>sql_drop_user</strong> FROM <strong>sql_grants</strong> GROUP BY GRANTEE HAVING COUNT(*)=1 AND SUM(current_privileges='USAGE')=1;
++--------------------------------+
+| sql_drop_user                  |
++--------------------------------+
+| DROP USER 'gromit'@'localhost' |
++--------------------------------+</pre>
+</blockquote>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2013/01/14/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2013/01/14/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum/">common_schema: 1.3: security goodies, parameterized split(), json-to-xml, query checksum</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2013/01/24/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/">Re: MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2013/01/24/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

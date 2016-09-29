@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Reading RBR binary logs with pt-query-digest &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Reading RBR binary logs with pt-query-digest</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>26 Jan 2015</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/analysis">Analysis</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/percona-toolkit">Percona Toolkit</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/python">python</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/replication">Replication</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/scripts">scripts</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>For purposes of auditing anything that goes on our servers we're looking to parse the binary logs of all servers (masters), as with "<a href="http://code.openark.org/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow">Anemomaster</a>". With Row Based Replication this is problematic since <strong>pt-query-digest</strong> <a href="https://bugs.launchpad.net/percona-toolkit/+bug/1377887">does not support parsing RBR binary logs</a> (true for <strong>2.2.12</strong>, latest at this time).</p>
+<p>I've written a simple script that translates RBR logs to SBR-like logs, with a little bit of cheating. My interest is that <strong>pt-query-digest</strong> is able to capture and count the queries, nothing else. By doing some minimal text manipulation on the binary log I'm able to now feed it to <strong>pt-query-digest</strong> which seems to be happy.</p>
+<p>The script of course does not parse the binary log directly; furthermore, it requires the binary log to be extracted via:</p>
+<blockquote>
+<pre>mysqlbinlog --verbose --base64-output=DECODE-ROWS your-mysql-binlog-filemame.000001</pre>
+</blockquote>
+<p>The above adds the interpretation of the RBR entires in the form of (unconventional) statements, commented, and strips out the cryptic RBR text. All that is left is to do a little manipulation on entry headers and uncomment the interpreted queries.</p>
+<p>The script can be found in <a href="https://gist.github.com/shlomi-noach/cc243fd690403e7617e3">my gist repositories</a>. Current version is as follows:<!--more--></p>
+<blockquote>
+<p>[code lang="python"]<br />
+#!/usr/bin/python<br />
+#<br />
+# Convert a Row-Based-Replication binary log to Statement-Based-Replication format, cheating a little.<br />
+# This script exists since Percona Toolkit's pt-query-digest cannot digest RBR format. The script<br />
+# generates enough for it to work with.<br />
+# Expecting standard input<br />
+# Expected input is the output of &quot;mysqlbinlog --verbose --base64-output=DECODE-ROWS &lt;binlog_file_name&gt;&quot;<br />
+# For example:<br />
+# $ mysqlbinlog --verbose --base64-output=DECODE-ROWS mysql-bin.000006 | python binlog-rbr-to-sbr.py | pt-query-digest --type=binlog --order-by Query_time:cnt --group-by fingerprint<br />
+#</p>
+<p>import fileinput</p>
+<p>def convert_rbr_to_pseudo_sbr():<br />
+    inside_rbr_statement = False<br />
+    for line in fileinput.input():<br />
+        line = line.strip()<br />
+        if line.startswith(&quot;#&quot;) and &quot;end_log_pos&quot; in line:<br />
+            for rbr_token in [&quot;Update_rows:&quot;, &quot;Write_rows:&quot;, &quot;Delete_rows:&quot;, &quot;Rows_query:&quot;, &quot;Table_map:&quot;,]:<br />
+                if rbr_token in line:<br />
+                    line = &quot;%s%s&quot; % (line.split(rbr_token)[0], &quot;Query\tthread_id=1\texec_time=0\terror_code=0&quot;)<br />
+        if line.startswith(&quot;### &quot;):<br />
+            inside_rbr_statement = True<br />
+            # The &quot;### &quot; commented rows are the pseudo-statement interpreted by mysqlbinlog's &quot;--verbose&quot;,<br />
+            # and which we will feed into pt-query-digest<br />
+            line = line[4:]<br />
+        else:<br />
+            if inside_rbr_statement:<br />
+                print(&quot;/*!*/;&quot;)<br />
+            inside_rbr_statement = False<br />
+        print(line) </p>
+<p>convert_rbr_to_pseudo_sbr()<br />
+</pre>
+</blockquote>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2014/12/18/orchestrator-1-2-9-ga-released/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2014/12/18/orchestrator-1-2-9-ga-released/">Orchestrator 1.2.9 GA released</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2015/01/29/speaking-at-fosdem-pseudo-gtid-and-easy-replication-management/">Speaking at FOSDEM: Pseudo GTID and easy replication management</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2015/01/29/speaking-at-fosdem-pseudo-gtid-and-easy-replication-management/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

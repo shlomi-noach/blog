@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Views on code.openark.org</title>
+    <link>/blog/tags/views/</link>
+    <description>Recent content in Views on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Tue, 06 Mar 2012 15:18:36 +0000</lastBuildDate>
+    <atom:link href="/blog/tags/views/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Auto caching tables</title>
+      <link>/blog/2012/03/06/auto-caching-tables/</link>
+      <pubDate>Tue, 06 Mar 2012 15:18:36 +0000</pubDate>
+      
+      <guid>/blog/2012/03/06/auto-caching-tables/</guid>
+      <description>&lt;p&gt;Is there a way to create a caching table, some sort of a materialized view, such that &lt;em&gt;upon selecting&lt;/em&gt; from that table, its data is validated/invalidated?&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Hint&lt;/em&gt;: yes.&lt;/p&gt;
+&lt;p&gt;But to elaborate the point: say I have some table &lt;strong&gt;data_table&lt;/strong&gt;. Can I rewrite all my queries which access &lt;strong&gt;data_table&lt;/strong&gt; to read from some &lt;strong&gt;autocache_data_table&lt;/strong&gt;, but have nothing changed in the query itself? No caveats, no additional &lt;strong&gt;WHERE&lt;/strong&gt;s, and still have that &lt;strong&gt;autocache_data_table&lt;/strong&gt; provide with the correct data, dynamically updated by some rule &lt;em&gt;of our choice&lt;/em&gt;?&lt;/p&gt;
+&lt;p&gt;And: no &lt;em&gt;crontab&lt;/em&gt;, no &lt;em&gt;event scheduler&lt;/em&gt;, and no funny triggers on &lt;strong&gt;data_table&lt;/strong&gt;? In such way that invalidation/revalidation occurs &lt;em&gt;upon &lt;strong&gt;SELECT&lt;/strong&gt;&lt;/em&gt;?&lt;/p&gt;
+&lt;p&gt;Well, yes.&lt;/p&gt;
+&lt;p&gt;This post is long, but I suggest you read it through to understand the mechanism, it will be worthwhile.&lt;/p&gt;
+&lt;h4&gt;Background&lt;/h4&gt;
+&lt;p&gt;The following derives from my long research on how to provide better, faster and &lt;em&gt;safer&lt;/em&gt; access to &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt; tables. It is however not limited to this exact scenario, and in this post I provide with a simple, general purpose example. I&#39;ll have more to share about &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt; specific solutions shortly.&lt;/p&gt;
+&lt;p&gt;I was looking for a server side solution which would not require query changes, apart from directing the query to other tables. Solution has to be supported by all standard MySQL installs; so: no plugins, no special rebuilds.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Sample data&lt;/h4&gt;
+&lt;p&gt;I&#39;ll explain by walking through the solution. Let&#39;s begin with some sample table:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE TABLE sample_data (
+  id INT UNSIGNED NOT NULL PRIMARY KEY,
+  dt DATETIME,
+  msg VARCHAR(128) CHARSET ascii
+);
+
+INSERT INTO sample_data VALUES (1, NOW(), &#39;sample txt&#39;);
+INSERT INTO sample_data VALUES (2, NOW(), &#39;sample txt&#39;);
+INSERT INTO sample_data VALUES (3, NOW(), &#39;sample txt&#39;);
+
+SELECT * FROM sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;In this simplistic example, I wish to create a construct which looks exactly like &lt;strong&gt;sample_data&lt;/strong&gt;, but which caches data according to some heuristic. It will, in fact, cache the entire content of &lt;strong&gt;sample_data&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;That much is not a problem: just create another table to cache the data:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE TABLE cache_sample_data LIKE sample_data;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The big question is: how do you make the table invalidate itself while &lt;strong&gt;SELECT&lt;/strong&gt;ing from it?&lt;/p&gt;
+&lt;p&gt;Here&#39;s the deal. I&#39;ll ask for your patience while I draw the outline, and start with failed solutions. By the end, everything will work.&lt;/p&gt;
+&lt;h4&gt;Failed attempt: purge rows from the table even while reading it&lt;/h4&gt;
+&lt;p&gt;My idea is to create a stored function which purges the &lt;strong&gt;cache_sample_data&lt;/strong&gt; table, then fills in with fresh data, according to some heuristic. Something like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DELIMITER $$
+
+CREATE FUNCTION `revalidate_cache_sample_data`() RETURNS tinyint unsigned
+    MODIFIES SQL DATA
+    DETERMINISTIC
+    SQL SECURITY INVOKER
+BEGIN
+  if(rand() &amp;gt; 0.1) then
+    return 0; -- simplistic heuristic
+  end if;
+
+  DELETE FROM cache_sample_data;
+  INSERT INTO cache_sample_data SELECT * FROM sample_data;
+  RETURN 0;
+END $$
+
+DELIMITER ;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;So the function uses some heuristic. It&#39;s a funny &lt;strong&gt;RAND()&lt;/strong&gt; in our case; you will want to check up on time stamps, or some flags, what have you. But this is not the important part here, and I want to keep the focus on the main logic.&lt;/p&gt;
+&lt;p&gt;Upon deciding the table needs refreshing, the function purges all rows, then copies everything from &lt;strong&gt;sample_data&lt;/strong&gt;. Sounds fair enough?&lt;/p&gt;
+&lt;p&gt;Let&#39;s try and invoke it. Just write some query by hand:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              &lt;strong&gt;0&lt;/strong&gt; |
++--------------------------------+
+
+mysql&amp;gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              &lt;strong&gt;0&lt;/strong&gt; |
++--------------------------------+
+
+mysql&amp;gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              &lt;strong&gt;1&lt;/strong&gt; |
++--------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;First two invocations - nothing. The third one indicated a revalidation of cache data. Let&#39;s verify:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM cache_sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;OK, seems like the function works.&lt;/p&gt;
+&lt;p&gt;We now gather some courage, and try combining calling to this function even while SELECTing from the cache table, like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To explain what happens in the above query, consider its &lt;a href=&#34;http://code.openark.org/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql&#34;&gt;programmatic nature&lt;/a&gt;: we create a derived table, populated by the function&#39;s result. That means the function is invoked in order to generate the derived table. The derived table itself must be materialized before the query begins execution, and so it is that we first invoke the function, then make the &lt;strong&gt;SELECT&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Don&#39;t open the champagne yet. While the above paragraph is correct, we are deceived: in this last invocation, the function did &lt;strong&gt;not&lt;/strong&gt; attempt a revalidation. The &lt;strong&gt;RAND()&lt;/strong&gt; function just didn&#39;t provide with the right value.&lt;/p&gt;
+&lt;p&gt;Let&#39;s try again:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
+&lt;strong&gt;ERROR 1442 (HY000): Can&#39;t update table &#39;cache_sample_data&#39; in stored function/trigger because it is already used by statement which invoked this stored function/trigger.&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Aha! Bad news. The MySQL manual says on &lt;a href=&#34;http://dev.mysql.com/doc/refman/5.1/en/stored-program-restrictions.html&#34;&gt;Restrictions on Stored Programs&lt;/a&gt;:&lt;/p&gt;
+&lt;blockquote&gt;A stored function or trigger cannot modify a table that is already being used (for reading or writing) by the statement that invoked the function or trigger.&lt;/blockquote&gt;
+&lt;h4&gt;Anyone to the rescue?&lt;/h4&gt;
+&lt;p&gt;I was quite upset. Can we not make this work? At sorrow times like these, one reflects back on words of wiser people. What would &lt;a href=&#34;http://rpbouman.blogspot.com/&#34;&gt;Roland Bouman&lt;/a&gt; say on this?&lt;/p&gt;
+&lt;p&gt;Oh, yes; he would say: &lt;em&gt;&#34;we can use a &lt;strong&gt;FEDERATED&lt;/strong&gt; table which connect onto itself, thus bypass the above restriction&#34;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Unfortunately, &lt;strong&gt;FEDERATED&lt;/strong&gt; is by default disabled nowadays; I cannot rely on its existence. Besides, to use &lt;strong&gt;FEDERATED&lt;/strong&gt; one has to fill in passwords and stuff. Definitely not an out-of-the-box solution in this case.&lt;/p&gt;
+&lt;p&gt;Few more days gone by. Decided the problem cannot be solved. And then it hit me.&lt;/p&gt;
+&lt;h4&gt;MyISAM to the rescue&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;&lt;strong&gt;MyISAM&lt;/strong&gt;&lt;/em&gt;? Really?&lt;/p&gt;
+&lt;p&gt;Yes, and not only &lt;strong&gt;MyISAM&lt;/strong&gt;, but also its cousin: it&#39;s long abandoned cousin, forgotten once &lt;strong&gt;views&lt;/strong&gt; and &lt;strong&gt;partitions&lt;/strong&gt; came into MySQL. &lt;strong&gt;&lt;a href=&#34;http://dev.mysql.com/doc/refman/5.1/en/merge-storage-engine.html&#34;&gt;MERGE&lt;/a&gt;&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;MERGE&lt;/strong&gt; reflects the data contained within &lt;strong&gt;MyISAM&lt;/strong&gt; tables. Perhaps the most common use for &lt;strong&gt;MERGE&lt;/strong&gt; is to work out partitioned-like table of records, with &lt;strong&gt;MyISAM&lt;/strong&gt; table-per month, and an overlooking &lt;strong&gt;MERGE&lt;/strong&gt; table dynamically adding and removing tables from its view.&lt;/p&gt;
+&lt;p&gt;But I intend for &lt;strong&gt;MERGE&lt;/strong&gt; a different use: just be an identical reflection of &lt;strong&gt;cache_sample_data&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;So we must work out the following:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;ALTER TABLE &lt;strong&gt;cache_sample_data&lt;/strong&gt; ENGINE=&lt;strong&gt;MyISAM&lt;/strong&gt;;
+CREATE TABLE &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt; LIKE cache_sample_data;
+ALTER TABLE &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt; ENGINE=&lt;strong&gt;MERGE&lt;/strong&gt; &lt;strong&gt;UNION=(cache_sample_data)&lt;/strong&gt;;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I just want to verify the new table is setup correctly:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM cache_sample_data_wrapper;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Seems fine.&lt;/p&gt;
+&lt;p&gt;So the next step is what makes the difference: the two tables are &lt;em&gt;not the same&lt;/em&gt;. One &lt;em&gt;relies on the other&lt;/em&gt;, but they are distinct. Our function &lt;strong&gt;DELETE&lt;/strong&gt;s from and &lt;strong&gt;INSERT&lt;/strong&gt;s to &lt;strong&gt;cached_sample_data&lt;/strong&gt;, but it does &lt;em&gt;not affect, nor lock&lt;/em&gt;, &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;We now rewrite our query to read:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  cache_sample_data_wrapper.*
+FROM
+  &lt;strong&gt;cache_sample_data_wrapper&lt;/strong&gt;,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This query is perfectly valid. It works. To illustrate, I do:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;-- Try this a few times till RAND() is lucky:
+
+&lt;strong&gt;TRUNCATE&lt;/strong&gt; cache_sample_data;
+
+SELECT
+  cache_sample_data_wrapper.*
+FROM
+  cache_sample_data_wrapper,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Whoa! Where did all this data come from? Didn&#39;t we just &lt;strong&gt;TRUNCATE&lt;/strong&gt; the table?&lt;/p&gt;
+&lt;p&gt;The query worked. The function re-populated &lt;strong&gt;cache_sample_data&lt;/strong&gt;.&lt;/p&gt;
+&lt;h4&gt;The final touch&lt;/h4&gt;
+&lt;p&gt;Isn&#39;t the above query just &lt;em&gt;beautiful&lt;/em&gt;? I suppose not many will share my opinion. What happened to my declaration that &lt;em&gt;&#34;the original query need not be changed, apart from querying a different table&#34;&lt;/em&gt;?&lt;/p&gt;
+&lt;p&gt;Yes, indeed. It&#39;s now time for the final touch. There&#39;s nothing amazing in this step, but we all know the way it is packaged is what makes the sale. We will now use &lt;em&gt;views&lt;/em&gt;. We use two of them since a view must not contain a &lt;em&gt;subquery&lt;/em&gt; in the &lt;strong&gt;FROM&lt;/strong&gt; clause. Here goes:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE OR REPLACE VIEW &lt;strong&gt;revalidate_cache_sample_data_view&lt;/strong&gt; AS
+  SELECT revalidate_cache_sample_data()
+;
+
+CREATE OR REPLACE VIEW &lt;strong&gt;autocache_sample_data&lt;/strong&gt; AS
+  SELECT
+    cache_sample_data_wrapper.*
+  FROM
+    cache_sample_data_wrapper,
+    revalidate_cache_sample_data_view
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;And finally, we can make a very simple query like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT * FROM &lt;strong&gt;autocache_sample_data&lt;/strong&gt;;
+--
+-- &lt;strong&gt;&lt;span style=&#34;color: #ff9900;&#34;&gt;Magic in work now!&lt;/span&gt;&lt;/strong&gt;
+--
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Much as we would query the original &lt;strong&gt;sample_data&lt;/strong&gt; table.&lt;/p&gt;
+&lt;h4&gt;Summary&lt;/h4&gt;
+&lt;p&gt;So what have we got? A stored routine, a &lt;strong&gt;MyISAM&lt;/strong&gt; table, a &lt;strong&gt;MERGE&lt;/strong&gt; table and two views. Quite a lot of constructs just to cache a table! But a beautiful cache access: &lt;em&gt;plain old SQL queries&lt;/em&gt;. The flow looks like this:&lt;/p&gt;
+&lt;blockquote&gt;&lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2011/11/autocache_flow.png&#34;&gt;&lt;img class=&#34;alignnone size-full wp-image-4463&#34; title=&#34;autocache flow chart&#34; src=&#34;/blog/blog/assets/autocache_flow.png&#34; alt=&#34;&#34; width=&#34;835&#34; height=&#34;625&#34; /&gt;&lt;/a&gt;&lt;/blockquote&gt;
+&lt;p&gt;Our cache table is a &lt;strong&gt;MyISAM&lt;/strong&gt; table. It can get corrupted, which is bad. But not completely bad: it&#39;s nothing more than a cache; we can throw away its entire data, and revalidate. We can actually ask the function to revalidate (say, pass a parameter).&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>ROUTINE_PRIVILEGES implementation</title>
+      <link>/blog/2011/06/22/routine_privileges-implementation/</link>
+      <pubDate>Wed, 22 Jun 2011 14:14:45 +0000</pubDate>
+      
+      <guid>/blog/2011/06/22/routine_privileges-implementation/</guid>
+      <description>&lt;p&gt;Following up on &lt;a title=&#34;Link to MySQL security: inconsistencies&#34; rel=&#34;bookmark&#34; href=&#34;http://code.openark.org/blog/mysql/mysql-security-inconsistencies&#34;&gt;MySQL security: inconsistencies&lt;/a&gt;, and on &lt;a href=&#34;http://bugs.mysql.com/bug.php?id=61596&#34;&gt;MySQL bug #61596&lt;/a&gt;, I was thinking it may take a long time till the non-existent &lt;strong&gt;ROUTINE_PRIVILEGES&lt;/strong&gt; view is implemented. Here&#39;s my own implementation of the view.&lt;/p&gt;
+&lt;p&gt;I&#39;ve followed the somewhat strange conventions used in the &lt;strong&gt;*_PRIVILEGES&lt;/strong&gt; tables in &lt;strong&gt;INFORMATION_SCHEMA&lt;/strong&gt;, where the &lt;strong&gt;IS_GRANTABLE&lt;/strong&gt; is a separate column, although in &lt;em&gt;&lt;del&gt;2nd&lt;/del&gt; 1st normal form&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;I present it here as a query, using session variables, rather than a view definition:&lt;span id=&#34;more-3764&#34;&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT STRAIGHT_JOIN
+  CONCAT(&#39;\&#39;&#39;, User, &#39;\&#39;@\&#39;&#39;, Host, &#39;\&#39;&#39;) AS GRANTEE,
+  NULL AS ROUTINE_CATALOG,
+  Db AS ROUTINE_SCHEMA,
+  Routine_name AS ROUTINE_NAME,
+  Routine_type AS ROUTINE_TYPE,
+  UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(Proc_priv, &#39;,&#39;, n+1), &#39;,&#39;, -1)) AS PRIVILEGE_TYPE,
+  IF(grantable_procs_priv.User IS NULL, &#39;NO&#39;, &#39;YES&#39;) AS IS_GRANTABLE
+FROM
+  mysql.procs_priv
+  CROSS JOIN (SELECT @counter := -1) select_init
+  CROSS JOIN (
+    SELECT
+      @counter := @counter+1 AS n
+    FROM
+      INFORMATION_SCHEMA.COLLATIONS
+    LIMIT 5
+  ) numbers
+  LEFT JOIN (
+      SELECT
+        DISTINCT User, Host, Db, Routine_name
+      FROM
+        mysql.procs_priv
+      WHERE
+         find_in_set(&#39;Grant&#39;, Proc_priv) &amp;gt; 0
+    ) grantable_procs_priv USING (User, Host, Db, Routine_name)
+WHERE
+  numbers.n BETWEEN 0 AND CHAR_LENGTH(Proc_priv) - CHAR_LENGTH(REPLACE(Proc_priv, &#39;,&#39;, &#39;&#39;))
+  AND UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(Proc_priv, &#39;,&#39;, n+1), &#39;,&#39;, -1)) != &#39;GRANT&#39;
+ORDER BY
+  GRANTEE, ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, n
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;It takes &lt;strong&gt;2&lt;/strong&gt; views and a table to make this a VIEW rather than a query.&lt;/p&gt;
+&lt;p&gt;First teaser: the view which represents this query, along with many other interesting diagnostic views, is to take part in a new open source project I&#39;m working on.&lt;/p&gt;
+&lt;h4&gt;[UPDATE]&lt;/h4&gt;
+&lt;p&gt;Guess I was in a rush to produce the query. Here&#39;s a shorter, cleaner one:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+  CONCAT(&#39;\&#39;&#39;, User, &#39;\&#39;@\&#39;&#39;, Host, &#39;\&#39;&#39;) AS GRANTEE,
+  NULL AS ROUTINE_CATALOG,
+  Db AS ROUTINE_SCHEMA,
+  Routine_name AS ROUTINE_NAME,
+  Routine_type AS ROUTINE_TYPE,
+  UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(Proc_priv, &#39;,&#39;, n+1), &#39;,&#39;, -1)) AS PRIVILEGE_TYPE,
+  IF(find_in_set(&#39;Grant&#39;, Proc_priv) &amp;gt; 0, &#39;YES&#39;, &#39;NO&#39;) AS IS_GRANTABLE
+FROM
+  mysql.procs_priv
+  CROSS JOIN (
+    SELECT
+      @counter := @counter+1 AS n
+    FROM
+      INFORMATION_SCHEMA.COLLATIONS, (SELECT @counter := -1) select_init
+    LIMIT 5
+  ) numbers
+WHERE
+  numbers.n BETWEEN 0 AND CHAR_LENGTH(Proc_priv) - CHAR_LENGTH(REPLACE(Proc_priv, &#39;,&#39;, &#39;&#39;))
+  AND UPPER(SUBSTRING_INDEX(SUBSTRING_INDEX(Proc_priv, &#39;,&#39;, n+1), &#39;,&#39;, -1)) != &#39;GRANT&#39;
+ORDER BY
+  GRANTEE, ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, n
+;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Example output:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;+--------------------------+-----------------+----------------+----------------------------+--------------+----------------+--------------+
+| GRANTEE                  | ROUTINE_CATALOG | ROUTINE_SCHEMA | ROUTINE_NAME               | ROUTINE_TYPE | PRIVILEGE_TYPE | IS_GRANTABLE |
++--------------------------+-----------------+----------------+----------------------------+--------------+----------------+--------------+
+| &#39;other_user&#39;@&#39;localhost&#39; |            NULL | sakila         | film_in_stock              | PROCEDURE    | EXECUTE        | NO           |
+| &#39;other_user&#39;@&#39;localhost&#39; |            NULL | sakila         | film_in_stock              | PROCEDURE    | ALTER ROUTINE  | NO           |
+| &#39;other_user&#39;@&#39;localhost&#39; |            NULL | sakila         | get_customer_balance       | FUNCTION     | EXECUTE        | NO           |
+| &#39;other_user&#39;@&#39;localhost&#39; |            NULL | sakila         | get_customer_balance       | FUNCTION     | ALTER ROUTINE  | NO           |
+| &#39;other_user&#39;@&#39;localhost&#39; |            NULL | sakila         | inventory_held_by_customer | FUNCTION     | EXECUTE        | NO           |
+| &#39;other_user&#39;@&#39;localhost&#39; |            NULL | sakila         | inventory_held_by_customer | FUNCTION     | ALTER ROUTINE  | NO           |
+| &#39;shlomi&#39;@&#39;127.0.0.1&#39;     |            NULL | sakila         | film_in_stock              | PROCEDURE    | EXECUTE        | YES          |
+| &#39;shlomi&#39;@&#39;127.0.0.1&#39;     |            NULL | sakila         | get_customer_balance       | FUNCTION     | EXECUTE        | NO           |
+| &#39;shlomi&#39;@&#39;127.0.0.1&#39;     |            NULL | sakila         | get_customer_balance       | FUNCTION     | ALTER ROUTINE  | NO           |
+| &#39;world_user&#39;@&#39;localhost&#39; |            NULL | sakila         | get_customer_balance       | FUNCTION     | EXECUTE        | YES          |
+| &#39;world_user&#39;@&#39;localhost&#39; |            NULL | sakila         | get_customer_balance       | FUNCTION     | ALTER ROUTINE  | YES          |
++--------------------------+-----------------+----------------+----------------------------+--------------+----------------+--------------+&lt;/pre&gt;
+&lt;/blockquote&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

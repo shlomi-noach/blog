@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Forking Golang repositories on GitHub and managing the import path &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Forking Golang repositories on GitHub and managing the import path</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>23 Nov 2015</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/development">Development</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/github">GitHub</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/golang">golang</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Problem: there's an awesome Golang project on GitHub which you want to fork. You want to develop &amp; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything.</p>
+<p>A couple solutions offered below. First, though, let's get some names.</p>
+<h3>A sample case, the problem at hand</h3>
+<p>There's an awesome tool on <strong><em>http://github.com/awsome-org/tool</em></strong>. You successfully fork it onto <strong><em>http://github.com/awesome-you/tool</em></strong>.</p>
+<p>You want to collaborate on <strong><em>http://github.com/awesome-you/tool</em></strong>; you wish to pull, commit &amp; push. Maybe you want to send pull requests to the origin.</p>
+<p>The following is commonly found throughout <strong>.go</strong> files in the repository:</p>
+<blockquote>
+<pre>import (
+    "github.com/awesome-org/tool/config"
+    "github.com/awesome-org/tool/driver"
+    "github.com/awesome-org/tool/net"
+    "github.com/awesome-org/tool/util"
+)</pre>
+</blockquote>
+<p>If you:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p><em>golang</em> creates your <strong>$GOPATH/src/github.com/awesome-you/tool/</strong>, which is awesome. However, as you resolve dependencies via</p>
+<blockquote>
+<pre>cd $GOPATH/src/github.com/awesome-you/tool/ ; go get ./...</pre>
+</blockquote>
+<p><em>golang</em> digs into the source code, finds references to <strong>github.com/awesome-org/tool/config</strong>, <strong>github.com/awesome-org/tool/driver</strong> etc, and fetches <em>those</em> from <strong>http://github.com/awsome-org/tool</strong> and onto <strong>$GOPATH/src/github.com/awesome-org/tool/</strong>, which is not awesome. You actually have two copies of the code, one from your fork, one from the origin, and your own fork will be largely ignored as it mostly points back to the origin.</p>
+<h3>A bad solution</h3>
+<p>The dirty, bad solution would be for you to go over the source code and replace <strong>"github.com/awesome-org/tool"</strong> entries with <strong>"github.com/awesome-you/tool"</strong>. It is bad for two reasons:</p>
+<ul>
+<li>You will not be able to further pull changes from upstream</li>
+<li>You will not be able to pull-request and push your own changes upstream</li>
+</ul>
+<p><!--more-->When I say "You will not be able" I mean "in a reasonable, developer-friendly manner". The code will be incompatible with upstream and you have effectively detached your code. You will need to keep editing and re-editing those entries anytime you wish to pull/push upstream.</p>
+<h3>Solution #1: add remote</h3>
+<p>Described in <a href="http://blog.campoy.cat/2014/03/github-and-go-forking-pull-requests-and.html">GitHub and Go: forking, pull requests, and go-getting</a>, follow these procedures:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-org/tool
+git remote add <strong>awesome-you-fork</strong> http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p>You're adding your repository as <a href="http://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes">remote</a>. You will from now on need to explicitly:</p>
+<blockquote>
+<pre>git pull --rebase <strong>awesome-you-fork</strong>
+git push <strong>awesome-you-fork</strong></pre>
+</blockquote>
+<p>If you forget to add the <strong>"awesome-you-fork"</strong> argument, you are pulling and pushing from upstream.</p>
+<h3>Solution #2: cheat "go get", DIY</h3>
+<p>The problem began with the <strong>go get</strong> command, which copied the URI path onto <strong>$GOPATH/src</strong>. However <strong>go get</strong> implicitly issues a git clone, and we can do the same ourselves. We will dirty our hands just once, and then benefit from an ambiguous-less environment.</p>
+<p>We will now create our git repository in the name of <strong>awesome-org</strong> but with the contents of <strong>awesome-you</strong>:</p>
+<blockquote>
+<pre>cd $GOPATH
+mkdir -p {src,bin,pkg}
+mkdir -p <strong>src/github.com/awesome-org/</strong>
+cd src/github.com/awesome-org/
+git clone git@github.com:<strong>awesome-you/tool.git</strong> # OR: git clone https://github.com/<strong>awesome-you/tool.git</strong>
+cd tool/
+go get ./...</pre>
+</blockquote>
+<p>The <strong>mkdir -p {src,bin,pkg}</strong> is there just in case you do not have anything setup in your <strong>$GOPATH</strong>. We then create the repository path under the name of <strong>awesome-org</strong>, but once inside clone from <strong>awesome-you</strong>.</p>
+<p>The source code's import path fits your directory layout now, but as you push/pull you are only speaking to your own <strong>awesome-you</strong> repository.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2015/11/20/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2015/11/20/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/">State of automated recovery via Pseudo-GTID &amp; Orchestrator @ Booking.com</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2015/11/30/joining-github/">Joining GitHub</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2015/11/30/joining-github/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,1163 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Python on code.openark.org</title>
+    <link>/blog/tags/python/</link>
+    <description>Recent content in Python on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Mon, 26 Jan 2015 17:50:46 +0000</lastBuildDate>
+    <atom:link href="/blog/tags/python/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Reading RBR binary logs with pt-query-digest</title>
+      <link>/blog/2015/01/26/reading-rbr-binary-logs-with-pt-query-digest/</link>
+      <pubDate>Mon, 26 Jan 2015 17:50:46 +0000</pubDate>
+      
+      <guid>/blog/2015/01/26/reading-rbr-binary-logs-with-pt-query-digest/</guid>
+      <description>&lt;p&gt;For purposes of auditing anything that goes on our servers we&#39;re looking to parse the binary logs of all servers (masters), as with &#34;&lt;a href=&#34;http://code.openark.org/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow&#34;&gt;Anemomaster&lt;/a&gt;&#34;. With Row Based Replication this is problematic since &lt;strong&gt;pt-query-digest&lt;/strong&gt; &lt;a href=&#34;https://bugs.launchpad.net/percona-toolkit/+bug/1377887&#34;&gt;does not support parsing RBR binary logs&lt;/a&gt; (true for &lt;strong&gt;2.2.12&lt;/strong&gt;, latest at this time).&lt;/p&gt;
+&lt;p&gt;I&#39;ve written a simple script that translates RBR logs to SBR-like logs, with a little bit of cheating. My interest is that &lt;strong&gt;pt-query-digest&lt;/strong&gt; is able to capture and count the queries, nothing else. By doing some minimal text manipulation on the binary log I&#39;m able to now feed it to &lt;strong&gt;pt-query-digest&lt;/strong&gt; which seems to be happy.&lt;/p&gt;
+&lt;p&gt;The script of course does not parse the binary log directly; furthermore, it requires the binary log to be extracted via:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysqlbinlog --verbose --base64-output=DECODE-ROWS your-mysql-binlog-filemame.000001&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above adds the interpretation of the RBR entires in the form of (unconventional) statements, commented, and strips out the cryptic RBR text. All that is left is to do a little manipulation on entry headers and uncomment the interpreted queries.&lt;/p&gt;
+&lt;p&gt;The script can be found in &lt;a href=&#34;https://gist.github.com/shlomi-noach/cc243fd690403e7617e3&#34;&gt;my gist repositories&lt;/a&gt;. Current version is as follows:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;[code lang=&#34;python&#34;]&lt;br /&gt;
+#!/usr/bin/python&lt;br /&gt;
+#&lt;br /&gt;
+# Convert a Row-Based-Replication binary log to Statement-Based-Replication format, cheating a little.&lt;br /&gt;
+# This script exists since Percona Toolkit&#39;s pt-query-digest cannot digest RBR format. The script&lt;br /&gt;
+# generates enough for it to work with.&lt;br /&gt;
+# Expecting standard input&lt;br /&gt;
+# Expected input is the output of &amp;quot;mysqlbinlog --verbose --base64-output=DECODE-ROWS &amp;lt;binlog_file_name&amp;gt;&amp;quot;&lt;br /&gt;
+# For example:&lt;br /&gt;
+# $ mysqlbinlog --verbose --base64-output=DECODE-ROWS mysql-bin.000006 | python binlog-rbr-to-sbr.py | pt-query-digest --type=binlog --order-by Query_time:cnt --group-by fingerprint&lt;br /&gt;
+#&lt;/p&gt;
+&lt;p&gt;import fileinput&lt;/p&gt;
+&lt;p&gt;def convert_rbr_to_pseudo_sbr():&lt;br /&gt;
+    inside_rbr_statement = False&lt;br /&gt;
+    for line in fileinput.input():&lt;br /&gt;
+        line = line.strip()&lt;br /&gt;
+        if line.startswith(&amp;quot;#&amp;quot;) and &amp;quot;end_log_pos&amp;quot; in line:&lt;br /&gt;
+            for rbr_token in [&amp;quot;Update_rows:&amp;quot;, &amp;quot;Write_rows:&amp;quot;, &amp;quot;Delete_rows:&amp;quot;, &amp;quot;Rows_query:&amp;quot;, &amp;quot;Table_map:&amp;quot;,]:&lt;br /&gt;
+                if rbr_token in line:&lt;br /&gt;
+                    line = &amp;quot;%s%s&amp;quot; % (line.split(rbr_token)[0], &amp;quot;Query\tthread_id=1\texec_time=0\terror_code=0&amp;quot;)&lt;br /&gt;
+        if line.startswith(&amp;quot;### &amp;quot;):&lt;br /&gt;
+            inside_rbr_statement = True&lt;br /&gt;
+            # The &amp;quot;### &amp;quot; commented rows are the pseudo-statement interpreted by mysqlbinlog&#39;s &amp;quot;--verbose&amp;quot;,&lt;br /&gt;
+            # and which we will feed into pt-query-digest&lt;br /&gt;
+            line = line[4:]&lt;br /&gt;
+        else:&lt;br /&gt;
+            if inside_rbr_statement:&lt;br /&gt;
+                print(&amp;quot;/*!*/;&amp;quot;)&lt;br /&gt;
+            inside_rbr_statement = False&lt;br /&gt;
+        print(line) &lt;/p&gt;
+&lt;p&gt;convert_rbr_to_pseudo_sbr()&lt;br /&gt;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>common_schema over traditional scripts</title>
+      <link>/blog/2012/12/12/common_schema-over-traditional-scripts/</link>
+      <pubDate>Wed, 12 Dec 2012 13:55:44 +0000</pubDate>
+      
+      <guid>/blog/2012/12/12/common_schema-over-traditional-scripts/</guid>
+      <description>&lt;p&gt;If you are familiar with both &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt; and &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema&lt;/a&gt;, you&#39;ll notice I&#39;ve incorporated some functionality already working in &lt;em&gt;openark kit&lt;/em&gt; into &lt;em&gt;common_schema&lt;/em&gt;, essentially rewriting what used to be a Python script into SQL/&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html&#34;&gt;QueryScript&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;What was my reasoning for rewriting good code? I wish to explain that, and provide with a couple examples.&lt;/p&gt;
+&lt;p&gt;I&#39;m generally interested in pushing as much functionality into the MySQL server. When using an external script, one:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Needs the right dependencies (OS, Perl/Python version, Perl/Python modules).&lt;/li&gt;
+&lt;li&gt;Needs to provide with connection params,&lt;/li&gt;
+&lt;li&gt;Needs to get acquainted with a lot of command line options,&lt;/li&gt;
+&lt;li&gt;Is limited by whatever command line options are provided.&lt;/li&gt;
+&lt;li&gt;Has to invoke that script (duh!) to get the work done.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This last bullet is not so trivial: it means you can&#39;t work some operation with your favorite GUI client, because it has no notion of your Perl script; does not run on the same machine where your Python code resides; simply can&#39;t run those scripts for you.&lt;/p&gt;
+&lt;p&gt;With server-side code, functionality is accessible via any client. You run your operation via a query (e.g. &lt;strong&gt;CALL some_procedure&lt;/strong&gt;). That can be done from your GUI client, your command line client, your event scheduler, your cronjob, all equally. You only need access to your MySQL server, which is trivial.&lt;/p&gt;
+&lt;p&gt;Of course, server side scripting is &lt;a href=&#34;http://code.openark.org/blog/mysql/things-that-cant-and-some-that-can-be-done-from-within-a-mysql-stored-routine&#34;&gt;limited&lt;/a&gt;. Some stuff simply can&#39;t be written solely on server side. If you want to consult your replicating slave; gracefully take action on user&#39;s &lt;strong&gt;Ctrl+C&lt;/strong&gt;, send data over the web, you&#39;ll have to do it with an external tool. There are actually a lot of surprising limitations to things one would assume &lt;em&gt;are&lt;/em&gt; possible on server side. You may already know how frustrated I am by the fact one can &lt;a href=&#34;http://code.openark.org/blog/mysql/reading-results-of-show-statements-on-server-side&#34;&gt;hardly&lt;/a&gt; get info from &lt;strong&gt;SHOW&lt;/strong&gt; commands.&lt;/p&gt;
+&lt;h4&gt;But, when it works, it shines&lt;/h4&gt;
+&lt;p&gt;Let&#39;s review a couple examples. The first one is nearly trivial. The second less so.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Example: getting AUTO_INCREMENT &#34;free space&#34;&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;openark kit&lt;/em&gt; offers &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-show-limits.html&#34;&gt;oak-show-limits&lt;/a&gt;. It&#39;s a tool that tells you if any of your &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt; columns are running out of space (and so you might want to &lt;strong&gt;ALTER&lt;/strong&gt; that &lt;strong&gt;INT&lt;/strong&gt; to &lt;strong&gt;BIGINT&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;It&#39;s a very simple Python script. It gets your &lt;strong&gt;MAX(auto_increment_column) FROM tables_with_auto_increment&lt;/strong&gt;, and compares that &lt;strong&gt;MAX&lt;/strong&gt; value to the column type. It pre-computes:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;max_values[&#39;tinyint&#39;] = 2**8
+max_values[&#39;smallint&#39;] = 2**16
+max_values[&#39;mediumint&#39;] = 2**24
+max_values[&#39;int&#39;] = 2**32
+max_values[&#39;bigint&#39;] = 2**64&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;takes care of &lt;strong&gt;SIGNED/UNSIGNED&lt;/strong&gt;, and does the math. Why is this tool such a perfect candidate for &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/auto_increment_columns.html&#34;&gt;replacement on server side&lt;/a&gt;? For two reasons.&lt;/p&gt;
+&lt;p&gt;First, It turns out it takes very little effort to &lt;a href=&#34;http://code.openark.org/blog/mysql/checking-for-auto_increment-capacity-with-single-query&#34;&gt;build a query&lt;/a&gt; which does the same. In which case it is also easy to build a view which provides the same.&lt;/p&gt;
+&lt;p&gt;Second, there&#39;s this thing with command line arguments. The &lt;em&gt;openark&lt;/em&gt; tool provides with &lt;strong&gt;--threshold&lt;/strong&gt; (only output those columns where capacity is larger than &lt;strong&gt;x%&lt;/strong&gt;), &lt;strong&gt;--database&lt;/strong&gt; (only scan given database), &lt;strong&gt;--table&lt;/strong&gt; (only for tables matching name), &lt;strong&gt;--column&lt;/strong&gt; (only for columns matching name).&lt;/p&gt;
+&lt;p&gt;I don&#39;t like this. See, the above is essentially an extra layer for saying:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; auto_increment_ratio &amp;gt;= x&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; table_schema = ...&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; table_name = ...&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;WHERE&lt;/strong&gt; column_name = ...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The command line arguments each take the role of some &lt;strong&gt;WHERE/AND&lt;/strong&gt; condition.Wow, what a &lt;strong&gt;1-1&lt;/strong&gt; mapping. How about if I wanted the results sorted in some specific order? I would have to add a command line argument for that! How about only listing the &lt;strong&gt;SIGNED&lt;/strong&gt; columns? I would have to add a command line argument for that, too! How about showing top &lt;strong&gt;10&lt;/strong&gt;? Yes, another command line argument!&lt;/p&gt;
+&lt;p&gt;Some of the above can be solved via shell scripting (&lt;strong&gt;sort -k 3 -n&lt;/strong&gt;, &lt;strong&gt;head -n 10&lt;/strong&gt;, etc.). But, hey, we&#39;re OK with SQL, aren&#39;t we? Why add now these &lt;em&gt;two extra layers&lt;/em&gt;? Get to know all the command line options, get to script it? I love scripting, but this is an abuse.&lt;/p&gt;
+&lt;p&gt;So it makes much more sense, in my opinion, to &lt;strong&gt;SELECT * FROM auto_increment_columns WHERE table_schema=&#39;my_db&#39; AND auto_increment_ratio &amp;gt;= 0.8 ORDER BY auto_increment_ratio DESC LIMIT 10&lt;/strong&gt;. It doesn&#39;t require SQL-fu skills, just basic SQL skills which every DBA and DB user are expected to have. And it allows one to work from whatever environment one feels comfortable with. Heck, with your GUI editor you can probably get off with it by right-clicking and left-clicking your mouse buttons, never typing one character.&lt;/p&gt;
+&lt;h4&gt;Example: blocking user accounts&lt;/h4&gt;
+&lt;p&gt;The above mapped very easily to a query, and was just a read-only query. What if we had to modify data? &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-block-account.html&#34;&gt;oak-block-accounts&lt;/a&gt; is a tool which allows one to block grantees from logging in, then releasing them later on. &lt;em&gt;common_schema&lt;/em&gt; offers &lt;a href=&#34;common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_accounts.html&#34;&gt;sql_accounts&lt;/a&gt; and &lt;a href=&#34;file:///home/shlomi/workspace/common_schema/doc/html/eval.html&#34;&gt;eval()&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Let&#39;s skip the command line arguments issue, as it is identical to the above. How should we best provide with &#34;taking action&#34; interface? A script would have no problem to first &lt;strong&gt;SELECT&lt;/strong&gt; stuff, then &lt;strong&gt;UPDATE&lt;/strong&gt;, or &lt;strong&gt;SET PASSWORD&lt;/strong&gt;, or &lt;strong&gt;DROP&lt;/strong&gt; etc. How easy is it to do the same on server side?&lt;/p&gt;
+&lt;p&gt;The immediate solution is to write a stored procedure to do that. I reject the idea. Why? Because the procedure would look like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;PROCEDURE block_account(user VARCHAR(64), host VARCHAR(64), only_if_empty_password BOOL, ...);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Can you see where I&#39;m getting at? Doing the above re-introduces command line options, this time disguised as procedure parameters. We would again have to list all available filtering methods, only this time things are worse: since stored procedures have no such notion as overloading, and change to the params will break compatibility. Once we introduce this routine, we&#39;re stuck with it.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; tries to stay away as far as it can from this pitfall. It presents another solution: the &lt;em&gt;view&lt;/em&gt; solution. Just as with &lt;em&gt;auto_increment_columns&lt;/em&gt;, &lt;strong&gt;SELECT&lt;/strong&gt; your way to get the right rows. But this time, the result is a SQL query:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;sql_block_account&lt;/strong&gt; FROM &lt;strong&gt;sql_accounts&lt;/strong&gt; &lt;strong&gt;WHERE USER = &#39;gromit&#39;&lt;/strong&gt;;
++-------------------------------------------------------------------------------------+
+| sql_block_account                                                                   |
++-------------------------------------------------------------------------------------+
+| SET PASSWORD FOR &#39;gromit&#39;@&#39;localhost&#39; = &#39;752AA50E562A6B40DE87DF0FA69FACADD908EA32*&#39; |
++-------------------------------------------------------------------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Do your own &lt;strong&gt;WHERE&lt;/strong&gt;/&lt;strong&gt;AND&lt;/strong&gt; combination in SQL. But, how to take action? Our view cannot take the actual action for us!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;eval()&lt;/em&gt; is at the core of many common_schema operations, like this one:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CALL &lt;strong&gt;eval&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#34;SELECT &lt;strong&gt;sql_block_account&lt;/strong&gt; FROM &lt;strong&gt;sql_accounts WHERE USER = &#39;gromit&#39;&lt;/strong&gt;&#34;&lt;/span&gt;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The &lt;strong&gt;SET PASSWORD&lt;/strong&gt; query just got evaluated. Meaning it was executed. &lt;em&gt;eval()&lt;/em&gt; is a very powerful solution.&lt;/p&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;I prefer stuff on server side. It requires basic SQL skills (or a smart GUI editor), and allows you easy access to a lot of functionality, removing dependency requirements. It is not always possible, and external scripts can do miracles not possible on server side, but server side scripting has its own miracles.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>oak-hook-general-log: your poor man&#39;s Query Analyzer</title>
+      <link>/blog/2010/12/15/oak-hook-general-log-your-poor-mans-query-analyzer/</link>
+      <pubDate>Wed, 15 Dec 2010 19:46:06 +0000</pubDate>
+      
+      <guid>/blog/2010/12/15/oak-hook-general-log-your-poor-mans-query-analyzer/</guid>
+      <description>&lt;p&gt;The latest release of &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt; introduces &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-hook-general-log.html&#34;&gt;oak-hook-general-log&lt;/a&gt;, a handy tool which allows for some analysis of executing queries.&lt;/p&gt;
+&lt;p&gt;Initially I just intended for the tool to be able to dump the general log to standard output, from any machine capable to connect to MySQL. Quick enough, I realized the power it brings.&lt;/p&gt;
+&lt;p&gt;With this tool, one can dump to standard output all queries using temporary tables; or using a specific index; or doing a full index scan; or just follow up on connections; or... For example, the following execution will only log queries which make for filesort:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;oak-hook-general-log --user=root --host=localhost --password=123456 --filter-explain-filesort&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;The problem with using the standard logs&lt;/h4&gt;
+&lt;p&gt;So you have the &lt;em&gt;general log&lt;/em&gt;, which you don&#39;t often enable, since it tends to grow huge within moments. You then have the &lt;em&gt;slow log&lt;/em&gt;. Slow log is great, and is among the top tools for MySQL diagnosis.&lt;/p&gt;
+&lt;p&gt;The slow log allows for &lt;strong&gt;log-queries-not-using-indexes&lt;/strong&gt;, which is yet another nice feature. Not only should you log any query running for over &lt;strong&gt;X&lt;/strong&gt; seconds, but also log any query which does not use an index.&lt;/p&gt;
+&lt;p&gt;Wait. This logs all single-row tables (no single row table will use an index), as well as very small tables (a common &lt;strong&gt;20&lt;/strong&gt; rows lookup table will most often be scanned). These are OK scans. This makes for some noise in the slow log.&lt;/p&gt;
+&lt;p&gt;And how about queries which do use an index, but do so poorly? They use an index, but retrieve some &lt;strong&gt;12,500,000&lt;/strong&gt; rows, &lt;em&gt;using temporary&lt;/em&gt; table &amp;amp; &lt;em&gt;filesort&lt;/em&gt;?&lt;/p&gt;
+&lt;h4&gt;What oak-hook-general-log does for you&lt;/h4&gt;
+&lt;p&gt;This tool streams out the general log, and filters out queries based on their &lt;em&gt;role&lt;/em&gt; or on their &lt;em&gt;execution plan&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;To work at all, it must enable the general log. Moreover, it directs the general log to log table. Mind that this makes for a performance impact, which is why the tool auto-terminates and restores original log settings (default is &lt;strong&gt;1&lt;/strong&gt; minute, configurable). It&#39;s really not a tool you should keep running for days. But during the few moments it runs, it will:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Routinely rotate the &lt;strong&gt;mysql.general_log&lt;/strong&gt; table so that it doesn&#39;t fill up&lt;/li&gt;
+&lt;li&gt;Examine entries found in the general log&lt;/li&gt;
+&lt;li&gt;Cross reference entries to the PROCESSLIST so as to deduce database context (&lt;a href=&#34;http://bugs.mysql.com/bug.php?id=52554&#34;&gt;bug #52554&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;If required and appropriate, evaluate a query&#39;s execution plan&lt;/li&gt;
+&lt;li&gt;Decide whether to dump each entry based on filtering rules&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Filtering rules&lt;/h4&gt;
+&lt;p&gt;Filtering rules are passed as command line options. At current, only one filtering rule applies (if more than one specified only one is used, so no point in passing more than one). Some of the rules are:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;filter-connection&lt;/strong&gt;: only log connect/quit entries&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-fullscan&lt;/strong&gt;: only log full table scans&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-temporary&lt;/strong&gt;: only log queries which create implicit temporary tables&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-rows-exceed&lt;/strong&gt;: only log queries where more than &lt;strong&gt;X&lt;/strong&gt; number of rows are being accessed on some table (estimated)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-total-rows-exceed&lt;/strong&gt;: only log queries where more than &lt;strong&gt;X&lt;/strong&gt; number of rows are accessed on all tables combined (estimated, with possibly incorrect numbers on some queries)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-key&lt;/strong&gt;: only log queries using a specific index. This feature somewhat overlaps with Maatkit&#39;s &lt;em&gt;mk-index-usage&lt;/em&gt; (read &lt;a href=&#34;http://www.mysqlperformanceblog.com/2010/11/11/advanced-index-analysis-with-mk-index-usage/&#34;&gt;announcement&lt;/a&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;filter-explain-contains&lt;/strong&gt;: a general purpose &lt;em&gt;grep&lt;/em&gt; on the execution plan. Log queries where the execution plan contains &lt;em&gt;some text&lt;/em&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;There are other filters, and I will possibly add more in due time.&lt;/p&gt;
+&lt;p&gt;Here are a couple cases I used &lt;em&gt;oak-hook-general-log&lt;/em&gt; for:&lt;/p&gt;
+&lt;h4&gt;Use case: temporary tables&lt;/h4&gt;
+&lt;p&gt;I have a server with this alarming chart (courtesy &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;) of temporary tables:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;Created tmp tables per second&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=370x180&amp;amp;chts=303030,12&amp;amp;chtt=Latest+24+hours:+Dec+9,+06:30++-++Dec+10,+06:30&amp;amp;chf=c,s,ffffff&amp;amp;chdl=created_tmp_tables_psec|created_tmp_disk_tables_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4&amp;amp;chd=s:yzzy02zzz100zzz0rv9zz0zyzyz0yy2xz1t11xzztz0xr1xt2tz07vwzz100100z31z111yz1vzzzzz1zs80r902s1111010y20z03z11487zz011z11011002w0q5rxxz0y00z0s02xy1yy0,gggfghggfgggghhgYekhhghhhhhghfjghhdihfhgdghgZhgcicihpcehhhhhhhifkigjihghjehgiigjgYqiYqgiaihiifkhekhfijgiihhggggggggggfhgghffZoYgggggggggdihfggghg&amp;amp;chxt=x,y&amp;amp;chxr=1,0,35.060000&amp;amp;chxl=0:||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||+|&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chg=4.17,25,1,2,2.08,0&amp;amp;chxp=0,2.08,6.25,10.42,14.59,18.76,22.93,27.10,31.27,35.44,39.61,43.78,47.95,52.12,56.29,60.46,64.63,68.80,72.97,77.14,81.31,85.48,89.65,93.82,97.99&amp;amp;tsstart=2010-12-09+06:30:00&amp;amp;tsstep=600&#34; alt=&#34;&#34; width=&#34;370&#34; height=&#34;180&#34; /&gt;
+
+&lt;/blockquote&gt;
+What could possibly create &lt;strong&gt;30&lt;/strong&gt; temporary tables per second on average?
+
+The slow log produced nothing helpful, even with &lt;strong&gt;log-queries-not-using-indexes&lt;/strong&gt; enabled. There were a lot of queries not using indexes there, but nothing at these numbers. With:
+&lt;blockquote&gt;
+&lt;pre&gt;oak-hook-general-log --filter-explain-temporary&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;enabled for &lt;strong&gt;1&lt;/strong&gt; minute, nothing came out. Weird. Enabled for &lt;strong&gt;5&lt;/strong&gt; minutes, I got one entry. Turned out a scheduled script, acting once per &lt;strong&gt;5&lt;/strong&gt; minutes, was making a single complicated query involving many nested views, which accounted for some &lt;em&gt;hundreds&lt;/em&gt; of temporary tables created. All of them very small, query time was very fast. There is no temporary tables problem with this server, case closed.&lt;/p&gt;
+&lt;h4&gt;Use case: connections&lt;/h4&gt;
+&lt;p&gt;A server had issues with some exceptions being thrown on the client side. There was a large number of new connections created per second although the client was using a connection pool. Suspecting the pool didn&#39;t work well, I issued:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;oak-hook-general-log --filter-connect&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The pool was working well, all right. No entries for that client were recorder in &lt;strong&gt;1&lt;/strong&gt; minute of testing. However, it turned out some old script was flooding the MySQL server with requests, every second. The log showed root@somehost, and sure enough, the script was disabled. Exceptions were due to another reason; it was good to eliminate a suspect.&lt;/p&gt;
+&lt;p&gt;Some of the tool&#39;s use case is relatively easy to solve with tail, grep &amp;amp; awk; others are not. I am using it more and more often, and find it to make significant shortcuts in tracking down queries.&lt;/p&gt;
+&lt;h4&gt;Get it&lt;/h4&gt;
+&lt;p&gt;Download the tool as part of &lt;em&gt;openark kit&lt;/em&gt;: access the &lt;a href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;openark kit project page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Or get the &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/src/oak/oak-hook-general-log.py&#34;&gt;source code&lt;/a&gt; directly.&lt;/p&gt;
+&lt;p&gt;Feedback is most welcome.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>openark-kit (rev. 170): new tools, new functionality</title>
+      <link>/blog/2010/12/15/openark-kit-rev-170-new-tools-new-functionality/</link>
+      <pubDate>Wed, 15 Dec 2010 08:31:24 +0000</pubDate>
+      
+      <guid>/blog/2010/12/15/openark-kit-rev-170-new-tools-new-functionality/</guid>
+      <description>&lt;p&gt;I&#39;m pleased to announce a new release of the &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt;. There&#39;s a lot of new functionality inside; following is a brief overview.&lt;/p&gt;
+&lt;p&gt;The &lt;em&gt;openark kit&lt;/em&gt; is a set of utilities for MySQL. They  solve everyday maintenance tasks, which may be complicated or time  consuming to work by hand.&lt;/p&gt;
+&lt;p&gt;It&#39;s been a while since the last announced release. Most of my attention was on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, building new features, writing documentation etc. However my own use of &lt;em&gt;openark kit&lt;/em&gt; has only increased in the past few months, and there&#39;s new useful solutions to common problems that have been developed.&lt;/p&gt;
+&lt;p&gt;I&#39;ve used and improved many tools over this time, but doing the final cut, along with proper documentation, took some time. Anyway, here are the highlights:&lt;/p&gt;
+&lt;h4&gt;New tool: oak-hook-general-log&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;oak-hook-general-log&lt;/em&gt; hooks up a MySQL server and dumps the general log based on filtering rules, applying to query role or execution plan. It is possible to only dump connect/disconnect entries, queries which make a full table scan, or use temporary tables, or scan more than X number of rows, or...&lt;/p&gt;
+&lt;p&gt;I&#39;ll write more on this tool shortly.&lt;/p&gt;
+&lt;h4&gt;New tool: oak-prepare-shutdown&lt;/h4&gt;
+&lt;p&gt;This tool makes for an orderly and faster shutdown by safely stopping replication, and flushing InnoDB pages to disk prior to shutting down (keeping server available for connections even while attempting to flush dirty pages to disk). A typical use case would be:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;oak-prepare-shutdown --user=root --ask-pass --socket=/tmp/mysql.sock &amp;amp;&amp;amp; /etc/init.d/mysql stop&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;New tool: oak-repeat query&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;oak-repeat-query&lt;/em&gt; repeats executing a given query until some condition holds. The condition can be:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Number of given iterations has been reached&lt;/li&gt;
+&lt;li&gt;Given time has elapsed&lt;/li&gt;
+&lt;li&gt;No rows have been affected by query&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The tool comes in handy for cleanup jobs, warming up caches, etc.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;New tool: oak-get-slave-lag&lt;/h4&gt;
+&lt;p&gt;This simple tool just returns the number of seconds a slave is behind master. But it also returns with an appropriate exit code, based on a given threshold: &lt;strong&gt;0&lt;/strong&gt; when lag is good, &lt;strong&gt;1&lt;/strong&gt; (error exit code) when lag is too great or slave fails to replicate.&lt;/p&gt;
+&lt;p&gt;This tool has been used by 3rd party applications, such as a load balancer, to determine whether a slave should be accessed.&lt;/p&gt;
+&lt;h4&gt;Updated tool: oak-chunk-update&lt;/h4&gt;
+&lt;p&gt;This extremely useful utility breaks down very long queries into smaller chunks. These could be queries which should affect a huge amount of rows, or queries which cannot utilize an index.&lt;/p&gt;
+&lt;p&gt;Updates to the tool include limiting the range of rows the tool scans, by specifying start and stop position (either by providing constant values or by SELECT query). Also added is auto-termination when no rows are found to be affected. Last, it is possible to override INFORMATION_SCHEMA lookup by explicitly specifying chunking key.&lt;/p&gt;
+&lt;p&gt;This tool works great for your daily/weekly/monthly batch jobs; in creating DWH tables; populating new columns; purging old entries; clearing data based on non-indexed values; generating summary tables; and more.&lt;/p&gt;
+&lt;h4&gt;Frozen tool: oak-apply-ri&lt;/h4&gt;
+&lt;p&gt;I haven&#39;t been using this tool for a while. The main work down by this tool can be done with &lt;em&gt;oak-chunk-update&lt;/em&gt;. There are some additional safety checks &lt;em&gt;oak-apply-ri&lt;/em&gt; provides; I&#39;m thinking over if they justify the tool&#39;s existence.&lt;/p&gt;
+&lt;h4&gt;Frozen tool: oak-online-alter-table&lt;/h4&gt;
+&lt;p&gt;With the appearance of Facebook’s &lt;a href=&#34;http://www.facebook.com/note.php?note_id=430801045932&#34;&gt;Online Schema Change&lt;/a&gt; (OSC) tool, which derives from &lt;em&gt;oak-online-alter-table&lt;/em&gt;, I&#39;m not sure I will continue developing the tool. I intend to wait for general feedback on OSC before making a decision.&lt;/p&gt;
+&lt;h4&gt;Documentation&lt;/h4&gt;
+&lt;p&gt;&lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html&#34;&gt;Documentation&lt;/a&gt; is now part of &lt;em&gt;openark kit&lt;/em&gt;&#39;s SVN repository.&lt;/p&gt;
+&lt;h4&gt;Download&lt;/h4&gt;
+&lt;p&gt;The &lt;em&gt;openark kit&lt;/em&gt; project is currently hosted by Google Code.  Downloads are available at the Google Code &lt;a href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;openark kit project page&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Downloads are available in the following packaging formats:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;.deb&lt;/strong&gt; package, to be installed on &lt;em&gt;debian&lt;/em&gt;, &lt;em&gt;ubuntu&lt;/em&gt; and otherwise debian based distributions.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;.rpm&lt;/strong&gt; package, architecture free (&lt;em&gt;noarch&lt;/em&gt;), for RPM supporting Linux distributions such as &lt;em&gt;RedHat&lt;/em&gt;, &lt;em&gt;Fedora&lt;/em&gt;, &lt;em&gt;CentOS&lt;/em&gt; etc.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;.tar.gz&lt;/strong&gt; using python&#39;s distutils installer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;source&lt;/strong&gt;, directly retrieved from SVN or from above python package.&lt;/li&gt;
+&lt;li&gt;Some distribution specific &lt;a href=&#34;http://software.opensuse.org/search?baseproject=ALL&amp;amp;p=1&amp;amp;q=openark-kit&#34;&gt;RPM packages&lt;/a&gt;, courtesy Lenz Grimmer.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Feedback&lt;/h4&gt;
+&lt;p&gt;Your feedback is welcome! I may not always respond promptly; and I confess that some bugs were left open for more than I would have liked them to. I hope to make for good quality of code, and bug reporting is one major factor you can control.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>mycheckpoint (rev 208): aggregation tables, enhanced charting, RPM distribution</title>
+      <link>/blog/2010/11/08/mycheckpoint-rev-208-aggregation-tables-enhanced-charting-rpm-distribution/</link>
+      <pubDate>Mon, 08 Nov 2010 12:45:45 +0000</pubDate>
+      
+      <guid>/blog/2010/11/08/mycheckpoint-rev-208-aggregation-tables-enhanced-charting-rpm-distribution/</guid>
+      <description>&lt;p&gt;Revision &lt;strong&gt;208&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a MySQL monitoring solution, has  been released. New and updated in this revision:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Aggregation tables&lt;/strong&gt;: aggregated data makes for fast reports on previously slow queries.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Enhanced charting&lt;/strong&gt;: interactive charts now present time stamps dynamically (see &lt;a href=&#34;http://mycheckpoint.googlecode.com/svn/trunk/doc/html/sample/http/mcp_sql00/sv_report_html_brief&#34;&gt;&lt;strong&gt;demo&lt;/strong&gt;&lt;/a&gt;); &#34;Zoom in&#34; charts are available (see &lt;a href=&#34;http://mycheckpoint.googlecode.com/svn/trunk/doc/html/sample/http/mcp_sql00/zoom/questions&#34;&gt;&lt;strong&gt;demo&lt;/strong&gt;&lt;/a&gt;) on &lt;em&gt;mycheckpoint&lt;/em&gt;&#39;s HTTP server.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;RPM distribution&lt;/strong&gt;: a &#34;noarch&#34; RPM &lt;em&gt;mycheckpoint&lt;/em&gt; build is now available.&lt;/li&gt;
+&lt;li&gt;Initial work on formalizing test environment&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; celebrates one year of existence!&lt;/p&gt;
+&lt;h4&gt;Aggregation tables&lt;/h4&gt;
+&lt;p&gt;I really wanted to avoid using these: everything was so more beautiful with one single dataset and dozens of supporting views (OK, the views themselves are hardly &#34;beautiful&#34;).&lt;/p&gt;
+&lt;p&gt;However it was impossible (for my level of expertise) to optimize query performance what with all those views on per-hour and per-day aggregation. The GROUP BYs and the JOINs did not make it possible for condition pushdown (i.e. using MERGE algorithm) where desired.&lt;/p&gt;
+&lt;p&gt;As result, mycheckpoint now manages aggregation tables: per-hour and per-day. The impact on sample taking is neglect able (making for two additional fast queries), but the impact on reading aggregated data is overwhelming. Generating a HTML full report could take a few minutes to complete. It now returns in no time. This makes charting more attractive, and allows for enhanced charting, such as zooming in on charts, as described following.&lt;/p&gt;
+&lt;p&gt;Aggregation tables will automatically be created and retroactively populated upon using revision 208. There&#39;s nothing special to do; be advised that for one single execution of &lt;em&gt;mycheckpoint&lt;/em&gt;, many INSERT queries are going to be executed. Shouldn&#39;t take more than a couple minutes on commodity hardware and a few months of history.&lt;/p&gt;
+&lt;p&gt;It is possible to disable aggregation tables, or make for a complete rebuild of tables; by default, though, aggregation is ON.&lt;/p&gt;
+&lt;h4&gt;Enhanced charting&lt;/h4&gt;
+&lt;p&gt;Two enhancements here:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;The interactive line charts already know how to update legend data as mouse hovers over them. Now they also present accurate date &amp;amp; time. This provides with fully informative charts.&lt;/li&gt;
+&lt;li&gt;As with other monitoring tools, it is possible to &#34;zoom in&#34; on a chart: zooming in will present any chart in &#34;last 24 hours&#34;, &#34;last 10 days&#34; and &#34;complete history&#34; views, magnified on screen. See &lt;a href=&#34;http://mycheckpoint.googlecode.com/svn/trunk/doc/html/sample/http/mcp_sql00/zoom/questions&#34;&gt;&lt;strong&gt;demo&lt;/strong&gt;&lt;/a&gt; here.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4&gt;RPM distribution&lt;/h4&gt;
+&lt;p&gt;No excuse for this being so late, I know. But RPM distribution is now &lt;a href=&#34;http://code.google.com/p/mycheckpoint/&#34;&gt;available&lt;/a&gt;. Yeepee!&lt;/p&gt;
+&lt;p&gt;This is a &lt;em&gt;noarch&lt;/em&gt; distribution, courtesy of Python&#39;s &lt;a href=&#34;http://docs.python.org/distutils/&#34;&gt;distutils&lt;/a&gt;; you should be able to install the package on any RPM supporting platform. I have only tested in on CentOS; feedback is welcome.&lt;/p&gt;
+&lt;h4&gt;Future plans&lt;/h4&gt;
+&lt;p&gt;Work is going on. These are the non-scheduled future tasks I see:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Monitoring InnoDB Plugin &amp;amp; XtraDB status.&lt;/li&gt;
+&lt;li&gt;A proper &lt;em&gt;man&lt;/em&gt; page.&lt;/li&gt;
+&lt;li&gt;Anything else that interests me &amp;amp; the users.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Try it out&lt;/h4&gt;
+&lt;p&gt;Try out &lt;em&gt;mycheckpoint&lt;/em&gt;. It’s a different kind of monitoring    solution. Simple monitoring (charting) is immediate. For more  interesting results you will need basic SQL skills, and in return you’ll  get a lot   of power under your hands.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Download mycheckpoint &lt;a href=&#34;https://code.google.com/p/mycheckpoint/&#34;&gt;here&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Visit the project’s &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;homepage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Browse the &lt;a href=&#34;../../forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Report &lt;a href=&#34;https://code.google.com/p/mycheckpoint/issues/list&#34;&gt;bugs&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;New BSD  License&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Umm, I&#39;ll repeat this last one: &lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;New BSD  License&lt;/a&gt;. Still, and will continue to be. Thanks for the &lt;a href=&#34;http://code.openark.org/blog/mysql/openark-kit-facebook-online-schema-change-and-thoughts-on-open-source-licenses#comments&#34;&gt;good advice&lt;/a&gt; by Lenz, Domas and others.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Thoughts and ideas for Online Schema Change</title>
+      <link>/blog/2010/10/07/thoughts-and-ideas-for-online-schema-change/</link>
+      <pubDate>Thu, 07 Oct 2010 10:29:10 +0000</pubDate>
+      
+      <guid>/blog/2010/10/07/thoughts-and-ideas-for-online-schema-change/</guid>
+      <description>&lt;p&gt;Here&#39;s a few thoughts on current status and further possibilities for Facebook&#39;s &lt;a href=&#34;http://www.facebook.com/note.php?note_id=430801045932&#34;&gt;Online Schema Change&lt;/a&gt; (OSC) tool. I&#39;ve had these thoughts for months now, pondering over improving &lt;a href=&#34;../../forge/openark-kit/oak-online-alter-table&#34;&gt;oak-online-alter-table&lt;/a&gt; but haven&#39;t got around to implement them nor even write them down. Better late than never.&lt;/p&gt;
+&lt;p&gt;The tool has some limitations. Some cannot be lifted, some could. Quoting from the &lt;a href=&#34;http://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932&#34;&gt;announcement&lt;/a&gt; and looking at the code, I add a few comments. I conclude with a general opinion on the tool&#39;s abilities.&lt;/p&gt;
+&lt;h4&gt;&#34;The original table must have PK. Otherwise an error is returned.&#34;&lt;/h4&gt;
+&lt;p&gt;This restriction could be lifted: it&#39;s enough that the table has a UNIQUE KEY. My original &lt;em&gt;oak-online-alter-table&lt;/em&gt; handled that particular case. As far as I see from their code, the Facebook code would work just as well with any unique key.&lt;/p&gt;
+&lt;p&gt;However, this restriction is of no real interest. As we&#39;re mostly interested in InnoDB tables, and since any InnoDB table &lt;em&gt;should have&lt;/em&gt; a PRIMARY KEY, we shouldn&#39;t care too much.&lt;/p&gt;
+&lt;h4&gt;&#34;No foreign keys should exist. Otherwise an error is returned.&#34;&lt;/h4&gt;
+&lt;p&gt;Tricky stuff. With &lt;em&gt;oak-online-alter-table&lt;/em&gt;, changes to the original table were immediately reflected in the &lt;em&gt;ghost&lt;/em&gt; table. With InnoDB tables, that meant same transaction. And although I never got to update the text and code, there shouldn&#39;t be a reason for not using child-side foreign keys (the child-side is the table on which the FK constraint is defined).&lt;/p&gt;
+&lt;p&gt;The Facebook patch works differently: it captures changes and writes them to a &lt;strong&gt;delta&lt;/strong&gt; table,  to be later (asynchronously) analyzed and make for a &lt;em&gt;replay&lt;/em&gt; of actions on the &lt;em&gt;ghost&lt;/em&gt; table.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;So in the Facebook code, some cases will lead to undesired behavior. Consider two tables, &lt;strong&gt;country&lt;/strong&gt; and &lt;strong&gt;city&lt;/strong&gt;, with city holding a RESTRICT/NO ACTION foreign key on &lt;strong&gt;country&lt;/strong&gt;&#39;s id. Now consider the scenario:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Rows from &lt;strong&gt;city&lt;/strong&gt; are DELETEd, where the country Id is Spain&#39;s.
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;city&lt;/strong&gt;&#39;s ghost table is still unaffected, Spain&#39;s cities are still there.&lt;/li&gt;
+&lt;li&gt;A change is written to the delta table to mark these rows for deletion.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;A DELETE is issued on &lt;strong&gt;country&lt;/strong&gt;&#39;s Spain record.
+&lt;ul&gt;
+&lt;li&gt;The DELETE should work, from the user&#39;s perspective&lt;/li&gt;
+&lt;li&gt;But it will fail: city&#39;s ghost table has not received the changes yet. There&#39;s still matching rows. The NO ACTION constraint will fail the DELETE statement.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Now, this does not lead to corruption, just to seemingly unreasonable behavior on the database part. This behavior is probably undesired. NO ACTION constraint won&#39;t do.&lt;/p&gt;
+&lt;p&gt;However, with CASCADE or SET NULL options, there is less of an issue: operations on the parent table (e.g. &lt;strong&gt;country&lt;/strong&gt;) cannot fail. We must make sure operations on the ghost table make it consistent with the original table (e.g. &lt;strong&gt;city&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;Consider the following scenario:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;A new country is created, called &#34;Sleepyland&#34;. An INSERT is made to &lt;strong&gt;country&lt;/strong&gt;.
+&lt;ul&gt;
+&lt;li&gt;Both &lt;strong&gt;city&lt;/strong&gt; and &lt;strong&gt;city&lt;/strong&gt;&#39;s ghost are immediately aware of it.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;A new town is created and INSERTed to &lt;strong&gt;city&lt;/strong&gt;. The town is called &#34;Naphaven&#34;.
+&lt;ul&gt;
+&lt;li&gt;The change takes time to propagate to &lt;strong&gt;city&lt;/strong&gt;&#39;s ghost table.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Meanwhile, we realized we made a mistake. We&#39;ve been had. There&#39;s no such city nor country.
+&lt;ol&gt;
+&lt;li&gt;We DELETE &#34;Naphaven&#34; from &lt;strong&gt;city&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;We DELETE &#34;Sleepyland&#34; from &lt;strong&gt;country&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;ul&gt;
+&lt;li&gt;Note that &lt;strong&gt;city&lt;/strong&gt;&#39;s ghost table still hasn&#39;t caught up with the changes.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Eventually, the INSERT statement for &#34;Naphaven&#34; reaches &lt;strong&gt;city&lt;/strong&gt;&#39;s ghost table.
+&lt;ul&gt;
+&lt;li&gt;What should happen now? The INSERT cannot succeed.&lt;/li&gt;
+&lt;li&gt;Will this fail the entire process?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Looking at the PHP code, I see that changes written on the &lt;strong&gt;delta&lt;/strong&gt; table are blindly replayed on the ghost table.&lt;/p&gt;
+&lt;p&gt;Since the process is asynchronous, this should not be the case. We can solve the above if we use INSERT IGNORE instead of INSERT. The statement will fail without failing anything else. The row cannot exist, and that&#39;s because the original row does not exist anymore.&lt;/p&gt;
+&lt;p&gt;Unlike a replication corruption, this does not lead to accumulation mistakes. The &lt;strong&gt;replay&lt;/strong&gt; is static, somewhat like in &lt;em&gt;binary log format&lt;/em&gt;. Changes are &lt;em&gt;just written&lt;/em&gt;, regardless of existing data.&lt;/p&gt;
+&lt;p&gt;I have given this considerable thought, and I can&#39;t say I&#39;ve covered all the possible scenario. However I believe that with proper use of INSERT IGNORE and REPLACE INTO (two statements I heavily relied on with &lt;em&gt;oak-online-alter-table&lt;/em&gt;), correctness can be achieved.&lt;/p&gt;
+&lt;p&gt;There&#39;s the small pain of re-generating the foreign key definition on the &#34;ghost&#34; table (&lt;strong&gt;CREATE TABLE LIKE ...&lt;/strong&gt; does not copy FK definitions). And since foreign key names are unique, a new name must be picked up. Not pretty, but perfectly doable.&lt;/p&gt;
+&lt;h4&gt;&#34;No AFTER_{INSERT/UPDATE/DELETE} triggers must exist.&#34;&lt;/h4&gt;
+&lt;p&gt;It would be nicer if MySQL had an ALTER TRIGGER statement. There isn&#39;t such statement. If there were such an atomic statement, then we would be able to rewrite the trigger, so as to add our own code to the &lt;em&gt;end of the trigger&#39;s code&lt;/em&gt;. Yuck. Would be even nicer if we were &lt;a href=&#34;http://code.openark.org/blog/mysql/triggers-use-case-compilation-part-ii&#34;&gt;allowed to have multiple triggers&lt;/a&gt; of same event.&lt;/p&gt;
+&lt;p&gt;So, we are left with DROP and CREATE triggers. Alas, this makes for a short period where the trigger does not exist. Bad. The easy solution would be to LOCK WRITE the table, but apparently you can&#39;t DROP the trigger (*) when the table is locked. Sigh.&lt;/p&gt;
+&lt;p&gt;(*) Happened to me, apparently to Facebook too; With latest 5.1 (5.1.51) version this actually works. With 5.0 it didn&#39;t use to; this needs more checking.&lt;/p&gt;
+&lt;h4&gt;Use of INFORMATION_SCHEMA&lt;/h4&gt;
+&lt;p&gt;As with oak-online-alter-table, the OSC checks for triggers, indexes, column by searching on the INFORMATION_SCHEMA tables. This makes for nice SQL for getting the exact listing and types of PRIMARY KEY columns, whether or not AFTER triggers exist, and so on.&lt;/p&gt;
+&lt;p&gt;I&#39;ve always considered this to be the weak part of &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark-kit&lt;/a&gt;, that it relies on INFORMATION_SCHEMA so much. It&#39;s easier, it&#39;s cleaner, it&#39;s even &lt;em&gt;more correct&lt;/em&gt; to work that way -- but it just puts too much locks. I think Baron Schwartz (and now Daniel Nichter) did amazing work on analyzing table schemata by parsing the SHOW CREATE TABLE and other SHOW commands regex-wise with &lt;a href=&#34;http://www.maatkit.org/&#34;&gt;Maatkit&lt;/a&gt;. It&#39;s a crazy work! Had I written &lt;em&gt;openark-kit&lt;/em&gt; in Perl, I would have just import their code. But I&#39;m too &lt;span style=&#34;text-decoration: line-through;&#34;&gt;lazy&lt;/span&gt; busy to do the conversion from Perl to Python, and rewrite that code, what with all the debugging.&lt;/p&gt;
+&lt;p&gt;OSC is written in PHP. Again, much conversion work. I think performance-wise this is an important step to make.&lt;/p&gt;
+&lt;h4&gt;A word for the critics&lt;/h4&gt;
+&lt;p&gt;Finally, a word for the critics. I&#39;ve read some Facebook/MySQL bashing comments and wish to relate.&lt;/p&gt;
+&lt;p&gt;In his &lt;a href=&#34;http://www.theregister.co.uk/2010/09/21/facebook_online_schema_change_for_mysql/&#34;&gt;interview to The Register&lt;/a&gt;, Mark Callaghan gave the example that &#34;Open Schema Change lets the company update indexes without user downtime, according to Callaghan&#34;.&lt;/p&gt;
+&lt;p&gt;PostgreSQL was mentioned for being able to add index with only read locks taken, or being able to do the work with no locks using CREATE INDEX CONCURRENTLY. I wish MySQL had that feature! Yes, MySQL has a lot to improve upon, and the latest PostgreSQL 9.0 brings valuable new features. (Did I make it clear I have no intention of bashing PostgreSQL? If not, please re-read this paragraph until convinced).&lt;/p&gt;
+&lt;p&gt;Bashing related to the notion of MySQL being so poor that Facebook used an even poorer mechanism to work out the ALTER TABLE.&lt;/p&gt;
+&lt;p&gt;Well, allow me to add a few words: the CREATE INDEX is by far not the only thing you can achieve with OSC (although it may be Facebook&#39;s major concern). You should be able to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Add columns&lt;/li&gt;
+&lt;li&gt;Drop columns&lt;/li&gt;
+&lt;li&gt;Convert character sets&lt;/li&gt;
+&lt;li&gt;Modify column types&lt;/li&gt;
+&lt;li&gt;Add partitioning&lt;/li&gt;
+&lt;li&gt;Reorganize partitioning&lt;/li&gt;
+&lt;li&gt;Compress the table&lt;/li&gt;
+&lt;li&gt;Otherwise changing table format&lt;/li&gt;
+&lt;li&gt;Heck, you could even modify the storage engine! (To other transactional engine)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;These are giant steps. How easy would it be to write these down into the database? It only takes a few weeks time to work out a working solution with reasonable limitations, just using the resources the MySQL server provides you with. The &lt;a href=&#34;http://www.facebook.com/MySQLatFacebook&#34;&gt;MySQL@Facebook team&lt;/a&gt; should be given credit for that.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>mycheckpoint (rev. 190): HTTP server; interactive charts</title>
+      <link>/blog/2010/09/07/mycheckpoint-rev-190-http-server-interactive-charts/</link>
+      <pubDate>Tue, 07 Sep 2010 07:53:01 +0000</pubDate>
+      
+      <guid>/blog/2010/09/07/mycheckpoint-rev-190-http-server-interactive-charts/</guid>
+      <description>&lt;p&gt;Revision &lt;strong&gt;190&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a MySQL monitoring solution, has  been released. New and updated in this revision:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;HTTP server&lt;/strong&gt;: &lt;em&gt;mycheckpoint&lt;/em&gt; can now act as a web server. Point your browser and start browsing through HTML reports. See mock up &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/09/r190/mcp_sql00/sv_report_html_brief.html&#34;&gt;&lt;strong&gt;demo&lt;/strong&gt;&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Interactive charts&lt;/strong&gt;: HTML line charts are now interactive, presenting with accurate data as you move over them. See &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/09/r190/mcp_sql00_samples/sv_report_html_brief.html&#34;&gt;&lt;strong&gt;sample&lt;/strong&gt;&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Enhanced auto-deploy&lt;/strong&gt;: now auto-recognizing failed upgrades.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Reduced footprint&lt;/strong&gt;: much code taken out of the views, leading to faster loading times.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Better configuration file use&lt;/strong&gt;: now supporting all command line options in config file.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Remote host monitoring accessibility&lt;/strong&gt;: now supporting complete configurable accessibility details.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Bug fixes&lt;/strong&gt;: thanks to the bug reporters!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is free, simple, easy to use (now easier with HTTP server) and &lt;strong&gt;useful&lt;/strong&gt;. I encourage you to try it out: even compared with other existing and emerging monitoring tools, I believe you will find it a breeze; it&#39;s low impact and lightness appealing; it&#39;s alerts mechanism assuring; its geeky SQL-based nature with ability to drill down to fine details -- geeky-kind-of-attractive.&lt;/p&gt;
+&lt;p&gt;&amp;lt;/encouragement&amp;gt;&lt;/p&gt;
+&lt;h4&gt;HTTP server&lt;/h4&gt;
+&lt;p&gt;You can now run &lt;em&gt;mycheckpoint&lt;/em&gt; in &lt;em&gt;http&lt;/em&gt; mode:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;bash$ &lt;strong&gt;mycheckpoint http&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; will listen on port &lt;strong&gt;12306&lt;/strong&gt;, and will present you with easy browsing through the reports of your &lt;em&gt;mycheckpoint&lt;/em&gt; databases.&lt;!--more--&gt;&lt;/p&gt;
+&lt;p&gt;The &lt;em&gt;http&lt;/em&gt; server automatically detects those schemata used by mycheckpoint, and utilizes the existing HTML views, integrating them into the greater web framework.&lt;/p&gt;
+&lt;p&gt;While in &lt;em&gt;http&lt;/em&gt; mode, mycheckpoint does nothing besides serving web pages. It does not actively exercise monitoring: you must still use the usual cron jobs or other scheduled tasks by which you invoke &lt;em&gt;mycheckpoint&lt;/em&gt; for monitoring.&lt;/p&gt;
+&lt;p&gt;The http server is directed at a single MySQL server, as with the following example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;bash$ &lt;strong&gt;mycheckpoint --host=slave1.localdomain --port=3306 --http-port=12306 http&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;It is assumed that this server has the monitoring schemata.&lt;/p&gt;
+&lt;p&gt;See mock up &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/09/r190/mcp_sql00/sv_report_html_brief.html&#34;&gt;&lt;strong&gt;demo&lt;/strong&gt;&lt;/a&gt;. The demo uses presents with real output from a mycheckpoint HTTP server; I haven&#39;t got the means to put up a live demo.&lt;/p&gt;
+&lt;h4&gt;Interactive charts&lt;/h4&gt;
+&lt;p&gt;The &lt;em&gt;openark line charts&lt;/em&gt;, used in the HTML reports, are now interactive. As you scroll over, the legend presents you with series values.&lt;/p&gt;
+&lt;p&gt;No more &lt;em&gt;&#34;I have this huge spike once every 4 hours, which reduces all other values to something that looks like zero but is actually NOT&#34;&lt;/em&gt;. Hover, and see the real values.&lt;/p&gt;
+&lt;p&gt;See &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/09/r190/mcp_sql00_samples/sv_report_html_brief.html&#34;&gt;&lt;strong&gt;sample&lt;/strong&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Enhanced auto-deploy&lt;/h4&gt;
+&lt;p&gt;The idea with mycheckpoint is that it should know how to self upgrade the schema on version upgrade (much like automatic WordPress upgrades). mycheckpoint does bookkeeping of installed versions within the database, and upgrades by simple comparison.&lt;/p&gt;
+&lt;p&gt;It now, following a couple of reported bugs, also recognizes failure of partial, failed upgrades. This adds to the automation of &lt;em&gt;mycheckpoint&lt;/em&gt;&#39;s installation.&lt;/p&gt;
+&lt;h4&gt;Reduced footprint&lt;/h4&gt;
+&lt;p&gt;Some of &lt;em&gt;mycheckpoint&lt;/em&gt;&#39;s views are complicated, and lead to a large amount of code in view declaration. This leads to increased table definition size (large &lt;strong&gt;.frm&lt;/strong&gt; files). There has been some work to reduce this size where possible. Work is still ongoing, but some 30% has been taken off already. This leads to faster table (view) load time.&lt;/p&gt;
+&lt;h4&gt;Better configuration file use&lt;/h4&gt;
+&lt;p&gt;Any argument supported on the command line is now also supported in the config style. Much like is handled with MySQL. For example, one can issue:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mycheckpoint --monitored-host=sql02.mydb.com  --monitored-user=monitor --monitored-password=123456&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;But now also:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mycheckpoint&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;With the following in &lt;strong&gt;/etc/mycheckpoint.cnf&lt;/strong&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;[mycheckpoint]
+monitored_host     = sql02.mydb.com
+monitored_user     = monitor
+monitored_password = 123456
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Rules are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If an option is specified on command line, it takes precedence over anything else.&lt;/li&gt;
+&lt;li&gt;Otherwise, if it&#39;s specified in the configuration file, value is read from file.&lt;/li&gt;
+&lt;li&gt;Otherwise use default value is used.&lt;/li&gt;
+&lt;li&gt;On command line, option format is&lt;strong&gt; xxx-yyy-zzz&lt;/strong&gt;: words split with dash/minus character.&lt;/li&gt;
+&lt;li&gt;On configuration file, option format is &lt;strong&gt;xxx_yyy_zzz&lt;/strong&gt;: words split with underscore. Unlike MySQL configuration format, dashes cannot be used.&lt;/li&gt;
+&lt;li&gt;If an option is specified multiple times on configuration file -- well -- I have the answer, but I won&#39;t tell. Just don&#39;t do it. It&#39;s bad for your health.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Future plans&lt;/h4&gt;
+&lt;p&gt;Work is going on. These are the non-scheduled future tasks I see:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Monitoring InnoDB Plugin &amp;amp; XtraDB status.&lt;/li&gt;
+&lt;li&gt;A proper &lt;em&gt;man&lt;/em&gt; page.&lt;/li&gt;
+&lt;li&gt;Anything else that interests me &amp;amp; the users.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Try it out&lt;/h4&gt;
+&lt;p&gt;Try out &lt;em&gt;mycheckpoint&lt;/em&gt;. It’s a different kind of monitoring   solution. Simple monitoring (charting) is immediate. For more interesting results you will need basic SQL skills, and in return you’ll get a lot   of power under your hands.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Download mycheckpoint &lt;a href=&#34;https://code.google.com/p/mycheckpoint/&#34;&gt;here&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Visit the project’s &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;homepage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Browse the &lt;a href=&#34;../../forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Report &lt;a href=&#34;https://code.google.com/p/mycheckpoint/issues/list&#34;&gt;bugs&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;New BSD  License&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Another Python MySQL template</title>
+      <link>/blog/2010/08/11/another-python-mysql-template/</link>
+      <pubDate>Wed, 11 Aug 2010 07:51:57 +0000</pubDate>
+      
+      <guid>/blog/2010/08/11/another-python-mysql-template/</guid>
+      <description>&lt;p&gt;Following up on Matt Reid&#39;s &lt;a href=&#34;http://themattreid.com/wordpress/?p=330&#34;&gt;simple python, mysql connection and iteration&lt;/a&gt;, I would like to share one of my own, which is the base for mycheckpoint &amp;amp; openark kit scripts.&lt;/p&gt;
+&lt;p&gt;It is oriented to provide with clean access to the data: the user is not expected to handle cursors and connections. Result sets are returned as python lists and dictionaries. It is also config file aware and comes with built in command line options.&lt;/p&gt;
+&lt;p&gt;I hope it comes to use: &lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2010/08/my.py&#34;&gt;my.py&lt;/a&gt;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>mycheckpoint (rev. 132): custom monitoring, custom charts, process list dump</title>
+      <link>/blog/2010/06/04/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/</link>
+      <pubDate>Fri, 04 Jun 2010 11:17:27 +0000</pubDate>
+      
+      <guid>/blog/2010/06/04/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/</guid>
+      <description>&lt;p&gt;Revision &lt;strong&gt;132&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; has been released. New and updated in this revision:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Custom monitoring: monitoring &amp;amp; charting for user defined queries&lt;/li&gt;
+&lt;li&gt;HTML reports for custom monitoring&lt;/li&gt;
+&lt;li&gt;Process list dump upon alert notifications&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Custom monitoring &amp;amp; charts&lt;/h4&gt;
+&lt;p&gt;Custom monitoring allows the user to supply with a query, the results of which will be monitored.&lt;/p&gt;
+&lt;p&gt;That is, &lt;em&gt;mycheckpoint&lt;/em&gt; monitors the status variables, replication status, OS metrics. But it cannot by itself monitor one&#39;s &lt;em&gt;application&lt;/em&gt;. Which is why a user may supply with such query as:&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;
+SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1
+&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;Such a query will tell an online store how many customers are in the midst of shopping. There is no argument that this number is worth monitoring for. Given the above query, &lt;em&gt;mycheckpoint&lt;/em&gt; will execute it per sample, and store the query&#39;s result along with all sampled data, to be then aggregated by complex views to answer for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;What was the value per given sample?&lt;/li&gt;
+&lt;li&gt;What is the value difference for each sample?&lt;/li&gt;
+&lt;li&gt;What is the change per second, i.e. the rate?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;mycheckpoint goes one step forward, and explicity records another metric:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;How much time did it take to take that sample?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;As another example, a query worth testing for rate:&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;
+SELECT MAX(shopping_cart_id) FROM shopping_cart
+&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;The above will provide with the last id. Assuming this is &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt;, and assuming we&#39;re on &lt;strong&gt;auto_increment_increment=1&lt;/strong&gt;, two samples will allow us to get the number of created carts between those samples. Now, here&#39;s a metric I&#39;d like to read:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;How many carts are created per second, for each hour of the day?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We get all these for free with mycheckpoint, which already does this analysis. All we need to provide is the query, and how we would like it to be visualized (visualization is optional, it is not the only way to diagnose monitored data) graphically:&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;
+INSERT INTO
+ custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)
+ VALUES (0, 1, &#39;SELECT COUNT(*) FROM store.shopping_cart WHERE is_pending=1&#39;, &#39;Number of pending carts&#39;, &#39;value&#39;, 0);
+INSERT INTO
+ custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)
+ VALUES (1, 1, &#39;SELECT MAX(shopping_cart_id) FROM store.shopping_cart&#39;, &#39;Created carts rate&#39;, &#39;value_psec&#39;, 0);
+&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;We can later query for these values, just like we do for normal monitored values:&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;
+mysql&amp;gt; SELECT id, ts, created_tmp_tables_psec, custom_0, custom_1_psec FROM sv_sample WHERE ts &amp;gt;= NOW() - INTERVAL 1 HOUR;
++-------+---------------------+-------------------------+----------+---------------+
+| id    | ts                  | created_tmp_tables_psec | custom_0 | custom_1_psec |
++-------+---------------------+-------------------------+----------+---------------+
+| 50730 | 2010-05-21 19:05:01 |                   16.64 |      448 |          3.02 |
+| 50731 | 2010-05-21 19:10:02 |                   20.97 |       89 |          1.73 |
+| 50732 | 2010-05-21 19:15:01 |                   15.70 |      367 |          3.56 |
+| 50733 | 2010-05-21 19:20:01 |                   18.32 |       54 |          1.43 |
+| 50734 | 2010-05-21 19:25:01 |                   16.42 |       91 |          1.96 |
+| 50735 | 2010-05-21 19:30:02 |                   21.93 |      233 |          2.11 |
+| 50736 | 2010-05-21 19:35:02 |                   14.58 |      176 |          1.91 |
+| 50737 | 2010-05-21 19:40:01 |                   21.61 |      168 |          1.93 |
+| 50738 | 2010-05-21 19:45:01 |                   16.05 |      241 |          2.44 |
+| 50739 | 2010-05-21 19:50:01 |                   19.70 |       46 |          1.19 |
+| 50740 | 2010-05-21 19:55:01 |                   15.85 |      177 |          2.28 |
+| 50741 | 2010-05-21 20:00:01 |                   19.04 |        8 |          0.82 |
++-------+---------------------+-------------------------+----------+---------------+
+&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;Of course, it is also possible to harness &lt;em&gt;mycheckpoint&lt;/em&gt;&#39;s views power to generate charts:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT custom_1_psec FROM sv_report_chart_sample\G
+&lt;/pre&gt;
+&lt;img class=&#34;alignnone&#34; title=&#34;custom_1_psec&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Latest+24+hours:+May+19,+20:10++-++May+20,+20:10&amp;amp;chf=c,s,ffffff&amp;amp;chdl=custom_1_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:QfXQmZQhXTmWVkWRobPpWUtQPVROaOOUMJPOKdJHQJFJEDJJEGCAIEFJHFFEGGDQHGJGMJPPMNZNRWR_ZUWfR_nSjuUcaXa3OgxRl4UivWZ5UhtWX4VgnUTYktiVW9WanUVxVYlgXwVdicXpb&amp;amp;chxt=x,y&amp;amp;chxr=1,0,5.120000&amp;amp;chxl=0:||+||00:00||+||04:00||+||08:00||+||12:00||+||16:00||+||20:00|&amp;amp;chxs=0,505050,10,0,lt&amp;amp;chg=4.17,25,1,2,3.47,0&amp;amp;chxp=0,3.47,7.64,11.81,15.98,20.15,24.32,28.49,32.66,36.83,41.00,45.17,49.34,53.51,57.68,61.85,66.02,70.19,74.36,78.53,82.70,86.87,91.04,95.21,99.38&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+The rules are:
+&lt;ul&gt;
+&lt;li&gt;There can (currently) only be 18 custom queries.&lt;/li&gt;
+&lt;li&gt;The &lt;strong&gt;custom_query_id&lt;/strong&gt; must range 0-17 (to be lifted soon).&lt;/li&gt;
+&lt;li&gt;A custom query must return with &lt;em&gt;exactly&lt;/em&gt; one row, with &lt;em&gt;exactly&lt;/em&gt; one column, which is a kind of &lt;em&gt;integer&lt;/em&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+Please read &lt;a href=&#34;http://code.openark.org/blog/mysql/things-to-monitor-on-mysql-the-users-perspective&#34;&gt;my earlier post&lt;/a&gt; on custom monitoring to get more background.
+&lt;h4&gt;Custom monitoring HTML reports&lt;/h4&gt;
+Custom monitoring comes with a HTML reports, featuring requested charts. See a &lt;a href=&#34;http://code.openark.org/blog/wp-content/uploads/2010/05/mcp_custom_report-128.html&#34;&gt;sample custom report&lt;/a&gt;.
+In this sample report, a few queries are monitored for value (pending rentals, pending downloads) and a few for rates (downloads per second, emails per second etc.).
+Custom HTML reports come in two flavors:
+&lt;ul&gt;
+&lt;li&gt;Brief reports, featuring last 24 hours, as in the example above. These are handled by the &lt;strong&gt;sv_custom_html_brief&lt;/strong&gt; view.&lt;/li&gt;
+&lt;li&gt;Full reports, featuring last 24 hours, last 10 days, known history. These take longer to generate, and are handled by the &lt;strong&gt;sv_custom_html&lt;/strong&gt; view.&lt;/li&gt;
+&lt;/ul&gt;
+The sample report was generated by issuing:
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT html FROM sv_custom_html_brief;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I won&#39;t go into details here as for how this view generates the HTML code. There is a myriad of view dependencies, with many interesting tricks on the way. But do remember it&#39;s &lt;em&gt;just a view&lt;/em&gt;. You don&#39;t need an application (not even &lt;em&gt;mycheckpoint&lt;/em&gt; itself) to generate the report. All it takes is a query.&lt;/p&gt;
+&lt;h4&gt;Processlist dump&lt;/h4&gt;
+&lt;p&gt;When an alert notification fires (an email is prepared to inform on some alert condition), a processlist dump summary is taken and included in email report. It may be useful to understand why the slave is lagging, or exactly why there are so many active threads.&lt;/p&gt;
+&lt;p&gt;The dump summary presents the processlist much as you would see it on SHOW PROCESSLIST, but only lists the active threads, noting down how many sleeping processes there are (PS, thread &amp;amp; process are the same in the terminology of MySQL connections). An example dump looks like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;PROCESSLIST summary:
+
+     Id: 3
+   User: system user
+   Host:
+     db: NULL
+Command: Connect
+   Time: 3168098
+  State: Waiting for master to send event
+   Info: NULL
+-------
+
+     Id: 4
+   User: system user
+   Host:
+     db: prod_db
+Command: Connect
+   Time: 612
+  State: Updating
+   Info: UPDATE user SET is_offline = 1 WHERE id IN (50440010,50440011)
+-------
+
+     Id: 8916579
+   User: prod_user
+   Host: localhost
+     db: prod_db
+Command: Query
+   Time: 1
+  State: Sending data
+   Info: INSERT IGNORE INTO archive.stat_archive (id, origin, path, ts, content
+-------
+
+     Id: 8916629
+   User: mycheckpoint
+   Host: localhost
+     db: NULL
+Command: Query
+   Time: 0
+  State: NULL
+   Info: SHOW PROCESSLIST
+-------
+Sleeping: 3 processes
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Future plans&lt;/h4&gt;
+&lt;p&gt;Work is going on. These are the non-scheduled future tasks I see:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Monitoring InnoDB Plugin &amp;amp; XtraDB status.&lt;/li&gt;
+&lt;li&gt;Interactive charts. See my &lt;a href=&#34;http://code.openark.org/blog/mysql/static-charts-vs-interactive-charts&#34;&gt;earlier post&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Monitoring for swap activity (Linux only).&lt;/li&gt;
+&lt;li&gt;Enhanced custom queries handling, including auto-deploy upon change of custom queries.&lt;/li&gt;
+&lt;li&gt;A proper &lt;em&gt;man&lt;/em&gt; page.&lt;/li&gt;
+&lt;li&gt;Anything else that interests me.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Try it out&lt;/h4&gt;
+&lt;p&gt;Try out &lt;em&gt;mycheckpoint&lt;/em&gt;. It’s a different kind of monitoring solution. You will need basic SQL skills, and in return you&#39;ll get a lot of power under your hands.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Download mycheckpoint &lt;a href=&#34;https://code.google.com/p/mycheckpoint/&#34;&gt;here&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Visit the project’s &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;homepage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Browse the &lt;a href=&#34;../../forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Report &lt;a href=&#34;https://code.google.com/p/mycheckpoint/issues/list&#34;&gt;bugs&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;New BSD License&lt;/a&gt;.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>mycheckpoint (Rev. 118): alerts, email notifications and more</title>
+      <link>/blog/2010/03/25/mycheckpoint-rev-118-alerts-email-notifications-and-more/</link>
+      <pubDate>Thu, 25 Mar 2010 08:26:34 +0000</pubDate>
+      
+      <guid>/blog/2010/03/25/mycheckpoint-rev-118-alerts-email-notifications-and-more/</guid>
+      <description>&lt;p&gt;Revision &lt;strong&gt;118&lt;/strong&gt; of &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; has been released. New and updated in this revision:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Conditional alerts&lt;/li&gt;
+&lt;li&gt;Email notifications&lt;/li&gt;
+&lt;li&gt;Revised HTML reports, including 24/7 reports.&lt;/li&gt;
+&lt;li&gt;Updated documentation&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;With this new revision mycheckpoint turns into a &lt;em&gt;monitoring solution&lt;/em&gt; for MySQL. One can now:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Store measure metrics&lt;/li&gt;
+&lt;li&gt;Query for raw, aggregated or digested metrics&lt;/li&gt;
+&lt;li&gt;Generate charts for selected metrics&lt;/li&gt;
+&lt;li&gt;View HTML reports for selecetd metrics&lt;/li&gt;
+&lt;li&gt;Define alerts conditions, query for pending alerts&lt;/li&gt;
+&lt;li&gt;Be notified via &lt;em&gt;email&lt;/em&gt; on &lt;em&gt;raised&lt;/em&gt; or &lt;em&gt;resolved&lt;/em&gt; alerts.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Conditional alerts&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is &lt;em&gt;SQL oriented&lt;/em&gt;. As such, it allows for creation of alert conditions, which are nothing more than SQL conditions.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;For example, we wish to raise an alerts when the slave stops replicating (just ping us with an email one this happens):&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;INSERT INTO alert_condition (condition_eval, description, alert_delay_minutes)
+  VALUES (&#39;seconds_behind_master IS NULL&#39;, &#39;Slave not replicating&#39;, 0);&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;Or is too far behind (but since we do maintenance work during the night, it&#39;s OK on those hours). We only want to be notified if this goes on for &lt;strong&gt;10&lt;/strong&gt; minutes:&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;INSERT INTO alert_condition (condition_eval, description, alert_delay_minutes)
+  VALUES (&#39;(seconds_behind_master &amp;gt; 60) AND (HOUR(ts) NOT BETWEEN 2 AND 4)&#39;, &#39;Slave lags too far behind&#39;, 10);&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;We want to be notified when the &lt;strong&gt;datadir&lt;/strong&gt; mount point disk quota exceeds 95% usage. Oh, and please keep nagging us about this, as long as it is unresolved:&lt;/p&gt;
+&lt;blockquote&gt;&lt;pre&gt;INSERT INTO alert_condition (condition_eval, description, repetitive_alert)
+  VALUES (&#39;os_datadir_mountpoint_usage_percent &amp;gt; 95&#39;, &#39;datadir mount point is over 95%&#39;, 1);&lt;/pre&gt;&lt;/blockquote&gt;
+&lt;p&gt;There&#39;s much more to alert conditions. You can generate a pending alerts report, get a textual presentation of raised and pending alerts, view the query which determines what alerts are currently raised, and more.&lt;/p&gt;
+&lt;p&gt;Read more on the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/alerts&#34;&gt;alerts documentation page&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Email notifications&lt;/h4&gt;
+&lt;p&gt;Introducing email notifications, &lt;em&gt;mycheckpoint&lt;/em&gt; now:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Sends email notification on alert conditions meeting. See &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/03/mycheckpoint-alerts-email-sample-113.jpeg&#34;&gt;sample email screenshot&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Sends email notification when it is unable to access the database.&lt;/li&gt;
+&lt;li&gt;Sends report via mail. Currently only HTML brief report is supported. Report is attached as HTML file in email message.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Alert notifications are automatically sent by mail (once SMTP configuration is in place, see following) when an alert is &lt;em&gt;raised&lt;/em&gt; (alert condition becomes &lt;strong&gt;true&lt;/strong&gt;) or &lt;em&gt;resolved&lt;/em&gt; (alert condition turns &lt;strong&gt;false&lt;/strong&gt;).&lt;/p&gt;
+&lt;p&gt;Email notifications require simple configuration for SMTP host, SMTP-from-address, SMTP-to-address. These can be made in the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/usage#defaults_file&#34;&gt;defaults file&lt;/a&gt; (revised), or through the command line. The following example shows how one can manually send an HTML brief report:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mycheckpoint --defaults-file=/etc/mycheckpoint.cnf &lt;strong&gt;--smtp-from&lt;/strong&gt;=monitor@my-server-company.com &lt;strong&gt;--smtp-to&lt;/strong&gt;=dba@my-server-company.com &lt;strong&gt;--smtp-host&lt;/strong&gt;=mail.my-server-company.com &lt;strong&gt;email_brief_report&lt;/strong&gt;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;One should generally set up these parameters in the configuration file (aka &lt;em&gt;defaults file&lt;/em&gt;) and forget all about it. mycheckpoint now has a default for the defaults file, which is &lt;strong&gt;/etc/mycheckpoint.cnf&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Read more on the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/emails&#34;&gt;emails documentation page&lt;/a&gt;.&lt;/p&gt;
+&lt;h4&gt;Revised HTML reports&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;The brief HTML reports has been updated, see &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/03/mycheckpoint-brief-report-sample-113.html&#34;&gt;sample&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;An HTML 24/7 report as been added, see &lt;a href=&#34;../../forge/wp-content/uploads/2010/03/mycheckpoint-24-7-report-sample-107.html&#34;&gt;sample&lt;/a&gt;. This report shows the distribution of popular metrics throughout the weekdays and hours.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Full HTML reports remain slow to load. I&#39;m putting some work into this, but I&#39;m not sure I can work around the optimizer&#39;s limitations of using indexes for GROUPing through views.&lt;/p&gt;
+&lt;h4&gt;Updated documentation&lt;/h4&gt;
+&lt;p&gt;The documentation has been revised, with more details put into the pages. Since &lt;em&gt;mycheckpoint&lt;/em&gt; gains more and more features, I saw fit to write a &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/quick-howto&#34;&gt;Quick HOWTO&lt;/a&gt; page which gets you up to speed, no fuss around, with &lt;em&gt;mycheckpoint&lt;/em&gt;&#39;s usage and features.&lt;/p&gt;
+&lt;p&gt;Read the mycheckpoint &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/quick-howto&#34;&gt;Quick HOWTO&lt;/a&gt; here.&lt;/p&gt;
+&lt;h4&gt;Future plans&lt;/h4&gt;
+&lt;p&gt;Work is going on. These are the non-scheduled future tasks I see:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Custom monitoring + notifications. See my &lt;a href=&#34;http://code.openark.org/blog/mysql/things-to-monitor-on-mysql-the-users-perspective&#34;&gt;earlier post&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Monitoring InnoDB Plugin &amp;amp; XtraDB status.&lt;/li&gt;
+&lt;li&gt;PROCESSLIST dump on alerts.&lt;/li&gt;
+&lt;li&gt;Interactive charts. See my &lt;a href=&#34;http://code.openark.org/blog/mysql/static-charts-vs-interactive-charts&#34;&gt;earlier post&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;A proper &lt;em&gt;man&lt;/em&gt; page...&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Try it out&lt;/h4&gt;
+&lt;p&gt;Try out &lt;em&gt;mycheckpoint&lt;/em&gt;. It&#39;s a different kind of monitoring solution. It does not require to to have a web server or complicated dependencies. To the experienced DBA it can further provide with valuable, raw or digested information in the form of SQL accessible data. I have used it to find anomalies in passing months, doing SQL search for periods of time where several conditions applied -- it really gives you some extra power.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Download mycheckpoint &lt;a href=&#34;https://code.google.com/p/mycheckpoint/&#34;&gt;here&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Visit the project&#39;s &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;homepage&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Browse the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Report &lt;a href=&#34;https://code.google.com/p/mycheckpoint/issues/list&#34;&gt;bugs&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;New BSD License&lt;/a&gt;.&lt;/p&gt;
+&lt;div id=&#34;_mcePaste&#34; style=&#34;overflow: hidden; position: absolute; left: -10000px; top: 855px; width: 1px; height: 1px;&#34;&gt;http://code.openark.org/forge/mycheckpoint/documentation/quick-howto&lt;/div&gt;</description>
+    </item>
+    
+    <item>
+      <title>oak-hook-general-log: streaming general log</title>
+      <link>/blog/2010/03/21/oak-hook-general-log-streaming-general-log/</link>
+      <pubDate>Sun, 21 Mar 2010 10:45:58 +0000</pubDate>
+      
+      <guid>/blog/2010/03/21/oak-hook-general-log-streaming-general-log/</guid>
+      <description>&lt;p&gt;I&#39;m seeking input on a new &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt; utility I&#39;ve started to implement.&lt;/p&gt;
+&lt;p&gt;The tool, &lt;strong&gt;oak-hook-general-log&lt;/strong&gt;, will hook up to a MySQL (&amp;gt;= 5.1) server, and stream the general log into standard output. It looks like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;bash$ python src/oak/oak-hook-general-log.py --socket=/tmp/mysql.sock --user=root
+2010-03-21 10:18:42     root[root] @ localhost []       79      1       Query   SELECT COUNT(*) FROM City
+2010-03-21 10:18:48     root[root] @ localhost []       79      1       Query   DELETE FROM City WHERE id=1000
+2010-03-21 10:18:54     root[root] @ localhost []       79      1       Query   SHOW PROCESSLIST
+2010-03-21 10:19:06     root[root] @ localhost []       79      1       Quit
+2010-03-21 10:19:07     root[root] @ localhost []       93      1       Connect root@localhost on
+2010-03-21 10:19:07     root[root] @ localhost []       93      1       Query   select @@version_comment limit 1
+2010-03-21 10:22:33     root[root] @ localhost []       93      1       Query   SELECT City.Name, Country.Name FROM Country JOIN City ON Country.Capit
+2010-03-21 10:22:58     root[root] @ localhost []       93      1       Quit
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Since output is written to &lt;strong&gt;stdout&lt;/strong&gt;, one can further:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;bash$ python src/oak/oak-hook-general-log.py --socket=/tmp/mysql.sock --user=root | grep Connect
+bash$ python src/oak/oak-hook-general-log.py --socket=/tmp/mysql.sock --user=root | grep webuser@webhost&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;What the tool does is to enable table logs, and periodically rotate the &lt;strong&gt;mysql.general_log&lt;/strong&gt; table, read and dump its content.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;The tool:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Stores and restores the original log state (general log enabled/disabled, log output).&lt;/li&gt;
+&lt;li&gt;Disables printing of its own queries to the general log.&lt;/li&gt;
+&lt;li&gt;Automatically times out (timeout configurable) so as not to enter a situation where the general log is forgotten to be turned on.&lt;/li&gt;
+&lt;li&gt;Can discard pre-existing data on the &lt;strong&gt;mysql.general_log&lt;/strong&gt; table.&lt;/li&gt;
+&lt;li&gt;Will cleanup the &lt;strong&gt;mysql.slow_log&lt;/strong&gt; table, if it wasn&#39;t originally used (turning on table logs applies to both general log and slow log).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;What would you have the tool do further? Should it provide filtering, or should we just use &lt;strong&gt;grep&lt;/strong&gt;/&lt;strong&gt;sed&lt;/strong&gt;/&lt;strong&gt;awk&lt;/strong&gt; for that? Any internal aggregation of data?&lt;/p&gt;
+&lt;p&gt;I would love to hear your thoughts. Meanwhile, &lt;a href=&#34;http://code.google.com/p/openarkkit/source/browse/trunk/openarkkit/src/oak/oak-hook-general-log.py&#34;&gt;view or grab the python script file&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Proper SQL table alias use conventions</title>
+      <link>/blog/2010/03/11/proper-sql-table-alias-use-conventions/</link>
+      <pubDate>Thu, 11 Mar 2010 09:10:09 +0000</pubDate>
+      
+      <guid>/blog/2010/03/11/proper-sql-table-alias-use-conventions/</guid>
+      <description>&lt;p&gt;After seeing quite some SQL statements over the years, something is bugging me: there is no consistent convention as for how to write an SQL query.&lt;/p&gt;
+&lt;p&gt;I&#39;m going to leave formatting, upper/lower-case issues aside, and discuss a small part of the SQL syntax: table aliases. Looking at three different queries, I will describe what I find to be problematic table alias use.&lt;/p&gt;
+&lt;p&gt;Using the &lt;a href=&#34;http://dev.mysql.com/doc/sakila/en/sakila.html&#34;&gt;sakila&lt;/a&gt; database, take a look at the following queries:&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Query #1&lt;/h4&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;SELECT&lt;/strong&gt;
+ R.rental_date, C.customer_id, C.first_name, C.last_name
+&lt;strong&gt;FROM&lt;/strong&gt;
+ rental R
+ &lt;strong&gt;JOIN&lt;/strong&gt; customer C &lt;strong&gt;USING&lt;/strong&gt; (customer_id)
+&lt;strong&gt;WHERE&lt;/strong&gt;
+ R.rental_date &amp;gt;= DATE(&#39;2005-10-01&#39;)
+ &lt;strong&gt;AND&lt;/strong&gt; C.store_id=1;
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above looks for film rentals done in a specific store (store #&lt;strong&gt;1&lt;/strong&gt;), as of Oct. 1st, 2005.&lt;/p&gt;
+&lt;h4&gt;Query #2&lt;/h4&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;SELECT&lt;/strong&gt;
+ F.title, C.name
+&lt;strong&gt;FROM&lt;/strong&gt;
+ film &lt;strong&gt;AS&lt;/strong&gt; F
+ &lt;strong&gt;JOIN&lt;/strong&gt; film_category &lt;strong&gt;AS&lt;/strong&gt; S &lt;strong&gt;ON&lt;/strong&gt; (F.film_id = S.film_id)
+ &lt;strong&gt;JOIN&lt;/strong&gt; category &lt;strong&gt;AS&lt;/strong&gt; C &lt;strong&gt;ON&lt;/strong&gt; (S.category_id = C.category_id)
+&lt;strong&gt;WHERE&lt;/strong&gt; F.length &amp;gt; 180;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above lists the title and category for all films longer than three hours.&lt;/p&gt;
+&lt;h4&gt;Query #3&lt;/h4&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;SELECT&lt;/strong&gt; c.customer_id, c.last_name
+&lt;strong&gt;FROM&lt;/strong&gt;
+  customer c
+  &lt;strong&gt;INNER JOIN&lt;/strong&gt; address a ON (c.address_id = a.address_id)
+  &lt;strong&gt;INNER JOIN&lt;/strong&gt; (
+    &lt;strong&gt;SELECT&lt;/strong&gt;
+      c.city_id
+    &lt;strong&gt;FROM&lt;/strong&gt;
+      city AS c
+      &lt;strong&gt;JOIN&lt;/strong&gt; country s &lt;strong&gt;ON&lt;/strong&gt; (c.country_id = s.country_id)
+    &lt;strong&gt;WHERE&lt;/strong&gt;
+      s.country &lt;strong&gt;LIKE&lt;/strong&gt; &#39;F%&#39;
+  ) s1 &lt;strong&gt;USING&lt;/strong&gt; (city_id)
+&lt;strong&gt;WHERE&lt;/strong&gt;
+  create_date &amp;gt;= DATE(&#39;2005-10-01&#39;);
+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above lists customers created as of Oct. 1st, 2005, and who live in countries starting with an &#39;F&#39;. The query could be solved without a subquery, but there&#39;s a good reason why I made it so.&lt;/p&gt;
+&lt;h4&gt;The problems&lt;/h4&gt;
+&lt;p&gt;I used very different conventions on any one of the queries, and sometimes within each query. And it&#39;s common that I see the same on a customer&#39;s site, what with having many programmers do the SQL coding. Again, I will only discuss the table aliases conventions. I&#39;ll leaver the rest to the reader.&lt;/p&gt;
+&lt;p&gt;Here&#39;s where I see problems:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Query &lt;strong&gt;#1&lt;/strong&gt;: In itself, it looks fine. &lt;strong&gt;Rental&lt;/strong&gt; turns to &lt;strong&gt;R&lt;/strong&gt;, &lt;strong&gt;Customer&lt;/strong&gt; turns to &lt;strong&gt;C&lt;/strong&gt;. I will comment on this slightly later on when I provide my full opinion.&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#2&lt;/strong&gt;: So &lt;strong&gt;film&lt;/strong&gt; turns to &lt;strong&gt;F&lt;/strong&gt;, &lt;strong&gt;category&lt;/strong&gt; turns to &lt;strong&gt;C&lt;/strong&gt;. What should &lt;strong&gt;film_category&lt;/strong&gt; turn into? &lt;em&gt;Out of letters?&lt;/em&gt; Let&#39;s just go for &lt;strong&gt;S&lt;/strong&gt;, shall we? But &lt;strong&gt;S&lt;/strong&gt; has nothing do with &lt;strong&gt;film_category&lt;/strong&gt;. Yet it&#39;s so commonly seen.&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#2&lt;/strong&gt;: We&#39;re using the &lt;strong&gt;AS&lt;/strong&gt; keyword now. We didn&#39;t use it before.&lt;/li&gt;
+&lt;li&gt;Queries &lt;strong&gt;#1&lt;/strong&gt;, &lt;strong&gt;#2&lt;/strong&gt;: Hold on. Wasn&#39;t &lt;strong&gt;C&lt;/strong&gt; taken for &lt;strong&gt;customer&lt;/strong&gt; in Query &lt;strong&gt;#1&lt;/strong&gt;? Now, in Query &lt;strong&gt;#2&lt;/strong&gt; it stands for &lt;strong&gt;category&lt;/strong&gt;? I&#39;m beginning to get confused.&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#3&lt;/strong&gt;: Now aliases are lower case; I was just getting used to them being upper case.&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#3&lt;/strong&gt;: But, hey, &lt;strong&gt;c&lt;/strong&gt; is back to &lt;strong&gt;customer&lt;/strong&gt;!&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#3&lt;/strong&gt;: Or, is it? Take a look at the subquery. Theres another &lt;strong&gt;c&lt;/strong&gt; in there! This time it&#39;s &lt;strong&gt;city&lt;/strong&gt;! And it&#39;s perfectly valid syntax. We actually have two identical aliases in the same query.&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#3&lt;/strong&gt;: If I could, I would name country with &lt;strong&gt;c&lt;/strong&gt; as well. But I can&#39;t. So why not throw in &lt;strong&gt;s&lt;/strong&gt; again?&lt;/li&gt;
+&lt;li&gt;Query &lt;strong&gt;#3&lt;/strong&gt;: and now I don&#39;t even bother using the alias when accessing the &lt;strong&gt;create_date&lt;/strong&gt;. Well, there&#39;s no such column in any of the other tables!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Proper conventions&lt;/h4&gt;
+&lt;p&gt;What I find so disturbing is that whenever I read a complex query, I need to go back and forth, back and forth between table aliases (found everywhere in the query) and their declaration point. Such irregularities make the queries difficult to read.&lt;/p&gt;
+&lt;p&gt;Any of the above issues could be justified. But I wish to make some suggestions:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Decide whether you&#39;re going for upper or lower case.&lt;/li&gt;
+&lt;li&gt;Do not use the same alias twice in your query, even if it&#39;s valid.&lt;/li&gt;
+&lt;li&gt;Aliases do not have to be single character. &lt;strong&gt;film_category&lt;/strong&gt; may just as well be &lt;strong&gt;FC&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Do not alias something that is hard to interpret. &lt;strong&gt;s&lt;/strong&gt; does not stand for &lt;strong&gt;country&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Think ahead: use same aliases throughout all your queries, as far as you can. If uniqueness is a problem, make for longer aliases. Use &lt;strong&gt;cust&lt;/strong&gt; instead of &lt;strong&gt;c&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The above should make for more organized and readable SQL code. Remember: what one programmer finds as a very intuitive alias, is unintuitive to another!&lt;/p&gt;
+&lt;h4&gt;My own convention&lt;/h4&gt;
+&lt;p&gt;Simple: I &lt;em&gt;only use aliases&lt;/em&gt; when using self joins. I am aware that queries are much longer what with long table names. I go farther than that: I prefer fully qualifying questionable columns throughout the query. Yes, it makes the query even longer.&lt;/p&gt;
+&lt;p&gt;I know this does not appeal to many. But there&#39;s no confusion. And it&#39;s easily searchable. And it&#39;s consistent. And if properly formatted, as in the above queries, is well readable.&lt;/p&gt;
+&lt;p&gt;Now please join me in asking Oracle if they can add multi-line Strings for java, as there are for python.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>mycheckpoint rev. 76: OS monitoring, auto deploy, brief HTML and 24/7 reports</title>
+      <link>/blog/2010/01/05/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports/</link>
+      <pubDate>Tue, 05 Jan 2010 10:55:14 +0000</pubDate>
+      
+      <guid>/blog/2010/01/05/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports/</guid>
+      <description>&lt;p&gt;Revision &lt;strong&gt;76&lt;/strong&gt; of &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; comes with quite a few improvements, including:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;OS monitoring (CPU, load average, memory)&lt;/li&gt;
+&lt;li&gt;Auto-deploy&lt;/li&gt;
+&lt;li&gt;Improved charting&lt;/li&gt;
+&lt;li&gt;Brief HTML reports&lt;/li&gt;
+&lt;li&gt;24/7 charts&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;OS Monitoring&lt;/h4&gt;
+&lt;p&gt;When monitoring the local machine, &lt;em&gt;mycheckpoint&lt;/em&gt; now monitors CPU utilization, load average, memory and swap space.&lt;/p&gt;
+&lt;p&gt;This only applies to the Linux operating system; there is currently no plan to work this out for other operating systems.&lt;/p&gt;
+&lt;p&gt;Examples:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;os_cpu_utilization_percent&lt;/strong&gt; FROM sv_report_chart_sample;
+
+&lt;/pre&gt;
+&lt;img class=&#34;size-full wp-image-1794 alignnone&#34; title=&#34;mycheckpoint-chart-cpu-sample&#34; src=&#34;/blog/blog/assets/mycheckpoint-chart-cpu-sample.png&#34; alt=&#34;mycheckpoint-chart-cpu-sample&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, &lt;strong&gt;os_loadavg&lt;/strong&gt; FROM mycheckpoint.sv_report_sample;
++---------------------+------------+
+| 2009-12-27 11:45:01 |       1.78 |
+| 2009-12-27 11:50:01 |       2.48 |
+| 2009-12-27 11:55:01 |       2.35 |
+...
++---------------------+------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT report FROM mycheckpoint.sv_report_human_sample ORDER BY id DESC LIMIT 1 \G
+*************************** 1. row ***************************
+report:
+Report period: 2009-12-27 13:20:01 to 2009-12-27 13:25:01. Period is 5 minutes (0.08 hours)
+Uptime: 100.0% (Up: 334 days, 06:37:28 hours)
+
+&lt;strong&gt;OS:
+ Load average: 1.67
+ CPU utilization: 25.2%
+ Memory: 7486.4MB used out of 7985.6484MB (Active: 6685.8906MB)
+ Swap: 3835.2MB used out of 8189.3750MB&lt;/strong&gt;
+...&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Auto-deploy&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; now has a version recognition mechanism. There is no need to call &lt;em&gt;mycheckpoint&lt;/em&gt; with the &#34;&lt;strong&gt;deploy&lt;/strong&gt;&#34; argument on first install or after upgrade. &lt;em&gt;mycheckpoint&lt;/em&gt; will recognize a change of version and will auto-deploy before moving on to monitoring your system.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;It is still possible, though, to use &#34;&lt;strong&gt;deploy&lt;/strong&gt;&#34;, in case you just want to make sure an upgrade takes place, without issuing a monitoring action.&lt;/p&gt;
+&lt;h4&gt;Improved charting&lt;/h4&gt;
+&lt;p&gt;Further improvements and bug fixes made to the Google charts, including the implementation of missing values charting.&lt;/p&gt;
+&lt;h4&gt;Brief HTML report&lt;/h4&gt;
+&lt;p&gt;In contrast with the full blown HTML report (see &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint_report-72.html&#34;&gt;sample&lt;/a&gt;), which presents hourly/daily/weekly reports for the many metrics, the new brief report only presents with a few hourly based charts. These include InnoDB performance, DML, OS metrics, and replication status.&lt;/p&gt;
+&lt;p&gt;To get a brief HTML report, issue:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT html FROM sv_report_html_brief;
+
+&lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint-brief-report.html&#34; /&gt;&lt;/pre&gt;
+&lt;img class=&#34;alignnone size-full wp-image-1839&#34; title=&#34;mycehckpoint-report-html-brief-screenshot-small&#34; src=&#34;/blog/blog/assets/mycehckpoint-report-html-brief-screenshot-small2.png&#34; alt=&#34;&#34; width=&#34;611&#34; height=&#34;409&#34; /&gt;
+&lt;/blockquote&gt;
+See &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint-brief-report.html&#34;&gt;sample brief HTML report&lt;/a&gt;.
+&lt;h4&gt;24/7 charts&lt;/h4&gt;
+24/7 charts present the various metrics on a 24x7 matrix, which allows for diagnostics of usage throughout the day and week. For example, it makes it easier to see how things slow down on Saturday/Sunday; how load increases on 10:00am every day, etc.
+24/7 charts are provided by the &lt;strong&gt;sv_report_chart_24_7&lt;/strong&gt; view.
+&lt;blockquote&gt;
+&lt;pre&gt;DESC sv_report_chart_24_7;
++---------------------------------------+----------+------+-----+---------+-------+
+| Field                                 | Type     | Null | Key | Default | Extra |
++---------------------------------------+----------+------+-----+---------+-------+
+| innodb_read_hit_percent               | longblob | YES  |     | NULL    |       |
+| innodb_buffer_pool_reads_psec         | longblob | YES  |     | NULL    |       |
+| innodb_buffer_pool_pages_flushed_psec | longblob | YES  |     | NULL    |       |
+| innodb_os_log_written_psec            | longblob | YES  |     | NULL    |       |
+| innodb_row_lock_waits_psec            | longblob | YES  |     | NULL    |       |
+| mega_bytes_sent_psec                  | longblob | YES  |     | NULL    |       |
+| mega_bytes_received_psec              | longblob | YES  |     | NULL    |       |
+| key_read_hit_percent                  | longblob | YES  |     | NULL    |       |
+| key_write_hit_percent                 | longblob | YES  |     | NULL    |       |
+| com_select_psec                       | longblob | YES  |     | NULL    |       |
+| com_insert_psec                       | longblob | YES  |     | NULL    |       |
+| com_delete_psec                       | longblob | YES  |     | NULL    |       |
+| com_update_psec                       | longblob | YES  |     | NULL    |       |
+| com_replace_psec                      | longblob | YES  |     | NULL    |       |
+| com_set_option_percent                | longblob | YES  |     | NULL    |       |
+| com_commit_percent                    | longblob | YES  |     | NULL    |       |
+| slow_queries_percent                  | longblob | YES  |     | NULL    |       |
+| select_scan_psec                      | longblob | YES  |     | NULL    |       |
+| select_full_join_psec                 | longblob | YES  |     | NULL    |       |
+| select_range_psec                     | longblob | YES  |     | NULL    |       |
+| table_locks_waited_psec               | longblob | YES  |     | NULL    |       |
+| opened_tables_psec                    | longblob | YES  |     | NULL    |       |
+| created_tmp_tables_psec               | longblob | YES  |     | NULL    |       |
+| created_tmp_disk_tables_psec          | longblob | YES  |     | NULL    |       |
+| connections_psec                      | longblob | YES  |     | NULL    |       |
+| aborted_connects_psec                 | longblob | YES  |     | NULL    |       |
+| threads_created_psec                  | longblob | YES  |     | NULL    |       |
+| seconds_behind_master                 | longblob | YES  |     | NULL    |       |
+| os_loadavg                            | longblob | YES  |     | NULL    |       |
+| os_cpu_utilization_percent            | longblob | YES  |     | NULL    |       |
+| os_mem_used_mb                        | longblob | YES  |     | NULL    |       |
+| os_mem_active_mb                      | longblob | YES  |     | NULL    |       |
+| os_swap_used_mb                       | longblob | YES  |     | NULL    |       |
++---------------------------------------+----------+------+-----+---------+-------&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Example:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT com_select_psec, innodb_buffer_pool_pages_flushed_psec FROM mycheckpoint.&lt;strong&gt;sv_report_chart_24_7&lt;/strong&gt; \G
+&lt;/pre&gt;
+&lt;p&gt;&lt;img class=&#34;alignnone size-full wp-image-1798&#34; title=&#34;mycheckpoint-chart-247-sample&#34; src=&#34;/blog/blog/assets/mycheckpoint-chart-247-sample1.png&#34; alt=&#34;mycheckpoint-chart-247-sample&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;&lt;br /&gt;
+&lt;img class=&#34;alignnone size-full wp-image-1830&#34; title=&#34;mycheckpoint-24-7-chart-sample2&#34; src=&#34;/blog/blog/assets/mycheckpoint-24-7-chart-sample2.png&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;Trying mycheckpoint&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;Get &lt;em&gt;mycheckpoint&lt;/em&gt; from the &lt;a href=&#34;https://code.google.com/p/mycheckpoint/&#34;&gt;mycheckpoint Google Code project page&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Read the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Report &lt;a href=&#34;https://code.google.com/p/mycheckpoint/issues/list&#34;&gt;issues&lt;/a&gt;!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Future plans&lt;/h4&gt;
+&lt;p&gt;I haven&#39;t got any major immediate issues; planning on user customization of charts and HTML reports. Considering thresholds and alerting for the future.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Announcing mycheckpoint: lightweight, SQL oriented monitoring for MySQL</title>
+      <link>/blog/2009/11/10/announcing-mycheckpoint-lightweight-sql-oriented-monitoring-for-mysql/</link>
+      <pubDate>Tue, 10 Nov 2009 15:16:59 +0000</pubDate>
+      
+      <guid>/blog/2009/11/10/announcing-mycheckpoint-lightweight-sql-oriented-monitoring-for-mysql/</guid>
+      <description>&lt;p&gt;I&#39;m proud to announce &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a monitoring utility for MySQL, with strong emphasis on user accessibility to monitored data.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is a different kind of monitoring tool. It leaves the power in the user&#39;s hand. It&#39;s power is not with script-based calculations of recorded data. It&#39;s with the creation of a view hierarchy, which allows the user to access computed metrics directly.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is needed first, to deploy a monitoring schema. It &lt;em&gt;may&lt;/em&gt; be needed next, so as to INSERT recorded data (GLOBAL STATUS, GLOBAL VARIABLES, MASTER STATUS, SLAVE STATUS) -- but this is just a simple INSERT; anyone can do that, even another monitoring tool.&lt;/p&gt;
+&lt;p&gt;It is then that you do not need it anymore: everything is laid at your fingertips. Consider:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;SELECT&lt;/strong&gt; innodb_read_hit_percent, DML &lt;strong&gt;FROM&lt;/strong&gt; sv_report_chart_hour;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;&lt;img class=&#34;alignnone&#34; title=&#34;Google chart #1&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Nov+5,+13:10++-++Nov+6,+10:25+(0+days,+21+hours)&amp;amp;chdl=innodb_read_hit_percent&amp;amp;chdlp=b&amp;amp;chco=ff8c00&amp;amp;chd=s:xz3m3P34z3svvz33xzsvxvvsz11xz344443x443133x414131444344144444o1K44444444664446664636444444z64x3666466666641q6666666666666666666666366668888616686866zMGq66666vhqW46666zqPx44466zljz444434343444444433434334434K434441413344444414444343434443434666666664464636&amp;amp;chxt=x,y&amp;amp;chxr=1,99.66,100.00&amp;amp;chxl=0:||Nov+5,+17:25|Nov+5,+21:40|Nov+6,+01:55|Nov+6,+06:10|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;&lt;img class=&#34;alignnone&#34; title=&#34;Google Chat #2&#34; src=&#34;/blog/blog/assets/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chts=303030,12&amp;amp;chtt=Oct+26,+19:00++-++Nov+6,+10:00+(10+days,+15+hours)&amp;amp;chdl=com_select_psec|com_insert_psec|com_delete_psec|com_update_psec|com_replace_psec&amp;amp;chdlp=b&amp;amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;amp;chd=s:11455ljjkkjnlmnoo268wyy123445njjjkjkllnoorsuvyvxv4533mikkljklmnoqrstuxy001223mojjkjkkllnnpqrrttuvyxyxkghghhhiihijjklmnnoprrssfdeefefgihjjmnoqstwwzx00khiijijilkmopprsuuxx0012khiijhihkjmmnprtwt0z2242mjjkljlknnnnpqrrwwzy1034jijhjijjkkmoqqsswvyx0z11khihjijjkkk,WXYWW4UUWSSRTUWWWjoncZYXZYZXXzUSSSTUVWYWWYbgbYXWWWWWW7aWTTTSTWXXWVVVWWWYXZZXXznTTVTUUVYWVYWUVWVVWVXWU3WWUVVSSSTSTSSTWTUUVUTUUVSUTTTUUVUVVVVVVWXWVXXVVUSVXUSSTTVWVVWVWZXYYbZXXaVVVVUTUUWXVVYZabXaYXXWWaTXZXUTVVVVVVVYZYYYWWWWVaTSRRSSSTVXZaaYWYYbXXWYXbTTUXXUUVVV,JKLKKtJIHHGILJJJJJKJKJKKKKLKKpIHGJGIIJJKJKJJJJJJKKLKKwNIJHGHJJJJLJLJJIKKKKKKKlbIIHHJIKJJKJKKKKKKLLKKMtKHGGHGGLIKMJJMJJJIJJJIIKJHHHIGIJJJJIIJJJIJJKJIJKIIGKHHKLJJKJJJIJJJIJIJKMJJHIHHMMKJJIJIIIHIIIIIIOJIIHIHIJJJJIJIIKIJLKJLKQIHGHGHIKKKKKJJJLKKKKKOKRJJHHHIIKKK,HIIHHJHHHHHHHHIHHHIIIIIIIIIIHJHHHHHHIHIIHHIIIIHHHHIHHIHHHHHGHIIIHHHHHHIIIIIHHJHHHHHHHHHHHHIHHHIHHHHHHIHHHHHHHHHHGGHHHHGGGGHGGIGGGGGHHHHHGHHHHHHHHHHHHIHHHHHHHHHHHHHHHHHHIHHHHJHHHHHHHHHHHHHHHHHHHIIHHJHHHHHHHHIHHHHHHHIIHHHHHIHHHHHHHHHHHIIIHHIIIIIIHIHHHHHHHHHH,&amp;amp;chxt=x,y&amp;amp;chxr=1,0,142.31&amp;amp;chxl=0:||Oct+28,+22:00|Oct+31,+01:00|Nov+2,+04:00|Nov+4,+07:00|&amp;amp;chxs=0,505050,10&#34; alt=&#34;&#34; width=&#34;400&#34; height=&#34;200&#34; /&gt;&lt;/blockquote&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; provides the views which take raw data (just &lt;strong&gt;innodb_buffer_pool_read_requests&lt;/strong&gt;, &lt;strong&gt;com_select&lt;/strong&gt;, &lt;strong&gt;innodb_buffer_pool_size&lt;/strong&gt;, &lt;strong&gt;table_open_cache&lt;/strong&gt;, &lt;strong&gt;seconds_behind_master&lt;/strong&gt; etc.) and generate Google Charts URLs, HTML reports, human readable reports, or otherwise easily accessible data.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;Data is provided in different time resolutions:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Per sampling&lt;/li&gt;
+&lt;li&gt;Per hour aggregated data&lt;/li&gt;
+&lt;li&gt;Per day aggregated data&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;It is thus easy to get a fine grained or a daily overview of your status. In fact, the &lt;em&gt;SQL-generated&lt;/em&gt; &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2009/11/report.html&#34;&gt;HTML report&lt;/a&gt; lays them all together.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-google-charts&#34;&gt;generating Google Charts&lt;/a&gt; and &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-html-reports&#34;&gt;HTML reports&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;It is more about data accessibility&lt;/h4&gt;
+&lt;p&gt;Charts are cool to look at, but they are not useful for detailed analysis. The user is free to ask anything of the supporting views:&lt;/p&gt;
+&lt;p&gt;I want to see the average number of SELECT queries per second in the last 5 hours:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, com_select_psec FROM sv_hour ORDER BY id DESC LIMIT 5;
++---------------------+-----------------+
+| ts                  | com_select_psec |
++---------------------+-----------------+
+| 2009-11-09 11:00:00 |          294.17 |
+| 2009-11-09 10:00:00 |          198.37 |
+| 2009-11-09 09:00:00 |          151.29 |
+| 2009-11-09 08:00:00 |           90.06 |
+| 2009-11-09 07:00:00 |           82.98 |
++---------------------+-----------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Hmm. Seems like too many SELECTs in the last hour.&lt;/p&gt;
+&lt;p&gt;Unrelated, is the InnoDB buffer pool being utilized well?&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, innodb_buffer_pool_used_percent, innodb_read_hit_percent
+       FROM sv_report_sample
+       ORDER BY id DESC LIMIT 5;
++---------------------+---------------------------------+-------------------------+
+| ts                  | innodb_buffer_pool_used_percent | innodb_read_hit_percent |
++---------------------+---------------------------------+-------------------------+
+| 2009-11-09 12:35:01 |                           100.0 |                   99.93 |
+| 2009-11-09 12:30:01 |                           100.0 |                   99.89 |
+| 2009-11-09 12:25:01 |                           100.0 |                   99.60 |
+| 2009-11-09 12:20:01 |                           100.0 |                   99.14 |
+| 2009-11-09 12:15:01 |                           100.0 |                   98.99 |
++---------------------+---------------------------------+-------------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Apparently, &lt;strong&gt;innodb_buffer_pool_size&lt;/strong&gt; could use some more memory.&lt;/p&gt;
+&lt;p&gt;When did we have excessive amount of writes?&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT ts, com_insert_psec
+       FROM sv_hour
+       WHERE com_insert_psec &amp;gt; (SELECT 2*AVG(com_insert_psec) FROM sv_hour);
++---------------------+-----------------+
+| ts                  | com_insert_psec |
++---------------------+-----------------+
+| 2009-10-27 00:00:00 |          133.66 |
+| 2009-10-28 00:00:00 |          121.79 |
+| 2009-10-29 00:00:00 |          138.88 |
+| 2009-10-30 00:00:00 |          120.79 |
+| 2009-10-31 00:00:00 |          131.78 |
++---------------------+-----------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Something is going on on those midnights!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/querying-for-data&#34;&gt;querying for data&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Human reports&lt;/h4&gt;
+&lt;p&gt;But while we&#39;re at it: it&#39;s nice to let the user the ability to ask around; but why not provide with some niceties? Special views aggregate monitored data to present human readable reports:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT report FROM sv_report_human_hour ORDER BY id DESC LIMIT 1,1 \G&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;Report period: 2009-11-08 14:00:00 to 2009-11-08 15:00:00. Period is 60 minutes (1.00 hours)
+Uptime: 100.0% (Up: 285 days, 07:17:28 hours)
+
+InnoDB:
+    innodb_buffer_pool_size: 4718592000 bytes (4500.0MB). Used: 100.0%
+    Read hit: 99.75%
+    Disk I/O: 83.00 reads/sec  20.33 flushes/sec
+    Estimated log written per hour: 797.0MB
+    Locks: 0.32/sec  current: 0
+
+MyISAM key cache:
+    key_buffer_size: 33554432 bytes (32.0MB). Used: 18.3%
+    Read hit: 99.7%  Write hit: 100.0%
+
+DML:
+    SELECT:  149.88/sec  34.1%
+    INSERT:  55.84/sec  12.7%
+    UPDATE:  17.55/sec  4.0%
+    DELETE:  20.68/sec  4.7%
+    REPLACE: 0.00/sec  0.0%
+    SET:     170.05/sec  38.7%
+    COMMIT:  0.02/sec  0.0%
+    slow:    2.28/sec  0.5% (slow time: 2sec)
+
+Selects:
+    Full scan: 8.37/sec  5.6%
+    Full join: 0.00/sec  0.0%
+    Range:     40.45/sec  27.0%
+    Sort merge passes: 0.00/sec
+
+Locks:
+    Table locks waited:  0.00/sec  0.0%
+
+Tables:
+    Table cache: 2048. Used: 26.5%
+    Opened tables: 0.00/sec
+
+Temp tables:
+    Max tmp table size:  67108864 bytes (64.0MB)
+    Max heap table size: 67108864 bytes (64.0MB)
+    Created:             7.15/sec
+    Created disk tables: 0.51/sec  7.1%
+
+Connections:
+    Max connections: 200. Max used: 245  122.5%
+    Connections: 3.31/sec
+    Aborted:     0.07/sec  2.1%
+
+Threads:
+    Thread cache: 32. Used: 50.0%
+    Created: 0.06/sec
+
+Replication:
+    Master status file number: 1494, position: 404951764
+    Relay log space limit: 10737418240, used: N/A  (N/A%)
+    Seconds behind master: N/A
+    Estimated time for slave to catch up: N/A seconds (N/A days, N/A hours)  ETA: N/A&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;The above is a &lt;em&gt;SQL-generated&lt;/em&gt; report. The view&#39;s CREATE statement is &lt;em&gt;ugly&lt;/em&gt;, trust me! But the user needs not be aware of this -- all is generated behind the scenes. Since it is SQL-generated, the report is not actually stored anywhere; and one can generate reports for as long as data exists. A three months old data can still be evaluated and used to produce a fresh report.&lt;/p&gt;
+&lt;p&gt;The above report resembles the ever-so-useful &lt;a href=&#34;http://hackmysql.com/mysqlreport&#34;&gt;mysqlreport&lt;/a&gt; by &lt;a href=&#34;http://hackmysql.com/&#34;&gt;&lt;strong&gt;Daniel Nichter&lt;/strong&gt;&lt;/a&gt;. I have drawn many ideas from this tool.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/generating-human-reports&#34;&gt;generating human readable reports&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Tracking change of parameters&lt;/h4&gt;
+&lt;p&gt;Since &lt;em&gt;mycheckpoint&lt;/em&gt; records server variables, it&#39;s easy enough to detect a change in variable. Did you dynamically change a variable and forgot to update &lt;strong&gt;my.cnf&lt;/strong&gt;? Were you baffled when the server restarted and everything started behaving differently? Just ask away:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM sv_param_change;
++---------------------+-----------------+-----------+-----------+
+| ts                  | variable_name   | old_value | new_value |
++---------------------+-----------------+-----------+-----------+
+| 2009-11-04 13:00:01 | max_connections |       500 |       200 |
++---------------------+-----------------+-----------+-----------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Doh! That&#39;s how we got &lt;strong&gt;122.5%&lt;/strong&gt; max used connections!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;[Read more on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/detecting-parameters-change&#34;&gt;detecting parameters change&lt;/a&gt;]&lt;/em&gt;&lt;/p&gt;
+&lt;h4&gt;Additional notes&lt;/h4&gt;
+&lt;p&gt;Just recently, a somewhat similar project, &lt;a href=&#34;http://www.pythian.com/news/4703/sar-sql-the-script-formerly-known-as-mysar&#34;&gt;sar-sql&lt;/a&gt; was announced by &lt;a href=&#34;http://mmatemate.blogspot.com/&#34;&gt;&lt;strong&gt;Gerry Narvaja&lt;/strong&gt;&lt;/a&gt; (Ex-&lt;a href=&#34;http://www.pythian.com/&#34;&gt;Pythian&lt;/a&gt;). When sar-sql (formerly MySAR) was announced, my own code and ideas were at late stages. I&#39;ve pondered about this, and have decided to go on with a separate project. While both make use of the same ideas, the implementation is quite different.&lt;/p&gt;
+&lt;p&gt;With proper setup, &lt;em&gt;mycheckpoint&lt;/em&gt; can be used as an add-on to other monitoring tools. I currently have no plans for doing that, but time will tell.&lt;/p&gt;
+&lt;p&gt;I believe the ease of access to monitored data is a compelling reason to try out &lt;em&gt;mycheckpoint&lt;/em&gt;. Please visit the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint home page&lt;/a&gt;, read through the &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation&#34;&gt;documentation&lt;/a&gt;, and take some &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/download&#34;&gt;downloads&lt;/a&gt; with you!&lt;/p&gt;
+&lt;p&gt;As always, community feedback is welcome. Feel free to throw in valueable feedback, &lt;a href=&#34;http://code.google.com/p/mycheckpoint/issues/list&#34;&gt;bug reports&lt;/a&gt; or even a couple of tomatoes!&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;BSD license&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Announcing openark kit</title>
+      <link>/blog/2009/02/25/announcing-openark-kit/</link>
+      <pubDate>Wed, 25 Feb 2009 13:55:45 +0000</pubDate>
+      
+      <guid>/blog/2009/02/25/announcing-openark-kit/</guid>
+      <description>&lt;p&gt;It is my great pleasure to announce the availability of the &lt;a title=&#34;openark kit project home page&#34; href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark kit&lt;/a&gt;, a set of lightweight utilities for MySQL, which eases every day tasks.&lt;/p&gt;
+&lt;p&gt;The available tools are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a title=&#34;oak-apply-ri&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-apply-ri&#34;&gt;oak-apply-ri&lt;/a&gt;: apply referential integrity on two columns with parent-child  relationship.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-block-account&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-block-account&#34;&gt;oak-block-account&lt;/a&gt;: block or release MySQL users accounts, disabling them or enabling them to login.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-kill-slow-queries&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-kill-slow-queries&#34;&gt;oak-kill-slow-queries&lt;/a&gt;: terminate long running queries.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-modify-charset&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-modify-charset&#34;&gt;oak-modify-charset&lt;/a&gt;: change the character set (and collation) of a textual column.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-purge-master-logs&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-purge-master-logs&#34;&gt;oak-purge-master-logs&lt;/a&gt;: purge master logs, depending on the state of replicating slaves.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-security-audit&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-security-audit&#34;&gt;oak-security-audit&lt;/a&gt;: audit accounts, passwords, privileges and other security settings.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-show-limits&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-show-limits&#34;&gt;oak-show-limits&lt;/a&gt;: show AUTO_INCREMENT “free space”.&lt;/li&gt;
+&lt;li&gt;&lt;a title=&#34;oak-show-replication-status&#34; href=&#34;http://code.openark.org/forge/openark-kit/oak-show-replication-status&#34;&gt;oak-show-replication-status&lt;/a&gt;: show how far behind are replicating slaves on a given master.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;!--more--&gt;All tools are written in Python, and require Python 2.3 or newer, and the python-mysqldb driver.&lt;/p&gt;
+&lt;p&gt;The project is hosted in &lt;a title=&#34;openark kit Google Code page&#34; href=&#34;http://code.google.com/p/openarkkit/&#34;&gt;Google Code&lt;/a&gt;, where you can find downloads, issue tracking etc. Community feedback is requested and welcome. Please use the &#39;Issues&#39; mechanism to report bugs.&lt;/p&gt;
+&lt;p&gt;The openark kit is released under the &lt;a href=&#34;http://www.opensource.org/licenses/bsd-license.php&#34;&gt;BSD license&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;All utilities have been put to work on production, yet all are still being developed, and still more are being created, as new ideas and needs emerge. I have been using custom made scripts for handling DB issues for years, and finally have decided to formalize them and to support them as an open source project. I do hope you try them out.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

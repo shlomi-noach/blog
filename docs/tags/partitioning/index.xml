@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Partitioning on code.openark.org</title>
+    <link>/blog/tags/partitioning/</link>
+    <description>Recent content in Partitioning on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Tue, 13 Nov 2012 14:25:38 +0000</lastBuildDate>
+    <atom:link href="/blog/tags/partitioning/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>common_schema 1.2: security, partition management, processes, QueryScript goodies</title>
+      <link>/blog/2012/11/13/common_schema-1-2-security-partition-management-processes-queryscript-goodies/</link>
+      <pubDate>Tue, 13 Nov 2012 14:25:38 +0000</pubDate>
+      
+      <guid>/blog/2012/11/13/common_schema-1-2-security-partition-management-processes-queryscript-goodies/</guid>
+      <description>&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema&lt;/a&gt; &lt;strong&gt;1.2&lt;/strong&gt; is released! This version comes shortly after &lt;strong&gt;1.1&lt;/strong&gt;, yet contains quite a few interesting goodies:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Account blocking&lt;/li&gt;
+&lt;li&gt;Security audit&lt;/li&gt;
+&lt;li&gt;RANGE partition management&lt;/li&gt;
+&lt;li&gt;Slave status&lt;/li&gt;
+&lt;li&gt;Better blocking and idle transaction management&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;QueryScript &lt;/em&gt;goodies:
+&lt;ul&gt;
+&lt;li&gt;echo, report&lt;/li&gt;
+&lt;li&gt;while-otherwise statement; foreach-otherwise statement&lt;/li&gt;
+&lt;li&gt;Better variable scope handling&lt;/li&gt;
+&lt;li&gt;Complete support for variable expansion&lt;/li&gt;
+&lt;li&gt;Transaction support within QueryScript&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;More summary info and SQL statements in processlist-related views&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;A closer look at these follows:&lt;/p&gt;
+&lt;h4&gt;Account blocking&lt;/h4&gt;
+&lt;p&gt;A new view called &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_accounts.html&#34;&gt;&lt;strong&gt;sql_accounts&lt;/strong&gt;&lt;/a&gt;, inspired by &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-block-account.html&#34;&gt;oak-block-account&lt;/a&gt; (also see &lt;a href=&#34;http://code.openark.org/blog/mysql/blocking-user-accounts&#34;&gt;here&lt;/a&gt; and &lt;a href=&#34;http://code.openark.org/blog/mysql/pop-quiz-what-is-the-most-basic-privilege-an-account-can-be-assigned-with&#34;&gt;here&lt;/a&gt;) provides with the means of blocking use accounts (and releasing them, of course) without revoking their privileges. It offers the SQL statements to block an account (by modifying its password in a symmetric way) and to release an account (by modifying its password back to normal). It really works like a charm. Together with &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/killall.html&#34;&gt;killall()&lt;/a&gt; and &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html&#34;&gt;sql_accounts&lt;/a&gt; this gives the administrator great control over accounts.&lt;/p&gt;
+&lt;h4&gt;Security audit&lt;/h4&gt;
+&lt;p&gt;Imported from &lt;a href=&#34;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-security-audit.html&#34;&gt;openark kit&lt;/a&gt;, and implemented via &lt;em&gt;QueryScript&lt;/em&gt;, the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/security_audit.html&#34;&gt;&lt;strong&gt;security_audit()&lt;/strong&gt;&lt;/a&gt; procedure will audit your accounts, passwords and general settings to find problems, pitfalls and security hazards. I will write more on this later.&lt;/p&gt;
+&lt;h4&gt;RANGE partition management&lt;/h4&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_range_partitions.html&#34;&gt;&lt;strong&gt;sql_range_partitions&lt;/strong&gt;&lt;/a&gt; view manages your &lt;strong&gt;RANGE&lt;/strong&gt; and &lt;strong&gt;RANGE COLUMNS&lt;/strong&gt; partitioned tables by providing with the SQL statements to drop oldest partitions and to create the next (in sequence) partitions. See my &lt;a href=&#34;http://code.openark.org/blog/mysql/your-magical-range-partitioning-maintenance-query&#34;&gt;earlier post&lt;/a&gt;.&lt;!--more--&gt;&lt;/p&gt;
+&lt;h4&gt;Slave status&lt;/h4&gt;
+&lt;p&gt;This is a hack providing a minified version of &lt;strong&gt;SHOW SLAVE STATUS&lt;/strong&gt;, but as a &lt;em&gt;view&lt;/em&gt; (&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/slave_status.html&#34;&gt;&lt;strong&gt;slave_status&lt;/strong&gt;&lt;/a&gt;). It only provides with &lt;strong&gt;5&lt;/strong&gt; columns:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM slave_status \G
+*************************** 1. row ***************************
+ Slave_Connected_time: 82077
+     Slave_IO_Running: 1
+    Slave_SQL_Running: 1
+        Slave_Running: 1
+Seconds_Behind_Master: 5&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;For me, the &lt;strong&gt;Seconds_Behind_Master&lt;/strong&gt; is one critical value I am interested in getting using a query. So here it is.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT &lt;strong&gt;(Seconds_Behind_Master &amp;lt; 10) IS TRUE&lt;/strong&gt; AS slave_is_up_to_date FROM &lt;strong&gt;slave_status&lt;/strong&gt;;
++---------------------+
+| slave_is_up_to_date |
++---------------------+
+|                   1 |
++---------------------+&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;QueryScript goodies&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_while.html&#34;&gt;&lt;strong&gt;while-otherwise&lt;/strong&gt;&lt;/a&gt; statement: &lt;strong&gt;while (some_condition) { ... } otherwise { /* this gets executed if the while never performs a single iteration */ }&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_foreach.html&#34;&gt;&lt;strong&gt;foreach-otherwise&lt;/strong&gt;&lt;/a&gt; statement, likewise&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_echo.html&#34;&gt;&lt;strong&gt;echo&lt;/strong&gt;&lt;/a&gt;, &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_report.html&#34;&gt;&lt;strong&gt;report&lt;/strong&gt;&lt;/a&gt; statements: echo your statements before applying them, or just echo your comments along the code. Generate a (beautified) report at the end of script execution (which is how security_audit() works).&lt;/li&gt;
+&lt;li&gt;Better variable scopes: now allowing variables of same name to be declared when their scopes do not overlap. This makes for the expected behavior a programmer would expect.&lt;/li&gt;
+&lt;li&gt;Complete variable expansion handling: expanded variables are now recognized anywhere within the script, including inside a while or &lt;strong&gt;foreach&lt;/strong&gt; expression.&lt;/li&gt;
+&lt;li&gt;Transactions are now handled by QueryScript and immediately delegated to MySQL. This completes the transaction management in QueryScript. Just &lt;strong&gt;start transaction&lt;/strong&gt;, &lt;strong&gt;commit&lt;/strong&gt; or &lt;strong&gt;rollback&lt;/strong&gt; at will.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;InnoDB idle transactions, blocking transactions&lt;/h4&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_transactions.html&#34;&gt;&lt;strong&gt;innodb_transactions&lt;/strong&gt;&lt;/a&gt; view now lists idle transactions, as well as their idle time. It also provides with the SQL statements to kill the query or connection for each transaction. This allows for a quick track or track-and-kill of idle transactions.&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_locked_transactions.html&#34;&gt;&lt;strong&gt;innodb_locked_transactions&lt;/strong&gt;&lt;/a&gt; view now offers the wait time and SQL statements for killing the query or connection of a blocking  transaction. This allows for a quick track or track-and-kill long time blocking transactions.&lt;/p&gt;
+&lt;p&gt;I will write more in depth on both in a future post.&lt;/p&gt;
+&lt;h4&gt;Processlist-related views&lt;/h4&gt;
+&lt;p&gt;The new &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_states.html&#34;&gt;&lt;strong&gt;processlist_states&lt;/strong&gt;&lt;/a&gt; view aggregates processlist by thread state. This view, and all other processlist views now provide with median or &lt;strong&gt;95%&lt;/strong&gt; median runtime for processes, in addition to the less informative AVG provided earlier.&lt;/p&gt;
+&lt;h4&gt;Get it!&lt;/h4&gt;
+&lt;p&gt;&lt;em&gt;common_schema&lt;/em&gt; is free and licensed under the New BSD License. It is nothing but a SQL file, so you simply import it into your MySQL server. &lt;em&gt;common_schema&lt;/em&gt; installs on any MySQL &amp;gt;= &lt;strong&gt;5.1&lt;/strong&gt; server, including Percona Server and MariaDB, tested on &lt;strong&gt;5.1&lt;/strong&gt;, &lt;strong&gt;5.5&lt;/strong&gt; and &lt;strong&gt;5.6 RC&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;Go to common_schema download page&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Your magical RANGE partitioning maintenance query</title>
+      <link>/blog/2012/10/09/your-magical-range-partitioning-maintenance-query/</link>
+      <pubDate>Tue, 09 Oct 2012 06:44:12 +0000</pubDate>
+      
+      <guid>/blog/2012/10/09/your-magical-range-partitioning-maintenance-query/</guid>
+      <description>&lt;p&gt;If you use &lt;strong&gt;RANGE&lt;/strong&gt; (or &lt;strong&gt;RANGE COLUMNS&lt;/strong&gt;) partitioning, and in particular when partitioning by date/time, then your are subject to the following questions: how and when do you create the &#34;next&#34; partition? How and when do you drop your older partitions?&lt;/p&gt;
+&lt;p&gt;Many people use in-house scripting to do that, and Giuseppe Maxia wrote &lt;a href=&#34;http://datacharmer.blogspot.co.il/2008/12/partition-helper-improving-usability.html&#34;&gt;Partition Helper&lt;/a&gt;. But I would like to take you one step forward, and provide with a &lt;em&gt;query&lt;/em&gt; (based on views) which automagically understands which new partition you want to create, and provides you with the statement to do so. It looks somewhat like this (a demo follows later on):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT * FROM &lt;strong&gt;sql_range_partitions&lt;/strong&gt; \G
+*************************** 1. row ***************************
+            table_schema: test
+              table_name: city
+&lt;strong&gt;sql_drop_first_partition&lt;/strong&gt;: alter table `test`.`city` drop partition `p3`
+  &lt;strong&gt;sql_add_next_partition&lt;/strong&gt;: alter table `test`.`city` add partition (partition `p_20160101000000` values less than (736329) /* 2016-01-01 00:00:00 */ )
+*************************** 2. row ***************************
+            table_schema: test
+              table_name: quarterly_report_status
+&lt;strong&gt;sql_drop_first_partition&lt;/strong&gt;: alter table `test`.`quarterly_report_status` drop partition `p3`
+  &lt;strong&gt;sql_add_next_partition&lt;/strong&gt;: alter table `test`.`quarterly_report_status` reorganize partition `p_maxvalue` into (partition `p_20110401000000` values less than (1301608800) /* 2011-04-01 00:00:00 */ , partition p_maxvalue values less than MAXVALUE)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;h4&gt;A closer look at why this is magic&lt;/h4&gt;
+&lt;p&gt;This query just gave you the &lt;strong&gt;DROP PARTITION&lt;/strong&gt; and &lt;strong&gt;ADD PARTITION&lt;/strong&gt; for all tables in your databases that use a &lt;strong&gt;RANGE&lt;/strong&gt; partitioning scheme. But, consider:&lt;!--more--&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The query &lt;em&gt;automatically&lt;/em&gt; deduces the &lt;strong&gt;LESS THAN&lt;/strong&gt; value of the new partition. It looks for a constant interval, time-based or integer-based, and keeps this interval onward.&lt;/li&gt;
+&lt;li&gt;It understands that &lt;strong&gt;5.1&lt;/strong&gt; does not allow you to partition by &lt;strong&gt;DATETIME&lt;/strong&gt;, only via integers. It understands your integer may sometimes stand for &lt;strong&gt;TO_DAYS()&lt;/strong&gt;, and sometimes for &lt;strong&gt;UNIX_TIMESTAMP()&lt;/strong&gt; of your datetime. It auto-detects that.&lt;/li&gt;
+&lt;li&gt;The query recognizes a &lt;strong&gt;MAXVALUE&lt;/strong&gt; partition, and if such partition exists, it provides with a &lt;strong&gt;REORGANIZE PARTITION&lt;/strong&gt; statement rather than &lt;strong&gt;ADD PARTITION&lt;/strong&gt; statement.&lt;/li&gt;
+&lt;li&gt;It suggests names for your partitions which give you a clue on what the partition contains. &lt;strong&gt;p_20160101000000&lt;/strong&gt; (can you splot the date/time?) tells me a lot more than some arbitrary &lt;strong&gt;p17&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;It recognizes the common case of using a &lt;strong&gt;LESS THAN (0)&lt;/strong&gt; as first partition, to take care of &lt;strong&gt;NULL&lt;/strong&gt;s. It skips this partition: the query does not offer to drop it, not does it consider it while examining the interval.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;So I never have to tell the query &lt;em&gt;&#34;I want a 3 month interval between partitions, and these are implemented using TO_DAYS()&#34;&lt;/em&gt;. I let it understand it &lt;em&gt;on its own&lt;/em&gt;.&lt;/p&gt;
+&lt;h4&gt;It is just a view&lt;/h4&gt;
+&lt;p&gt;Which means you can &lt;strong&gt;SELECT sql_drop_first_partition&lt;/strong&gt;, or you can &lt;strong&gt;SELECT sql_add_next_partition&lt;/strong&gt;, or you can only &lt;strong&gt;SELECT ... WHERE table_schema=&#39;your_schema&#39;&lt;/strong&gt;. Or you can select them all.&lt;/p&gt;
+&lt;h4&gt;You can eval() it&lt;/h4&gt;
+&lt;p&gt;This view will be released with &lt;a href=&#34;http://code.google.com/p/common-schema/&#34;&gt;common_schema&lt;/a&gt;&#39;s next version. &lt;em&gt;common_schema&lt;/em&gt; has a lot of these views which generate SQL statements. And it provides with the means to evaluate them: the &lt;a href=&#34;http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html&#34;&gt;eval()&lt;/a&gt; routine. So you don&#39;t need to export the text &lt;strong&gt;INTO OUTFILE&lt;/strong&gt; and execute it via &lt;strong&gt;SOURCE&lt;/strong&gt;. You can simply:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;call common_schema.&lt;strong&gt;eval&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#34;SELECT &lt;strong&gt;sql_add_next_partition&lt;/strong&gt; FROM sql_range_partitions WHERE table_name=&#39;quarterly_report_status&#39;&#34;&lt;/span&gt;);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;And it is done.&lt;/p&gt;
+&lt;h4&gt;Get it&lt;/h4&gt;
+&lt;p&gt;The&lt;strong&gt; sql_range_partitions&lt;/strong&gt; view will be included in &lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;1.2&lt;/strong&gt;, schedules to be released soon. Meanwhile, you can import this file: [download id=&#34;1&#34; format=&#34;1&#34;] onto your existing &lt;a href=&#34;http://code.google.com/p/common-schema&#34;&gt;common_schema&lt;/a&gt; &lt;strong&gt;1.1&lt;/strong&gt; install (what? You don&#39;t already have &lt;em&gt;common_schema&lt;/em&gt; installed? You should know it&#39;s packed with lots of stuff like this one!)&lt;/p&gt;
+&lt;p&gt;If, by the time you read this, &lt;em&gt;common_schema&lt;/em&gt; &lt;strong&gt;1.2&lt;/strong&gt; is already out, you don&#39;t need to add anything.&lt;/p&gt;
+&lt;h4&gt;In action&lt;/h4&gt;
+&lt;p&gt;Consider the following table on a MySQL &lt;strong&gt;5.1&lt;/strong&gt; server:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;&lt;strong&gt;CREATE TABLE&lt;/strong&gt; test.quarterly_report_status (
+    report_id INT NOT NULL,
+    report_status VARCHAR(20) NOT NULL,
+    report_updated TIMESTAMP NOT NULL 
+)
+&lt;strong&gt;PARTITION BY RANGE&lt;/strong&gt; (&lt;strong&gt;UNIX_TIMESTAMP(report_updated)&lt;/strong&gt;) (
+    PARTITION p0 VALUES LESS THAN (&lt;strong&gt;UNIX_TIMESTAMP(&#39;2008-01-01 00:00:00&#39;)&lt;/strong&gt;),
+    PARTITION p1 VALUES LESS THAN (&lt;strong&gt;UNIX_TIMESTAMP(&#39;2008-04-01 00:00:00&#39;)&lt;/strong&gt;),
+    PARTITION p2 VALUES LESS THAN (&lt;strong&gt;UNIX_TIMESTAMP(&#39;2008-07-01 00:00:00&#39;)&lt;/strong&gt;),
+    PARTITION p3 VALUES LESS THAN (&lt;strong&gt;UNIX_TIMESTAMP(&#39;2008-10-01 00:00:00&#39;)&lt;/strong&gt;),
+    PARTITION p4 VALUES LESS THAN (&lt;strong&gt;UNIX_TIMESTAMP(&#39;2009-01-01 00:00:00&#39;)&lt;/strong&gt;),
+    PARTITION p5 VALUES LESS THAN (&lt;strong&gt;UNIX_TIMESTAMP(&#39;2009-04-01 00:00:00&#39;)&lt;/strong&gt;),
+    PARTITION p6 VALUES LESS THAN (&lt;strong&gt;MAXVALUE&lt;/strong&gt;)
+);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Unfortunately MySQL does not remember the definition expressions, so:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; &lt;strong&gt;SHOW CREATE TABLE&lt;/strong&gt; test.quarterly_report_status \G
+
+Create Table: &lt;strong&gt;CREATE TABLE&lt;/strong&gt; `quarterly_report_status` (
+  `report_id` int(11) NOT NULL,
+  `report_status` varchar(20) NOT NULL,
+  `report_updated` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+/*!50100 &lt;strong&gt;PARTITION BY RANGE&lt;/strong&gt; (&lt;strong&gt;UNIX_TIMESTAMP(report_updated)&lt;/strong&gt;)
+(PARTITION p0 VALUES LESS THAN (&lt;strong&gt;1199138400&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION p1 VALUES LESS THAN (&lt;strong&gt;1206997200&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION p2 VALUES LESS THAN (&lt;strong&gt;1214859600&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION p3 VALUES LESS THAN (&lt;strong&gt;1222808400&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION p4 VALUES LESS THAN (&lt;strong&gt;1230760800&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION p5 VALUES LESS THAN (&lt;strong&gt;1238533200&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION p6 VALUES LESS THAN MAXVALUE ENGINE = MyISAM) */&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Yikes! What does&lt;strong&gt; &lt;/strong&gt;&lt;strong&gt;1238533200&lt;/strong&gt; stand for?&lt;/p&gt;
+&lt;p&gt;No worries, let&#39;s &lt;strong&gt;eval()&lt;/strong&gt;:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call common_schema.&lt;strong&gt;eval&lt;/strong&gt;(&lt;span style=&#34;color: #000080;&#34;&gt;&#34;SELECT &lt;strong&gt;sql_add_next_partition&lt;/strong&gt; FROM sql_range_partitions &lt;strong&gt;WHERE table_name=&#39;quarterly_report_status&#39;&lt;/strong&gt;&#34;&lt;/span&gt;);
+
+mysql&amp;gt; &lt;strong&gt;SHOW CREATE TABLE&lt;/strong&gt; test.quarterly_report_status \G
+
+CREATE TABLE `quarterly_report_status` (
+  `report_id` int(11) NOT NULL,
+  `report_status` varchar(20) NOT NULL,
+  `report_updated` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+/*!50100 PARTITION BY RANGE (UNIX_TIMESTAMP(report_updated))
+(PARTITION p0 VALUES LESS THAN (1199138400) ENGINE = MyISAM,
+ PARTITION p1 VALUES LESS THAN (1206997200) ENGINE = MyISAM,
+ PARTITION p2 VALUES LESS THAN (1214859600) ENGINE = MyISAM,
+ PARTITION p3 VALUES LESS THAN (1222808400) ENGINE = MyISAM,
+ PARTITION p4 VALUES LESS THAN (1230760800) ENGINE = MyISAM,
+ PARTITION p5 VALUES LESS THAN (1238533200) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_20090701000000&lt;/strong&gt; VALUES LESS THAN (&lt;strong&gt;1246395600&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_maxvalue&lt;/strong&gt; VALUES LESS THAN MAXVALUE ENGINE = MyISAM) */&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Our query auto-detected the meaning of those numbers like &lt;strong&gt;&lt;/strong&gt;&lt;strong&gt;1238533200&lt;/strong&gt;, and has found the next partition to be created:&lt;strong&gt; p_20090701000000&lt;/strong&gt;. That&#39;s &lt;strong&gt;&#39;2009-07-01 00:00:00&#39;&lt;/strong&gt;, and now we know what the partition stands for. A new &lt;strong&gt;MAXVALUE&lt;/strong&gt; partition called &lt;strong&gt;p_maxvalue&lt;/strong&gt; is created.&lt;/p&gt;
+&lt;p&gt;Just for the fun of it, let&#39;s issue the same a few more times and see what comes out:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; call common_schema.&lt;strong&gt;eval&lt;/strong&gt;(&#34;SELECT sql_add_next_partition FROM sql_range_partitions WHERE table_name=&#39;quarterly_report_status&#39;&#34;);
+
+mysql&amp;gt; call common_schema.&lt;strong&gt;eval&lt;/strong&gt;(&#34;SELECT sql_add_next_partition FROM sql_range_partitions WHERE table_name=&#39;quarterly_report_status&#39;&#34;);
+
+mysql&amp;gt; call common_schema.&lt;strong&gt;eval&lt;/strong&gt;(&#34;SELECT sql_add_next_partition FROM sql_range_partitions WHERE table_name=&#39;quarterly_report_status&#39;&#34;);
+
+mysql&amp;gt; call common_schema.&lt;strong&gt;eval&lt;/strong&gt;(&#34;SELECT sql_add_next_partition FROM sql_range_partitions WHERE table_name=&#39;quarterly_report_status&#39;&#34;);
+
+mysql&amp;gt; &lt;strong&gt;SHOW CREATE TABLE&lt;/strong&gt; test.quarterly_report_status \G
+
+Create Table: CREATE TABLE `quarterly_report_status` (
+  `report_id` int(11) NOT NULL,
+  `report_status` varchar(20) NOT NULL,
+  `report_updated` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+/*!50100 PARTITION BY RANGE (UNIX_TIMESTAMP(report_updated))
+(PARTITION p0 VALUES LESS THAN (1199138400) ENGINE = MyISAM,
+ PARTITION p1 VALUES LESS THAN (1206997200) ENGINE = MyISAM,
+ PARTITION p2 VALUES LESS THAN (1214859600) ENGINE = MyISAM,
+ PARTITION p3 VALUES LESS THAN (1222808400) ENGINE = MyISAM,
+ PARTITION p4 VALUES LESS THAN (1230760800) ENGINE = MyISAM,
+ PARTITION p5 VALUES LESS THAN (1238533200) ENGINE = MyISAM,
+ PARTITION p_20090701000000 VALUES LESS THAN (1246395600) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_20091001000000&lt;/strong&gt; VALUES LESS THAN (&lt;strong&gt;1254348000&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_20100101000000&lt;/strong&gt; VALUES LESS THAN (&lt;strong&gt;1262296800&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_20100401000000&lt;/strong&gt; VALUES LESS THAN (&lt;strong&gt;1270069200&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_20100701000000&lt;/strong&gt; VALUES LESS THAN (&lt;strong&gt;1277931600&lt;/strong&gt;) ENGINE = MyISAM,
+ PARTITION &lt;strong&gt;p_maxvalue&lt;/strong&gt; VALUES LESS THAN MAXVALUE ENGINE = MyISAM) */&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Notice the number interval is not constant: we have different number of days in different quarters. We have Feb &lt;strong&gt;29th&lt;/strong&gt; every &lt;strong&gt;4&lt;/strong&gt; years. Yet we get the right &lt;strong&gt;LESS THAN&lt;/strong&gt; value.&lt;/p&gt;
+&lt;p&gt;Now isn&#39;t this cool?&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

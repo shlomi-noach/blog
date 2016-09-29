@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Monitoring DML/slow queries with graphite &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Monitoring DML/slow queries with graphite</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>19 Apr 2014</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/graphite">graphite</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/monitoring">Monitoring</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/scripts">scripts</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p><a href="http://www.percona.com/doc/percona-toolkit/2.2/pt-query-digest.html">pt-query-digest</a>, <a href="https://github.com/box/Anemometer/wiki">Anemometer</a> or <a href="http://code.openark.org/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow">"Anemomaster"</a> do a great job of analysing your queries and giving you visibility into what's going on with your MySQL servers. However, the place where the query digests are written is just some MySQL tables on some server. Do you have monitoring/alerts on that table? How will you verify a specific query does not exceed some runtime/execution count threshold, and get notified when it does?</p>
+<p>At Outbrain we use <a href="http://graphite.wikidot.com/">Graphite</a> to collect almost all of our data. We like it for its simplicity and for the fact it has a "push" strategy as opposed to "pull" strategy: every service/server/collectd writes (<em>pushes</em>) its own data to Graphite, as opposed to having some centralized monitoring service trying to pull data from thousands of servers &amp; services. We also have a great Graphite dashboard (developed at our company by Erez Mazor) called <a href="https://github.com/ezbz/graphitus">graphitus</a>, which is a very sophisticated and easily configurable visualization solution (see <a href="http://ezbz.github.io/graphitus/">documentation</a>).</p>
+<p>Our love/hate relationship with <em>Nagios</em> boil down to having a single Nagios plugin: one that reads data from Graphite. We use Nagios to generate our alerts, and dream of the day we will substitute it with something else (there's not too much love in this love/hate relationship).</p>
+<p>Graphite is a <em>numeric timeseries data</em> monitoring solution. How do you throw MySQL query analysis into Graphite, then?</p>
+<p>The answer lies within the flexible structure of a Graphite metric entry, which is a freely composed path, such as <strong>collectd.hosts.us-east.myhost01.mysql.gauge-Threads_running.value</strong>. Graphite does not require you to pre-define paths, and you can use anything that makes sense to you. Thus, you can use a slow query's text, for example, as part of the Graphite entry <em>path</em>. This is not entirely simple as the graphite path limits the allowed characters. So this is what we do:<!--more--></p>
+<p>Any query that is written to Graphite is transformed into a "canonical form". We strip it of excessive information and write enough of it that still makes sense to us. Actually, we found out that we usually do well with just the bare bones of "what type of query this is and what tables are involved". For better drill down we then go to Anemometer/Anemomaster. Hence, the canonical form of the following query:</p>
+<blockquote>
+<pre>UPDATE my_documents SET document_owner='Wallace'  WHERE document_domain='Gromit'</pre>
+</blockquote>
+<p>is simply</p>
+<blockquote>
+<pre>update_my_documents</pre>
+</blockquote>
+<p>Thankfully the <em>pt-query-digest</em> report tables are already timestamp based, and are already aggregated by query "fingerprints". This makes writing this data to graphite just a matter of text normalizing. The following script is a slightly modified version of what we use. Do note that we have the notion of "clustername" which is the name of the replication topology we're looking at. We have many topologies, like OLTP, OLAP, Metadata, etc. etc. We support this notion by adding a <strong>clustername_max</strong> column to the report tables and instructing <em>pt-query-digest</em> fill in this value.</p>
+<p>We run the following shell script by cron every 10 minutes (based on the 10 minute interval of analysing our masters' DML):</p>
+<blockquote>
+<pre>
+#!/bin/bash
+#
+# This script should run on the anemomaster machine every 10 minutes, shortly after
+# binary logs / relay logs are analyzed via pt-query-digest.
+#
+unixtime=$(date +%s)
+# Get stats for the last round 10 minutes
+# The query only takes one representative from each cluster
+query=&quot; select clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp group by clustername_max) group by clustername_max, fingerprint order by sum(ts_cnt) desc &quot;
+mysql -umyself -psecret anemomaster --silent --silent --raw -e &quot;$query&quot; | while IFS=$'\t' read -r -a result_values
+    do
+        fingerprint_cluster=${result_values[0]} ;
+        fingerprint_count=${result_values[1]} ;
+        fingerprint_query=${result_values[2]} ;
+        fingerprint_query=$(echo $fingerprint_query | sed -r -e &quot;s/^(-- .*)]//g&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr '\n' ' ' | tr '\r' ' ' | tr '\t' ' ')
+        fingerprint_query=${fingerprint_query%%(*}
+        fingerprint_query=${fingerprint_query%%,*}
+        fingerprint_query=${fingerprint_query%% set *}
+        fingerprint_query=${fingerprint_query%% SET *}
+        fingerprint_query=${fingerprint_query%% where *}
+        fingerprint_query=${fingerprint_query%% WHERE *}
+        fingerprint_query=${fingerprint_query%% join *}
+        fingerprint_query=${fingerprint_query%% JOIN *}
+        fingerprint_query=${fingerprint_query%% using *}
+        fingerprint_query=${fingerprint_query%% USING *}
+        fingerprint_query=${fingerprint_query%% select *}
+        fingerprint_query=${fingerprint_query%% SELECT *}
+        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;\`&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;*&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr -d &quot;?&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr &quot; &quot; &quot;_&quot;)
+        fingerprint_query=$(echo $fingerprint_query | tr &quot;.&quot; &quot;__&quot;)
+        echo &quot;data.mysql.dml.${fingerprint_cluster}.${fingerprint_query}.count ${fingerprint_count} $unixtime&quot; | nc -w 1 my.graphite.server 2003
+    done
+</pre>
+</blockquote>
+<p>If you don't need the "clustername stuff", modify the query to read:</p>
+<blockquote>
+<pre>
+select 'mysql' as clustername_max, sum(ts_cnt), replace(fingerprint, '\n', ' ') from global_query_review_history join global_query_review using (checksum), (select date(now()) + interval hour(now()) hour + interval (minute(now()) div 10 *10) minute as search_to_timestamp) as search_to_timestamp_sel where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp and hostname_max in ( select min(hostname_max) from global_query_review_history where ts_min &gt;= search_to_timestamp - interval 10 minute and ts_min &lt; search_to_timestamp) group by fingerprint order by sum(ts_cnt) desc
+</pre>
+</blockquote>
+<p>The graphite metric path will look like <strong>data.mysql.dml.oltp.update_my_documents.count</strong>, which makes for a perpefctly valid metric to monitor, graphically visualize and get alerts on.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2014/04/18/anemomaster-dml-visibility-your-must-do-for-tomorrow/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2014/04/18/anemomaster-dml-visibility-your-must-do-for-tomorrow/">&#34;Anemomaster&#34;: DML visibility. Your must-do for tomorrow</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2014/04/20/the-mystery-of-mysql-5-6-excessive-buffer-pool-flushing/">The mystery of MySQL 5.6 excessive buffer pool flushing</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2014/04/20/the-mystery-of-mysql-5-6-excessive-buffer-pool-flushing/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

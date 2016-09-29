@@ -1,0 +1,51 @@
+---
+author:
+  display_name: shlomi
+  email: shlomi@openark.org
+  first_name: Shlomi
+  last_name: Noach
+  login: shlomi
+categories:
+- MySQL
+date: 2016-09-28T14:22:14Z
+meta:
+  _edit_last: "2"
+  _oembed_1868aa5e0d1aa644ded2ca0a0ec6792f: '{{unknown}}'
+  _wpas_done_all: "1"
+  _wpcom_is_markdown: "1"
+published: true
+status: publish
+tags:
+- gh-ost
+- GTID
+- operations
+- replication
+- SQL
+- Opinions
+title: 'Three wishes for a new year'
+type: post
+#alias: /mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more/
+---
+
+<p>(Almost) another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Relaxed GTID constraints</li>
+</ol>
+<p>I'm still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? <code>gh-ost</code>&nbsp;has to write something to the binary log. Thus, it "corrupts" the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but...</p>
+<p>I understand the idea and need for the <code>Executed GTID Set</code>. It will&nbsp;certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a <code>flush tables with read lock</code>&nbsp;without disabling <code>sql_log_bin</code>. Things just happen.</p>
+<p>For that, I would like to suggest GTID control levels, such as:</p>
+<ol>
+<li><em>Strict</em>: same as Oracle's existing&nbsp;implementation. Executed sets, purged sets, whatnot.</li>
+<li><em>Last executed</em>: a mode where the only thing that counts is the last executed GTID value. If I repoint replica,&nbsp;all it needs to check is "hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don't care about comparing executed and purged sets, I will trust you and keep running from that point on"</li>
+<li><em>Declarative</em>: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.</li>
+</ol>
+<p>I realize Oracle MySQL GTID is out for some over 3 years now, but I'm sorry - I still have reservations and see&nbsp;use cases where I fear it will not serve me right.</p>
+<p>How about my previous years wishes? World peace and good health never came through, however:</p>
+<ul>
+<li>My <a href="http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-2015">2015 wish</a> for "decent, operations friendly built in online table refactoring" was unmet, however <code>gh-ost</code>&nbsp;is a thing now and exceeds my expectations. No, really. Please come see <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">Tom &amp; myself present gh-ost</a> and how it changed our migration paradigm.</li>
+<li>My <a href="http://code.openark.org/blog/mysql/three-wishes-for-a-new-year-201">2012 wish</a> for "decent, long waited for, implementation of <a href="http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function">Window Functions</a> (aka Analytic Functions) for MySQL" was met by&nbsp;MariaDB's <a href="https://mariadb.com/kb/en/mariadb/window-functions/">window functions</a>.<br>
+Not strictly Window Functions, but Oracle MySQL 8.0 will <a href="http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/">support CTE</a> (hierarchial/recursive), worth a mention.</li>
+</ul>
+<p>See you in Amsterdam!</p>

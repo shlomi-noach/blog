@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>SQL: finding a user&#39;s country/region based on IP &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>SQL: finding a user&#39;s country/region based on IP</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>26 May 2009</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/indexing">Indexing</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/performance">Performance</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>I've encountered the same problem twice for different customers, so I guess it's worth a discussion.</p>
+<p>A common task for web applications is to find out the country/region of a user, based on her IP address, as can be detected in the HTTP request. Depending on the country of origin, the website can translate dates for different time zones, can change locale settings, and, perhaps most commonly, show advertisements in her native language.</p>
+<p>To start with, there's a table which lists the IP ranges per country/region. Let's assume we're only dealing with IPv4:</p>
+<blockquote>
+<pre>CREATE TABLE regions_ip_range (
+  regions_ip_range_id INT UNSIGNED AUTO_INCREMENT,
+  country VARCHAR(64) CHARSET utf8,
+  region VARCHAR(64) CHARSET utf8,
+  start_ip INT UNSIGNED,
+  end_ip INT UNSIGNED,
+  …
+  PRIMARY KEY(regions_ip_range_id),
+  ...
+);</pre>
+</blockquote>
+<p>The table is fixed, and is populated. Now the question arises: how do we query this table, and which indexes should be created?</p>
+<h4>The wrong way</h4>
+<p>The form I've encountered is as follows: an index is declared on regions_ip_range:</p>
+<blockquote>
+<pre>KEY ip_range_idx (start_ip, end_ip)</pre>
+</blockquote>
+<p>And the query goes like this:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE my_ip BETWEEN start_ip AND end_ip</pre>
+</blockquote>
+<p><!--more-->It takes a grasp of indexes to understand that this is wrong. I'm not saying the results are wrong, just that the query performance is bad. Let's rewrite the query to understand why. The following query is the exact equal of the above:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE my_ip &gt;= start_ip AND my_ip &lt;= end_ip</pre>
+</blockquote>
+<p>Can you see the problem?</p>
+<p>There's a range condition on the first indexed column (<strong>start_ip</strong>). This automatically negates the use of the second column (<strong>end_ip</strong>). Reversing the order won't do, since there's also a range condition on <strong>end_ip</strong>.</p>
+<p>Effectively, if this were the only query we were executing, we would get the same performance had we defined the following index:</p>
+<blockquote>
+<pre>KEY ip_range_idx (start_ip)</pre>
+</blockquote>
+<p>Now that doesn't look promising. It's fair to guess (as happens in reality) that for the vast majority of ip addresses, MySQL would rather perform a full table scan than use the index.</p>
+<h4>Another wrong way</h4>
+<p>When pointing this to people, the natural response is: "OK, then, let's index like <em>this</em>:"</p>
+<blockquote>
+<pre>KEY start_ip_idx (start_ip)
+KEY end_ip_idx (end_ip)</pre>
+</blockquote>
+<p>Now we have two indexes, one on each address. But that won't do at all. Even if we assume MySQL will use both indexes for our query, and do an index_merge, we won't have good performance. Consider: you can't have both indexes be selective for any given IP. Either the IP is close to the beginning of the global range (in which case the '<strong>my_ip &gt;= start_ip</strong>' part is not selective) or it is nearer the upper bound (in which case the '<strong>my_ip &lt;= end_ip</strong>' part is not selective), or is somewhere in the middle, in which case none is selective.</p>
+<p>In fact, I cannot imagine MySQL would choose to use index_merge at all, and so at most one index is used, if not full table scan again.</p>
+<h4>A solution</h4>
+<p>An important step towards a solution is the realization that the IP ranges are <em>mutually exclusive</em>. No IP can lie in any two ranges, just one (at least, this is the data I've worked with. If you have hierarchical ranges, you'll need to make adjustments). This means I don't really need to index both columns. One would suffice. Say I was to put the following index:</p>
+<blockquote>
+<pre>KEY start_ip_idx (start_ip)</pre>
+</blockquote>
+<p>We've seen that the presented query won't run well on this. Can we rewrite the query as well? Sure! Here's one that will work:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE start_ip &lt;= my_ip
+ORDER BY start_ip DESC LIMIT 1</pre>
+</blockquote>
+<p>What we're asking for, now, is the first range for which our IP is larger than the range's start, reading <em>backwards</em>. What the optimizer needs to do is find the first entry for which <strong>start_ip &lt;= my_ip</strong>, using the index, and then... oh, there's no need to go on, as we have <strong>LIMIT 1</strong>.</p>
+<p>If this seems confusing, you can do the opposite. Define this key:</p>
+<blockquote>
+<pre>KEY end_ip_idx (end_ip)</pre>
+</blockquote>
+<p>And use this query, instead:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE my_ip &lt;= end_ip
+ORDER BY end_ip ASC LIMIT 1</pre>
+</blockquote>
+<p>It's interesting that EXPLAIN would still claim it's going to scan a large number of rows, since it does not take the <strong>LIMIT 1</strong> into account.</p>
+<p>I've <a title="Two storage engines; different plans, Part II" href="http://code.openark.org/blog/mysql/two-storage-engines-different-plans-part-ii">written before</a> about the differences between storage engines in the way they recommend the optimizer to use (or not to use) an index. So you may need to end up with a <strong>FORCE_INDEX</strong> after all.</p>
+<h4>Assumptions</h4>
+<p>I've made a few assumptions here:</p>
+<ol>
+<li>The table lists ranges are covering: they start with 0.0.0.0 and end with 255.255.255.255.</li>
+<li>There are no 'holes' in the table. Meaning there's bound to be a range for any given IP.</li>
+<li>IP ranges are mutually exclusive (no hierarchical IP ranges)</li>
+</ol>
+<p>If the first two assumptions are not met, it should be checked, once the query returns, that <strong>my_ip</strong> is indeed between <strong>start_ip</strong> and <strong>end_ip</strong>.</p>
+<p>If assumption #3 is not met, the data can be split to two tables: one must hold the mutually exlusive data; the second one may contain whatever data you have, possibly utilizing some hierarchial algorithm such as nested sets etc.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2009/05/21/reasons-to-use-innodb_file_per_table/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2009/05/21/reasons-to-use-innodb_file_per_table/">Reasons to use innodb_file_per_table</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2009/06/08/even-more-on-mysql-password-security/">Even more on MySQL password security</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2009/06/08/even-more-on-mysql-password-security/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

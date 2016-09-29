@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Math on code.openark.org</title>
+    <link>/blog/tags/math/</link>
+    <description>Recent content in Math on code.openark.org</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2016. All rights reserved.</copyright>
+    <lastBuildDate>Tue, 09 Feb 2010 09:47:21 +0000</lastBuildDate>
+    <atom:link href="/blog/tags/math/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Monotonic functions, SQL and MySQL</title>
+      <link>/blog/2010/02/09/monotonic-functions-sql-and-mysql/</link>
+      <pubDate>Tue, 09 Feb 2010 09:47:21 +0000</pubDate>
+      
+      <guid>/blog/2010/02/09/monotonic-functions-sql-and-mysql/</guid>
+      <description>&lt;blockquote&gt;In mathematics, a &lt;strong&gt;monotonic function&lt;/strong&gt; (or &lt;strong&gt;monotone function&lt;/strong&gt;) is a function which preserves the given order. [&lt;a href=&#34;http://en.wikipedia.org/wiki/Monotonic_function&#34;&gt;Wikipedia&lt;/a&gt;]&lt;/blockquote&gt;
+&lt;p&gt;To be more precise, a function &lt;em&gt;f&lt;/em&gt; is monotonic increasing, if for every &lt;em&gt;x ≤ y&lt;/em&gt; it holds that &lt;em&gt;f(x) ≤ f(y)&lt;/em&gt;. &lt;em&gt;f&lt;/em&gt; is said to be strictly monotonic increasing is for every &lt;em&gt;x &amp;lt; y&lt;/em&gt; it holds that &lt;em&gt;f(x) &amp;lt; f(y)&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;So, if we follow values in some order, we say that &lt;em&gt;f&lt;/em&gt; is monotonic increasing if &lt;em&gt;f&lt;/em&gt;&#39;s value never decreases (it either increases or stays the same), and we say that &lt;em&gt;f&lt;/em&gt; is strictly increasing if &lt;em&gt;f&lt;/em&gt;&#39;s value is always changes &#34;upwards&#34;.&lt;/p&gt;
+&lt;p&gt;Monotonic functions play an important role in SQL. To discuss monotonic functions in SQL we must first determine what the &lt;em&gt;order&lt;/em&gt; is, and then, what the &lt;em&gt;function&lt;/em&gt; is.&lt;/p&gt;
+&lt;p&gt;Well, they both change according to our point of view. Let&#39;s look at some examples. Take a look at the following table:&lt;!--more--&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;CREATE TABLE `log` (
+ `&lt;strong&gt;id&lt;/strong&gt;` int(11) NOT NULL &lt;strong&gt;AUTO_INCREMENT&lt;/strong&gt;,
+ `&lt;strong&gt;ts&lt;/strong&gt;` &lt;strong&gt;timestamp&lt;/strong&gt; NOT NULL &lt;strong&gt;DEFAULT CURRENT_TIMESTAMP&lt;/strong&gt;,
+ `error_level` tinyint(4) DEFAULT NULL,
+ `subject` varchar(32) DEFAULT NULL,
+ `description` varchar(255) DEFAULT NULL,
+ PRIMARY KEY (`id`)
+)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;In the above &lt;strong&gt;log&lt;/strong&gt; table, log entries are added with &lt;strong&gt;id&lt;/strong&gt; and &lt;strong&gt;ts&lt;/strong&gt; getting automatically evaluated. Assuming no dirty hacks occur, we can expect that &lt;strong&gt;ts&lt;/strong&gt; in &lt;em&gt;monotonic&lt;/em&gt; by order of &lt;strong&gt;id&lt;/strong&gt;. That is, as &lt;strong&gt;id&lt;/strong&gt; increases, so does &lt;strong&gt;ts&lt;/strong&gt;. Is is possible that we get the same &lt;strong&gt;ts&lt;/strong&gt; for a few rows (it is not unique), but once it increases, it never decreases again.&lt;/p&gt;
+&lt;h4&gt;Why is this interesting?&lt;/h4&gt;
+&lt;p&gt;Because it simplifies common problems.&lt;/p&gt;
+&lt;p&gt;For example, it simplifies a search for a given &lt;strong&gt;ts&lt;/strong&gt; value, when no index exists on the &lt;strong&gt;ts&lt;/strong&gt; column. If we were to look for a log entry from &lt;strong&gt;&#39;2009-02-07 11:58:00&#39;&lt;/strong&gt; by simple &lt;strong&gt;SELECT&lt;/strong&gt;, we would have to use a full table scan. But, by knowing that &lt;strong&gt;ts&lt;/strong&gt; is monotonic, we can also use &lt;a href=&#34;http://en.wikipedia.org/wiki/Binary_search_algorithm&#34;&gt;binary search&lt;/a&gt; on &lt;strong&gt;id&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;As another example, it simplifies the task of purging all rows up to last midnight. Instead of issuing &lt;strong&gt;&#34;DELETE FROM log WHERE ts &amp;lt; DATE(NOW())&#34;&lt;/strong&gt;, thus using, again, full table scan plus locking all rows (depending on storage engine), we can use other methods:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;We can detect the &lt;strong&gt;id&lt;/strong&gt; for the first row which holds the condition using binary search, then &lt;strong&gt;&#34;DELETE FROM log WHERE id &amp;lt; ###&#34;&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Or we can slowly work our way in ascending &lt;strong&gt;id&lt;/strong&gt; order, issuing something like &lt;strong&gt;&#34;DELETE FROM log WHERE ts &amp;lt; DATE(NOW()) ORDER BY id ASC LIMIT 1000&#34;&lt;/strong&gt;, and stop once the &lt;strong&gt;ROW_COUNT()&lt;/strong&gt; is less than &lt;strong&gt;1000&lt;/strong&gt;. We know we need not advance any further, without needing to compute anything. We thus block less, while retaining correctness of our operation.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Monotonic functions in MySQL&lt;/h4&gt;
+&lt;p&gt;When we iterate InnoDB tables (as in full table scan), we know that rows are iterated in ascending &lt;strong&gt;PRIMARY KEY&lt;/strong&gt; order &lt;a name=&#34;note1m&#34; href=&#34;#note1&#34;&gt;[¹]&lt;/a&gt;. So the &lt;strong&gt;PRIMARY KEY&lt;/strong&gt; dictates the order by which monotonic functions are evaluated.&lt;/p&gt;
+&lt;p&gt;With MyISAM, rows are iterated according to internal storage order. It has nothing to do with &lt;strong&gt;PRIMARY KEY&lt;/strong&gt;s (though depending on &lt;strong&gt;concurrent_insert&lt;/strong&gt; this can be somewhat controlled). It also has nothing to do with chronological order. Newer rows may capture space held by older rows.&lt;/p&gt;
+&lt;p&gt;But MyISAM allows for &lt;strong&gt;ALTER TABLE ... ORDER BY ...&lt;/strong&gt; syntax, which allows us to do a one-time sort of the table. Assuming no writes shortly thereafter, a full table scan will iterate the rows according to specified order.&lt;/p&gt;
+&lt;h4&gt;Monotonic functions and indexes&lt;/h4&gt;
+&lt;p&gt;A column which is indexed dictates a monotonic function by index order.&lt;/p&gt;
+&lt;p&gt;Wait. Isn&#39;t that obvious? Of course: if we index a column, then the index sorts by that column, and the column is ascending by the index order which is,... itself.&lt;/p&gt;
+&lt;p&gt;I call that trivial, but it does interest us: because, while mathematically there may be nothing significant here, we do care about this order when we have index scans. So, if we can force an index scan on our query, then we can anticipate the order by which rows are processed; we now have some order by which to evaluate monotonic functions.&lt;/p&gt;
+&lt;p&gt;OK, maybe I made it sound more complicated than it really is. Monotonic functions work well when the &lt;em&gt;order&lt;/em&gt; by which they are monotonic is some indexed column(s). The &lt;strong&gt;AUTO_INCREMENT PRIMARY KEY&lt;/strong&gt; we saw in the &lt;strong&gt;log&lt;/strong&gt; example above, is perhaps the most trivial case.&lt;/p&gt;
+&lt;p&gt;While MySQL does not support function indexes, if the function we consider is monotonic, we still benefit from adding an index on the raw column.&lt;/p&gt;
+&lt;h4&gt;Other examples of monotonic functions&lt;/h4&gt;
+&lt;p&gt;So, where else can we find them? Timestamp columns are probably the most common (this post holds true until time travel to the past is introduced).&lt;/p&gt;
+&lt;p&gt;But also summaries: like a reporting table which lists down some ever-ascending value (the number of books ever sold in our store; trip mileage; hop counter; etc.).&lt;/p&gt;
+&lt;p&gt;I&#39;ve seen many cases (though difficult to illustrate in this scope) when foreign key values are in ascending order. A very brief example is a 1-1 relation between two denormalized tables, where the tables ids do not necessarily have to match, but is always ascending).&lt;/p&gt;
+&lt;p&gt;And Baron&#39;s &lt;a href=&#34;http://www.xaprb.com/blog/2010/01/22/my-wishlist-for-sql-the-until-clause/&#34;&gt;wishlist for SQL&lt;/a&gt; can also benefit from monotonic functions.&lt;/p&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;p&gt;When a monotonic function is present, it brings an added value to our schema and query design. It allows for less indexing; quicker operations. Look for these. I&#39;ve only discussed increasing functions. Indeed, MySQL&#39;s indexes are always increasing (they cannot be defined in decreasing order), but query simplifications work just as well for monotonic decreasing functions.&lt;/p&gt;
+&lt;p&gt;&lt;a name=&#34;note1&#34; href=&#34;#note1m&#34;&gt;[¹]&lt;/a&gt; I&#39;ve actually seen a different behavior on temporary InnoDB tables and on compressed InnoDB Plugin tables; I&#39;ll write on this on another occasion.&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>Checking for string permutation</title>
+      <link>/blog/2010/01/20/checking-for-string-permutation/</link>
+      <pubDate>Wed, 20 Jan 2010 08:58:10 +0000</pubDate>
+      
+      <guid>/blog/2010/01/20/checking-for-string-permutation/</guid>
+      <description>&lt;p&gt;A permutation is a change of places. Thus, &lt;strong&gt;&#39;lolhe&#39;&lt;/strong&gt; is a permuted &lt;strong&gt;&#39;hello&#39;&lt;/strong&gt; (commonly referred to as &#39;scrambled text&#39;).&lt;/p&gt;
+&lt;p&gt;I wish to present an SQL solution for checking if two strings are permutations of the same text.&lt;/p&gt;
+&lt;h4&gt;About permutations&lt;/h4&gt;
+&lt;p&gt;So, if &lt;strong&gt;&#39;lolhe&#39;&lt;/strong&gt; is a permutation of &lt;strong&gt;&#39;hello&#39;&lt;/strong&gt;, then &lt;strong&gt;&#39;hello&#39;&lt;/strong&gt; is a permutation of &lt;strong&gt;&#39;lolhe&#39;&lt;/strong&gt;, as well; and both are permutations of &lt;strong&gt;&#39;elloh&#39;&lt;/strong&gt;. The &lt;strong&gt;REVERSE()&lt;/strong&gt; of a text is an example of permutation. Mathematically, string permutation is an equivalence relation, and divides all strings to equivalence classes.&lt;/p&gt;
+&lt;h4&gt;Use cases&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;We may be interested in permutations when a user chooses a password. We may disallow a password which is identical to the login name; but we may also disallow upper-lower-case-only transformations of the text. We may still disallow a &lt;em&gt;permutation&lt;/em&gt; of the text.&lt;/li&gt;
+&lt;li&gt;On a slightly different scale, the two queries: &lt;strong&gt;SELECT * FROM City WHERE id IN (5, 21, 13)&lt;/strong&gt; and &lt;strong&gt;SELECT * FROM City WHERE id IN (13, 5, 21)&lt;/strong&gt; are identical. Here, the permutation is not with string characters, but with string tokens. While the solution discussed is targeted at string characters, it can be easily converted to work with string tokens.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Checking for permutation&lt;/h4&gt;
+&lt;p&gt;The solution I&#39;m suggesting checks for permutation between 2 strings by permuting both to a third, &lt;strong&gt;normal form&lt;/strong&gt;. The two string are permutations of each other if both have &lt;em&gt;the same normal form&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;!--more--&gt;What exactly &lt;em&gt;is&lt;/em&gt; a normal form? Well, anything you like, really, as long as it&#39;s deterministic and works the same for all elements in the equivalence class (mathematically speaking, this was a really bad definition, I know).&lt;/p&gt;
+&lt;p&gt;Enough of mathematical notions: on the practical side, I&#39;ll normalize &#39;CAB&#39; to &#39;ABC&#39;, and &#39;DOG&#39; to &#39;DGO&#39;. Can you see what normalization means here? I&#39;m merely rearranging the characters in alphabetical order. This rearrangement is in itself a permutation of the string (hence, one last mathematical statement, it can be seen as a representative of the equivalence class).&lt;/p&gt;
+&lt;p&gt;So, to see if two strings are permutations of each other, we rearrange both in alphabetical order, and see if we got the same text. &lt;strong&gt;&#39;hello&#39;&lt;/strong&gt; and &lt;strong&gt;&#39;lolhe&#39;&lt;/strong&gt; both normalize to &lt;strong&gt;&#39;ehllo&#39;&lt;/strong&gt;, hence are permutations.&lt;/p&gt;
+&lt;h4&gt;Normalizing the text&lt;/h4&gt;
+&lt;p&gt;Down to business: how do we normalize a text using SQL? Well, once again, &lt;a href=&#34;http://code.openark.org/blog/mysql/unwalking-a-string-with-group_concat&#34;&gt;string walking and string unwalking&lt;/a&gt; to the rescue. The trick is to break the string apart (to distinct characters), then re-combine the characters, but instead of in original order, do that in ascending order.&lt;/p&gt;
+&lt;p&gt;Breaking of the word &#39;hello&#39; is as follows:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT
+ SUBSTRING(s, value+1, 1) AS c
+FROM
+ tinyint_asc, (SELECT &#39;hello&#39; AS s) sel1
+WHERE
+ value &amp;lt; char_length(s);&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Recombining it in ascending character order is as follows:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;SELECT GROUP_CONCAT(c ORDER BY c SEPARATOR &#39;&#39;) AS normalized FROM
+ (
+ SELECT
+   SUBSTRING(s, value+1, 1) AS c
+ FROM
+   tinyint_asc, (SELECT &#39;hello&#39; AS s) sel1
+ WHERE
+   value &amp;lt; char_length(s)
+ ) walked_string_select;
++------------+
+| normalized |
++------------+
+| ehllo      |
++------------+
+1 row in set (0.00 sec)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;We can write a stored function to do that more conveniently (and, while at it, also normalize character case):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;DELIMITER $$
+
+DROP FUNCTION IF EXISTS `normalize_text`$$
+CREATE FUNCTION `normalize_text` (input_text VARCHAR(255) CHARSET utf8) RETURNS VARCHAR(255) CHARSET utf8
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+ SELECT GROUP_CONCAT(c ORDER BY c SEPARATOR &#39;&#39;) INTO @normalized FROM
+ (
+ SELECT
+   SUBSTRING(s, value+1, 1) AS c
+ FROM
+   tinyint_asc, (SELECT input_text AS s) sel1
+ WHERE
+   value &amp;lt; char_length(s)
+ ) walked_string_select;
+ RETURN LOWER(@normalized);
+END$$
+
+DELIMITER ;&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;And use like this:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;pre&gt;mysql&amp;gt; SELECT normalize_text(&#39;Smith&#39;);
++-------------------------+
+| normalize_text(&#39;Smith&#39;) |
++-------------------------+
+| himst                   |
++-------------------------+
+1 row in set (0.00 sec)
+
+mysql&amp;gt; SELECT normalize_text(&#39;Smith&#39;) = normalize_text(&#39;Thims&#39;);
++---------------------------------------------------+
+| normalize_text(&#39;Smith&#39;) = normalize_text(&#39;Thims&#39;) |
++---------------------------------------------------+
+|                                                 1 |
++---------------------------------------------------+
+1 row in set (0.00 sec)
+
+mysql&amp;gt; SELECT normalize_text(&#39;Smith&#39;) = normalize_text(&#39;Sniff&#39;);
++---------------------------------------------------+
+| normalize_text(&#39;Smith&#39;) = normalize_text(&#39;Sniff&#39;) |
++---------------------------------------------------+
+|                                                 0 |
++---------------------------------------------------+
+1 row in set (0.00 sec)&lt;/pre&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To compare tokenized strings (like &lt;strong&gt;&#39;21,5,13&#39;&lt;/strong&gt; vs. &lt;strong&gt;&#39;5,13,21&#39;&lt;/strong&gt;), we can use the &lt;strong&gt;SUBSTRING_INDEX()&lt;/strong&gt; function to break the string apart, instead of &lt;strong&gt;SUBSTRING()&lt;/strong&gt;.&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

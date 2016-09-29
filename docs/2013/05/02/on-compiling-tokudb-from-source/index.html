@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>On compiling TokuDB from source &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>On compiling TokuDB from source</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>02 May 2013</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/tokudb">TokuDB</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Sharing my experience of compiling TokuDB + MariaDB <strong>5.5</strong>. Why? Because I must have <a href="http://code.openark.org/blog/mysql/sphinx-sphinx_snippets-mysql-5-5">this patch</a> to Sphinx <strong>2.0.4</strong>.</p>
+<p><strong>Note</strong>: I was using what seems to be the "old" method of compiling; quoting Leif Walsh:</p>
+<blockquote>... We are looking at deprecating that method of building (MariaDB source plus binary fractal tree handlerton).  It only really needed to be that complex when we were closed source.</blockquote>
+<p>I also tried the "new" method of compiling, which I couldn't work out.</p>
+<p>Here's how it goes: TokuDB is newly <a href="http://www.tokutek.com/2013/04/announcing-tokudb-v7-open-source-and-more/">released as open source</a>. As such, it got a lot of attention, many downloads and I hope it will succeed.</p>
+<p>However as stable as the product may be, it's new to open source, which means anyone compiling it from source is an early adopter (at least for the compilation process).</p>
+<h4>Installation process</h4>
+<p>This is an unorthodox, and actually weird process. See <a href="http://www.tokutek.com/wp-content/uploads/2013/04/mariadb-5.5.30-tokudb-7.0.1-users-guide.pdf">section 6 on the Tokutek docs</a>. In order to compile the project you must download:</p>
+<ul>
+<li>The source code tar.gz</li>
+<li><em>And</em> the binary (?!) tar.gz</li>
+<li>And the binary checksum</li>
+<li>And the Tokutek patches</li>
+<li>And the patches checksum<!--more--></li>
+</ul>
+<p>You extract the source tarball. But instead of doing the standard <strong>"./configure &amp;&amp; make &amp;&amp; sudo make install"</strong> you need to copy a shell script called <strong>tokudb.build.bash</strong> <em>one directory level up</em>, and run it from there.</p>
+<p><strong>tokudb.build.bash</strong> lists <strong>gcc47</strong> and <strong>g++47</strong> on rows <strong>3, 4</strong>. Modify <strong>"gcc47"</strong> to <strong>"gcc"</strong>, modify <strong>"g++47"</strong> to  <strong>"g++"</strong>. I'm assuming you don't have a binary called <strong>gcc47</strong>. Why would you?</p>
+<h4>Dependencies</h4>
+<p>You will need <strong>CMake &gt;= 2.8</strong></p>
+<p>This means Ubuntu LTS <strong>10.04</strong> users are unable to compile out of the box; will need to manually install later version of CMake.</p>
+<p>Also needed is <strong>zlib1g-dev</strong>, <strong>rpmbuild</strong>.</p>
+<h4>While compiling</h4>
+<p>I ran out of disk space. <em>What?</em> I was using a <strong>10G</strong> partition I use for my compilations. Looking at <strong>"df -h"</strong> I get that:</p>
+<ul>
+<li>The source tarball is extracted (I did it)</li>
+<li>The binary tarball is also extracted (someone has to explain this for me)</li>
+<li>And inside the source directory we have:</li>
+</ul>
+<blockquote>
+<pre>bash$ df -h
+...
+1484    build.RelWithDebInfo.rpms
+5540    build.RelWithDebInfo</pre>
+</blockquote>
+<p>At about <strong>7GB</strong> (and counting) of build... <em>stuff?</em>.</p>
+<p><strong>UPDATE</strong>: just ran out on disk space <em>again</em>. Is this an incremental thing? Like every time my compilation fails and I recompile some files are not cleaned up? If so, put them on <strong>/tmp</strong>! OK, moving everything to a <strong>300GB</strong> partition and starting all over.</p>
+<h4>More while compiling</h4>
+<p><strong></strong>I got errors on missing libraries. Like I was missing <strong>libssl</strong>, <strong>rpmbuild</strong>. This is what the <strong>"configure"</strong> script is for -- to test for dependencies. It's really a bummer to have to recompile 4-5 times (and it's a long compilation), only to find out there's another missing package.</p>
+<h4>After compiling</h4>
+<p>What is the result of the compilation? Not a "make install" prepared binary. The result is a MySQL-binary package. Se need to extract and put on <strong>/usr/local/somewhere</strong> etc.</p>
+<h4>Conclusions</h4>
+<p>The compilation process is unexpected and non-standard. The output is unexpected.</p>
+<p>The correct way of doing this is a <strong>"./configure &amp;&amp; make &amp;&amp; sudo make install"</strong>. I don't understand the need for a binary package while compiling from source. Isn't this the chicken and the egg?</p>
+<p>A source distribution is no different from a binary distribution. You must have a testing environment to verify the source distribution actually works. This test environment is typically a bare-new-RedHat or a bare-new-Ubuntu etc. The machines at Tokutek are already installed with needed packages. Not so on my compilation machine. I suggest that <strong>apt-get</strong>s and <strong>yum install</strong>s for dependencies are added to the source distribution testing. This is the only reliable way for you guys at Tokutek to know that clients will actually be able to install via source.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2013/04/28/percona-live-2013-keynotes-followup-questions-and-discussion/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2013/04/28/percona-live-2013-keynotes-followup-questions-and-discussion/">Percona Live 2013 keynotes: followup questions and discussion</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2013/05/07/opeark-kit-revision-196-released/">opeark-kit revision 196 released</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2013/05/07/opeark-kit-revision-196-released/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Beware of implicit casting &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Beware of implicit casting</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>02 Feb 2010</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/indexing">Indexing</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Ever so often a query provides a "bad" execution plan. Adding a missing index can many times solve the problem. However, not everything can be solved with an index. I wish to highlight the point of having an <em>implicit cast</em>, which negates the use of an index on MySQL.</p>
+<p>I see this happening a lot on customers' databases, and this begs for a short introduction.</p>
+<h4>MySQL doesn't support index functions</h4>
+<p>Let's assume the following table:<!--more--></p>
+<blockquote>
+<pre>CREATE TABLE `person` (
+ `id` bigint(20) NOT NULL AUTO_INCREMENT,
+ `first_name` varchar(32) CHARACTER SET utf8 DEFAULT NULL,
+ `last_name` varchar(32) CHARACTER SET utf8 DEFAULT NULL,
+ `driver_license_registration` bigint(20) DEFAULT NULL,
+ PRIMARY KEY (`id`),
+ KEY `last_name` (`last_name`),
+ KEY `driver_license_registration` (`driver_license_registration`)
+)
+</pre>
+</blockquote>
+<p>And suppose we're looking for persons whose last name begin with "Smith". The following query will <strong>NOT</strong> utilize an index:</p>
+<blockquote>
+<pre>SELECT * FROM person WHERE <strong>LEFT(last_name, 5) = 'Smith'</strong>;
+</pre>
+</blockquote>
+<p>Why not? Because we use a function (<strong>LEFT</strong>) over the <strong>last_name</strong> column, and this makes MySQL unable to deduce the outcome of the expression. Will it be ordered in the same way as the original column? (in this case, the answer is <em>yes</em>, <strong>LEFT</strong> is a monotonic function) Is it possible to produce the reverse function? (In this case, <em>no</em>). MySQL cannot and does not handle these questions and therefore avoids using the index on <strong>last_name</strong> altogether:</p>
+<blockquote>
+<pre>EXPLAIN SELECT * FROM person WHERE LEFT(last_name, 5) = 'Smith';
++----+-------------+--------+------+---------------+------+---------+------+------+-------------+
+| id | select_type | table  | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+-------------+--------+------+---------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | person | <strong>ALL</strong>  | NULL          | NULL | NULL    | NULL | 1000 | Using where |
++----+-------------+--------+------+---------------+------+---------+------+------+-------------+
+</pre>
+</blockquote>
+<p>To solve the problem above, a simple change to the query will do the trick:</p>
+<blockquote>
+<pre>EXPLAIN SELECT * FROM person WHERE last_name <strong>LIKE 'Smith%'</strong>;
++----+-------------+--------+-------+---------------+-----------+---------+------+------+-------------+
+| id | select_type | table  | type  | possible_keys | key       | key_len | ref  | rows | Extra       |
++----+-------------+--------+-------+---------------+-----------+---------+------+------+-------------+
+|  1 | SIMPLE      | person | <strong>range</strong> | last_name     | last_name | 99      | NULL |    5 | Using where |
++----+-------------+--------+-------+---------------+-----------+---------+------+------+-------------+
+</pre>
+</blockquote>
+<h4>Not all functions are explicit</h4>
+<p>This leads us to the subject of this post. What if we were to look for persons whose driver license registration number begins with <strong>'123'</strong>? Trying to learn from the above example, we write:</p>
+<blockquote>
+<pre>SELECT * FROM person WHERE driver_license_registration LIKE '123%';</pre>
+</blockquote>
+<p>But the above query does <strong>NOT</strong> utilize an index! See:</p>
+<blockquote>
+<pre>EXPLAIN SELECT * FROM person WHERE driver_license_registration LIKE '123%';
++----+-------------+--------+------+-----------------------------+------+---------+------+------+-------------+
+| id | select_type | table  | type | possible_keys               | key  | key_len | ref  | rows | Extra       |
++----+-------------+--------+------+-----------------------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | person | ALL  | driver_license_registration | NULL | NULL    | NULL | 1000 | Using where |
++----+-------------+--------+------+-----------------------------+------+---------+------+------+-------------+
+</pre>
+</blockquote>
+<p>Why not?</p>
+<p>Because the <strong>driver_license_registration</strong> column is an integer. The query asks for a string comparison (<strong>LIKE '123%'</strong>). This kind of comparison cannot be performed on integers. The column value will have to transform to text in order to work out the query. Effectively, it's as if we wrote:</p>
+<blockquote>
+<pre>SELECT * FROM person WHERE <strong>CAST(driver_license_registration AS CHAR)</strong> LIKE '123%';
+</pre>
+</blockquote>
+<p>There's no immediate solution to this last query. Perhaps the column should be textual after all, perhaps maintain a "ghost" column. If the number of digits in a number if fixed an known, then we can convert the above to a range query.</p>
+<h4>Casting is an implicit function</h4>
+<p>And, alas, it's a well hidden function. There's nothing to suggest a problem here. This is SQL, not Java. It's not a strongly typed language. I see the above example quite a lot. Another common casting mistake is comparing Timestamp values to strings.</p>
+<p>So, until MySQL supports index functions, watch out for these nuances.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2010/01/20/checking-for-string-permutation/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2010/01/20/checking-for-string-permutation/">Checking for string permutation</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2010/02/09/monotonic-functions-sql-and-mysql/">Monotonic functions, SQL and MySQL</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2010/02/09/monotonic-functions-sql-and-mysql/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

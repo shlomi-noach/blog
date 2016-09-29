@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Getting rid of huge ibdata file, no dump required, part II &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Getting rid of huge ibdata file, no dump required, part II</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>30 May 2012</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/hack">Hack</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/innodb">InnoDB</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/myisam">MyISAM</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/refactoring">Refactoring</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>This post continues <a href="http://code.openark.org/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required">Getting rid of huge ibdata file, no dump required, part I</a>, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing <em>everything at once</em>.</p>
+<p>In previous part we put aside the issue of foreign keys. We address this issue now.</p>
+<h4>What if my InnoDB tables have foreign keys?</h4>
+<p>MyISAM does not support them, so you can't just <strong>ALTER</strong> an InnoDB table to MyISAM and back into InnoDB, and expect everything to work.</p>
+<p>Alas, this calls for additional steps (i.e. additional <strong>ALTER</strong> commands). However, these still fall well under the concept of <em>"do it one table at a time, then take time to recover your breath and replication lag"</em>.</p>
+<h4>Save , drop and restore your Foreign Keys setup</h4>
+<p>You can use <a href="http://code.google.com/p/common-schema/">common_schema</a>'s  <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">sql_foreign_keys</a> to get the full listing and create definition of your foreign keys. For example, assume we use the <strong>sakila</strong> database:<!--more--></p>
+<blockquote>
+<pre>SELECT create_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila' INTO OUTFILE '/somewhere/safe/create_foreign_keys.sql'</pre>
+</blockquote>
+<p>(replace <strong>TABLE_SCHEMA='sakila'</strong> with whatever you want).</p>
+<p>A sample output would be something like this (<em>note: no semicolon on end of line</em>):</p>
+<blockquote>
+<pre>ALTER TABLE `sakila`.`address` ADD CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `sakila`.`city` (`city_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`city` ADD CONSTRAINT `fk_city_country` FOREIGN KEY (`country_id`) REFERENCES `sakila`.`country` (`country_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+...</pre>
+</blockquote>
+<p>Once the above is in a safe place, you will want to DROP all of your foreign keys. Again, using <em>common_schema</em>:</p>
+<blockquote>
+<pre>SELECT drop_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila';
++-----------------------------------------------------------------------------------+
+| drop_statement                                                                    |
++-----------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` DROP FOREIGN KEY `fk_address_city`                 |
+| ALTER TABLE `sakila`.`city` DROP FOREIGN KEY `fk_city_country`                    |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_address`            |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_store`              |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language`                   |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language_original`          |
+| ...                                                                               |
++-----------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>You don't want to issue all these at once: do them one at a time, and wait for your slave to catch up.</p>
+<p>Once this is done, you can move on to the steps described in Part I of this post: converting tables to MyISAM, shutting down, removing InnoDB files, then converting back to InnoDB.</p>
+<p>And then, taking breath again, you must re-import the foreign keys. Use the <strong>ADD CONSTRAINT</strong> commands you have saved earlier on. Again, one at a time, wait for slave to catch up.</p>
+<p>To reiterate, for each table you would take the following steps:</p>
+<ol>
+<li>Make sure the FK definition is safely stored somewhere</li>
+<li>STOP SLAVE</li>
+<li>Drop all table's foreign keys: ALTER TABLE ... DROP FOREIGN KEY ..., DROP FOREIGN KEY ...</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE ... ENGINE=MyISAM (*)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(*) Altering to MyISAM drops FK constraints, so the above could actually be done in one step. I'm cautious and illustrate in two.</p>
+<p>Once all tables are altered, and InnoDB tablespace is removed, restoration is as follows: for each table,</p>
+<ol>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE ... ENGINE=InnoDB [create options]</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE ... ADD CONSTRAINT ..., ADD CONSTRAINT ...(+)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(+) Alas, you can't convert to InnoDB and add constraints at the same time...</p>
+<h4>This is not entirely safe</h4>
+<p>A MyISAM slave to an InnoDB master with foreign keys is a tricky business. It really depends on the type of foreign keys you have and the use you make of them. See <a title="Link to Impact of foreign keys absence on replicating slaves" href="http://code.openark.org/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves" rel="bookmark">Impact of foreign keys absence on replicating slaves</a>.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/2012/05/22/getting-rid-of-huge-ibdata-file-no-dump-required/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/2012/05/22/getting-rid-of-huge-ibdata-file-no-dump-required/">Getting rid of huge ibdata file, no dump required</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/2012/06/12/char-and-spaces/">CHAR and spaces</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/2012/06/12/char-and-spaces/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+
