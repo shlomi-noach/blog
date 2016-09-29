@@ -291,7 +291,7 @@
 </blockquote>
 <p>The issued query is valid, and should generally be allowed. However, we may decide to block changes to the specific 'admin' row, in the following manner:</p>
 <blockquote>
-<pre><code>DELIMITER $$
+<pre>DELIMITER $$
 DROP TRIGGER IF EXISTS my_users_bu $$
 CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
 FOR EACH ROW
@@ -300,7 +300,7 @@ BEGIN
     SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
   END IF;
 END $$
-DELIMITER ;</code></pre>
+DELIMITER ;</pre>
 </blockquote>
 <p>Let's try running again the query:</p>
 <blockquote>
@@ -311,7 +311,7 @@ DELIMITER ;</code></pre>
 <p>The query fails, since the <strong>BEFORE UPDATE</strong> trigger fails.<br />
 We can tweak the trigger to only allow specific users to modify the row:</p>
 <blockquote>
-<pre><code>DELIMITER $$
+<pre>DELIMITER $$
 DROP TRIGGER IF EXISTS my_users_bu $$
 CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
 FOR EACH ROW
@@ -320,7 +320,7 @@ BEGIN
     SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
   END IF;
 END $$
-DELIMITER ;</code></pre>
+DELIMITER ;</pre>
 </blockquote>
 <p>This way it is possible for the root user to modify the password at will. We can further tweak the trigger to INSERT INTO some log table. The information we may wish to register is USER(), the CURRENT_TIMESTAMP(), old password and new password, and perhaps the CONNECTION_ID(). More data means more means to locate the security breach, and monitoring the log table allows for immediate response for such an attempt.</p>
 

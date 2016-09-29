@@ -727,7 +727,7 @@ DELETE FROM online_user WHERE login = &#39;john&#39;;&lt;/pre&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;The issued query is valid, and should generally be allowed. However, we may decide to block changes to the specific &#39;admin&#39; row, in the following manner:&lt;/p&gt;
 &lt;blockquote&gt;
-&lt;pre&gt;&lt;code&gt;DELIMITER $$
+&lt;pre&gt;DELIMITER $$
 DROP TRIGGER IF EXISTS my_users_bu $$
 CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
 FOR EACH ROW
@@ -736,7 +736,7 @@ BEGIN
     SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
   END IF;
 END $$
-DELIMITER ;&lt;/code&gt;&lt;/pre&gt;
+DELIMITER ;&lt;/pre&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;Let&#39;s try running again the query:&lt;/p&gt;
 &lt;blockquote&gt;
@@ -747,7 +747,7 @@ DELIMITER ;&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;The query fails, since the &lt;strong&gt;BEFORE UPDATE&lt;/strong&gt; trigger fails.&lt;br /&gt;
 We can tweak the trigger to only allow specific users to modify the row:&lt;/p&gt;
 &lt;blockquote&gt;
-&lt;pre&gt;&lt;code&gt;DELIMITER $$
+&lt;pre&gt;DELIMITER $$
 DROP TRIGGER IF EXISTS my_users_bu $$
 CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
 FOR EACH ROW
@@ -756,7 +756,7 @@ BEGIN
     SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
   END IF;
 END $$
-DELIMITER ;&lt;/code&gt;&lt;/pre&gt;
+DELIMITER ;&lt;/pre&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;This way it is possible for the root user to modify the password at will. We can further tweak the trigger to INSERT INTO some log table. The information we may wish to register is USER(), the CURRENT_TIMESTAMP(), old password and new password, and perhaps the CONNECTION_ID(). More data means more means to locate the security breach, and monitoring the log table allows for immediate response for such an attempt.&lt;/p&gt;</description>
     </item>
