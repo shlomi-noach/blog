@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Installing MySQL from source/binary tarball as a Linux service &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Installing MySQL from source/binary tarball as a Linux service</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>01 May 2012</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/installation">Installation</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/linux">Linux</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>I've <a href="http://code.openark.org/blog/mysql/to-not-yum-or-to-not-apt-get">written before</a> I prefer to do a manual install of MySQL over a repository one. I still do: I typically install from binary tarball or by compiling from source.</p>
+<p>I'd like to share my setup procedure for Linux installation and service setup. I've done this dozens of times, on different Linux flavors, and it works well for me.</p>
+<h4>Installing from source</h4>
+<p>To get this straight: you sometimes have to compile the source files. I, for example, happen to use the Sphinx MySQLSE extension. You can only use it if compiled with MySQL. You had to compile a "vanilla" <strong>5.1</strong> version without query cache in order to completely remove the cache's mutex contention.</p>
+<p>Anyway, I find the easiest way is to install onto a path associated with the server version. For example, I would install a <strong>5.5</strong> server onto <strong>/usr/local/mysql55</strong></p>
+<p>This way, a new version gets its own path, and no ambiguity.</p>
+<p>To do that, use the <strong>prefix</strong> option on configuration step:</p>
+<blockquote>
+<pre>cd /path/to/extracted/source/tarball
+sh BUILD/autorun.sh
+./configure --prefix=/usr/local/mysql55
+make
+sudo make install</pre>
+</blockquote>
+<p>Once this is complete, you have <em>everything</em> under <strong>/usr/local/mysql55</strong>. This means binaries, libraries, scripts, etc.</p>
+<p>To install the MySQL server as a service, copy the mysql.server script to <strong>/etc/init.d</strong>:</p>
+<blockquote>
+<pre>sudo cp /usr/local/mysql55/support-files/mysql.server /etc/init.d/mysql55</pre>
+</blockquote>
+<p>Again, I'm naming the script after the MySQL version. This avoids conflict with possible past or future installations of the MySQL server, which typically create a service named <strong>mysql</strong> or <strong>mysqld</strong>.<!--more--></p>
+<p>A thing to note about the mysql.server script is that it allows you (at around line <strong>#45</strong>) to set two variables:</p>
+<ul>
+<li><strong>basedir</strong>: path to your installation directory. When compiling from source this is already setup with the path provided to the <strong>configure</strong> script. Thus, in our example, you can expect this variable to read <strong>/usr/local/mysql55</strong>. So basically nothing to do here.</li>
+<li><strong>datadir</strong>: path to your data directory. If you're putting your <strong>my.cnf</strong> file in <strong>/etc</strong> or <strong>/etc/mysql</strong>, then setting <strong>datadir</strong> in <strong>my.cnf</strong> suffices. However, if you're going to put <strong>my.cnf</strong> itself on the data directory (e.g. so as to avoid collisions) then make sure to set the variable in the <strong>mysql.server</strong> init script.</li>
+</ul>
+<p>Depending on your <strong>$PATH</strong> configuration, it is also a good idea to specify <strong>basedir</strong> variable on your <strong>my.cnf</strong>'s <strong>[mysqld]</strong> section.</p>
+<p>Which leads us to <strong>$PATH</strong>: your linux system is still unaware of the many binaries you've got in there. I typically add the following line at the end of <strong>/etc/bash.bashrc</strong>:</p>
+<blockquote>
+<pre>export PATH=/usr/local/mysql55:${PATH}</pre>
+</blockquote>
+<p>This is the most global PATH settings one can do. Alternatively, use <strong>/etc/profile</strong>, <strong>~/.bashrc</strong> etc. (you may have noticed by now I'm working with <strong>bash</strong>).</p>
+<p>Finally, need to setup the init script to run at startup and stop at shutdown.</p>
+<ul>
+<li>On Debian/Ubuntu/related I use <strong>rcconf</strong> (I'm too lazy to remember the command line setup).</li>
+<li>On RedHat/CentOS/related I use <strong>chkconfig --add mysql55</strong>, or  <strong>linuxconf</strong> (since I'm lazy).</li>
+</ul>
+<h4>Installing from binary tarball</h4>
+<p>The only difference is that the <strong>mysql.server</strong> script is unaware of our deployment path. So the <strong>basedir</strong> variable must be set in that file. Other than that, follow same steps as for source installation (oh, of course no need to <strong>configure</strong> &amp; <strong>make</strong>...).</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/its-that-time-of-the-year/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/its-that-time-of-the-year/">It&#39;s *that time* of the year</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/webinar-review-zero-downtime-schema-changes-in-mysql/">Webinar review: Zero-Downtime Schema Changes In MySQL</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/webinar-review-zero-downtime-schema-changes-in-mysql/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

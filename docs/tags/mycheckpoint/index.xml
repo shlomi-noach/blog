@@ -12,10 +12,10 @@
     
     <item>
       <title>mycheckpoint, discontinued</title>
-      <link>/blog/2014/03/06/mycheckpoint-discontinued/</link>
+      <link>/blog/mysql/mycheckpoint-discontinued/</link>
       <pubDate>Thu, 06 Mar 2014 12:27:28 +0000</pubDate>
       
-      <guid>/blog/2014/03/06/mycheckpoint-discontinued/</guid>
+      <guid>/blog/mysql/mycheckpoint-discontinued/</guid>
       <description>&lt;p&gt;Time to admit to myself: &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; has to be discontinued.&lt;/p&gt;
 &lt;p&gt;I started &lt;em&gt;mycheckpoint&lt;/em&gt; back in &lt;strong&gt;2009&lt;/strong&gt;, as a free &amp;amp; open source lightweight monitoring tool for MySQL. Over some years it evolved and became an actual (lightweight) monitoring solution, used by many. It has a unique and original design, which, alas, is also its bane.&lt;/p&gt;
 &lt;p&gt;&lt;em&gt;mycheckpoint&lt;/em&gt; uses the relational model &amp;amp; SQL to store and query monitored metrics. This leads to quite a sophisticated service, which can make practically anything visible to the user. The raw data is just numbers. but with some SQL-Fu one can &lt;a href=&#34;http://code.openark.org/blog/mysql/generating-google-line-charts-with-sql-part-ii&#34;&gt;generate charts out of it&lt;/a&gt;,  (&lt;a href=&#34;http://mycheckpoint.googlecode.com/svn/trunk/doc/html/sample/http/mcp_sql00/sv_report_html_brief&#34;&gt;interactive&lt;/a&gt; ones as well), human readable &lt;a href=&#34;http://mycheckpoint.googlecode.com/svn/trunk/doc/html/sample/http/mcp_sql00/sv_report_html_brief&#34;&gt;reports&lt;/a&gt; and full blown email messages. It is still the only common solution I&#39;m aware of that &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/detecting-parameters-change&#34;&gt;keeps track of variable changes&lt;/a&gt; and provides with clear &#34;what changed, when, from value &amp;amp; to_value&#34;. I caught many deployment bugs by just observing this. It&#39;s a single file that provides with full blown HTTP service, alerting, mail notifications, multi-database monitoring, custom monitoring queries, query execution time monitoring, OS metrics, ...&lt;/p&gt;
@@ -28,10 +28,10 @@
     
     <item>
       <title>mycheckpoint revision 231 released</title>
-      <link>/blog/2013/05/23/mycheckpoint-revision-released/</link>
+      <link>/blog/mysql/mycheckpoint-revision-released/</link>
       <pubDate>Thu, 23 May 2013 14:21:52 +0000</pubDate>
       
-      <guid>/blog/2013/05/23/mycheckpoint-revision-released/</guid>
+      <guid>/blog/mysql/mycheckpoint-revision-released/</guid>
       <description>&lt;p&gt;A &lt;a href=&#34;http://code.google.com/p/mycheckpoint/&#34;&gt;new release&lt;/a&gt; for &lt;strong&gt;&lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;&lt;/strong&gt;: lightweight, SQL oriented MySQL monitoring solution.&lt;/p&gt;
 &lt;p&gt;If you&#39;re unfamiliar with &lt;em&gt;mycheckpoint&lt;/em&gt;, well, the one minute sales pitch is: it&#39;s a free and open source monitoring tool for MySQL, which is extremely easy to install and execute, and which includes &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/custom-monitoring&#34;&gt;custom queries&lt;/a&gt;, &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/alerts&#34;&gt;alerts&lt;/a&gt; (via &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/emails&#34;&gt;emails&lt;/a&gt;), and out of the box &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint/documentation/http-web-server&#34;&gt;HTTP server&lt;/a&gt; and &lt;a href=&#34;http://mycheckpoint.googlecode.com/svn/trunk/doc/html/sample/http/mcp_sql00/sv_report_html_brief&#34;&gt;charting&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;This is mostly a maintenance release, with some long-time requested features, and of course solved bugs. Here are a few highlights:&lt;/p&gt;
@@ -52,10 +52,10 @@
     
     <item>
       <title>MySQL monitoring: storing, not caching</title>
-      <link>/blog/2012/02/22/mysql-monitoring-storing-not-caching/</link>
+      <link>/blog/mysql/mysql-monitoring-storing-not-caching/</link>
       <pubDate>Wed, 22 Feb 2012 09:44:47 +0000</pubDate>
       
-      <guid>/blog/2012/02/22/mysql-monitoring-storing-not-caching/</guid>
+      <guid>/blog/mysql/mysql-monitoring-storing-not-caching/</guid>
       <description>&lt;p&gt;I&#39;ve followed with interest on Baron&#39;s &lt;a href=&#34;http://www.mysqlperformanceblog.com/2012/02/19/why-dont-our-new-nagios-plugins-use-caching/&#34;&gt;Why don’t our new Nagios plugins use caching?&lt;/a&gt; and Sheeri&#39;s &lt;a href=&#34;http://www.sheeri.com/content/caching-monitoring-timing-everything&#34;&gt;Caching for Monitoring: Timing is Everything&lt;/a&gt;. I wish to present my take on this, from &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;&#39;s point of view.&lt;/p&gt;
 &lt;p&gt;So &lt;em&gt;mycheckpoint&lt;/em&gt; works in a completely different way. On one hand, it doesn&#39;t bother with caching. On the other hand, it doesn&#39;t bother with re-reads of data.&lt;/p&gt;
 &lt;p&gt;There are no staleness issues, the data is consistent as it can get (you can &lt;em&gt;never&lt;/em&gt; get a completely atomic read of everything in MySQL), and you can issue as many calculations as you want at the price of one take of monitoring. As in Sheere&#39;s example, you can run &lt;strong&gt;Threads_connected/max_connections*100&lt;/strong&gt;, mix status variables, system variables, meta-variables (e.g. Seconds_behind_master), user-created variables (e.g. number of purchases in your online shop) etc.&lt;/p&gt;
@@ -74,10 +74,10 @@
     
     <item>
       <title>Documentation in SQL: CALL for help()</title>
-      <link>/blog/2012/01/11/documentation-in-sql-call-for-help/</link>
+      <link>/blog/mysql/documentation-in-sql-call-for-help/</link>
       <pubDate>Wed, 11 Jan 2012 09:01:54 +0000</pubDate>
       
-      <guid>/blog/2012/01/11/documentation-in-sql-call-for-help/</guid>
+      <guid>/blog/mysql/documentation-in-sql-call-for-help/</guid>
       <description>&lt;p&gt;Documentation is an important part of any project. On the projects I maintain I put a lot of effort on documentation, and, frankly, the majority of time spent on my projects is on documentation.&lt;/p&gt;
 &lt;p&gt;The matter of keeping the documentation faithful is a topic of interest. I&#39;d like to outline a few documentation bundling possibilities, and the present the coming new documentation method for &lt;a href=&#34;http://code.google.com/p/common-schema/&#34; rel=&#34;nofollow&#34;&gt;common_schema&lt;/a&gt;. I&#39;ll talk about any bundling that is NOT &lt;em&gt;man pages&lt;/em&gt;.&lt;/p&gt;
 &lt;h4&gt;High level: web docs&lt;/h4&gt;
@@ -204,10 +204,10 @@
     
     <item>
       <title>Generating Google line charts with SQL, part II</title>
-      <link>/blog/2011/03/03/generating-google-line-charts-with-sql-part-ii/</link>
+      <link>/blog/mysql/generating-google-line-charts-with-sql-part-ii/</link>
       <pubDate>Thu, 03 Mar 2011 09:38:10 +0000</pubDate>
       
-      <guid>/blog/2011/03/03/generating-google-line-charts-with-sql-part-ii/</guid>
+      <guid>/blog/mysql/generating-google-line-charts-with-sql-part-ii/</guid>
       <description>&lt;p&gt;This post continues &lt;a href=&#34;http://code.openark.org/blog/mysql/generating-google-line-charts-with-sql-part-i&#34;&gt;Generating Google line charts with SQL, part I&lt;/a&gt;, in pursue of generating time series based image charts.&lt;/p&gt;
 &lt;p&gt;We ended last post with the following chart:&lt;/p&gt;
 &lt;blockquote&gt;
@@ -419,10 +419,10 @@ http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chtt=SQL%2
     
     <item>
       <title>Generating Google line charts with SQL, part I</title>
-      <link>/blog/2011/02/01/generating-google-line-charts-with-sql-part-i/</link>
+      <link>/blog/mysql/generating-google-line-charts-with-sql-part-i/</link>
       <pubDate>Tue, 01 Feb 2011 10:29:31 +0000</pubDate>
       
-      <guid>/blog/2011/02/01/generating-google-line-charts-with-sql-part-i/</guid>
+      <guid>/blog/mysql/generating-google-line-charts-with-sql-part-i/</guid>
       <description>&lt;p&gt;In this series of posts I wish to show how &lt;a href=&#34;http://code.google.com/apis/chart/image_charts.html&#34;&gt;Google Charts&lt;/a&gt; can be generated via SQL. We discuss the Google Charts limitations which must be challenged, and work towards a simple chart.&lt;/p&gt;
 &lt;p&gt;I&#39;m going to present the algorithm I use in &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a MySQL monitoring utility, which generates Google charts by raw data using views. An example of such chart follows:&lt;/p&gt;
 &lt;blockquote&gt;
@@ -644,10 +644,10 @@ http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chtt=SQL%2
     
     <item>
       <title>mycheckpoint (rev 208): aggregation tables, enhanced charting, RPM distribution</title>
-      <link>/blog/2010/11/08/mycheckpoint-rev-208-aggregation-tables-enhanced-charting-rpm-distribution/</link>
+      <link>/blog/mysql/mycheckpoint-rev-208-aggregation-tables-enhanced-charting-rpm-distribution/</link>
       <pubDate>Mon, 08 Nov 2010 12:45:45 +0000</pubDate>
       
-      <guid>/blog/2010/11/08/mycheckpoint-rev-208-aggregation-tables-enhanced-charting-rpm-distribution/</guid>
+      <guid>/blog/mysql/mycheckpoint-rev-208-aggregation-tables-enhanced-charting-rpm-distribution/</guid>
       <description>&lt;p&gt;Revision &lt;strong&gt;208&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a MySQL monitoring solution, has  been released. New and updated in this revision:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;Aggregation tables&lt;/strong&gt;: aggregated data makes for fast reports on previously slow queries.&lt;/li&gt;
@@ -692,10 +692,10 @@ http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chtt=SQL%2
     
     <item>
       <title>openark-kit, Facebook Online Schema Change, and thoughts on open source licenses</title>
-      <link>/blog/2010/09/16/openark-kit-facebook-online-schema-change-and-thoughts-on-open-source-licenses/</link>
+      <link>/blog/mysql/openark-kit-facebook-online-schema-change-and-thoughts-on-open-source-licenses/</link>
       <pubDate>Thu, 16 Sep 2010 08:02:53 +0000</pubDate>
       
-      <guid>/blog/2010/09/16/openark-kit-facebook-online-schema-change-and-thoughts-on-open-source-licenses/</guid>
+      <guid>/blog/mysql/openark-kit-facebook-online-schema-change-and-thoughts-on-open-source-licenses/</guid>
       <description>&lt;p&gt;MySQL@Facebook team have recently published an &lt;a href=&#34;http://www.facebook.com/note.php?note_id=430801045932&#34;&gt;Online Schema Change&lt;/a&gt; code for non blocking ALTER TABLE operations. Thumbs Up!&lt;/p&gt;
 &lt;p&gt;The code is derived from &lt;em&gt;oak-online-alter-table&lt;/em&gt;, part of &lt;a href=&#34;http://code.openark.org/forge/openark-kit&#34;&gt;openark-kit&lt;/a&gt;, a toolkit I&#39;m authoring. Looking at the documentation I can see many ideas were incorporated as well. And of course many things are different, a lot of work has been put to it by MySQL@Facebook.&lt;/p&gt;
 &lt;p&gt;&lt;em&gt;openark-kit&lt;/em&gt; is currently released under the new BSD license, and, as far as I can tell (I&#39;m not a lawyer), Facebook&#39;s work has followed the license to the letter. It is a strange thing to see your code incorporated into another project. While I knew work has begun on the tool by Facebook, I wasn&#39;t in on it except for a few preliminary email exchanges.&lt;/p&gt;
@@ -711,10 +711,10 @@ http://chart.apis.google.com/chart?cht=lc&amp;amp;chs=400x200&amp;amp;chtt=SQL%2
     
     <item>
       <title>mycheckpoint (rev. 190): HTTP server; interactive charts</title>
-      <link>/blog/2010/09/07/mycheckpoint-rev-190-http-server-interactive-charts/</link>
+      <link>/blog/mysql/mycheckpoint-rev-190-http-server-interactive-charts/</link>
       <pubDate>Tue, 07 Sep 2010 07:53:01 +0000</pubDate>
       
-      <guid>/blog/2010/09/07/mycheckpoint-rev-190-http-server-interactive-charts/</guid>
+      <guid>/blog/mysql/mycheckpoint-rev-190-http-server-interactive-charts/</guid>
       <description>&lt;p&gt;Revision &lt;strong&gt;190&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a MySQL monitoring solution, has  been released. New and updated in this revision:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;HTTP server&lt;/strong&gt;: &lt;em&gt;mycheckpoint&lt;/em&gt; can now act as a web server. Point your browser and start browsing through HTML reports. See mock up &lt;a href=&#34;http://code.openark.org/forge/wp-content/uploads/2010/09/r190/mcp_sql00/sv_report_html_brief.html&#34;&gt;&lt;strong&gt;demo&lt;/strong&gt;&lt;/a&gt;.&lt;/li&gt;
@@ -796,10 +796,10 @@ monitored_password = 123456
     
     <item>
       <title>mycheckpoint (rev. 170): improved custom queries; local charting; page/swap I/O monitoring; improved HTML reports</title>
-      <link>/blog/2010/07/16/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports/</link>
+      <link>/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports/</link>
       <pubDate>Fri, 16 Jul 2010 10:58:40 +0000</pubDate>
       
-      <guid>/blog/2010/07/16/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports/</guid>
+      <guid>/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports/</guid>
       <description>&lt;p&gt;Revision &lt;strong&gt;170&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, a MySQL monitoring solution, has  been released. New and updated in this revision:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;Improved custom queries&lt;/strong&gt;: lifting of limitations from previous, introductory revision; better HTML presentation&lt;/li&gt;
@@ -874,10 +874,10 @@ monitored_password = 123456
     
     <item>
       <title>mycheckpoint (rev. 132): custom monitoring, custom charts, process list dump</title>
-      <link>/blog/2010/06/04/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/</link>
+      <link>/blog/mysql/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/</link>
       <pubDate>Fri, 04 Jun 2010 11:17:27 +0000</pubDate>
       
-      <guid>/blog/2010/06/04/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/</guid>
+      <guid>/blog/mysql/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/</guid>
       <description>&lt;p&gt;Revision &lt;strong&gt;132&lt;/strong&gt; of &lt;a href=&#34;../../forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; has been released. New and updated in this revision:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Custom monitoring: monitoring &amp;amp; charting for user defined queries&lt;/li&gt;
@@ -1035,10 +1035,10 @@ Sleeping: 3 processes
     
     <item>
       <title>mycheckpoint (Rev. 118): alerts, email notifications and more</title>
-      <link>/blog/2010/03/25/mycheckpoint-rev-118-alerts-email-notifications-and-more/</link>
+      <link>/blog/mysql/mycheckpoint-rev-118-alerts-email-notifications-and-more/</link>
       <pubDate>Thu, 25 Mar 2010 08:26:34 +0000</pubDate>
       
-      <guid>/blog/2010/03/25/mycheckpoint-rev-118-alerts-email-notifications-and-more/</guid>
+      <guid>/blog/mysql/mycheckpoint-rev-118-alerts-email-notifications-and-more/</guid>
       <description>&lt;p&gt;Revision &lt;strong&gt;118&lt;/strong&gt; of &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; has been released. New and updated in this revision:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Conditional alerts&lt;/li&gt;
@@ -1114,10 +1114,10 @@ Sleeping: 3 processes
     
     <item>
       <title>Things to monitor on MySQL, the user&#39;s perspective</title>
-      <link>/blog/2010/03/10/things-to-monitor-on-mysql-the-users-perspective/</link>
+      <link>/blog/mysql/things-to-monitor-on-mysql-the-users-perspective/</link>
       <pubDate>Wed, 10 Mar 2010 11:12:24 +0000</pubDate>
       
-      <guid>/blog/2010/03/10/things-to-monitor-on-mysql-the-users-perspective/</guid>
+      <guid>/blog/mysql/things-to-monitor-on-mysql-the-users-perspective/</guid>
       <description>&lt;p&gt;Working on &lt;em&gt;mycheckpoint&lt;/em&gt;, I have the intention of adding custom monitoring. That is, letting the user define things to monitor. I have my own thoughts, I would be grateful to get more input!&lt;/p&gt;
 &lt;h4&gt;What would the user want to monitor?&lt;/h4&gt;
 &lt;p&gt;Monitoring for the number of SELECT statements per second, InnoDB locks, slave replication lag etc. is very important, and monitoring utilities provide with this information. But what does that tell the end user? Not much.&lt;/p&gt;
@@ -1141,10 +1141,10 @@ Sleeping: 3 processes
     
     <item>
       <title>Static charts vs. interactive charts</title>
-      <link>/blog/2010/03/02/static-charts-vs-interactive-charts/</link>
+      <link>/blog/mysql/static-charts-vs-interactive-charts/</link>
       <pubDate>Tue, 02 Mar 2010 15:28:08 +0000</pubDate>
       
-      <guid>/blog/2010/03/02/static-charts-vs-interactive-charts/</guid>
+      <guid>/blog/mysql/static-charts-vs-interactive-charts/</guid>
       <description>&lt;p&gt;I&#39;m having my usual fun with charts. Working on &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt;, I&#39;ve generated monitoring charts using the &lt;a href=&#34;http://code.google.com/apis/chart/image_charts.html&#34;&gt;Google Chars API&lt;/a&gt;. But I&#39;ve also had chance to experiment and deploy interactive charts, JavaScript based. In particular, I used and tweaked &lt;a href=&#34;http://www.danvk.org/dygraphs/&#34;&gt;dygraphs&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;I&#39;d like to note some differences in using charts of both kinds. And I think it makes a very big difference.&lt;/p&gt;
 &lt;h4&gt;Static charts&lt;/h4&gt;
@@ -1210,10 +1210,10 @@ Interactive charts are those which react to your commands. These are either Java
     
     <item>
       <title>mycheckpoint (rev. 88): mount points monitoring, improved charting, enhanced auto-deploy</title>
-      <link>/blog/2010/02/10/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy/</link>
+      <link>/blog/mysql/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy/</link>
       <pubDate>Wed, 10 Feb 2010 08:29:47 +0000</pubDate>
       
-      <guid>/blog/2010/02/10/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy/</guid>
+      <guid>/blog/mysql/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy/</guid>
       <description>&lt;p&gt;Revision &lt;a href=&#34;http://code.google.com/p/mycheckpoint/&#34;&gt;#88&lt;/a&gt; of &lt;a href=&#34;http://code.openark.org/forge/mycheckpoint&#34;&gt;mycheckpoint&lt;/a&gt; is released. In this revision:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Disk space monitoring&lt;/li&gt;

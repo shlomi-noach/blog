@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Introducing audit_login: simple MySQL login logfile based auditing &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Introducing audit_login: simple MySQL login logfile based auditing</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>17 Sep 2013</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/development">Development</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/open-source">Open Source</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/plugin">plugin</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/security">Security</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p><a href="https://github.com/outbrain/audit_login">audit_login</a> is a simple MySQL login auditing plugin, logging any login or login attempt to log file in JSON format.</p>
+<p>It seems that audit plugins are <a href="http://serge.frezefond.com/2013/09/news-mariadb-audit-plugin-beta-is-out/">all the rage</a> lately... We've developed out simple plugin a month ago as part of our database securing efforts; by auditing any login or login attempt we could either intercept or later investigate suspicious logins.</p>
+<p>However we quickly realized there is much more to be gathered by this info.</p>
+<p>In very short, you install this plugin onto your MySQL server, and your server starts writing into a text file called <strong>audit_login.log</strong> entries such as follows:</p>
+<blockquote>
+<pre>{"ts":"2013-09-11 09:11:47","type":"successful_login","myhost":"gromit03","thread":"74153868","user":"web_user","priv_user":"web_user","host":"web-87.localdomain","ip":"10.0.0.87"}
+{"ts":"2013-09-11 09:11:55","type":"failed_login","myhost":"gromit03","thread":"74153869","user":"backup_user","priv_user":"","host":"web-32","ip":"10.0.0.32"}
+{"ts":"2013-09-11 09:11:57","type":"failed_login","myhost":"gromit03","thread":"74153870","user":"backup_user","priv_user":"","host":"web-32","ip":"10.0.0.32"}
+{"ts":"2013-09-11 09:12:48","type":"successful_login","myhost":"gromit03","thread":"74153871","user":"root","priv_user":"root","host":"localhost","ip":"10.0.0.111"}
+{"ts":"2013-09-11 09:13:26","type":"successful_login","myhost":"gromit03","thread":"74153872","user":"web_user","priv_user":"web_user","host":"web-11.localdomain","ip":"10.0.0.11"}
+{"ts":"2013-09-11 09:13:44","type":"successful_login","myhost":"gromit03","thread":"74153873","user":"web_user","priv_user":"web_user","host":"web-40.localdomain","ip":"10.0.0.40"}
+{"ts":"2013-09-11 09:13:51","type":"successful_login","myhost":"gromit03","thread":"74153874","user":"web_user","priv_user":"web_user","host":"web-03.localdomain","ip":"10.0.0.03"}
+{"ts":"2013-09-11 09:14:09","type":"successful_login","myhost":"gromit03","thread":"74153875","user":"web_user","priv_user":"web_user","host":"web-40.localdomain","ip":"10.0.0.40"}
+{"ts":"2013-09-11 10:55:25","type":"successful_login","myhost":"gromit03","thread":"74153876","user":"web_user","priv_user":"web_user","host":"web-87.localdomain","ip":"10.0.0.87"}
+{"ts":"2013-09-11 10:55:59","type":"successful_login","myhost":"gromit03","thread":"74153877","user":"web_user","priv_user":"web_user","host":"web-12.localdomain","ip":"10.0.0.12"}
+{"ts":"2013-09-11 10:55:59","type":"failed_login","myhost":"gromit03","thread":"74153878","user":"(null)","priv_user":"(null)","host":"(null)","ip":"10.0.0.1"}</pre>
+</blockquote>
+<p>In the above your MySQL server is on <strong>gromit03</strong>, and is accepting connections from other hosts; some successful, some not. What kind of information can you gather from the above?</p>
+<ul>
+<li>You can tell how many connections are being created on your server</li>
+<li>Where they came from</li>
+<li>Where <strong>'root'</strong> connections come from</li>
+<li>Port scans (see last row) can be identified by no credentials. These don't have to be port scans <em>per se</em>; any <strong>telnet localhost 3006</strong> followed by <strong>Ctrl+D</strong> will show the same. Typically these would be either load balancer or monitoring tools checks to see that the <strong>3306</strong> port is active.</li>
+<li>You can tell which accounts connect, and how many times</li>
+<li>And you can infer which accounts are stale and can be dropped -- if an account does not connect within a week's time, it's probably stale (pick your own timeframe)</li>
+</ul>
+<p>The above is quite interesting on one host; but we have dozens. We've installed this plugin on all our MySQL servers, and we use <a href="http://logstash.net/"><strong>logstash</strong></a> to aggregate them. We aggregate to two destinations:<!--more--></p>
+<ul>
+<li>All logs are being sent over to <strong><a href="http://kibana.org/">kibana</a></strong>, where they are easily searchable via <a href="http://lucene.apache.org/core/">lucene</a> queries</li>
+<li>They are also all aggregated into one CSV formatted logfile, rotating daily; this format makes it easier for me to <strong>grep</strong> and <strong>uniq -c</strong> and generally produce very valuable data by scripting.</li>
+</ul>
+<p>By aggregating the logs from multiple hosts, we are able to gather such insight as:</p>
+<ul>
+<li>How well our load balancers are distributing connections</li>
+<li>How our various applications servers connect on our multiple data centres to our MySQL hosts</li>
+<li>Catching misbehaving apps with hardcoded server IPs</li>
+<li>Catching naughty developers logging into our masters directly (we have more mechanisms now to prevent and audit such cases)</li>
+<li>Identifying differences in behaviour of monitoring tools across our data centres</li>
+<li>etc.</li>
+</ul>
+<h4>Free to use</h4>
+<p>The <strong>audit_login</strong> plugin has been made free to use, open source, licensed under GNU GPL v2. It is <a href="https://github.com/outbrain/audit_login">publicly available in our github repository</a>, where more documentation on build and installation can be found.</p>
+<p>As MySQL plugins go, you must compile your plugin with your particular MySQL version. For you convenience, pre-compiled binaries are <a href="https://github.com/outbrain/audit_login/tree/master/lib">available in the repository</a> (at this time for <strong>5.5.32</strong> and <strong>5.5.21</strong> linux 64 bit; likely to add more)</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration/">Converting an OLAP database to TokuDB, part 2: the process of migration</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/on-mysql-plugin-configuration/">On MySQL plugin configuration</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/on-mysql-plugin-configuration/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

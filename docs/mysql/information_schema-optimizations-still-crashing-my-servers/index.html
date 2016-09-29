@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>INFORMATION_SCHEMA Optimizations: still crashing my servers &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>INFORMATION_SCHEMA Optimizations: still crashing my servers</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>12 Dec 2011</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/information_schema">INFORMATION_SCHEMA</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p><strong>[Update</strong>: need to take more breaks: now<strong> NOT</strong> crashing my servers! See clarifications below<strong>]</strong></p>
+<p><a href="http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html">INFORMATION_SCHEMA Optimizations</a> are meant to make your <strong>INFORMATION_SCHEMA</strong> queries lighter and safer.</p>
+<p>For example, if you're going to query the <strong>COLUMNS</strong> table for just the columns of a single table, then the following:</p>
+<blockquote>
+<pre>SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='sakila' AND TABLE_NAME='rental'</pre>
+</blockquote>
+<p>makes for an optimization: specifying a literal on <strong>TABLE_SCHEMA</strong> avoid scanning the directories of other schemata. Specifying a literal on <strong>TABLE_NAME</strong> avoids checking up on other tables. So it's a one-schema-one-table read operation, as opposed to <em>"first read every single column from all and any single schema and table, then return only those I'm interested in"</em>.</p>
+<p>Here's the execution plan for the above query:</p>
+<blockquote>
+<pre>*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: COLUMNS
+         type: ALL
+possible_keys: NULL
+          key: TABLE_SCHEMA,TABLE_NAME
+      key_len: NULL
+          ref: NULL
+         rows: NULL
+        Extra: Using where; Open_frm_only; Scanned 0 databases</pre>
+</blockquote>
+<p>What I tried to do is to read the entire <strong>COLUMNS</strong> table, one schema at a time, one table at a time. I'm good with this taking longer time.</p>
+<p>I have a production system on which reads from <strong>COLUMNS</strong> <em>consistently crash the servers</em>. Well, one read at a time can't do harm, right?<!--more--></p>
+<p><del>Unfortunately, as the title of this posts reveals, even sequential read of <strong>COLUMNS</strong> using <strong>INFORMATION_SCHEMA</strong> optimization does not help: a minute into the process and the client lost connection. The server crashed.</del></p>
+<p><del>I was expecting that table locks would be released, buffers released etc. One at a time, there wouldn't be a congestion of locks, reads, table cache suffocation etc.</del></p>
+<p><del>Was actually having high hopes for this to succeed. I have to find a way in which <strong>INFORMATION_SCHEMA</strong> tables are not dangerous.</del></p>
+<p>A few hours later, and I have both conclusions and achievements.</p>
+<p>There are indeed memory issues with querying from <strong>INFORMATION_SCHEMA</strong> tables. I've found that <strong>VARCHAR(64)</strong> columns can consume <strong>64K</strong> each: I'm reading from large tables of more than <strong>1,000</strong> columns each, while monitoring MySQL's memory consumption. By dividing the increase in memory by the number of rows resulting from a query I sent, and which was for one single columns, I got an almost exact <strong>64K</strong> value per row.</p>
+<p>So a query on <strong>INFORMATION_SCHEMA</strong> consumes much more memory than it should. The good news is that this memory is released once the query terminates. So there is no leak into the session memory.</p>
+<p>This is combined with a <em>mistake of mine</em> in the way I iterated the tables, such that the problem was amplified: I happened to query much more than I needed, and so got my query's memory bloated. That is to say, I used the <strong>INFORMATION_SCHEMA</strong> optimizations only partly right, and so got only part of the savings it could offer me.</p>
+<p>With better pinpointing I'm now actually able to read from <strong>COLUMNS,</strong> without crashing my servers, <em>consistently</em>.</p>
+<p>I will further look into the <strong>64K</strong> issue. That in itself still drains a lot of memory: on my <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> schema tables a singe table read means &gt; <strong>64MB</strong> of query memory down the drain.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/more-mysql-foreach/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/more-mysql-foreach/">More MySQL foreach()</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/monitor-your-mysql-servers-as-done-before-for-free/">Monitor your MySQL servers as done before, for free!</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/monitor-your-mysql-servers-as-done-before-for-free/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

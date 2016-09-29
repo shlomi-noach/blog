@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Selecting a specific non aggregated column data in GROUP BY &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Selecting a specific non aggregated column data in GROUP BY</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>01 Dec 2008</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/sql">SQL</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/syntax">Syntax</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>In a GROUP BY query, MySQL may allow specifying non aggregated columns. For example, using <a title="Setting up the world database" href="http://dev.mysql.com/doc/world-setup/en/world-setup.html">MySQL's world database</a>, I wish to get the number of countries per continent, along with a "sample" country:</p>
+<blockquote>
+<pre><strong>SELECT </strong>Continent, <strong>COUNT</strong>(*), Name
+<strong>FROM </strong>`Country` <strong>GROUP BY </strong>Continent
+
++---------------+----------+----------------+
+| Continent     | COUNT(*) | Name           |
++---------------+----------+----------------+
+| Asia          |       51 | Afghanistan    |
+| Europe        |       46 | Albania        |
+| North America |       37 | Aruba          |
+| Africa        |       58 | Angola         |
+| Oceania       |       28 | American Samoa |
+| Antarctica    |        5 | Antarctica     |
+| South America |       14 | Argentina      |
++---------------+----------+----------------+</pre>
+</blockquote>
+<p>What if I want to choose that "sample" country? For example, for each continent, I wish to show the country with the largest population. To simply see the largest population, I would use MAX(Population). But which country is referred? I wish to provide a solution which does not involve sub-queries, HAVING or JOINs.<!--more--></p>
+<p>We begin by observing MySQL's GROUP_CONCAT() fcuntion:</p>
+<blockquote>
+<pre><strong>SELECT </strong>Continent, <strong>COUNT</strong>(*), <strong>GROUP_CONCAT</strong>(Name)
+<strong>FROM </strong>`Country` <strong>GROUP BY </strong>Continent
+
++---------------+----------+-------------------------------+
+| Continent     | COUNT(*) | GROUP_CONCAT(Name)            |
++---------------+----------+-------------------------------+
+| Asia          |       51 | Sri Lanka,South Korea,Mald... |
+| Europe        |       46 | Iceland,Faroe Islands,Fran... |
+| North America |       37 | Martinique,Mexico,Puerto R... |
+| Africa        |       58 | Zambia,South Africa,Nigeri... |
+| Oceania       |       28 | Tokelau,American Samoa,Sam... |
+| Antarctica    |        5 | South Georgia and the Sout... |
+| South America |       14 | Suriname,Argentina,Ecuador... |
++---------------+----------+-------------------------------+</pre>
+</blockquote>
+<p>Mmmm. The order by which the names are presented does not seem to be of use to me. Didn't we say we want to see the country with the largest population? It just so happens that GROUP_CONCAT allows for ORDER BY:</p>
+<blockquote>
+<pre><strong>SELECT </strong>Continent, <strong>COUNT</strong>(*),
+  <strong>GROUP_CONCAT</strong>(Name <strong>ORDER BY </strong>Population <strong>DESC</strong>)
+<strong>FROM </strong>`Country` <strong>GROUP BY </strong>Continent
+
++---------------+----------+-------------------------------------------------------+
+| Continent     | COUNT(*) | GROUP_CONCAT(Name ORDER BY Population DESC)           |
++---------------+----------+-------------------------------------------------------+
+| Asia          |       51 | China,India,Indonesia,Pakistan,Bangladesh,Japan,Vi... |
+| Europe        |       46 | Russian Federation,Germany,United Kingdom,France,I... |
+| North America |       37 | United States,Mexico,Canada,Guatemala,Cuba,Dominic... |
+| Africa        |       58 | Nigeria,Egypt,Ethiopia,Congo, The Democratic Repub... |
+| Oceania       |       28 | Australia,Papua New Guinea,New Zealand,Fiji Island... |
+| Antarctica    |        5 | Heard Island and McDonald Islands,Antarctica,Bouve... |
+| South America |       14 | Brazil,Colombia,Argentina,Peru,Venezuela,Chile,Ecu... |
++---------------+----------+-------------------------------------------------------+</pre>
+</blockquote>
+<p>Good progress! We can now see our desired countries first in list. What's next? We want to isolate the first country for each continent. SUBSTRING_INDEX() comes to the rescue. Finally, we reach the following query:</p>
+<blockquote>
+<pre><strong>SELECT </strong>Continent, <strong>COUNT</strong>(*),
+  <strong>SUBSTRING_INDEX</strong>(
+    <strong>CONCAT</strong>(
+      <strong>GROUP_CONCAT</strong>(Name <strong>ORDER BY </strong>Population <strong>DESC</strong>),
+      ','),
+    ',', 1) <strong>AS </strong>largest_country
+<strong>FROM </strong>`Country` <strong>GROUP BY </strong>Continent
+
++---------------+----------+-----------------------------------+
+| Continent     | COUNT(*) | largest_country                   |
++---------------+----------+-----------------------------------+
+| Asia          |       51 | China                             |
+| Europe        |       46 | Russian Federation                |
+| North America |       37 | United States                     |
+| Africa        |       58 | Nigeria                           |
+| Oceania       |       28 | Australia                         |
+| Antarctica    |        5 | Heard Island and McDonald Islands |
+| South America |       14 | Brazil                            |
++---------------+----------+-----------------------------------+</pre>
+</blockquote>
+<p>This query provides us with the right answer. No sub-selects, no joins required. Granted, it's not too pretty, and it's not clean SQL (it's not even <em>standard</em> SQL) - but it just may save some query time: there's an index to add which will cause this query to run "using index":</p>
+<blockquote>
+<pre><strong>ALTER TABLE </strong>Country <strong>ADD INDEX </strong>`Continent_Name_Population` (`Continent`,`name`,`Population`)</pre>
+</blockquote>
+<h4>Notes</h4>
+<ul>
+<li>The above assumes the comma (',') does not appear in the text of the column. Otherwise, you can choose your own delimiter in GROUP_CONCAT().</li>
+<li>The concatenated string can grow long if many rows are aggregated per group. Check out <a title="MySQL docs" href="http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html#sysvar_group_concat_max_len">group_concat_max_len</a>, which limits the length of the GROUP_CONCAT string. Also see<code class="literal"> max_allowed_packet</code>, or read the whole deal on the <a title="MySQL docs" href="http://dev.mysql.com/doc/refman/5.0/en/group-by-functions.html#function_group-concat">MySQL online documentation</a>.</li>
+</ul>
+<p>[<strong>UPDATE</strong>: Turns out an anonymous comment to <a href="http://kristiannielsen.livejournal.com/6745.html">Kristian Nielsen's post</a> suggested the same solution, about a week ago. Moreover, it suggests that the CONCAT() part in the above solution is not required, as SUBSTRING_INDEX does not require the delimiter to be present]</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/useful-database-analysis-queries-with-information_schema/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/useful-database-analysis-queries-with-information_schema/">Useful database analysis queries with INFORMATION_SCHEMA</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/dynamic-sequencing-with-a-single-query/">Dynamic sequencing with a single query</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/dynamic-sequencing-with-a-single-query/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

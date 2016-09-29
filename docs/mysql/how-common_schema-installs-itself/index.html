@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>How common_schema installs itself &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>How common_schema installs itself</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>11 Sep 2012</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/common_schema">common_schema</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/installation">Installation</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/queryscript">QueryScript</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Up till <a href="http://code.google.com/p/common-schema/">common_schema</a> version <strong>1.1</strong>, the user would need to choose from distinct distribution files: an install compatible with MySQL <strong>5.1</strong>, one compatible with InnoDB Plugin enabled servers, and one compatible with Percona Server. The difference between the three is the availability of certain <strong>INFORMATION_SCHEMA</strong> tables.</p>
+<p>With <strong>1.1</strong>, this is no longer the case: <em>common_schema</em> auto-detects the server and available feature set, and installs accordingly.</p>
+<h4>Wait, isn't common_schema just a SQL file?</h4>
+<p>Yes. It's not like there's an installer like <em>InstallShield</em> or anything. Nevertheless, <em>common</em><em>_schema</em> offers a smart way of conditional handling, which is uses in itself. It's called <a href="http://www.queryscript.com/">QueryScript</a>.</p>
+<p><em>common_schema</em> is installed by importing the SQL file (via <strong>SOURCE</strong> command; the <em>mysql</em> client; your favorite GUI). This creates your usual tables, views and routines. But some of these routines make for an interpreter for <em>QueryScript</em>. Somewhere along the installation process (remember - it's just a SQL import), <em>common_schema</em> switches over to executing scripts to manage the installation. In particular, there are a few views which depend on optional tables, such as InnoDB Plugin's tables for <strong>INFORMATION_SCHEMA</strong>.<!--more--></p>
+<p>Consider the following <strong>CREATE VIEW</strong> statement:</p>
+<blockquote>
+<pre>CREATE OR REPLACE
+ALGORITHM = UNDEFINED
+SQL SECURITY INVOKER
+VIEW innodb_transactions_summary AS
+  SELECT 
+    COUNT(*) AS count_transactions,
+    IFNULL(SUM(trx_state = 'RUNNING'), 0) AS running_transactions,
+    IFNULL(SUM(trx_requested_lock_id IS NOT NULL), 0) AS locked_transactions,
+    COUNT(DISTINCT trx_requested_lock_id) AS distinct_locks
+  FROM 
+    <strong>INFORMATION_SCHEMA.INNODB_TRX</strong>
+  WHERE 
+    trx_mysql_thread_id != CONNECTION_ID()
+;</pre>
+</blockquote>
+<p>Such a statement would fail the import if the underlying tables (<strong>INFORMATION_SCHEMA.INNODB_TRX</strong> in our example) do not actually exist. Which is why this <strong>CREATE</strong> statement is not invoked just like that. It is wrapped within a script:</p>
+<blockquote>
+<pre>set @script := "
+  set <strong>@common_schema_innodb_plugin_expected := 0</strong>;
+  <strong>try</strong> {
+    set <strong>@common_schema_innodb_plugin_expected</strong> := @common_schema_innodb_plugin_expected + 1; 
+
+    <strong>CREATE VIEW</strong> ... (as above)
+
+    set <strong>@common_schema_innodb_plugin_installed</strong> := @common_schema_innodb_plugin_installed + 1;
+  }
+  <strong>catch</strong> {
+  }
+";
+
+call run(@script);</pre>
+</blockquote>
+<p>I really want to stress this: this is a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_try_catch.html"><strong>try-catch</strong></a> statement running from within your MySQL server. <em>QueryScript</em> accepts this statement and behaves very similarly to the way you are used to with your favorite programming language.</p>
+<p>If the <strong>CREATE VIEW</strong> cannot be fulfilled, an error is generated. But instead of failing the entire script, it is caught by the <strong>catch</strong>clause; the "<strong>set @common_schema_innodb_plugin_installed :=</strong> ..." line is never executed upon such error.</p>
+<p>Upon <strong>CREATE VIEW</strong> failure, <strong>@common_schema_innodb_plugin_installed</strong> falls short of <strong>@common_schema_innodb_plugin_expected</strong> and<strong> </strong>. By the end of installation process, the two are compared, so as to determine the install success:</p>
+<blockquote>
+<pre>+-----------------------------------------------------------+
+| complete                                                  |
++-----------------------------------------------------------+
+| - Base components: <strong>installed</strong>                              |
+| - InnoDB Plugin components: <strong>installed</strong>                     |
+| - Percona Server components: <strong>not installed</strong>                |
+|                                                           |
+| Installation complete. Thank you for using common_schema! |
++-----------------------------------------------------------+</pre>
+</blockquote>
+<h4>Can't you just use "mysql --force"?</h4>
+<p>So, one can import a SQL file using <strong>mysql --force</strong>, which does nto break down on first sight of error, but continues to next statements.</p>
+<p>True, but:</p>
+<ul>
+<li>I don't want to ask that of the user.</li>
+<li>It won't give me a status on <em>what went wrong</em>.</li>
+</ul>
+<p>By using <em>QueryScript</em>'s <strong>try-catch</strong>:</p>
+<ul>
+<li>I can take alternate action on failure.</li>
+<li><em>common_schema</em> can (and does) inform the user at the end of installation process which components are installed and which are not.</li>
+<li>It can (and does) write this info down to a <em>metadata</em> table such that I can ask the user for that information when submitting a bug report.</li>
+</ul>
+<p><em>Eat your own dog food!</em></p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/how-common_schema-splits-tables-internals/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/how-common_schema-splits-tables-internals/">How common_schema split()s tables - internals</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/three-wishes-for-a-new-year-201/">Three wishes for a new year</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/three-wishes-for-a-new-year-201/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

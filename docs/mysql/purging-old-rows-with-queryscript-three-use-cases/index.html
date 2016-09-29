@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Purging old rows with QueryScript: three use cases &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Purging old rows with QueryScript: three use cases</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>14 Nov 2012</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/bulk-operations">Bulk operations</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/common_schema">common_schema</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/indexing">Indexing</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/queryscript">QueryScript</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/scripts">scripts</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>Problem: you need to purge old rows from a table. This may be your weekly/monthly cleanup task. The table is large, the amount of rows to be deleted is large, and doing so in one big <strong>DELETE</strong> is too heavy.</p>
+<p>You can use <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> or <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archiver</a> to accomplish the task. You can also use server side scripting with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a>, offering a very simple syntax with no external scripting, dependencies and command line options.</p>
+<p>I wish to present three cases of row deletion, with three different solutions. In all cases we assume some <strong>TIMESTAMP</strong> column exists in table, by which we choose to purge the row. In all cases we assume we wish to purge rows older than <strong>1</strong> month.</p>
+<p>We assume the naive query is this:</p>
+<blockquote>
+<pre>DELETE FROM my_schema.my_table WHERE row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH</pre>
+</blockquote>
+<h4>Case 1: TIMESTAMP column is indexed</h4>
+<p>I almost always index a timestamp column, if only for being able to quickly purge data (but usually also to slice data by date). In this case where the column is indexed, it's very easy to figure out which rows are older than <strong>1</strong> month.</p>
+<p>We break the naive query into smaller parts, and execute these in sequence:<!--more--></p>
+<blockquote>
+<pre>while (<span style="color: #000080;"><strong>DELETE FROM</strong> my_schema.my_table <strong>WHERE</strong> row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH <strong>ORDER BY</strong> row_timestamp <strong>LIMIT</strong> 1000</span>)
+  throttle 1;</pre>
+</blockquote>
+<p>How does the above work?</p>
+<p>QueryScript accepts a <strong>DELETE</strong> statement as a conditional expression in a while loop. The expression evaluates to <strong>TRUE</strong> when the <strong>DELETE</strong> affects rows. Once the <strong>DELETE</strong> ceases to affect rows (when no more rows match the <strong>WHERE</strong> condition), the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_while.html"><strong>while</strong></a> loop terminates.</p>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_throttle.html"><strong>throttle</strong></a> command allows us to play <em>nice</em>: by throttling we increase the total runtime through sleeping in between loop iterations.</p>
+<h4>Case 2: TIMESTAMP column is not indexed, and there is no heuristic for matching rows</h4>
+<p>This case is hardest to tackle by means of optimization: there is no index, and we cannot assume or predict anything about the distribution of old rows. We must therefore scan the entire table so as to be able to purge old rows.</p>
+<p>This <em>does not</em> mean we have to do one huge full table scan. As long as we have some way to split the table, we are still good. We can utilize the <strong>PRIMARY KEY</strong> or another <strong>UNIQUE KEY</strong> so as to break the table into smaller, distinct parts, and work our way on these smaller chunks:</p>
+<blockquote>
+<pre><strong>split</strong> (<span style="color: #000080;">DELETE FROM my_schema.my_table WHERE row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH</span>)
+  throttle 1;</pre>
+</blockquote>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> statement will automagically calculate the chunks and inject filtering conditions onto the query, such that each execution of the query relates to a distinct set of rows.</p>
+<h4>Case 3: TIMESTAMP column not indexed, but known to be monotonic</h4>
+<p>This is true for many tables. Rows with <strong>AUTO_INCREMENT</strong> columns and <strong>TIMESTAMP</strong> columns are created with <strong>CURRENT_TIMESTAMP</strong> values. This makes for a monotonic function: as the <strong>AUTO_INCREMENT</strong> grows, so does the <strong>TIMESTAMP</strong>.</p>
+<p>This makes for the following observation: it we iterate the table row by row, and reach a point where the current row is not old, then we can stop looking. Timestamps will only increase by value, which means further rows only turn to be <em>newer</em>.</p>
+<p>With this special case at hand, we can:</p>
+<blockquote>
+<pre><strong>split</strong> (<span style="color: #000080;"><strong></strong>DELETE FROM my_schema.my_table WHERE row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH</span>) {
+  if (<strong>$split_rowcount</strong> = 0)
+    break;
+  throttle 1;
+}</pre>
+</blockquote>
+<p><em>split</em> is a looping device, and a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_break.html"><strong>break</strong></a> statement works on <em>split</em> just as on a <strong>while</strong> statement.</p>
+<p><em>split</em> provides with magic variables which describe current chunk status. <strong>$split_rowcount</strong> relates to the number of rows affected by last chunk query. No more rows affected? This means we've hit recent rows, and we do not expect to find old rows any further. We can stop looking.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/common_schema-1-2-security-partition-management-processes-queryscript-goodies/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/common_schema-1-2-security-partition-management-processes-queryscript-goodies/">common_schema 1.2: security, partition management, processes, QueryScript goodies</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/mysql-5-6-rc-further-thoughts-and-questions/">MySQL 5.6 RC: further thoughts and questions</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/mysql-5-6-rc-further-thoughts-and-questions/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+

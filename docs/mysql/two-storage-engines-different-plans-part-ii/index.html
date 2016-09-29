@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.16" />
+
+  <title>Two storage engines; different plans, Part II &middot; code.openark.org</title>
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/blog/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/blog/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.1.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/blogimg/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+
+  <a class="pure-menu-heading brand" href="/blog">openark.org</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/blog/page/about"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+    <li class="pure-menu-item">
+      <a class="pure-menu-link">
+        Shlomi Noach
+        
+          <div class="avatar-container">
+        	  <div class="avatar-img-border">
+                <img class="avatar-img" src="/blog/images/shlomi-noach.png" alt="code.openark.org" />
+        	  </div>
+        	</div>
+        
+      </a>
+    </li>
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/shlomi-noach" target="_blank"><i class="fa fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/ShlomiNoach" target="_blank"><i class="fa fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/shlominoach" target="_blank"><i class="fa fa-linkedin-square fa-fw"></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2016. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+<div class="header-post">
+  <div>code.openark.org</div>
+</div>
+
+<div class="header">
+  <h1>Two storage engines; different plans, Part II</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+
+    <time>07 Nov 2008</time>
+  </div>
+
+  
+
+  
+
+  <div>
+    
+      
+      
+        <span>
+          
+            <a class="post-taxonomy-category" href="/blogcategories/mysql">MySQL</a>
+          
+        </span>
+      
+    
+
+    
+      
+      
+        <span>
+          <i class="fa fa-tags fa-fw"></i>
+          
+            <a class="post-taxonomy-tag" href="/blogtags/execution-plan">Execution plan</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/indexing">Indexing</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/innodb">InnoDB</a>&nbsp;&#47;
+          
+            <a class="post-taxonomy-tag" href="/blogtags/myisam">MyISAM</a>
+          
+        </span>
+      
+    
+  </div>
+
+</div>
+
+
+  <p>In <a title=" Two storage engines; different plans, Part I" href="http://code.openark.org/blog/?p=9">Part I</a> of this article, we have seen how the internal structure of the storage engine's index can affect an execution plan. We've seen that some plans are inherent to the way engines are implemented.</p>
+<p>We wish to present a second scenario in which execution plans vary for different storage engines. Again, we will consider MyISAM and InnoDB. Again, we will use the world database for testing. This time, we will see how confident the storage engines are in their index search capabilities.</p>
+<p>Many newcomers to databases often believe that an index search is always preferable to full table scan. This is not the case. If I were to look for 10 rows in a 1,000,000 rows table, using an indexed column - I could benefit from an index search. However, if I’m looking for 200,000 rows on that table (that’s 20% of the rows) - an index search can actually be much more expensive than a full table scan.<!--more--></p>
+<p>There are several points to consider here: a full table scan is often close to sequential, whereas an index traversal is not. Not only are the index nodes stored non sequentially, but the links from the index to table data may look like a macaroni plate. Also, the index structure itself is a tree-structure, and it can be shown that the number of pages in the index can be larger than the number of pages in the table. Even for partial index scans, it may be worthwhile to simply scan the table.</p>
+<p>The threshold above which table scan is preferred is somewhere between 10% and 30% in common DBMS.</p>
+<p>We will consider here a scenario where we index a two-valued column, a simple ‘T’ and ‘F’ enum. “That’s a very poor column to index”, you may say. But what if the ratio between the two values is high? Say, 1000:1? Should there be different search plans for the ‘F’ valued rows and for the ‘T’ valued rows?</p>
+<p>Let us duplicate the CountryLanguage table, and make it much larger. We will create a table named “cl”, with some 125K rows.</p>
+<p><strong><code>mysql&gt; SHOW CREATE TABLE CountryLanguage \G<br />
+*************************** 1. row ***************************<br />
+Table: CountryLanguage<br />
+Create Table: CREATE TABLE `CountryLanguage` (<br />
+`CountryCode` char(3) NOT NULL default '',<br />
+`Language` char(30) NOT NULL default '',<br />
+`IsOfficial` enum('T','F') NOT NULL default 'F',<br />
+`Percentage` float(4,1) NOT NULL default '0.0',<br />
+PRIMARY KEY  (`CountryCode`,`Language`)<br />
+) ENGINE=MyISAM DEFAULT CHARSET=latin1<br />
+1 row in set (0.00 sec)</code></strong></p>
+<p><strong><code>mysql&gt; CREATE TABLE cl SELECT * FROM CountryLanguage;<br />
+Query OK, 984 rows affected (0.02 sec)<br />
+Records: 984  Duplicates: 0  Warnings: 0</code></strong></p>
+<p>And now make it very large:</p>
+<p><strong><code>mysql&gt; INSERT INTO cl SELECT * FROM cl;<br />
+Query OK, 984 rows affected (0.02 sec)<br />
+Records: 984  Duplicates: 0  Warnings: 0</code></strong></p>
+<p>…</p>
+<p><strong><code>mysql&gt; INSERT INTO cl SELECT * FROM cl;<br />
+Query OK, 62976 rows affected (0.08 sec)<br />
+Records: 62976  Duplicates: 0  Warnings: 0</code></strong></p>
+<p><strong><code>mysql&gt; UPDATE cl SET IsOfficial='F';<br />
+Query OK, 1265 rows affected (0.23 sec)<br />
+Rows matched: 125952  Changed: 1265  Warnings: 0</code></strong></p>
+<p><strong><code>mysql&gt; UPDATE cl SET IsOfficial='T' WHERE RAND()&lt;0.001;<br />
+Query OK, 148 rows affected (0.20 sec)<br />
+Rows matched: 148  Changed: 148  Warnings: 0</code></strong></p>
+<p>We have now a large table, where the majority of rows have ‘F’ values for ‘IsOfficial’, and the minority have ‘T’. We shall now add an index on this column, and will then make sure the table is in MyISAM (it may be created with another storage engine, depending on our default engine parameter).</p>
+<p><strong><code>mysql&gt; ALTER TABLE cl ADD INDEX (IsOfficial);<br />
+Query OK, 125952 rows affected (0.31 sec)<br />
+Records: 125952  Duplicates: 0  Warnings: 0</code></strong></p>
+<p><strong><code>mysql&gt; ALTER TABLE cl ENGINE=MyISAM;<br />
+Query OK, 125952 rows affected (1.21 sec)<br />
+Records: 125952  Duplicates: 0  Warnings: 0</code></strong></p>
+<p>Now let us compare the search plans for ‘F’ and for ‘T’.</p>
+<p><strong><code>mysql&gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial='F' \G<br />
+*************************** 1. row ***************************<br />
+id: 1<br />
+select_type: SIMPLE<br />
+table: cl<br />
+type: ALL<br />
+possible_keys: IsOfficial<br />
+key: NULL<br />
+key_len: NULL<br />
+ref: NULL<br />
+rows: 94464<br />
+Extra: Using where<br />
+1 row in set (0.02 sec)</code></strong></p>
+<p><strong><code>mysql&gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial='T' \G<br />
+*************************** 1. row ***************************<br />
+id: 1<br />
+select_type: SIMPLE<br />
+table: cl<br />
+type: ref<br />
+possible_keys: IsOfficial<br />
+key: IsOfficial<br />
+key_len: 1<br />
+ref: const<br />
+rows: 138<br />
+Extra: Using where<br />
+1 row in set (0.00 sec)</code></strong></p>
+<p>What MyISAM decided was that an index search on the ‘F’ rows is useless. A table scan was deemed to be preferable. However, for ‘T’ values rows, the index we created was just fine, and would indeed be used.</p>
+<p>InnoDB will state differently.</p>
+<p><strong><code>mysql&gt; ALTER TABLE cl ENGINE=InnoDB;<br />
+Query OK, 125952 rows affected (1.07 sec)<br />
+Records: 125952  Duplicates: 0  Warnings: 0</code></strong></p>
+<p><strong><code>mysql&gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial='F' \G<br />
+*************************** 1. row ***************************<br />
+id: 1<br />
+select_type: SIMPLE<br />
+table: cl<br />
+type: ref<br />
+possible_keys: IsOfficial<br />
+key: IsOfficial<br />
+key_len: 1<br />
+ref: const<br />
+rows: 61667<br />
+Extra: Using where<br />
+1 row in set (0.00 sec)</code></strong></p>
+<p><strong><code>mysql&gt; EXPLAIN SELECT * FROM cl WHERE IsOfficial='T' \G<br />
+*************************** 1. row ***************************<br />
+id: 1<br />
+select_type: SIMPLE<br />
+table: cl<br />
+type: ref<br />
+possible_keys: IsOfficial<br />
+key: IsOfficial<br />
+key_len: 1<br />
+ref: const<br />
+rows: 148<br />
+Extra: Using where<br />
+1 row in set (0.00 sec)<br />
+</code><br />
+</strong>On the ‘T’ search, MyISAM and InnoDB agree. But look at the plan for the ‘F’ rows: InnoDB still prefers an index search to table scan, even though it estimates a lookup on 50% of the rows.</p>
+<p>The behavior just exposed is not entirely consistent. InnoDB and MyISAM differ in the way they update the index statistics. While ANALYZE TABLE on MyISAM performs an exaustive search on index values, InnoDB will only do 10 random test dives and return with a rough calculation. In fact, InnDB’s estimations can greatly vary from the real values distribution, and successive calls to ANALYZE table can produce varying results.</p>
+<p>What has been presented in this part is not a rule to live by. You shouldn’t base your queries or expected behavior on the index distribution or search plan calculated by the storage engine. These may change in time. What’s instructive here is the freedom MySQL gives the storage engines in decision making, and the different actions taken when dealing with different engines.</p>
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/blog/mysql/two-storage-engines-different-plans-part-i/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/blog/mysql/two-storage-engines-different-plans-part-i/">Two storage engines; different plans, Part I</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/blog/mysql/dangers-of-skip-grant-tables/">Dangers of skip-grant-tables</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/blog/mysql/dangers-of-skip-grant-tables/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'Your Disqus shortname';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+</div>
+
+</div>
+</div>
+<script src="/blogjs/ui.js"></script>
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'Your Google Analytics tracking ID', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+</body>
+</html>
+
