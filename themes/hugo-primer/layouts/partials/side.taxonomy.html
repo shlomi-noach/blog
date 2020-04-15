@@ -1,29 +1,43 @@
 <!-- Tags -->
-{{ if isset .Site.Taxonomies "tags" }}
+{{ if isset .Site.Taxonomies "tag" }}
   <div class="Box Box--blue p-2 mb-3 mt-5">
     <a href="{{ "tags/" | relLangURL }}" class="link-gray-dark">
       <h4>Tags</h4>
     </a>
-    {{ range $name, $items := .Site.Taxonomies.tags }}
-    <span class="css-truncate no-wrap m-1 pl-1">
-      <a href="{{ "tags/" | relLangURL }}{{ $name | urlize | lower }}" class="link-gray text-emphasized css-truncate-target"><span class="">{{ $name | humanize }}</span></a>
-      <span class="text-right Counter">{{ len $items }}</span>
-    </span>
-    {{ end }}
+    <div id="tag-cloud">
+      {{ range $name, $items := .Site.Taxonomies.tag }}
+      <span class="css-truncate">
+        <a href="{{ "tag/" | relLangURL }}{{ $name | urlize | lower }}" class="css-truncate-target Label"><span class="">{{ $name | humanize }}</span></a>
+        <!-- <span class="text-right Counter">{{ len $items }}</span> -->
+      </span>
+      {{ end }}
+    </div>
   </div>
 {{ end }}
 
 <!-- Categories -->
-{{ if isset .Site.Taxonomies "categories" }}
+{{ if isset .Site.Taxonomies "category" }}
   <div class="Box Box--blue p-2 mb-3">
     <a href="{{ "categories/" | relLangURL }}" class="link-gray-dark">
       <h4>Categories</h4>
     </a>
-    {{ range $name, $items := .Site.Taxonomies.categories }}
-    <span class="css-truncate no-wrap m-1 pl-1">
-      <a href="{{ "categories/" | relLangURL }}{{ $name | urlize | lower }}" class="link-gray text-emphasized css-truncate-target"><span class="">{{ $name | humanize }}</span></a>
-      <span class="text-right Counter">{{ len $items }}</span>
-    </span>
-    {{ end }}
+    <div id="category-cloud">
+      {{ range $name, $items := .Site.Taxonomies.category }}
+      <span class="css-truncate">
+        <a href="{{ "category/" | relLangURL }}{{ $name | urlize | lower }}" class="css-truncate-target Label Label--gray"><span class="">{{ $name | humanize }}</span></a>
+        <!-- <span class="text-right Counter">{{ len $items }}</span> -->
+      </span>
+      {{ end }}
+    </div>
   </div>
 {{ end }}
+
+<script>
+  var classes = ["Label--gray", "Label--gray-darker"];
+  var d = document.querySelector('#tag-cloud');
+  for (var i = d.children.length; i >= 0; i--) {
+      var child = d.children[Math.random() * i | 0]
+      child.firstElementChild.classList.add(classes[Math.floor(Math.random() * 1.5)])
+      d.appendChild(child);
+  }
+</script>
