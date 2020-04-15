@@ -7,17 +7,30 @@
 <!-- list template -->
 <div>
 
-  <h1>{{ .Title }}</h1>
+  <!-- <h1>{{ .Title }} 222 is this needed?</h1> -->
   {{ .Content }}
 
   {{ range .Paginator.Pages }}
-  <div>
+  <div class="paginator-page">
     <div>
       <a href="{{ .RelPermalink }}">
         <h3>{{ .Title }}</h3>
       </a>
-      <small>{{ .Permalink }}</small>
-      {{ .Date.Format "2006-01-02" }}
+      {{ partial "taxonomy.html" . }}
+
+      {{ if ( default true .Params.showDate ) }}
+      <div class="float-md-right">
+        <span title="Lastmod: {{ .Lastmod.Format "2006-01-02" }}. Published at: {{ .PublishDate.Format "2006-01-02" }}." class="Label Label--timestamp">
+          {{ if ne .Lastmod .PublishDate }}
+            Lastmod: {{ dateFormat ( default "2006-01-02" .Site.Params.dateFormat ) .Lastmod }}
+          {{ else }}
+            {{ dateFormat "2006-01-02" .PublishDate }}
+          {{ end }}
+        </span>
+      </div>
+      {{ end }}
+      <!-- <small>{{ .Permalink }}</small> -->
+      <!-- {{ .Date.Format "2006-01-02" }} -->
     </div>
     {{ .Summary }}
   </div>
