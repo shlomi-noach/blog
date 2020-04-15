@@ -1,6 +1,7 @@
 ---
 title: "About"
 type: page
+showDate: false
 ---
 
 This blog follows my software engineering work, most of it around MySQL.
@@ -9,8 +10,9 @@ I'm Shlomi Noach, and am enthusiast about writing software and solving problems.
 
 I author a bunch of open source projects:
 
-- [orchestrator](https://github.com/outbrain/orchestrator)
+- [orchestrator](https://github.com/openark/orchestrator)
 - [gh-ost](https://github.com/github/gh-ost)
+- [freno](https://github.com/github/freno)
 - [common_schema](https://github.com/shlomi-noach/common_schema)
 - [ccql](https://github.com/github/ccql)
 - and some more.
