@@ -1,14 +1,13 @@
 <!-- Tags -->
 {{ if isset .Site.Taxonomies "tag" }}
-  <div class="Box Box--blue p-2 mb-3 mt-5">
-    <a href="{{ "tags/" | relLangURL }}" class="link-gray-dark">
+  <div class="p-2 mb-3 mt-5">
+    <a href="{{ "tag/" | relLangURL }}" class="link-gray-dark">
       <h4>Tags</h4>
     </a>
-    <div id="tag-cloud">
+    <div id="tag-cloud" style="display: none">
       {{ range $name, $items := .Site.Taxonomies.tag }}
       <span class="css-truncate">
-        <a href="{{ "tag/" | relLangURL }}{{ $name | urlize | lower }}" class="css-truncate-target"><span class="">{{ $name | humanize }}</span></a>
-        <!-- <span class="text-right Counter">{{ len $items }}</span> -->
+        <a href="{{ "tag/" | relLangURL }}{{ $name | urlize | lower }}" class="css-truncate-target" title="{{ len $items }} posts"><span class="">{{ $name | humanize }}</span></a>
       </span>
       {{ end }}
     </div>
@@ -17,20 +16,32 @@
 
 <!-- Categories -->
 {{ if isset .Site.Taxonomies "category" }}
-  <div class="Box Box--blue p-2 mb-3">
-    <a href="{{ "categories/" | relLangURL }}" class="link-gray-dark">
+  <div class="p-2 mb-3">
+    <a href="{{ "category/" | relLangURL }}" class="link-gray-dark">
       <h4>Categories</h4>
     </a>
     <div id="category-cloud">
       {{ range $name, $items := .Site.Taxonomies.category }}
       <span class="css-truncate">
         <a href="{{ "category/" | relLangURL }}{{ $name | urlize | lower }}" class="css-truncate-target Label Label--gray"><span class="">{{ $name | humanize }}</span></a>
-        <!-- <span class="text-right Counter">{{ len $items }}</span> -->
       </span>
       {{ end }}
     </div>
   </div>
 {{ end }}
+
+<div class="p-2 mb-3">
+  <a href="{{ .Site.BaseURL }}" class="link-gray-dark">
+    <h4>Recent</h4>
+  </a>
+  <div id="recent-posts">
+    {{ range first 5 $.Site.RegularPages }}
+    <div>
+      <a href="{{ .URL }}">{{ .Title }}</a>
+    </div>
+    {{ end }}
+  </div>
+</div>
 
 <script>
   var classes = ["Label--gray-light", "Label--gray"];
@@ -41,4 +52,9 @@
       child.firstElementChild.classList.add(classes[Math.floor(Math.random() * 1.5)]);
       d.appendChild(child);
   }
+  var maxChildren = {{  .Site.Params.maxTags }};
+  while (d.children.length > maxChildren) {
+    d.removeChild(d.childNodes[maxChildren]);
+  }
+  d.removeAttribute("style");
 </script>
