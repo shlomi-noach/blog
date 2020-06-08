@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>command line &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/command-line/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 17 Sep 2014 07:08:20 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>zookeepercli: lightweight, powerful, controlled command line client for ZooKeeper</title>
+		<link>https://shlomi-noach.github.io/blog/linux/zookeepercli-lightweight-powerful-controlled-command-line-client-for-zookeeper</link>
+				<comments>https://shlomi-noach.github.io/blog/linux/zookeepercli-lightweight-powerful-controlled-command-line-client-for-zookeeper#comments</comments>
+				<pubDate>Wed, 17 Sep 2014 07:08:20 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[command line]]></category>
+		<category><![CDATA[go]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[ZooKeeper]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6980</guid>
+				<description><![CDATA[I&#8217;m happy to announce the availability of zookeepercli: a lightweight, simple, fast and controlled command line client for ZooKeeper. zookeepercli allows for: Basic CRUD-like operations: create,  set,  delete,  exists,  get,  ls (aka children). Extended operations: lsr (ls recursive),  creater (create recursively) Well formatted and controlled output: supporting either txt or json format Single, no-dependencies binary [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m happy to announce the availability of <a href="https://github.com/outbrain/zookeepercli"><strong>zookeepercli</strong></a>: a lightweight, simple, fast and controlled command line client for ZooKeeper.</p>
+<p><strong>zookeepercli</strong> allows for:</p>
+<ul class="task-list">
+<li>Basic CRUD-like operations: <strong><code>create</code></strong>,  <strong><code>set</code></strong>,  <strong><code>delete</code></strong>,  <strong><code>exists</code></strong>,  <strong><code>get</code></strong>,  <strong><code>ls</code></strong> (aka <strong><code>children</code></strong>).</li>
+<li>Extended operations: <strong><code>lsr</code></strong> (ls recursive),  <strong><code>creater</code></strong> (create recursively)</li>
+<li>Well formatted and controlled output: supporting either <strong><code>txt</code></strong> or <strong><code>json</code></strong> format</li>
+<li>Single, no-dependencies binary file, based on a native Go ZooKeeper library by <a href="http://github.com/samuel/go-zookeeper">github.com/samuel/go-zookeeper</a> (<a href="https://github.com/outbrain/zookeepercli/blob/master/go-zookeeper-LICENSE">LICENSE</a>)</li>
+</ul>
+<p>I was dissatisfied with existing command line access to ZooKeeper. Uncontrolled and noisy output as well as large footprint were among the reasons. <strong>zookeepercli</strong> overcomes the above and provides with often required powers.</p>
+<p>Usage samples:</p>
+<blockquote>
+<pre><code>
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only "path placeholder"
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only/key1 "value1"
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only/key2 "value2"
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only/key3 "value3"
+
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c ls /demo_only
+<span style="color: #808000;">key3
+key2
+key1
+</span>
+<span style="color: #ff6600;"># Same as above, JSON format output:</span>
+$ zookeepercli --servers srv-1,srv-2,srv-3 --format=json -c ls /demo_only
+<span style="color: #808000;">["key3","key2","key1"]</span>
+
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only/key1
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only/key2
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only/key3
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only
+
+<span style="color: #ff6600;"># Create a path recursively (auto-generate parent directories if not exist):</span>
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c creater "/demo_only/child/key1" "val1"
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c creater "/demo_only/child/key2" "val2"
+
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c get "/demo_only/child/key1"
+<span style="color: #808000;">val1</span>
+
+<span style="color: #ff6600;"># This path was auto generated due to recursive create:</span>
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c get "/demo_only" 
+<span style="color: #808000;">zookeepercli auto-generated</span>
+
+<span style="color: #ff6600;"># ls recursively a path and all sub children:</span>
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c lsr "/demo_only" 
+<span style="color: #808000;">child
+child/key1
+child/key2 </span></code></pre>
+</blockquote>
+<p><strong>zookeepercli</strong> is released as open source by <a href="https://github.com/outbrain">Outbrain</a> under the <a href="https://github.com/outbrain/zookeepercli/blob/master/LICENSE">Apache 2.0 license</a>.</p>
+<p>Quick links:</p>
+<ul>
+<li><a href="https://github.com/outbrain/zookeepercli">Project page</a></li>
+<li><a href="https://github.com/outbrain/zookeepercli/releases">Pre-built binaries</a> for download</li>
+<li><a href="https://github.com/outbrain/zookeepercli/blob/master/LICENSE">License</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/linux/zookeepercli-lightweight-powerful-controlled-command-line-client-for-zookeeper/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6980</post-id>	</item>
+		<item>
+		<title>Tool of the day: q</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/tool-of-the-day-q</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/tool-of-the-day-q#comments</comments>
+				<pubDate>Thu, 08 Aug 2013 09:26:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Linux]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[command line]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[tools]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6417</guid>
+				<description><![CDATA[If you work with command line and know your SQL, q is a great tool to use: q allows you to query your text files or standard input with SQL. You can: SELECT c1, COUNT(*) FROM /home/shlomi/tmp/my_file.csv GROUP BY c1 And you can: SELECT all.c2 FROM /tmp/all_engines.txt AS all LEFT JOIN /tmp/innodb_engines.txt AS inno USING [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>If you work with command line and know your SQL, <strong>q</strong> is a great tool to use:</p>
+<p><a href="https://github.com/harelba/q"><strong>q</strong></a> allows you to query your text files or standard input with SQL. You can:</p>
+<blockquote>
+<pre>SELECT c1, COUNT(*) FROM /home/shlomi/tmp/my_file.csv GROUP BY c1</pre>
+</blockquote>
+<p>And you can:</p>
+<blockquote>
+<pre>SELECT all.c2 FROM /tmp/all_engines.txt AS all LEFT JOIN /tmp/innodb_engines.txt AS inno USING (c1, c2) WHERE inno.c3 IS NULL</pre>
+</blockquote>
+<p>And you can also combine with your favourite shell commands and tools:</p>
+<blockquote>
+<pre>grep "my_term" /tmp/my_file.txt | q "SELECT c4 FROM - JOIN /home/shlomi/static.txt USING (c1)" | xargs touch</pre>
+</blockquote>
+<p>Some of <strong>q</strong>&#8216;s functionality (and indeed, SQL functionality) can be found in command line tools. You can use <strong>grep</strong> for pseudo <strong>WHERE</strong> filtering, or <strong>cut</strong> for projecting, but you can only get so far with <strong>cat my_file.csv | sort | uniq -c | sort -n</strong>. SQL is way more powerful for working with tabulated data, and so <strong>q</strong> makes for a great addition into one&#8217;s toolbox.</p>
+<p>The tool is authored by my colleague <a href="https://github.com/harelba">Harel Ben-Attia</a>, and is in daily use over at our company (it is in fact installed on all production servers).</p>
+<p>It is of course free and open source (<a href="https://github.com/harelba/q">get it on GitHub</a>, where you can also find documentation), and very easy to setup. Enjoy!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/tool-of-the-day-q/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6417</post-id>	</item>
+		<item>
+		<title>MySQL command line vs. visual editors</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-command-line-vs-visual-editors</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-command-line-vs-visual-editors#comments</comments>
+				<pubDate>Mon, 30 Jan 2012 15:04:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[command line]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4639</guid>
+				<description><![CDATA[Students in my training classes usually prefer to use some kind of visual editor for MySQL. Typically this would be the software they&#8217;re using at work. Sometimes they just bring over their laptops with the software installed. Or they would use MySQL Workbench, which is what I usually have pre-installed on their desktops. I see [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Students in my training classes usually prefer to use some kind of visual editor for MySQL. Typically this would be the software they&#8217;re using at work. Sometimes they just bring over their laptops with the software installed. Or they would use MySQL Workbench, which is what I usually have pre-installed on their desktops.</p>
+<p>I see MySQL Workbench, SQLyog, Toad for MySQL, or several more.</p>
+<p>I always humbly suggest they <em>close down their software and open up a command line</em>.</p>
+<p>It isn&#8217;t fancy. It may not even be convenient (especially on Windows, in my opinion). And repeating your last command with a minor modification requires a lot of key stroking. Or you would copy+paste from some text editor. Most students will give it a shot, then go back to their favorite editor.</p>
+<p>Well, again and again I reach the same conclusion:</p>
+<h4>Visual editors are not as trustworthy as the command line.</h4>
+<p>Time and again students show me something on their editor. Behavior seems strange to me. Opening up a console shows a completely different picture.</p>
+<p>Things like:<span id="more-4639"></span></p>
+<ul>
+<li>The visual editor would open a new connection for every new query (oh, so the <strong>@user_defined_variable</strong> I&#8217;ve just assigned turns <strong>NULL</strong>, or the <strong>TEMPORARY TABLE</strong> disappears).</li>
+<li>The visual editor will only show <strong>1,000</strong> results, via <strong>LIMIT 0,1000</strong>. &#8220;But the same query runs <em>so much faster</em> on my machine!&#8221;. Well, sure, a <strong>filesort</strong> of <strong>1,000,000</strong> rows that can satisfy the first <strong>1,000</strong> will quit early!</li>
+<li>The visual editor shows table definition graphically. &#8220;I didn&#8217;t realize the index did(n&#8217;t) cover this and that columns. I didn&#8217;t realize it only covered first <strong>n</strong> characters of my <strong>VARCHAR</strong>.&#8221;. That&#8217;s because you can&#8217;t beat <strong>SHOW CREATE TABLE</strong>, the definite table structure description.</li>
+<li>The visual editor allows for export/import/copy/transfer of tables and rows with just one click! &#8220;Why is it so complicated in the command line to purge <strong>1,000,000</strong> rows from a table?&#8221;. Ummm, did you realize the visual editor would typically use a naive approach of doing everything in one huge transaction?</li>
+<li>The visual editor is smart. But sometimes you don&#8217;t want smart. You just <a href="http://www.devart.com/blogs/dbforge/index.php/mind-data-modifications-via-data-editor-in-dbforge-studio-for-mysql.html">assume simple</a>. I personally take great precaution with <em>smart</em> solutions. Luckily, with scripts you have so much greater control (i.e. command line options, &#8220;dry-run&#8221; mode, etc.) that I have greater confidence in them.</li>
+</ul>
+<p>I do like it when a visual editor plays it both <em>smart</em> and <em>safe</em>, in such way that before doing its smart work it actually presents you with <em>the query it&#8217;s going to issue</em>. Which is why I always considered MySQL Query Browser (now replaced by Workbench) to be the visual editor of choice in my classes.</p>
+<p>But, at the end of the day, I strongly believe: if you don&#8217;t know how to do it with command line, you can&#8217;t really know how it&#8217;s done.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-command-line-vs-visual-editors/feed</wfw:commentRss>
+		<slash:comments>14</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4639</post-id>	</item>
+	</channel>
+</rss>

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Re: MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 15 Apr 2014 22:28:20 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Anonymous				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-237168</link>
+		<dc:creator><![CDATA[Anonymous]]></dc:creator>
+		<pubDate>Tue, 15 Apr 2014 22:28:20 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-237168</guid>
+					<description><![CDATA[This bug still seems to exist 1 year later ...]]></description>
+		<content:encoded><![CDATA[<p>This bug still seems to exist 1 year later &#8230;</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Alfie John				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-217418</link>
+		<dc:creator><![CDATA[Alfie John]]></dc:creator>
+		<pubDate>Tue, 20 Aug 2013 07:57:48 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-217418</guid>
+					<description><![CDATA[Currently testing a migration to 5.6. Ran a checksum and was smacked in the face by a wall of changes.
+
+After doing dumps+dumps of random tables, it looks like it&#039;s this issue.
+
+@shlomi: thanks for a suitable work around.]]></description>
+		<content:encoded><![CDATA[<p>Currently testing a migration to 5.6. Ran a checksum and was smacked in the face by a wall of changes.</p>
+<p>After doing dumps+dumps of random tables, it looks like it&#8217;s this issue.</p>
+<p>@shlomi: thanks for a suitable work around.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Sheeri				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-178018</link>
+		<dc:creator><![CDATA[Sheeri]]></dc:creator>
+		<pubDate>Mon, 11 Feb 2013 17:22:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-178018</guid>
+					<description><![CDATA[Note that depending on float precision, this still might not work. I tried to use your workaround and it still showed differences, and I think it&#039;s because we&#039;re not setting the float precision (and by default there is &#039;none&#039;).
+
+I found that with CAST, when using a float precision of 30 or less on a double field, it works, but not 31 or more:
+
+
+mysql&#062; select @@version; SELECT 
+ROUND(IF(double_field BETWEEN -1 AND 1, CAST(double_field AS DECIMAL(65,30)), double_field), 30) as float_p30,   
+ROUND(IF(double_field BETWEEN -1 AND 1, CAST(double_field AS DECIMAL(65,30)), double_field), 31) as float_p31 from my_table where id IN (val1,val2,val3);       
++------------+
+&#124; @@version  &#124;
++------------+
+&#124; 5.1.61-log &#124;
++------------+
+1 row in set (0.00 sec)
+
++----------------------------------+-------------+
+&#124; float_p30                        &#124; float_p31   &#124;
++----------------------------------+-------------+
+&#124; 0.000075488799999999981024841056 &#124; 7.54888e-05 &#124;
+&#124; 0.000090369599999999989390145338 &#124; 9.03696e-05 &#124;
+&#124; 0.000059410600000000003402360338 &#124; 5.94106e-05 &#124;
++----------------------------------+-------------+
+3 rows in set (0.00 sec)
+
+This kind of truncation also happens on MariaDB, but in a different way - it truncates to 10 decimal places.
+
+MariaDB [addons_allizom_org]&#062; SELECT ROUND(IF(movers BETWEEN -1 AND 1, CAST(movers AS DECIMAL(65,30)), movers), 30) as float_p30,ROUND(IF(movers BETWEEN -1 AND 1, CAST(movers AS DECIMAL(65,30)), movers), 31) as float_p31 from addons_allizom_org.personas where id in (4313,33619,66706);       
++----------------------------------+--------------+
+&#124; float_p30                        &#124; float_p31    &#124;
++----------------------------------+--------------+
+&#124; 0.000075488800000000000000000000 &#124; 0.0000754888 &#124;
+&#124; 0.000090369599999999990000000000 &#124; 0.0000903696 &#124;
+&#124; 0.000059410600000000000000000000 &#124; 0.0000594106 &#124;
++----------------------------------+--------------+
+3 rows in set (0.00 sec)
+
+MariaDB truncates without any warnings, which is odd.]]></description>
+		<content:encoded><![CDATA[<p>Note that depending on float precision, this still might not work. I tried to use your workaround and it still showed differences, and I think it&#8217;s because we&#8217;re not setting the float precision (and by default there is &#8216;none&#8217;).</p>
+<p>I found that with CAST, when using a float precision of 30 or less on a double field, it works, but not 31 or more:</p>
+<p>mysql&gt; select @@version; SELECT<br />
+ROUND(IF(double_field BETWEEN -1 AND 1, CAST(double_field AS DECIMAL(65,30)), double_field), 30) as float_p30,<br />
+ROUND(IF(double_field BETWEEN -1 AND 1, CAST(double_field AS DECIMAL(65,30)), double_field), 31) as float_p31 from my_table where id IN (val1,val2,val3);<br />
++&#8212;&#8212;&#8212;&#8212;+<br />
+| @@version  |<br />
++&#8212;&#8212;&#8212;&#8212;+<br />
+| 5.1.61-log |<br />
++&#8212;&#8212;&#8212;&#8212;+<br />
+1 row in set (0.00 sec)</p>
+<p>+&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;-+&#8212;&#8212;&#8212;&#8212;-+<br />
+| float_p30                        | float_p31   |<br />
++&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;-+&#8212;&#8212;&#8212;&#8212;-+<br />
+| 0.000075488799999999981024841056 | 7.54888e-05 |<br />
+| 0.000090369599999999989390145338 | 9.03696e-05 |<br />
+| 0.000059410600000000003402360338 | 5.94106e-05 |<br />
++&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;-+&#8212;&#8212;&#8212;&#8212;-+<br />
+3 rows in set (0.00 sec)</p>
+<p>This kind of truncation also happens on MariaDB, but in a different way &#8211; it truncates to 10 decimal places.</p>
+<p>MariaDB [addons_allizom_org]&gt; SELECT ROUND(IF(movers BETWEEN -1 AND 1, CAST(movers AS DECIMAL(65,30)), movers), 30) as float_p30,ROUND(IF(movers BETWEEN -1 AND 1, CAST(movers AS DECIMAL(65,30)), movers), 31) as float_p31 from addons_allizom_org.personas where id in (4313,33619,66706);<br />
++&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;-+&#8212;&#8212;&#8212;&#8212;&#8211;+<br />
+| float_p30                        | float_p31    |<br />
++&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;-+&#8212;&#8212;&#8212;&#8212;&#8211;+<br />
+| 0.000075488800000000000000000000 | 0.0000754888 |<br />
+| 0.000090369599999999990000000000 | 0.0000903696 |<br />
+| 0.000059410600000000000000000000 | 0.0000594106 |<br />
++&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;-+&#8212;&#8212;&#8212;&#8212;&#8211;+<br />
+3 rows in set (0.00 sec)</p>
+<p>MariaDB truncates without any warnings, which is odd.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Data Industry news round up, Log Buffer #304				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-167152</link>
+		<dc:creator><![CDATA[Data Industry news round up, Log Buffer #304]]></dc:creator>
+		<pubDate>Fri, 25 Jan 2013 14:08:30 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-167152</guid>
+					<description><![CDATA[[...] Sheeri&#8217;s MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation, Shlomi Noach was baffled at this change of floating point number [...]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] Sheeri&#8217;s MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation, Shlomi Noach was baffled at this change of floating point number [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-166847</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Thu, 24 Jan 2013 20:18:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-166847</guid>
+					<description><![CDATA[FLOAT goes down to about 1e-38, so DECIMAL(x, 30) can lose precision, even lose _all_ precision.  DOUBLE is much further.
+
+What is needed is to FORMAT to some number of _significant_ digits, not some number of _decimal places_.
+
+If the numbers are different on the two machines, they should be flagged as different.  Converting to strings, then comparing the strings is the source of the problem.
+
+Unfortunately, there is not a CAST AS BINARY to produce the internal representation.  (A trick like that works to bypass character set issues.)  Probably 99.99% of MySQL installations use hardware that uses IEEE 754, so I suggest that it is not reasonable to argue about differing representations.]]></description>
+		<content:encoded><![CDATA[<p>FLOAT goes down to about 1e-38, so DECIMAL(x, 30) can lose precision, even lose _all_ precision.  DOUBLE is much further.</p>
+<p>What is needed is to FORMAT to some number of _significant_ digits, not some number of _decimal places_.</p>
+<p>If the numbers are different on the two machines, they should be flagged as different.  Converting to strings, then comparing the strings is the source of the problem.</p>
+<p>Unfortunately, there is not a CAST AS BINARY to produce the internal representation.  (A trick like that works to bypass character set issues.)  Probably 99.99% of MySQL installations use hardware that uses IEEE 754, so I suggest that it is not reasonable to argue about differing representations.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Sheeri				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-166767</link>
+		<dc:creator><![CDATA[Sheeri]]></dc:creator>
+		<pubDate>Thu, 24 Jan 2013 17:23:17 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-166767</guid>
+					<description><![CDATA[Interesting - I&#039;d tried FORMAT() and CAST (and CONVERT) by itself, not with rounding, and nothing I&#039;d tried there worked. I appreciate that workaround!]]></description>
+		<content:encoded><![CDATA[<p>Interesting &#8211; I&#8217;d tried FORMAT() and CAST (and CONVERT) by itself, not with rounding, and nothing I&#8217;d tried there worked. I appreciate that workaround!</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-166763</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 24 Jan 2013 17:21:17 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-166763</guid>
+					<description><![CDATA[Baron,
+
+FORMAT() seems to work well for small numbers (for larger numbers, which are of no interest in this problem, it adds commas to denote orders of magnitude).
+It apparently doesn&#039;t have a limit on the number of digits after the floating point (FLOAT and DOUBLE max at 30 digits when casted to DECIMAL) -- but this is just silent: when FORMATting numbers with over 30 digits, result is rounded to 30 digits no matter what.
+So in conclusion I don&#039;t see the difference between the two.]]></description>
+		<content:encoded><![CDATA[<p>Baron,</p>
+<p>FORMAT() seems to work well for small numbers (for larger numbers, which are of no interest in this problem, it adds commas to denote orders of magnitude).<br />
+It apparently doesn&#8217;t have a limit on the number of digits after the floating point (FLOAT and DOUBLE max at 30 digits when casted to DECIMAL) &#8212; but this is just silent: when FORMATting numbers with over 30 digits, result is rounded to 30 digits no matter what.<br />
+So in conclusion I don&#8217;t see the difference between the two.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-166725</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 24 Jan 2013 16:18:13 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-166725</guid>
+					<description><![CDATA[Peter,
+Well, I don&#039;t touch large numbers as you can see. With small numbers I&#039;m casting with up to 30 digits after the period.
+
+Moreover, consider I&#039;ve put this into the float-precision option, whose target in the first place is to do round ups... So yes, there&#039;s round up, and it is intentional.]]></description>
+		<content:encoded><![CDATA[<p>Peter,<br />
+Well, I don&#8217;t touch large numbers as you can see. With small numbers I&#8217;m casting with up to 30 digits after the period.</p>
+<p>Moreover, consider I&#8217;ve put this into the float-precision option, whose target in the first place is to do round ups&#8230; So yes, there&#8217;s round up, and it is intentional.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Peter Laursen				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-166716</link>
+		<dc:creator><![CDATA[Peter Laursen]]></dc:creator>
+		<pubDate>Thu, 24 Jan 2013 15:59:15 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-166716</guid>
+					<description><![CDATA[Now if you have extremely small (atomar physics) or extremely large numbers (astronomics) a CAST to DECIMAL may truncate data I think?  And in that case after truncation different values may appear as identical values.
+
+Right/wrong?]]></description>
+		<content:encoded><![CDATA[<p>Now if you have extremely small (atomar physics) or extremely large numbers (astronomics) a CAST to DECIMAL may truncate data I think?  And in that case after truncation different values may appear as identical values.</p>
+<p>Right/wrong?</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Baron				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/comment-page-1#comment-166676</link>
+		<dc:creator><![CDATA[Baron]]></dc:creator>
+		<pubDate>Thu, 24 Jan 2013 14:29:55 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028#comment-166676</guid>
+					<description><![CDATA[I think it might be better to use FORMAT() instead. But that is just from my memory, I haven&#039;t looked at the documentation to remind myself of how it works.]]></description>
+		<content:encoded><![CDATA[<p>I think it might be better to use FORMAT() instead. But that is just from my memory, I haven&#8217;t looked at the documentation to remind myself of how it works.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Failover &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/failover/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 03 Aug 2017 13:32:59 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>orchestrator/raft: Pre-Release 3.0</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0#comments</comments>
+				<pubDate>Thu, 03 Aug 2017 08:41:11 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7740</guid>
+				<description><![CDATA[orchestrator 3.0 Pre-Release is now available. Most notable are Raft consensus, SQLite backend support, orchestrator-client no-binary-required client script. TL;DR You may now set up high availability for orchestrator via raft consensus, without need to set up high availability for orchestrator&#8216;s backend MySQL servers (such as Galera/InnoDB Cluster). In fact, you can run a orchestrator/raft setup [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><code>orchestrator</code> <strong>3.0 Pre-Release</strong> is <a href="https://github.com/github/orchestrator/releases/tag/v3.0.pre-release">now available</a>. Most notable are <strong>Raft</strong> consensus, <strong>SQLite</strong> backend support, <strong>orchestrator-client</strong> no-binary-required client script.</p>
+<h3>TL;DR</h3>
+<p>You may now set up high availability for <code>orchestrator</code> via <code>raft</code> consensus, without need to set up high availability for <code>orchestrator</code>&#8216;s backend MySQL servers (such as Galera/InnoDB Cluster). In fact, you can run a <code>orchestrator/raft</code> setup using embedded <code>SQLite</code> backend DB. Read on.</p>
+<p><code>orchestrator</code> still supports the existing shared backend DB paradigm; nothing dramatic changes if you upgrade to <strong>3.0</strong> and do not configure <code>raft</code>.</p>
+<h3>orchestrator/raft</h3>
+<p><a href="https://raft.github.io/">Raft</a> is a consensus protocol, supporting leader election and consensus across a distributed system.  In an <code>orchestrator/raft</code> setup <code>orchestrator</code> nodes talk to each other via raft protocol, form consensus and elect a leader. Each <code>orchestrator</code> node has its own <em>dedicated</em> backend database. The backend databases do not speak to each other; only the <code>orchestrator</code> nodes speak to each other.</p>
+<p>No MySQL replication setup needed; the backend DBs act as standalone servers. In fact, the backend server doesn&#8217;t have to be MySQL, and <code>SQLite</code> is supported. <code>orchestrator</code> now ships with <code>SQLite</code> embedded, no external dependency needed.<span id="more-7740"></span></p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png"><img class="alignnone size-full wp-image-7743" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png" alt="" width="824" height="326" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png 824w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft-300x119.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft-768x304.png 768w" sizes="(max-width: 824px) 100vw, 824px" /></a></p></blockquote>
+<p>In a <code>orchestrator/raft</code> setup, all <code>orchestrator</code> nodes talk to each other. One and only one is elected as <em>leader</em>. To become a leader a node must be part of a <em>quorum</em>. On a <code>3</code> node setup, it takes <code>2</code> nodes to form a quorum. On a <code>5</code> node setup, it takes <code>3</code> nodes to form a quorum.</p>
+<p>Only the leader will run failovers. This much is similar to the existing shared-backend DB setup. However in a <code>orchestrator/raft</code> setup each node is independent, and each <code>orchestrator</code> node <em>runs discoveries</em>. This means a MySQL server in your topology will be routinely visited and probed by not one <code>orchestrator</code> node, but by all <code>3</code> (or <code>5</code>, or what have you) nodes in your raft cluster.</p>
+<p>Any communication to <code>orchestrator</code> must take place through the leader. One may not tamper directly with the backend DBs anymore, since the <code>leader</code> is the one authoritative entity to replicate and announce changes to its peer nodes. See <strong>orchestrator-client</strong> section following.</p>
+<p>For details, please refer to the documentation:</p>
+<ul>
+<li><a href="https://github.com/github/orchestrator/blob/master/docs/raft.md">orchestrator/raft: overview</a></li>
+<li><a href="https://github.com/github/orchestrator/blob/master/docs/raft-vs-sync-repl.md">orchestrator/raft vs. shared backend DB setup, comparison</a></li>
+</ul>
+<p>The <code>orchetrator/raft</code> setup comes to solve several issues, the most obvious is high availability for the <code>orchestrator</code> service: in a <code>3</code> node setup any single <code>orchestrator</code> node can go down and <code>orchestrator</code> will reliably continue probing, detecting failures and recovering from failures.</p>
+<ul>
+<li>See all <a href="https://github.com/github/orchestrator/blob/master/docs/high-availability.md">orchestrator high availability solutions</a></li>
+</ul>
+<p>Another issue solve by <code>orchestrator/raft</code> is network isolation, in particularly cross-DC, also refered to as <em>fencing</em>. Some visualization will help describe the issue.</p>
+<p>Consider this 3 data-center replication setup. The master, along with a few replicas, resides on <strong>DC1</strong>. Two additional DCs have intermediate masters, aka local-masters, that relay replication to local replicas.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1.png"><img class="alignnone wp-image-7752 size-medium" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1-300x252.png" alt="" width="300" height="252" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1-300x252.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>We place <code>3 orchestrator</code> nodes in a <code>raft</code> setup, each in a different DC. Note that traffic between <code>orchestrator</code> nodes is very low, and cross DC latencies still conveniently support the <code>raft</code> communication. Also note that backend DB writes have nothing to do with cross-DC traffic and are unaffected by latencies.</p>
+<p>Consider what happens if DC1 gets network isolated: no traffic in or out DC1</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated.png"><img class="alignnone size-medium wp-image-7755" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-300x249.png" alt="" width="300" height="249" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-300x249.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>Each <code>orchestrator</code> nodes operates independently, and each will see a different state. DC1&#8217;s <code>orchestrator</code> will see all servers in DC2, DC3 as dead, but figure the master itself is fine, along with its local DC1 replicas:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view.png"><img class="alignnone size-medium wp-image-7756" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view-300x248.png" alt="" width="300" height="248" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view-300x248.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>However both <code>orchestrator</code> nodes in DC2 and DC3 will see a different picture: they will see all DC1&#8217;s servers as dead, with local masters in DC2 and DC3 having broken replication:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view.png"><img class="alignnone size-medium wp-image-7757" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view-300x255.png" alt="" width="300" height="255" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view-300x255.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>Who gets to choose?</p>
+<p>In the <code>orchestrator/raft</code> setup, only the leader runs failovers. The leader must be part of a quorum. Hence the leader will be an <code>orchestrator</code> node in either DC2 or DC3. DC1&#8217;s <code>orchestrator</code> will <em>know</em> it is isolated, that it isn&#8217;t part of the quorum, hence will step down from leadership (that&#8217;s the premise of the <code>raft</code> consensus protocol), hence will not run recoveries.</p>
+<p>There will be no split brain in this scenario. The <code>orchestrator</code> leader, be it in DC2 or DC3, will act to recover and promote a master from within DC2 or DC3. A possible outcome would be:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered.png"><img class="alignnone size-medium wp-image-7758" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered-300x259.png" alt="" width="300" height="259" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered-300x259.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered.png 680w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>What if you only have 2 data centers?</p>
+<p>In such case it is advisable to put two <code>orchestrator</code> nodes, one in each of your DCs, and a <em>third</em> <code>orchestrator</code> node as a mediator, in a 3rd DC, or in a different availability zone. A cloud offering should do well:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator.png"><img class="alignnone size-medium wp-image-7759" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator-300x254.png" alt="" width="300" height="254" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator-300x254.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator.png 688w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>The <code>orchestrator/raft</code> setup plays nice and allows one to <a href="https://github.com/openark/raft/pull/1">nominate</a> a preferred leader.</p>
+<h3>SQLite</h3>
+<p>Suggested and requested by many, is to remove <code>orchestrator</code>&#8216;s own dependency on a MySQL backend. <code>orchestrator</code> now supports a SQLite backend.</p>
+<p><code>SQLite</code> is a transactional, relational, embedded database, and as of <code>3.0</code> it is embedded within <code>orchestrator</code>, no external dependency required.</p>
+<p><code>SQLite</code> doesn&#8217;t replicate, doesn&#8217;t support client/server protocol. As such, it cannot work as a shared database backend. <code>SQLite</code> is only available on:</p>
+<ul>
+<li>A single node setup: good for local dev installations, testing server, CI servers (indeed, <code>SQLite</code> now runs in <code>orchestrator</code>&#8216;s CI)</li>
+<li><code>orchestrator/raft</code> setup, where, as noted above, backend DBs do not communicate with each other in the first place and are each dedicated to their own <code>orchestrator</code> node.</li>
+</ul>
+<p>It should be pointed out that <code>SQLite</code> is a great transactional database, however <code>MySQL</code> is more performant. Load on backend DB is directly (and mostly linearly) affected by the number of probed servers. If you have <code>50</code> servers in your topologies or <code>500</code> servers, that matters. The probing frequency of course also matters for the write frequency on your backend DB. I would suggest if you have thousands of backend servers, to stick with <code>MySQL</code>. If dozens, <code>SQLite</code> should be good to go. In between is a gray zone, and at any case run your own experiments.</p>
+<p>At this time <code>SQLite</code> is configured to commit to file; there is a different setup where <code>SQLite</code> places data in-memory, which makes it faster to execute. Occasional dumps required for durability. <code>orchestrator</code> may support this mode in the future.</p>
+<h3>orchestrator-client</h3>
+<p>You install <code>orchestrator</code> as a service on a few boxes; but then how do you access it from other hosts?</p>
+<ul>
+<li>Either <code>curl</code> the <code>orchestrator</code> API</li>
+<li>Or, as most do, install <code>orchestrator-cli</code> package, which includes the <code>orchestrator</code> binary, everywhere.</li>
+</ul>
+<p>The latter implies:</p>
+<ul>
+<li>Having the <code>orchestrator</code> binary installed everywhere, hence updated everywhere.</li>
+<li>Having the <code>/etc/orchestrator.conf.json</code>deployed everywhere, along with credentials.</li>
+</ul>
+<p>The <code>orchestrator/raft</code> setup does not support running <code>orchestrator</code> in command-line mode. Reason: in this mode <code>orchestrator</code> talks directly to the shared backend DB. There is no shared backend DB in the <code>orchestrator/raft</code> setup, and all communication must go through the leader service. This is a change of paradigm.</p>
+<p>So, back to <code>curl</code>ing the HTTP API. Enter <a href="https://github.com/github/orchestrator/blob/master/docs/orchestrator-client.md"><strong>orchestrator-client</strong></a> which mimics the command line interface, while running <code>curl | jq</code> requests against the HTTP API. <code>orchestrator-client</code>, however, is just a shell script.</p>
+<p><code>orchestrator-client</code> will work well on either <code>orchestrator/raft</code> or on your existing non-raft setups. If you like, you may replace your remote <code>orchestrator</code> installations and your <code>/etc/orchestrator.conf.json</code> deployments with this script. You will need to provide the script with a hint: the <code>$ORCHESTRATOR_API</code> environment variable should be set to point to the <code>orchestrator</code> HTTP API.</p>
+<p>Here&#8217;s the fun part:</p>
+<ul>
+<li>You will either have a proxy on top of your <code>orchestrator</code> service cluster, and you would <code>export ORCHESTRATOR_API=http://my.orchestrator.service/api</code></li>
+<li>Or you will provide <code>orchestrator-client</code> with all <code>orchestrator</code> node identities, as in <code>export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"</code> .<br />
+<code>orchestrator-client</code> will <strong>figure the identity of the leader</strong> and will forward requests to the leader. At least scripting-wise, you will not require a proxy.</li>
+</ul>
+<h3>Status</h3>
+<p><code>orchestrator 3.0</code> is a <strong>Pre-Release</strong>. We are running a mostly-passive <code>orchestrator/raft</code> setup in production. It is mostly-passive in that it is not in charge of failovers yet. Otherwise it probes and analyzes our topologies, as well as runs failure detection. We will continue to improve operational aspects of the <code>orchestrator/raft</code> setup (see <a href="https://github.com/github/orchestrator/issues/246">this issue</a>).</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7740</post-id>	</item>
+		<item>
+		<title>State of automated recovery via Pseudo-GTID &#038; Orchestrator @ Booking.com</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com#respond</comments>
+				<pubDate>Fri, 20 Nov 2015 09:41:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7453</guid>
+				<description><![CDATA[This post sums up some of my work on MySQL resilience and high availability at Booking.com by presenting the current state of automated master and intermediate master recoveries via Pseudo-GTID &#38; Orchestrator. Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post sums up some of my work on MySQL resilience and high availability at <a href="http://www.booking.com">Booking.com</a> by presenting the current state of automated master and intermediate master recoveries via <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo-GTID</a> &amp; <strong><a href="https://github.com/outbrain/orchestrator">Orchestrator</a></strong>.</p>
+<p>Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, OLAP, GTID (few), no GTID (most), Binlog Servers, filters, hybrid of all the above.</p>
+<p>Topologies size varies from a single server to many-many-many. Our typical topology has a master in one datacenter, a bunch of slaves in same DC, a slave in another DC acting as an intermediate master to further bunch of slaves in the other DC. Something like this, give or take:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample.png"><img class="alignnone wp-image-7480 size-medium" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-300x169.png" alt="booking-topology-sample" width="300" height="169" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-300x169.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-1024x576.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-900x506.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample.png 1600w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>However as we are building our third data center (with MySQL deployments mostly completed) the graph turns more complex.</p>
+<p>Two high availability questions are:</p>
+<ul>
+<li>What happens when an intermediate master dies? What of all its slaves?</li>
+<li>What happens when the master dies? What of the entire topology?</li>
+</ul>
+<p>This is not a technical drill down into the solution, but rather on overview of the state. For more, please refer to recent presentations in <a href="https://speakerdeck.com/shlominoach/managing-and-visualizing-your-replication-topologies-with-orchestrator">September</a> and <a href="https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management">April</a>.</p>
+<p>At this time we have:</p>
+<ul>
+<li>Pseudo-GTID deployed on all chains
+<ul>
+<li>Injected every 5 seconds</li>
+<li>Using the <a href="https://shlomi-noach.github.io/blog/mysql/pseudo-gtid-ascending">monotonically ascending</a> variation</li>
+</ul>
+</li>
+<li>Pseudo-GTID based automated failover for intermediate masters on all chains</li>
+<li>Pseudo-GTID based automated failover for masters on roughly 30% of the chains.
+<ul>
+<li>The rest of 70% of chains are set for manual failover using Pseudo-GTID.</li>
+</ul>
+</li>
+</ul>
+<p>Pseudo-GTID is in particular used for:</p>
+<ul>
+<li>Salvaging slaves of a dead intermediate master</li>
+<li>Correctly grouping and connecting slaves of a dead master</li>
+<li>Routine refactoring of topologies. This includes:
+<ul>
+<li>Manual repointing of slaves for various operations (e.g. offloading slaves from a busy box)</li>
+<li>Automated refactoring (for example, used by our automated upgrading script, which consults with <em>orchestrator</em>, upgrades, shuffles slaves around, updates intermediate master, suffles back&#8230;)</li>
+</ul>
+</li>
+<li>(In the works), failing over binlog reader apps that audit our binary logs.</li>
+</ul>
+<p><span id="more-7453"></span>Furthermore, Booking.com is also <a href="https://www.percona.com/live/europe-amsterdam-2015/sessions/binlog-servers-bookingcom">working on Binlog Servers</a>:</p>
+<ul>
+<li>These take production traffic and offload masters and intermediate masters</li>
+<li>Often co-serve slaves using round-robin VIP, such that failure of one Binlog Server makes for simple slave replication self-recovery.</li>
+<li>Are interleaved alongside standard replication
+<ul>
+<li>At this time we have no &#8220;pure&#8221; Binlog Server topology in production; we always have normal intermediate masters and slaves</li>
+</ul>
+</li>
+<li>This hybrid state makes for greater complexity:
+<ul>
+<li>Binlog Servers are not designed to participate in a game of changing masters/intermediate master, unless <a href="http://jfg-mysql.blogspot.nl/2015/09/abstracting-binlog-servers-and-mysql-master-promotion-wo-reconfiguring-slaves.html">successors come from their own sub-topology</a>, which is not the case today.
+<ul>
+<li>For example, a Binlog Server that replicates directly from the master, cannot be repointed to just any new master.</li>
+<li>But can still hold valuable binary log entries that other slaves may not.</li>
+</ul>
+</li>
+<li>Are not actual MySQL servers, therefore of course cannot be promoted as masters</li>
+</ul>
+</li>
+</ul>
+<p><em>Orchestrator</em> &amp; Pseudo-GTID makes this hybrid topology still resilient:</p>
+<ul>
+<li><em>Orchestrator</em> understands the limitations on the hybrid topology and can salvage slaves of 1st tier Binlog Servers via Pseudo-GTID</li>
+<li>In the case where the Binlog Servers were the most up to date slaves of a failed master, <em>orchestrator</em> knows to first move potential candidates under the Binlog Server and then extract them out again.</li>
+<li>At this time Binlog Servers are still unstable. Pseudo-GTID allows us to comfortably test them on a large setup with reduced fear of losing slaves.</li>
+</ul>
+<p>Otherwise <em>orchestrator</em> already understands pure Binlog Server topologies and can do master promotion. When pure binlog servers topologies will be in production <em>orchestrator</em> will be there to watch over.</p>
+<h3>Summary</h3>
+<p>To date, Pseudo-GTID has high scores in automated failovers of our topologies; <em>orchestrator&#8217;s</em> <a href="https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case">holistic approach</a> makes for reliable diagnostics; together they reduce our dependency on specific servers &amp; hardware, physical location, latency implied by SAN devices.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7453</post-id>	</item>
+		<item>
+		<title>Orchestrator &#038; Pseudo-GTID for binlog reader failover</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover#respond</comments>
+				<pubDate>Thu, 19 Nov 2015 08:52:16 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7446</guid>
+				<description><![CDATA[One of our internal apps at Booking.com audits changes to our tables on various clusters. We used to use tungsten replicator, but have since migrated onto our own solution. We have a binlog reader (uses open-replicator) running on a slave. It expects Row Based Replication, hence our slave runs with log-slave-updates, binlog-format=&#8217;ROW&#8217;, to translate from the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>One of our internal apps at <strong>Booking.com</strong> audits changes to our tables on various clusters. We used to use <em>tungsten replicator</em>, but have since migrated onto our own solution.</p>
+<p>We have a binlog reader (uses <a href="https://github.com/zendesk/open-replicator">open-replicator</a>) running on a slave. It expects Row Based Replication, hence our slave runs with <strong>log-slave-updates</strong>, <strong>binlog-format=&#8217;ROW&#8217;</strong>, to translate from the master&#8217;s Statement Based Replication. The binlog reader reads what it needs to read, audits what it needs to audit, and we&#8217;re happy.</p>
+<h3>However what happens if that slave dies?</h3>
+<p>In such case we need to be able to point our binlog reader to another slave, and it needs to be able to pick up auditing from the same point.</p>
+<p>This sounds an awful lot like slave repointing in case of master/intermediate master failure, and indeed the solutions are similar. However our binlog reader is not a real MySQL server and does not understands replication. It does not really replicate, it just parses binary logs.</p>
+<p>We&#8217;re also not using GTID. But we <em>are</em> using Pseudo-GTID. As it turns out, the failover solution is already built in by <a href="https://github.com/outbrain/orchestrator">orchestrator</a>, and this is how it goes:</p>
+<h3>Normal execution</h3>
+<p>Our binlog app reads entries from the binary log. Some are of interest for auditing purposes, some are not. An occasional Pseudo-GTID entry is found, and is being stored to ZooKeeper tagged as  &#8220;last seen and processed Pseudo-GTID&#8221;.</p>
+<h3>Upon slave failure</h3>
+<p>We recognize the death of a slave; we have other slaves in the pool; we pick another. Now we need to find the coordinates from which to carry on.</p>
+<p>We read our &#8220;last seen and processed Pseudo-GTID&#8221;. Say it reads:</p>
+<blockquote>
+<pre>drop view if exists `meta`.`_pseudo_gtid_hint__asc:56373F17:00000000012B1C8B:50EC77A1`</pre>
+</blockquote>
+<p>. We now issue:</p>
+<blockquote>
+<pre>$ orchestrator <strong>-c find-binlog-entry</strong> <strong>-i new.slave.fqdn.com</strong> --pattern='drop view if exists `meta`.`_pseudo_gtid_hint__asc:56373F17:00000000012B1C8B:50EC77A1`'</pre>
+</blockquote>
+<p>The output of such command are the binlog coordinates of that same entry as found in the new slave&#8217;s binlogs:</p>
+<blockquote>
+<pre>binlog.000148:43664433</pre>
+</blockquote>
+<p>Pseudo-GTID entries are only injected once every few seconds (<strong>5</strong> in our case). Either:<span id="more-7446"></span></p>
+<ul>
+<li>We are OK to reprocess up to <strong>5</strong> seconds worth of data (and indeed we are, our mechanism is such that this merely overwrites our previous audit, no corruption happens)</li>
+<li>Or our binlog reader also keeps track of the number of events since the last processed Pseudo-GTID entry, skipping the same amount of events after failing over.</li>
+</ul>
+<h3>Planned failover</h3>
+<p>In case we plan to repoint our binlog reader to another slave, we can further use orchestrator&#8217;s power in making an exact correlation between the binlog positions of two slaves. This has always been within its power, but only recently exposed as it own command. We can, at any stage:</p>
+<blockquote>
+<pre>$ sudo orchestrator <strong>-c correlate-binlog-pos</strong> -i current.instance.fqdn.com --binlog=binlog.002011:72656109 -d some.other.instance.fqdn.com</pre>
+</blockquote>
+<p>The output is the binlog coordinates in <strong>some.other.instance.fqdn.com</strong> that exactly correlate with <strong>binlog.002011:72656109</strong> in <strong>current.instance.fqdn.com</strong></p>
+<p>The case of failure of the binlog reader itself is also handled, but is not the subject of this blog post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7446</post-id>	</item>
+		<item>
+		<title>Thoughts on MaxScale automated failover (and Orchestrator)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comments</comments>
+				<pubDate>Wed, 18 Nov 2015 09:17:48 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[MaxScale]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7439</guid>
+				<description><![CDATA[Having attended a talk (as part of the MariaDB Developer Meeting in Amsterdam) about recent developments of MaxScale in executing automated failovers, here are some (late) observations of mine. I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Having attended a talk (as part of the <a href="https://blog.mariadb.org/2015-developers-meeting-amsterdam/">MariaDB Developer Meeting in Amsterdam</a>) about recent developments of <a href="https://mariadb.com/products/mariadb-maxscale">MaxScale</a> in executing automated failovers, here are some (late) observations of mine.</p>
+<p>I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food for thought, points for action and otherwise recommendations.</p>
+<p>Some functionality of the MaxScale failover is also implemented by <strong><a href="https://github.com/outbrain/orchestrator">orchestrator</a></strong>, which I author. <em>Orchestrator</em> was built in production environments by and for operational people. In this respect it has gained many insights and had to cope with many real-world cases, special cases &amp; Murphy&#8217;s law cases. This post compares logic, feature set and capabilities of the two where relevant. To some extent the below will read as &#8220;hey, I&#8217;ve already implemented this; shame to re-implement the same&#8221;, and indeed I think that way; but it wouldn&#8217;t be the first time a code of mine would just be re-implemented by someone else and I&#8217;ve done the same, myself.</p>
+<p>I&#8217;m describing the solution the way I understood it from the talk. If I&#8217;m wrong on any account I&#8217;m happy to be corrected via comments below. <strong>Edit:</strong> <em>please see comment by</em> <a class="url" href="http://www.mariadb.com/" rel="external nofollow">Dipti Joshi</a></p>
+<h3>General overview</h3>
+<p>The idea is that MaxScale operates as a proxy to your topology. You do not connect to your master directly, but rather through MaxScale. Thus, MaxScale acts as a proxy to your master.</p>
+<p>The next phase is that MaxScale would also auto-detect master failure, fix the topology for you, promote a new master, and will have your application unaware of all the complexity and without the app having to change setup/DNS/whatever. Of course some write downtime is implied.</p>
+<p>Now for some breakdown.</p>
+<h3>Detection</h3>
+<p>The detection of a dead master, the check by which a failover is initiated, is based on MaxScale not being able to query the master. This calls for some points for consideration:</p>
+<ul>
+<li>Typically, I would see &#8220;I can&#8217;t connect to the master therefore failover&#8221; as too hysterical, and the basis for a lot of false positives.</li>
+<li>However, since in the discussed configuration MaxScale is <em>the only access point</em> to the master, the fact MaxScale cannot connect to the master means the master is inaccessible <em>de-facto</em>.</li>
+<li>In light of the above, the decision makes sense &#8211; but I still hold that it would make false positives.</li>
+<li>I&#8217;m unsure (I <em>think</em> not; can anyone comment?) if MaxScale would make multiple attempts over time and only reach the conclusion after X successive failures. This would reduce the false positives.</li>
+<li>I&#8217;m having a growing dislike to a &#8220;check for 4 successive times then alert/failover&#8221; Nagios-style behavior. <em>Orchestrator</em> takes a different approach where it recognizes a master&#8217;s death by not being able to connect to the master <em>as well as</em> being able to connect to 1st tier slaves, check their status and observe that <em>they&#8217;re unable to connect to the master as well</em>. See <a title="Permanent Link to What makes a MySQL server failure/recovery case?" href="https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case" rel="bookmark">What makes a MySQL server failure/recovery case?</a>. This approach still calls for further refinement (what if the master is temporarily deadlocked? Is this a failover or not?).</li>
+</ul>
+<p><span id="more-7439"></span></p>
+<h3>Assumed topology</h3>
+<p>MaxScale assumes the topology is all MariaDB, and all slaves are using (MariaDB) GTID replication. Well, MaxScale does not actually assumes that. It is assumed so by the <a href="https://github.com/mariadb-corporation/replication-manager">MariaDB Replication Manager</a> which MaxScale invokes. But I&#8217;m getting ahead of myself here.</p>
+<h3>Topology detection</h3>
+<p>MaxScale does not recognize the master by configuration but rather by state. It observes the servers it should observe, and concludes which is the master.</p>
+<p>I&#8217;m using similar approach in <em>orchestrator</em>. I maintain that this approach works well and opens the Chakras for complex recovery options.</p>
+<h3>Upon failure detection</h3>
+<p>When MaxScale detects failure, it invokes external scripts to fix the problem. There are some similar and different particulars here as compared to <em>orchestrator</em>, and I will explain what&#8217;s wrong with the MaxScale approach:</p>
+<ul>
+<li>Although MaxScale observes the topology and understands who is the master and who isn&#8217;t, the executed scripts do not. They need to re-discover everything by themselves.</li>
+<li>This implies the scripts start without memory of &#8220;what was last observed&#8221;. This is one of the greatest strengths of <em>orchestrator</em>: it knows what the state was just before the failure, and, having the bigger picture, can make informed decisions.
+<ul>
+<li>As a nasty example, what do you do when some the first tier slaves also happen to be inaccessible at that time? What if one of those happens to further have slaves of its own?</li>
+</ul>
+</li>
+<li>The MariaDB Replication Manager script (to be referenced as <em>repmgr</em>) assumes all instances to be MariaDB with GTID.
+<ul>
+<li>It is also implied that all my slaves are configured with binary logs &amp; log-slave-updates</li>
+<li>That&#8217;s <strong>way too restrictive</strong>.
+<ul>
+<li><em>Orchestrator</em> handles all following topologies: Oracle MySQL with/out GTID, MariaDB with/out GTID, MariaDB hybrid GTID &amp; non-GTID replication, Pseudo-GTID (MySQL and/or MariaDB), hybrid normal &amp; binlog servers topologies, slaves with/out log-slave-updates, hybrid Oracle &amp; MariaDB &amp; Binlog Servers &amp; Pseudo-GTID.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><em>repmgr</em> is unaware of data centers &amp; physical environments. You want failover to be as local to your datacenters as possible. Avoid too many cross-DC replication streams.</li>
+</ul>
+<h3>Failover invocation</h3>
+<p>MaxScale invokes the failover scripts <em>asynchronously</em>. This is a major flaw imho, as the decoupling between the monitoring and acting processes leads to further problems, see further.</p>
+<h3>After failover</h3>
+<p>MaxScale continuously scans the topology and observes that some other server has been promoted. This behavior is similar to <em>orchestrator&#8217;s</em>. But the following differences are noteworthy:</p>
+<ul>
+<li>Because of both the decoupling as well as the asynchronous invocation by MaxScale, it doesn&#8217;t really have any idea if and how the promotion resolved.</li>
+<li>I don&#8217;t know that there&#8217;s any anti-flapping mechanism, nor that there could be. If MaxScale doesn&#8217;t care what happened to the failover script, it shouldn&#8217;t be able to keep up with flapping scenarios.</li>
+<li>Nor is there a minimal suspend period between any two failure recoveries, that I know of. MaxScale can actually have easier life than <em>orchestrator</em> in this regard as it is (I suspect) strictly associated with <em>a topology</em>. Not like there&#8217;s a single MaxScale handling multiple topologies. So it should be very easy to keep track of failures.</li>
+<li>Or, if there is a minimal period and I&#8217;m just uninformed &#8212; what makes sure it is not smaller than the time it takes for the failover?</li>
+</ul>
+<h3>Further on failover</h3>
+<p>I wish to point out that one component of the system analyses a failure scenario, and another one fixes it. I suggest this is an undesired design. The &#8220;fixer&#8221; must have its own ability to diagnose problems as it makes progress (or else it is naive and would fail in many production cases). And the &#8220;analyzer&#8221; part must have some wisdom of its own so as to suggest course of action; or understand the consequences of the recovery done by the &#8220;fixer&#8221;.</p>
+<h3>Use of shell scripts</h3>
+<p>Generally speaking, the use of shell scripts as external hooks is evil:</p>
+<ul>
+<li>Shell scripts tend to be poorly audited</li>
+<li>With poor clarity as for what went wrong</li>
+<li>Killing them has operational difficulty (detect the shell script, find possible children, detached children)</li>
+<li>The approach of &#8220;if you want something else, just write a shell script for it&#8221; is nice for some things, but as the problem turns complex, you turn out to just write big parts of the solution in shell. This decouples your code to unwanted degree.</li>
+</ul>
+<p>At this time, <em>orchestrator</em> also uses external hooks. However:</p>
+<ul>
+<li>Fixing the topology happens within <em>orchestrator</em>, not by external scripts. There is an elaborate, auditable, visible decision making.
+<ul>
+<li>Decision making includes data center considerations, different configuration of servers involved, servers hinted as candidates, servers configured to be ignored, servers known to be downtimed.</li>
+</ul>
+</li>
+<li>Leaving the external scripts with the task of managing DNS changes or what have you.
+<ul>
+<li>Today, at Booking.com, we have a special operational tool (called the dba tool) which does that, manages rosters, issues puppet etc. This tool is itself well audited. Granted, there is still decoupling, but information does not just get lost.</li>
+<li>Sometime in the future I suspect I will extend <strong><a href="https://github.com/outbrain/orchestrator-agent">orchestrator-agent</a></strong> to participate in failovers, which means the entire flow is within <em>orchestrator&#8217;s</em> scope.</li>
+</ul>
+</li>
+</ul>
+<h3>High availability</h3>
+<p>All the above is only available via a single MaxScale server. What happens if it dies?</p>
+<p>There is a MaxScale/pacemaker setup I&#8217;m aware of. If one MaxScale dies, pacemaker takes charge and starts another on another box.</p>
+<ul>
+<li>But this means real downtime</li>
+<li>There are no multiple-MaxScale servers to load-balance on</li>
+<li>The MaxScale started by pacemaker is newly born, and does not have the big picture of the topology. It needs to go through a &#8220;peaceful time&#8221; to understand what&#8217;s going on.</li>
+</ul>
+<h3>More High Availability</h3>
+<p>At a time where MaxScale will be able to load-balance and run on multiple nodes, MariaDB will have to further tackle:</p>
+<ul>
+<li>Leader election</li>
+<li>Avoiding concurrent initiation of failovers
+<ul>
+<li>Either via group communication</li>
+<li>Or via shared datastore</li>
+</ul>
+</li>
+<li>Taking off from a failed/crashed MaxScale server&#8217;s work
+<ul>
+<li>Or rolling it back</li>
+<li>Or just cleaning it up</li>
+</ul>
+</li>
+<li>And generally share all those little pieces of information, such as &#8220;Hey, now this server is the master&#8221; (are all MaxScales in complete agreement on the topology?) or &#8220;I have failed over this topology, we should avoid failing it over again for the next 10 minutes&#8221; and more.</li>
+</ul>
+<p>The above are supported by <em>orchestrator</em>. It provides leader election, automated leader promotion, fair recognition of various failure scenarios, picking up a failed recovery from a failed <em>orchestrator</em>. Data is shared by a backend MySQL datastore, and before you shout <em>SPOF</em>, make it Galera/NDB.</p>
+<h3>Further little things that can ruin your day</h3>
+<h4>How about having a delayed replica?</h4>
+<p>Here&#8217;s an operational use case we had to tackle.</p>
+<ul>
+<li>You have a slave configured to lag by <strong>24</strong> hours. You know the drill: hackers / accidental <strong>DROP TABLE</strong>&#8230;</li>
+<li>How much time will an automated tool spend on reconnecting this slave to the topology?
+<ul>
+<li>This could take long minutes</li>
+<li>Will your recovery hang till this is resolved?</li>
+</ul>
+</li>
+<li>Since <em>orchestrator</em> heals the topology in-house, it knows how to push certain operations till after specific other operations took place. For example, <em>orchestrator</em> wants to heal the entire topology, but pushes the delayed replicas aside, under the assumption that it will be able to fix them later (fair assumption, because they are known to be behind our promoted master); it will proceed to fix everything else, execute external hooks (change DNS etc.) and only then come back to the delayed replica. All the while, the process is audited.</li>
+</ul>
+<h4>Flapping ruins your day</h4>
+<ul>
+<li>Not only do you want some stall period between two failovers, you also want your team to respond to a failover and acknowledge it. Or clear up the stall period having verified the source of the problem. Or force the next failover even if it comes sooner than the stall period termination.</li>
+</ul>
+<h4>Binlog formats</h4>
+<p>It is still not uncommon to have Statement Based Replication running. And then it is also not uncommon to have one or two slaves translating to Row Based Replication because of:</p>
+<ul>
+<li>Some app that has to read ROW based format</li>
+<li>Experimenting with RBR for purposes of upgrade</li>
+</ul>
+<p>You just can&#8217;t promote such a RBR slave on top of SBR slaves; it wouldn&#8217;t work. <em>Orchestrator</em> is aware of such rules. I still need to integrate this particular consideration into the promotion algorithm.</p>
+<h4>Versions</h4>
+<p>Likewise, not all your slaves are of same version. You should not promote a newer version slave on top of an older version slave. Again, <em>orchestrator</em> will not allow putting such a topology, and again, I still need to integrate this consideration into the promotion algorithm.</p>
+<h3>In summary</h3>
+<p>There is a long way for MaxScale failover to go. When you consider the simplest, all-MariaDB-GTID-equal-slaves small topology case, things are kept simple and probably sustainable. But issues like complex topologies, flapping, special slaves, different configuration, high availability, leadership, acknowledgements, and more, call for a more advanced solution.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7439</post-id>	</item>
+		<item>
+		<title>What makes a MySQL server failure/recovery case?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case#comments</comments>
+				<pubDate>Sat, 25 Jul 2015 07:00:03 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7274</guid>
+				<description><![CDATA[Or: How do you reach the conclusion your MySQL master/intermediate-master is dead and must be recovered? This is an attempt at making a holistic diagnosis of our replication topologies. The aim is to cover obvious and not-so-obvious crash scenarios, and to be able to act accordingly and heal the topology. At Booking.com we are dealing with [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Or: How do you reach the conclusion your MySQL master/intermediate-master is dead and must be recovered?</p>
+<p>This is an attempt at making a holistic diagnosis of our replication topologies. The aim is to cover obvious and not-so-obvious crash scenarios, and to be able to act accordingly and heal the topology.</p>
+<p>At <strong>Booking.com</strong> we are dealing with very large amounts of MySQL servers. We have many topologies, and many servers in each topology. <a href="https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management">See past numbers</a> to get a feel for it. At these numbers failures happen frequently. Typically we would see normal slaves failing, but occasionally &#8212; and far more frequently than we would like to be paged for &#8212; an intermediate master or a master would crash. But our current (and ever in transition) setup also include SANs, DNS records, VIPs, any of which can fail and bring down our topologies.</p>
+<p>Tackling issues of monitoring, disaster analysis and recovery processes, I feel safe to claim the following statements:</p>
+<ul>
+<li>The fact your monitoring tool cannot access your database does not mean your database has failed.</li>
+<li>The fact your monitoring tool can access your database does not mean your database is available.</li>
+<li>The fact your database master is unwell does not mean you should fail over.</li>
+<li>The fact your database master is alive and well does not mean you should not fail over.</li>
+</ul>
+<p>Bummer. Let&#8217;s review a simplified topology with a few failure scenarios. Some of these scenarios you will find familiar. Some others may be caused by setups you&#8217;re not using. I would love to say <em>I&#8217;ve seen it all</em> but the more I see the more I know how strange things can become.<span id="more-7274"></span></p>
+<p>We will consider the simplified case of a master with three replicas: we have <strong>M</strong> as master, <strong>A</strong>, <strong>B</strong>, <strong>C</strong> as slaves.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures.png"><img class="alignnone size-full wp-image-7280" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures.png" alt="mysql-topologies-failures" width="192" height="108" /></a></p></blockquote>
+<p>&nbsp;</p>
+<p>A common monitoring scheme is to monitor each machine&#8217;s IP, availability of MySQL port (<strong>3306</strong>) and responsiveness to some simple query (e.g. <strong>&#8220;SELECT 1&#8221;</strong>). Some of these checks may run local to the machine, others remote.</p>
+<p>Now consider your monitoring tool fails to connect to your master.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-1.png"><img class="alignnone size-full wp-image-7281" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-1.png" alt="mysql-topologies-failures (1)" width="192" height="108" /></a></p></blockquote>
+<p>I&#8217;ve marked the slaves with question marks as the common monitoring schema does not associate the master&#8217;s monitoring result to the slaves&#8217;.  Can you safely conclude your master is dead? Are your feeling comfortable with initiating a failover process? How about:</p>
+<ul>
+<li>Temporary network partitioning; it just so happens that your monitoring tool cannot access the master, though everyone else can.</li>
+<li>DNS/VIP/name cache/name resolving issue. Sometimes similar to the above; does you monitoring tool host think the master&#8217;s IP is what it really is? Has something just changed? Some cache expired? Some cache is stale?</li>
+<li>MySQL connection rejection. This could be due to a serious &#8220;Too many connections&#8221; problem on the master, or due to accidental network noise.</li>
+</ul>
+<p>Now consider the following case: a first tier slave is failing to connect to the master:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-2.png"><img class="alignnone size-full wp-image-7282" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-2.png" alt="mysql-topologies-failures (2)" width="192" height="108" /></a></p></blockquote>
+<p>The slave&#8217;s IO thread is broken; do we have a problem here? Is the slave failing to connect because the master is dead, or because the slave itself suffers from a network partitioning glitch?</p>
+<h3>A holistic diagnosis</h3>
+<p>In the holistic approach we couple the master&#8217;s monitoring with that of its direct slaves. Before I continue to describe some logic, the previous statement is something we must reflect upon.</p>
+<p>We should associate the master&#8217;s state with that of its direct slaves. Hence we must know which are its direct slaves. We might have slaves D, E, F, G replicating from B, C. They are not in our story. But slaves come and go. Get provisioned and de-provisioned. They get repointed elsewhere. Our monitoring needs to be aware of the <em>state</em> of our replication topology.</p>
+<p>My preferred tool for the job is <a href="https://github.com/outbrain/orchestrator/">orchestrator</a>, since I author it. It is not a standard monitoring tool and does not serve metrics; but it observes your topologies and records them. And notes changes. And acts as a higher level failure detection mechanism which incorporates the logic described below.</p>
+<p>We continue our discussion under the assumption we are able to reliably claim we know our replication topology. Let&#8217;s revisit our scenarios from above and then add some.</p>
+<p>We will further only require MySQL client protocol connection to our database servers.</p>
+<h3>Dead master</h3>
+<p>A &#8220;real&#8221; dead master is perhaps the clearest failure. MySQL has crashed (signal 11); or the kernel panicked; or the disks failed; or power went off. The server is <em>really not serving</em>. This is observed as:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-3.png"><img class="alignnone size-full wp-image-7284" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-3.png" alt="mysql-topologies-failures (3)" width="192" height="108" /></a></p></blockquote>
+<p>In the holistic approach, we observe that:</p>
+<ul>
+<li>We cannot reach the master (our MySQL client connection fails).</li>
+<li>But we are able to connect to the slaves A, B, C</li>
+<li>And A, B, C <em>are all telling us</em> they cannot connect to the master</li>
+</ul>
+<p>We have now cross referenced the death of the master with its three slaves. Funny thing is the MySQL server on the master may still be up and running. Perhaps the master is suffering from some weird network partitioning problem (when I say &#8220;weird&#8221;, I mean we have it; discussed further below). And <em>perhaps</em> some application is actually still able to talk to the master!</p>
+<p>And yet our entire replication topology is broken. Replication is not there for beauty; it serves our application code. And it&#8217;s turning stale. Even if by some chance things are still operating on the master, this still makes for a valid failover scenario.</p>
+<h3>Unreachable master</h3>
+<p>Compare the above with:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-4.png"><img class="alignnone size-full wp-image-7285" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-4.png" alt="mysql-topologies-failures (4)" width="192" height="108" /></a></p></blockquote>
+<p>Our monitoring scheme cannot reach our master. But it can reach the slaves, an they&#8217;re all saying: <em>&#8220;I&#8217;m happy!&#8221;</em></p>
+<p>This gives us suspicion enough to avoid failing over. We may not actually have a problem: it&#8217;s just <em>us</em> that are unable to connect to the master.</p>
+<p><em>Right?</em></p>
+<p>There are still interesting use cases. Consider the problem of <strong>&#8220;Too many connections&#8221;</strong> on the master. You are unable to connect; the application starts throwing errors; but the slaves are happy. They were there first. They started replicating at the dawn of time, long before there was an issue. Their persistent connections are good to go.</p>
+<p>Or the master may suffer a deadlock. A long, blocking <strong>ALTER TABLE</strong>. An accidental <strong>FLUSH TABLES WITH READ LOCK</strong>. Or whatever occasional bug we hit. Slaves are still connected; but new connections are hanging; and your monitoring query is unable to process.</p>
+<p>And still our holistic approach can find that out: as we are able to connect to our slaves, we are also able to ask them: well what have your relay logs have to say about this? Are we progressing in replication position? Do we actually find application content in the slaves&#8217; relay logs? We can do all this via MySQL protocol (<strong>&#8220;SHOW SLAVE STATUS&#8221;</strong>, <strong>&#8220;SHOW RELAYLOG EVENTS&#8221;</strong>).</p>
+<p>Understanding the topology gives you greater insight into your failure case; you have increasing leevels of confidentiality in your analysis. Strike that: in your <em>automated</em> analysis.</p>
+<h3>Dead master and slaves</h3>
+<p>They&#8217;re all <em>gone</em>!</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-5.png"><img class="alignnone size-full wp-image-7287" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-5.png" alt="mysql-topologies-failures (5)" width="192" height="108" /></a></p></blockquote>
+<p>You cannot reach the master <em>and</em> you cannot reach any of its slaves. Once you are able to associate your master and slaves you can conclude you either have a complete DC power failure problem (or is this cross DC?) or you are having a network partitioning problem. Your application may or may not be affected &#8212; but at least you know where to start. Compare with:</p>
+<h3>Failed DC</h3>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-6.png"><img class="alignnone size-full wp-image-7289" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-6.png" alt="mysql-topologies-failures (6)" width="192" height="108" /></a></p></blockquote>
+<p>I&#8217;m stretching it now, because when a DC fails all the red lights start flashing. Nonetheless, if M, A, B are all in one DC and C is on another, you have yet another diagnosis.</p>
+<h3>Dead master and some slaves</h3>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-7.png"><img class="alignnone size-full wp-image-7290" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-7.png" alt="mysql-topologies-failures (7)" width="192" height="108" /></a></p></blockquote>
+<p>Things start getting complicated when you&#8217;re unable to get an authorized answer from everyone. What happens if the master is dead as well as one of its slaves? We previously expected all slaves to say &#8220;we cannot replicate&#8221;. For us, master being unreachable, some slaves being dead and all other complaining on IO thread is good enough indication that the master is dead.</p>
+<h3>All first tier slaves not replicating</h3>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-9.png"><img class="alignnone size-full wp-image-7293" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/mysql-topologies-failures-9.png" alt="mysql-topologies-failures (9)" width="192" height="108" /></a></p></blockquote>
+<p>Not a failover case, but certainly needs to ring the bells. All master&#8217;s direct slaves are failing replication on some SQL error or are just stopped. Our topology is turning stale.</p>
+<h3>Intermediate masters</h3>
+<p>With intermediate master the situation is not all that different. In the below:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/Untitled-presentation.png"><img class="alignnone size-full wp-image-7294" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/Untitled-presentation.png" alt="Untitled presentation" width="480" height="270" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/Untitled-presentation.png 480w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/Untitled-presentation-300x169.png 300w" sizes="(max-width: 480px) 100vw, 480px" /></a></p></blockquote>
+<p>The servers <strong>E</strong>, <strong>F</strong>, <strong>G</strong> replicating from <strong>C</strong> provide us with the holistic view on <strong>C</strong>. <strong>D</strong> provides the holistic view on <strong>A</strong>.</p>
+<h3>Reducing noise</h3>
+<p>Intermediate master failover is a much simpler operation than master failover. Changing masters require name resolve changes (of some sort), whereas moving slaves around the topology affects no one.</p>
+<p>This implies:</p>
+<ul>
+<li>We don&#8217;t mind over-reacting on failing over intermediate masters</li>
+<li>We pay with more noise</li>
+</ul>
+<p>Sure, we don&#8217;t mind failing over <strong>D</strong> elsewhere, but as <strong>D</strong> is the only slave of <strong>A</strong>, it&#8217;s enough that <strong>D</strong> hiccups that we might get an alert (&#8220;all&#8221; intermediate master&#8217;s slaves are not replicating). To that effect <em>orchestrator</em> treats single slave scenarios differently than multiple slaves scenarios.</p>
+<h3>Not so fun setups and failures</h3>
+<p>At Booking.com we are in transition between setups. We have some legacy configuration, we have a roadmap, two ongoing solutions, some experimental setups, and/or all of the above combined. Sorry.</p>
+<p>Some of our masters are on SAN. We are moving away from this; for those masters on SANs we have cold standbys in an active-passive mode; so master failure -&gt; unmount SAN -&gt; mount SAN on cold standby -&gt; start MySQL on cold standby -&gt; start recovery -&gt; watch some TV -&gt; go shopping -&gt; end recovery.</p>
+<p>Only SANs fail, too. When the master fails, switching over to the cold standby is pointless if the origin of the problem is the SAN. And given that some <em>other</em> masters share the same SAN&#8230; whoa. As I said we&#8217;re moving away from this setup for Pseudo GTID and then for Binlog Servers.</p>
+<p>The SAN setup also implied using VIPs for some servers. The slaves reference the SAN master via VIP, and when the cold standby start up it assumes the VIP, and the slaves know nothing about this. Same setup goes for DC masters. What happens when the VIP goes down? MySQL is running happily, but slaves are unable to connect. Does that make for a failover scenario? For intermediate masters we&#8217;re pushing it to be so, failing over to a normal local-disk based server; this improves out confidence in non-SAN setups (which we have plenty of, anyhow).</p>
+<h3>Double checking</h3>
+<p>You sample your server once every X seconds. But in a failover scenario you want to make sure your data is up to date. When <em>orchestrator</em> suspects a dead master (i.e. cannot reach the master) it immediately contacts its direct slaves and checks their status.</p>
+<p>Likewise, when <em>orchestrator</em> sees a first tier slave with broken IO thread, it immediately contacts the master to check if everything is fine.</p>
+<p>For intermediate masters <em>orchestrator</em> is not so concerned and does not issue emergency checks.</p>
+<h3>How to fail over</h3>
+<p>Different story. Some other time. But failing over makes for complex decisions, based on who the replicating slaves are; with/out log-slave-updates; with-out GTID; with/out Pseudo-GTID; are binlog servers available; which slaves are available in which data centers. Or you may be using Galera (we&#8217;re not) which answers most of the above.</p>
+<p>Anyway we use <em>orchestrator</em> for that; it knows our topologies, knows how they should look like, understands how to heal them, knows MySQL replication rules, and invokes external processes to do the stuff it doesn&#8217;t understand.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7274</post-id>	</item>
+	</channel>
+</rss>

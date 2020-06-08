@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Pseudo GTID &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/pseudo-gtid/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 20 Nov 2015 09:41:13 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>State of automated recovery via Pseudo-GTID &#038; Orchestrator @ Booking.com</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com#respond</comments>
+				<pubDate>Fri, 20 Nov 2015 09:41:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7453</guid>
+				<description><![CDATA[This post sums up some of my work on MySQL resilience and high availability at Booking.com by presenting the current state of automated master and intermediate master recoveries via Pseudo-GTID &#38; Orchestrator. Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post sums up some of my work on MySQL resilience and high availability at <a href="http://www.booking.com">Booking.com</a> by presenting the current state of automated master and intermediate master recoveries via <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo-GTID</a> &amp; <strong><a href="https://github.com/outbrain/orchestrator">Orchestrator</a></strong>.</p>
+<p>Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, OLAP, GTID (few), no GTID (most), Binlog Servers, filters, hybrid of all the above.</p>
+<p>Topologies size varies from a single server to many-many-many. Our typical topology has a master in one datacenter, a bunch of slaves in same DC, a slave in another DC acting as an intermediate master to further bunch of slaves in the other DC. Something like this, give or take:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample.png"><img class="alignnone wp-image-7480 size-medium" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-300x169.png" alt="booking-topology-sample" width="300" height="169" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-300x169.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-1024x576.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-900x506.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample.png 1600w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>However as we are building our third data center (with MySQL deployments mostly completed) the graph turns more complex.</p>
+<p>Two high availability questions are:</p>
+<ul>
+<li>What happens when an intermediate master dies? What of all its slaves?</li>
+<li>What happens when the master dies? What of the entire topology?</li>
+</ul>
+<p>This is not a technical drill down into the solution, but rather on overview of the state. For more, please refer to recent presentations in <a href="https://speakerdeck.com/shlominoach/managing-and-visualizing-your-replication-topologies-with-orchestrator">September</a> and <a href="https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management">April</a>.</p>
+<p>At this time we have:</p>
+<ul>
+<li>Pseudo-GTID deployed on all chains
+<ul>
+<li>Injected every 5 seconds</li>
+<li>Using the <a href="https://shlomi-noach.github.io/blog/mysql/pseudo-gtid-ascending">monotonically ascending</a> variation</li>
+</ul>
+</li>
+<li>Pseudo-GTID based automated failover for intermediate masters on all chains</li>
+<li>Pseudo-GTID based automated failover for masters on roughly 30% of the chains.
+<ul>
+<li>The rest of 70% of chains are set for manual failover using Pseudo-GTID.</li>
+</ul>
+</li>
+</ul>
+<p>Pseudo-GTID is in particular used for:</p>
+<ul>
+<li>Salvaging slaves of a dead intermediate master</li>
+<li>Correctly grouping and connecting slaves of a dead master</li>
+<li>Routine refactoring of topologies. This includes:
+<ul>
+<li>Manual repointing of slaves for various operations (e.g. offloading slaves from a busy box)</li>
+<li>Automated refactoring (for example, used by our automated upgrading script, which consults with <em>orchestrator</em>, upgrades, shuffles slaves around, updates intermediate master, suffles back&#8230;)</li>
+</ul>
+</li>
+<li>(In the works), failing over binlog reader apps that audit our binary logs.</li>
+</ul>
+<p><span id="more-7453"></span>Furthermore, Booking.com is also <a href="https://www.percona.com/live/europe-amsterdam-2015/sessions/binlog-servers-bookingcom">working on Binlog Servers</a>:</p>
+<ul>
+<li>These take production traffic and offload masters and intermediate masters</li>
+<li>Often co-serve slaves using round-robin VIP, such that failure of one Binlog Server makes for simple slave replication self-recovery.</li>
+<li>Are interleaved alongside standard replication
+<ul>
+<li>At this time we have no &#8220;pure&#8221; Binlog Server topology in production; we always have normal intermediate masters and slaves</li>
+</ul>
+</li>
+<li>This hybrid state makes for greater complexity:
+<ul>
+<li>Binlog Servers are not designed to participate in a game of changing masters/intermediate master, unless <a href="http://jfg-mysql.blogspot.nl/2015/09/abstracting-binlog-servers-and-mysql-master-promotion-wo-reconfiguring-slaves.html">successors come from their own sub-topology</a>, which is not the case today.
+<ul>
+<li>For example, a Binlog Server that replicates directly from the master, cannot be repointed to just any new master.</li>
+<li>But can still hold valuable binary log entries that other slaves may not.</li>
+</ul>
+</li>
+<li>Are not actual MySQL servers, therefore of course cannot be promoted as masters</li>
+</ul>
+</li>
+</ul>
+<p><em>Orchestrator</em> &amp; Pseudo-GTID makes this hybrid topology still resilient:</p>
+<ul>
+<li><em>Orchestrator</em> understands the limitations on the hybrid topology and can salvage slaves of 1st tier Binlog Servers via Pseudo-GTID</li>
+<li>In the case where the Binlog Servers were the most up to date slaves of a failed master, <em>orchestrator</em> knows to first move potential candidates under the Binlog Server and then extract them out again.</li>
+<li>At this time Binlog Servers are still unstable. Pseudo-GTID allows us to comfortably test them on a large setup with reduced fear of losing slaves.</li>
+</ul>
+<p>Otherwise <em>orchestrator</em> already understands pure Binlog Server topologies and can do master promotion. When pure binlog servers topologies will be in production <em>orchestrator</em> will be there to watch over.</p>
+<h3>Summary</h3>
+<p>To date, Pseudo-GTID has high scores in automated failovers of our topologies; <em>orchestrator&#8217;s</em> <a href="https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case">holistic approach</a> makes for reliable diagnostics; together they reduce our dependency on specific servers &amp; hardware, physical location, latency implied by SAN devices.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7453</post-id>	</item>
+		<item>
+		<title>Orchestrator &#038; Pseudo-GTID for binlog reader failover</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover#respond</comments>
+				<pubDate>Thu, 19 Nov 2015 08:52:16 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7446</guid>
+				<description><![CDATA[One of our internal apps at Booking.com audits changes to our tables on various clusters. We used to use tungsten replicator, but have since migrated onto our own solution. We have a binlog reader (uses open-replicator) running on a slave. It expects Row Based Replication, hence our slave runs with log-slave-updates, binlog-format=&#8217;ROW&#8217;, to translate from the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>One of our internal apps at <strong>Booking.com</strong> audits changes to our tables on various clusters. We used to use <em>tungsten replicator</em>, but have since migrated onto our own solution.</p>
+<p>We have a binlog reader (uses <a href="https://github.com/zendesk/open-replicator">open-replicator</a>) running on a slave. It expects Row Based Replication, hence our slave runs with <strong>log-slave-updates</strong>, <strong>binlog-format=&#8217;ROW&#8217;</strong>, to translate from the master&#8217;s Statement Based Replication. The binlog reader reads what it needs to read, audits what it needs to audit, and we&#8217;re happy.</p>
+<h3>However what happens if that slave dies?</h3>
+<p>In such case we need to be able to point our binlog reader to another slave, and it needs to be able to pick up auditing from the same point.</p>
+<p>This sounds an awful lot like slave repointing in case of master/intermediate master failure, and indeed the solutions are similar. However our binlog reader is not a real MySQL server and does not understands replication. It does not really replicate, it just parses binary logs.</p>
+<p>We&#8217;re also not using GTID. But we <em>are</em> using Pseudo-GTID. As it turns out, the failover solution is already built in by <a href="https://github.com/outbrain/orchestrator">orchestrator</a>, and this is how it goes:</p>
+<h3>Normal execution</h3>
+<p>Our binlog app reads entries from the binary log. Some are of interest for auditing purposes, some are not. An occasional Pseudo-GTID entry is found, and is being stored to ZooKeeper tagged as  &#8220;last seen and processed Pseudo-GTID&#8221;.</p>
+<h3>Upon slave failure</h3>
+<p>We recognize the death of a slave; we have other slaves in the pool; we pick another. Now we need to find the coordinates from which to carry on.</p>
+<p>We read our &#8220;last seen and processed Pseudo-GTID&#8221;. Say it reads:</p>
+<blockquote>
+<pre>drop view if exists `meta`.`_pseudo_gtid_hint__asc:56373F17:00000000012B1C8B:50EC77A1`</pre>
+</blockquote>
+<p>. We now issue:</p>
+<blockquote>
+<pre>$ orchestrator <strong>-c find-binlog-entry</strong> <strong>-i new.slave.fqdn.com</strong> --pattern='drop view if exists `meta`.`_pseudo_gtid_hint__asc:56373F17:00000000012B1C8B:50EC77A1`'</pre>
+</blockquote>
+<p>The output of such command are the binlog coordinates of that same entry as found in the new slave&#8217;s binlogs:</p>
+<blockquote>
+<pre>binlog.000148:43664433</pre>
+</blockquote>
+<p>Pseudo-GTID entries are only injected once every few seconds (<strong>5</strong> in our case). Either:<span id="more-7446"></span></p>
+<ul>
+<li>We are OK to reprocess up to <strong>5</strong> seconds worth of data (and indeed we are, our mechanism is such that this merely overwrites our previous audit, no corruption happens)</li>
+<li>Or our binlog reader also keeps track of the number of events since the last processed Pseudo-GTID entry, skipping the same amount of events after failing over.</li>
+</ul>
+<h3>Planned failover</h3>
+<p>In case we plan to repoint our binlog reader to another slave, we can further use orchestrator&#8217;s power in making an exact correlation between the binlog positions of two slaves. This has always been within its power, but only recently exposed as it own command. We can, at any stage:</p>
+<blockquote>
+<pre>$ sudo orchestrator <strong>-c correlate-binlog-pos</strong> -i current.instance.fqdn.com --binlog=binlog.002011:72656109 -d some.other.instance.fqdn.com</pre>
+</blockquote>
+<p>The output is the binlog coordinates in <strong>some.other.instance.fqdn.com</strong> that exactly correlate with <strong>binlog.002011:72656109</strong> in <strong>current.instance.fqdn.com</strong></p>
+<p>The case of failure of the binlog reader itself is also handled, but is not the subject of this blog post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7446</post-id>	</item>
+		<item>
+		<title>Orchestrator visual cheatsheet, TL;DR the &#8220;smart&#8221; way</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-visual-cheatsheet-tldr-the-smart-way</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-visual-cheatsheet-tldr-the-smart-way#respond</comments>
+				<pubDate>Wed, 02 Sep 2015 07:14:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7347</guid>
+				<description><![CDATA[Orchestrator is really growing. And the amount of users (DBAs, sys admins) using it is growing. Which gives me a lot of immediate feedback in the form of &#8220;Look, there&#8217;s just too many options to move slaves around! Which ones should we use?&#8221; TL;DR look at the two visualized commands below They are enough The &#8220;smart&#8221; commands to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong><a href="https://github.com/outbrain/orchestrator">Orchestrator</a></strong> is <em>really</em> growing. And the amount of users (DBAs, sys admins) using it is growing. Which gives me a lot of immediate feedback in the form of <em>&#8220;Look, there&#8217;s just too many options to move slaves around! Which ones should we use?&#8221;</em></p>
+<h3>TL;DR look at the two visualized commands below</h3>
+<p>They are enough</p>
+<h3>The &#8220;smart&#8221; commands to end all commands</h3>
+<p>So all relocation commands are important, and give you fine-grained, pin-pointed control of the method of topology refactoring. However, most of the time you <em>just want to move those servers around</em>. Which is why there&#8217;s a new &#8220;smart&#8221; mode which support these two commands, which you should be happy using:</p>
+<ul>
+<li><strong>relocate</strong>: move a single slave to another position</li>
+<li><strong>relocate-slaves</strong>: move all/some slaves of some server to another position.</li>
+</ul>
+<p>What makes these commands Smart? You can move slaves around from <em>anywhere</em> to <em>anywhere</em>. And <em>orchestrator</em> figures out the bast execution path. If possible, it uses GTID. Not possible? Is Pseudo-GTID available? Great, using Pseudo-GTID. Oh, are there binlog servers involved? Really simple, use them. None of the above? <em>Orchestrator</em> will use &#8220;standard&#8221; binlog file:pos math (with limitations). <em>Orchestrator</em> will even figure out if multiple steps are necessary and will combine any of the above.</p>
+<p>So you don&#8217;t have to remember all the possible ways and options. The visual cheatsheet now boils down to these two:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate.png"><img class="alignnone size-full wp-image-7357" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate.png" alt="orchestrator-cheatsheet-visualized-relocate" width="720" height="405" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate.png 720w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate-300x169.png 300w" sizes="(max-width: 720px) 100vw, 720px" /></a></p>
+<p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate-slaves.png"><img class="alignnone size-full wp-image-7350" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate-slaves.png" alt="orchestrator-cheatsheet-visualized-relocate-slaves" width="720" height="405" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate-slaves.png 720w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-cheatsheet-visualized-relocate-slaves-300x169.png 300w" sizes="(max-width: 720px) 100vw, 720px" /></a></p></blockquote>
+<p>Let&#8217;s take a slightly deeper look<span id="more-7347"></span></p>
+<h3>relocate</h3>
+<p>Moves a single slave <strong>X</strong> from any point to replicate another some server <strong>Z</strong></p>
+<ul>
+<li>As usual, <em>orchestrator</em> first confirms that <strong>X</strong> <em>can</em> replicate from <strong>Z</strong> (<strong>Z</strong> has <strong>log-slave-updates</strong> or is a binlog server; binlog format compatible, etc.)</li>
+<li>With GTID/Pseudo-GTID, move from any point to any point</li>
+<li>With binlog servers, move around the binlog server environment (at this point you are not using binlog servers, so ignore)</li>
+<li>With normal replication, requires an &#8220;atomic&#8221; operation: either move the slave one level up, or make it replicate from a sibling.</li>
+<li>You can <em>relocate</em> the same master, effectively repointing the slave back to its existing position. This serves to re-resolve master hostname; to reset relay logs; to verify slave is aligned with master.</li>
+<li>Or combination of the above</li>
+</ul>
+<h3>relocate-slaves</h3>
+<p>Moves multiple slaves of server <strong>X</strong> to replicate from some other server <strong>W</strong></p>
+<ul>
+<li>By default moves all slaves of <strong>X</strong>, where possible</li>
+<li>Each slave verified to be able to replicate from <strong>W</strong>. Those that can&#8217;t are left behind.</li>
+<li>Can filter using regular expression via <strong>&#8211;pattern=some?[reg]ex</strong> on slave hostnames</li>
+<li>Can relocate under same master, effectively repointing all slaves (see above explanation)</li>
+<li>Can relocate below one of the very slaves of X. If Y is in itself a slave of X and you&#8217;re executing:<br />
+<strong>orchestrator -c relocate-slaves -i X -d Y</strong><br />
+then <strong>Y</strong> is excluded from the list of relocated slaves. This effectively means &#8220;make <strong>Y</strong> local master of its current siblings&#8221;. Very cool stuff.</li>
+<li>When binlog servers involved, simple math-less repointing takes place</li>
+<li>When GTID involved, let MySQL/MariaDB (both supported) do the math on a per-server basis</li>
+<li>When Pseudo-GTID involved, <em>greatly</em> optimize by dividing into <a href="https://en.wikipedia.org/wiki/Equivalence_class">equivalence classes</a> and only doing the math on a representative of each class.</li>
+<li>Or combination of the above</li>
+</ul>
+<h3>What about the other commands?</h3>
+<p>The above covers such commands as <strong>move-up</strong>, <strong>move-below</strong>, <strong>repoint</strong>, <strong>repoint-slaves</strong>, <strong>match-below</strong>, <strong>multi-match-slaves</strong>, <strong>regroup-slaves</strong> and more. It does not cover <strong>enslave-master</strong> and <strong>make-co-master</strong> which are a bit different.</p>
+<p>My guess is you can pass <strong>98%</strong> of your operations with <strong>relocate </strong>and <strong>relocate-slaves</strong>. Otherwise just run <em>orchestrator</em> with no arguments nor options to get a full-blown breakdown of available commands.</p>
+<h3>GUI drag-n-drop</h3>
+<p><strong>relocate-slaves</strong> is achieved by dragging the slaves of an instance on top of a new master, as follows:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-before.png"><img class="alignnone size-full wp-image-7372" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-before.png" alt="orchestrator-relocate-slaves-before" width="994" height="369" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-before.png 994w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-before-300x111.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-before-900x334.png 900w" sizes="(max-width: 994px) 100vw, 994px" /></a><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-hover.png"><img class="alignnone size-full wp-image-7373" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-hover.png" alt="orchestrator-relocate-slaves-hover" width="996" height="339" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-hover.png 996w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-hover-300x102.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-hover-900x306.png 900w" sizes="(max-width: 996px) 100vw, 996px" /></a><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-drag1.png"><img class="alignnone size-large wp-image-7377" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-drag1.png" alt="orchestrator-relocate-slaves-drag" width="980" height="363" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-drag1.png 980w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-drag1-300x111.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-drag1-900x333.png 900w" sizes="(max-width: 980px) 100vw, 980px" /></a><br />
+<a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-after.png"><img class="alignnone size-full wp-image-7375" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-after.png" alt="orchestrator-relocate-slaves-after" width="993" height="345" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-after.png 993w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-after-300x104.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/08/orchestrator-relocate-slaves-after-900x313.png 900w" sizes="(max-width: 993px) 100vw, 993px" /></a></p></blockquote>
+<p>Find latest <em>orchestrator</em> release at <a href="https://github.com/outbrain/orchestrator/releases">https://github.com/outbrain/orchestrator/releases</a></p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-visual-cheatsheet-tldr-the-smart-way/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7347</post-id>	</item>
+		<item>
+		<title>Orchestrator 1.4.340: GTID, binlog servers, Smart Mode, failovers and lots of goodies</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-1-4-340-gtid-binlog-servers-smart-mode-failovers-and-lots-of-goodies</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-1-4-340-gtid-binlog-servers-smart-mode-failovers-and-lots-of-goodies#respond</comments>
+				<pubDate>Tue, 01 Sep 2015 10:10:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7360</guid>
+				<description><![CDATA[Orchestrator 1.4.340 is released. Not quite competing with the MySQL latest changelog, and as I haven&#8217;t blogged about orchestrator featureset in a while, this is a quick listing of orchestrator features available since my last publication: Supports GTID (Oracle &#38; MariaDB) GTID still not being used in automated recovery &#8212; in progress. enable-gtid, disable-gtid, skip-query for GTID commands [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://github.com/outbrain/orchestrator/releases"><strong>Orchestrator</strong> 1.4.340 is released</a>. Not quite competing with the MySQL latest changelog, and as I haven&#8217;t blogged about <em>orchestrator</em> featureset in a while, this is a quick listing of <em>orchestrator</em> features available since my last publication:</p>
+<ul>
+<li>Supports <strong>GTID</strong> (Oracle &amp; MariaDB)
+<ul>
+<li>GTID still not being used in automated recovery &#8212; in progress.</li>
+<li><strong>enable-gtid</strong>, <strong>disable-gtid</strong>, <strong>skip-query</strong> for GTID commands</li>
+</ul>
+</li>
+<li>Supports <strong>binlog servers</strong> (MaxScale)
+<ul>
+<li>Discovery &amp; operations on binlog servers</li>
+<li>Understanding slave repositioning in a binlog-server architecture</li>
+</ul>
+</li>
+<li><strong>Smart mode</strong>: relocate &amp; relocate-below commands (or Web/GUI drag-n-drop) let <em>orchestrator</em> figure out the best way of slave repositioning. <em>Orchestrator</em> picks from GTID, Pseudo GTID, binlog servers, binlog file:pos math (and more) options, or combinations of the above. Fine grained commands still there, but mostly you won&#8217;t need them.</li>
+<li><strong>Crash recoveries</strong> (did you know <em>orchestrator</em> does that?):
+<ul>
+<li>For intermediate master recovery: improved logic in picking the best recovery plan (prefer in-DC, prefer promoting local slave, supporting binlog server topologies, &#8230;)</li>
+<li>For master recovery: even better slave promotion; supports <em>candidate slaves </em>(prefer promoting such slaves); supports binlog server shared topologies</li>
+<li>Better auditing and logging of recovery cases</li>
+<li>Better analysis of crash scenarios, also in the event of lost VIPs, hanging connections; emergent checks in crash suspected scenarios</li>
+<li>recover-lite: do all topology-only recovery steps, without invoking external processes</li>
+</ul>
+</li>
+<li><strong>Better browser support</strong>: used to only work on Firefox and Chrome (and the latter has had issues), the Web UI should now work well on all browsers, at the cost of reduced <strong>d3</strong> animation. More work still in progress.</li>
+<li><strong>Faster</strong>, more parallel, less blocking operations on all counts; removed a lots of serialized code; less locks.</li>
+<li><strong>Web enhancements</strong>
+<ul>
+<li>More verbose drag-n-drop (operation hint; color hints)</li>
+<li>Drag-n-drop for <em>slaves-of-a-server</em></li>
+<li>Replication/crash analysis dashboard</li>
+</ul>
+</li>
+<li><strong>Pools</strong>: <em>orchestrator</em> can be <em>told</em> about instance-to-pool association (<strong>submit-pool-instances</strong> command)
+<ul>
+<li>And can then present pool status (web)</li>
+<li>Or pool hints within topologies (web)</li>
+<li>Or queried for all pools (<strong>cluster-pool-instances</strong> command)</li>
+</ul>
+</li>
+<li>Other:
+<ul>
+<li>Supports MySQL <strong>5.7</strong> (tested with <strong>5.7.8</strong>)</li>
+<li>Configurable graphite path for metrics</li>
+<li><strong>&#8211;noop</strong> flag; does all the work except for actually changing master on slaves. Shows intentions.</li>
+<li>Web (or cli <strong>which-cluster-osc-slaves</strong> command) provide list of control slaves to use in <strong>pt-osc</strong> operation</li>
+<li><strong>hostname-unresolve</strong>: force <em>orchestrator</em> to unresolve a fqdn into VIP/CNAME/&#8230; when issuing a CHANGE MASTER TO</li>
+</ul>
+</li>
+<li>3rd party contributions (hey, thanks!) include:
+<ul>
+<li>More &amp; better SSL support</li>
+<li>Vagrant templates</li>
+</ul>
+</li>
+<li>For developers:
+<ul>
+<li><em>Orchestrator</em> now go-gettable. Just <strong>go get github.com/outbrain/orchestrator</strong></li>
+<li>Improved build script; supports more architectures</li>
+</ul>
+</li>
+</ul>
+<p><span id="more-7360"></span></p>
+<p>Also consider these manuals:</p>
+<ul>
+<li><a href="https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual">The Orchestrator Manual</a></li>
+<li><a href="https://github.com/outbrain/orchestrator/wiki/Orchestrator-deployment">Orchestrator deployment</a></li>
+<li><a href="https://github.com/outbrain/orchestrator/wiki/Orchestrator-first-steps">Orchestrator first steps</a></li>
+<li><a href="https://github.com/outbrain/orchestrator/wiki/Orchestrator-for-developers">Orchestrator for developers</a></li>
+</ul>
+<p><em>Orchestrator</em> is free and open source (Apache 2.0 License).</p>
+<p>I&#8217;ll be <a href="https://www.percona.com/live/europe-amsterdam-2015/sessions/managing-and-visualizing-your-replication-topologies-orchestrator">speaking about orchestrator in PerconaLive Amsterdam</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-1-4-340-gtid-binlog-servers-smart-mode-failovers-and-lots-of-goodies/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7360</post-id>	</item>
+		<item>
+		<title>Pseudo GTID, ASCENDING</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/pseudo-gtid-ascending</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/pseudo-gtid-ascending#comments</comments>
+				<pubDate>Wed, 29 Jul 2015 10:59:50 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7299</guid>
+				<description><![CDATA[Pseudo GTID is a technique where we inject Globally Unique entries into MySQL, gaining GTID abilities without using GTID. It is supported by orchestrator and described in more detail here, here and here. Quick recap: we can join two slaves to replicate from one another even if they never were in parent-child relationship, based on our [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Pseudo GTID is a technique where we inject Globally Unique entries into MySQL, gaining GTID abilities without using GTID. It is supported by <strong><a href="https://github.com/outbrain/orchestrator">orchestrator</a></strong> and described in more detail <a href="https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management">here</a>, <a href="https://shlomi-noach.github.io/blog/tag/pseudo-gtid">here</a> and <a href="https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual#pseudo-gtid">here</a>.</p>
+<p>Quick recap: we can join two slaves to replicate from one another even if they never were in parent-child relationship, based on our uniquely identifiable entries which can be found in the slaves&#8217; binary logs or relay logs. Having Pseudo-GTID injected and controlled by us allows us to optimize failovers into quick operations, especially where a large number of server is involved.</p>
+<p><strong>Ascending Pseudo-GTID</strong> further speeds up this process for delayed/lagging slaves.</p>
+<h3>Recap, visualized</h3>
+<p>(but do look at the <a href="https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management">presentation</a>):</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/pseudo-gtid-quick1.png"><img class="alignnone size-full wp-image-7303" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/pseudo-gtid-quick1.png" alt="pseudo-gtid-quick" width="636" height="366" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/pseudo-gtid-quick1.png 636w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/07/pseudo-gtid-quick1-300x173.png 300w" sizes="(max-width: 636px) 100vw, 636px" /></a></p>
+<ol>
+<li>Find last pseudo GTID in slave’s binary log (or last applied one in relay log)</li>
+<li>Search for exact match on new master’s binary logs</li>
+<li>Fast forward both through successive identical statements until end of slave’s applied entries is reached</li>
+<li>Point slave into cursor position on master</li>
+</ol>
+</blockquote>
+<p>What happens if the slave we wish to reconnect is lagging? Or perhaps it is a delayed replica, set to run <strong>24</strong> hours behind its master?</p>
+<p>The naive approach would expand bullet <strong>#2</strong> into:</p>
+<ul>
+<li>Search for exact match on master’s last binary logs</li>
+<li>Unfound? Move on to previous (older) binary log on master</li>
+<li>Repeat</li>
+</ul>
+<p>The last Pseudo-GTID executed by the slave was issued by the master over <strong>24</strong> hours ago. Suppose the master generates one binary log per hour. This means we would need to full-scan <strong>24</strong> binary logs of the master where the entry will not be found; to only be matched in the <strong>25th</strong> binary log (it&#8217;s an off-by-one problem, don&#8217;t hold the exact number against me).</p>
+<h3>Ascending Pseudo GTID</h3>
+<p>Since we control the generation of Pseudo-GTID, and since we control the search for Pseudo-GTID, we are free to choose the form of Pseudo-GTID entries. We recently switched into using Ascending Pseudo-GTID entries, and this works like a charm. Consider these Pseudo-GTID entries:<span id="more-7299"></span></p>
+<blockquote>
+<pre>drop view if exists `meta`.`<strong>_pseudo_gtid_hint__asc:55B364E3:0000000000056EE2:6DD57B85</strong>`
+drop view if exists `meta`.`<strong>_pseudo_gtid_hint__asc:55B364E8:0000000000056EEC:ACF03802</strong>`
+drop view if exists `meta`.`<strong>_pseudo_gtid_hint__asc:55B364ED:0000000000056EF8:06279C24</strong>`
+drop view if exists `meta`.`<strong>_pseudo_gtid_hint__asc:55B364F2:0000000000056F02:19D785E4</strong>`</pre>
+</blockquote>
+<p>The above entries are ascending in lexical order. The above is generated using a UTC timestamp, along with other watchdog/random values. For a moment let&#8217;s trust that our generation is indeed always ascending. How does that help us?</p>
+<p>Suppose the last entry found in the slave is</p>
+<blockquote>
+<pre>drop view if exists `meta`.`<strong>_pseudo_gtid_hint__asc:55B364E3:0000000000056EE2:6DD57B85</strong>`</pre>
+</blockquote>
+<p>And this is what we&#8217;re to search on the master&#8217;s binary logs. Starting with the optimistic hope that the entry is in the master&#8217;s last binary log, we start reading. By nature of binary logs we have to scan them sequentially from start to end. As we read the binary log entries, we soon meet the first Pseudo-GTID injection, and it reads:</p>
+<blockquote>
+<pre>drop view if exists `meta`.`<strong>_pseudo_gtid_hint__asc:55B730E6:0000000000058F02:19D785E4</strong>`</pre>
+</blockquote>
+<p>&nbsp;</p>
+<p>At this stage we know we can completely skip scanning the rest of the binary log. Our entry will not be there: this entry is larger than the one we&#8217;re looking for, and they&#8217;ll only get larger as we get along in the binary log. It is therefore safe to ignore the rest of this file and move on to the next-older binary log on the master, to repeat our search there.</p>
+<p>Binary logs where the entry cannot be in are only briefly examined: <em>orchestrator</em> will probably read no more than first <strong>1,000</strong> entries or so (can&#8217;t give you a number, it&#8217;s your workload) before giving up on the binary log.</p>
+<p>On every topology chain we have <strong>2</strong> delayed replica slaves, to help us out in the case we make a grave mistake of DELETing the wrong data. These slaves would take, on some chains, <strong>5-6</strong> minutes to reconnect to a new master using Pseudo-GTID, since it required scanning many many GBs of binary logs. This is no longer the case; we&#8217;ve reduced scan time for such servers to about <strong>25s</strong> at worst, and much quicker on average. There can still be dozens of binary logs to open, but all but one are given up very quickly. I should stress that those <strong>25s</strong> are nonblocking for other slaves which are mote up to date than the delayed replicas.</p>
+<h3>Can there be a mistake?</h3>
+<p>Notice that the above algorithm does not require each and every entry to be ascending; it just compares the first entry in each binlog to determine whether our target entry is there or not. This means if we&#8217;ve messed up our Ascending order and injected some out-of-order entries, we can still get away with it &#8212; as long as those entries are not the first ones in the binary log, nor are they the last entries executed by the slave.</p>
+<p>But why be so negative? We&#8217;re using UTC timestamp as the major sorting order, and inject Pseudo-GTID every <strong>5</strong> seconds; even with leap second we&#8217;re comfortable.</p>
+<p>On my TODO is to also include a &#8220;Plan B&#8221; full-scan search: if the Ascending algorithm fails, we can still opt for the full scan option. So there would be no risk at all.</p>
+<h3>Example</h3>
+<p>We inject Pseudo-GTID via event-scheduler. These are the good parts of the event definition:</p>
+<blockquote>
+<pre>create event if not exists
+  create_pseudo_gtid_event
+  on schedule every 5 second starts current_timestamp
+  on completion preserve
+  enable
+  do
+    begin
+      set @connection_id := connection_id();
+      set @now := now();
+      set @rand := floor(rand()*(1 &lt;&lt; 32));
+      <strong>set @pseudo_gtid_hint := concat_ws(':', lpad(hex(unix_timestamp(@now)), 8, '0'), lpad(hex(@connection_id), 16, '0'), lpad(hex(@rand), 8, '0'));</strong>
+<strong>
+      set @_create_statement := concat('drop ', 'view if exists `meta`.`_pseudo_gtid_', 'hint__asc:', @pseudo_gtid_hint, '`');</strong>
+      PREPARE st FROM @_create_statement;
+      EXECUTE st;
+      DEALLOCATE PREPARE st;
+</pre>
+</blockquote>
+<p>We accompany this by the following <em>orchestrator</em> configuration:</p>
+<blockquote>
+<pre> "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__",
+ "PseudoGTIDMonotonicHint": "asc:",</pre>
+</blockquote>
+<p><strong>&#8220;PseudoGTIDMonotonicHint&#8221;</strong> notes a string; if that string (<strong>&#8220;asc:&#8221;</strong>) is found in the slave&#8217;s Pseudo-GTID entry, then the entry is assumed to have been injected as part of ascending entries, and the optimization kicks in.</p>
+<p><a href="https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual#pseudo-gtid">The Manual</a> has more on this.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/pseudo-gtid-ascending/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7299</post-id>	</item>
+		<item>
+		<title>Speaking at Percona Live: Pseudo GTID and Easy Replication Topology Management</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/speaking-at-percona-live-pseudo-gtid-and-easy-replication-topology-management</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/speaking-at-percona-live-pseudo-gtid-and-easy-replication-topology-management#comments</comments>
+				<pubDate>Tue, 31 Mar 2015 15:42:21 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[PerconaLive]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[secondary]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7205</guid>
+				<description><![CDATA[In two weeks time I will be presenting Pseudo GTID and Easy Replication Topology Management at Percona Live. From the time I submitted the proposal a LOT has been developed, experimented, deployed and used with both Pseudo GTID and with orchestrator. In my talk I will: Suggest that you skip the &#8220;to GTID or not to GTID&#8221; question [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In two weeks time I will be presenting <a href="https://www.percona.com/live/mysql-conference-2015/sessions/pseudo-gtid-and-easy-replication-management">Pseudo GTID and Easy Replication Topology Management</a> at Percona Live. From the time I submitted the proposal a LOT has been developed, experimented, deployed and used with both <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo GTID</a> and with <a href="https://github.com/outbrain/orchestrator">orchestrator</a>. In my talk I will:</p>
+<ul>
+<li>Suggest that you skip the &#8220;to GTID or not to GTID&#8221; question and go for the lightweight Pseudo GTID</li>
+<li>Show how Pseudo GTID is used in production to recover from various replication failures and server crashes</li>
+<li>Do an outrageous demonstration</li>
+<li>Tell you about 50,000 successful experiments and tests done in production</li>
+<li>Show off orchestrator and its support for Pseudo GTID, including automated crash analysis and recovery mechanism.</li>
+</ul>
+<p>I will further show how the orchestrator tooling makes for a less restrictive, more performant, less locking, non-intrusive, trusted and lightweight replication topology management solution.<span id="more-7205"></span></p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/03/orchestrator-topology-simple.png"><img class="wp-image-7206 size-full" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/03/orchestrator-topology-simple.png" alt="orchestrator-topology-simple" width="1010" height="286" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/03/orchestrator-topology-simple.png 1010w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/03/orchestrator-topology-simple-300x85.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/03/orchestrator-topology-simple-900x255.png 900w" sizes="(max-width: 1010px) 100vw, 1010px" /></a> An anonymized topology</p></blockquote>
+<p>Please come by my talk! </p>
+<p>Slides: </p>
+<iframe title="Pseudo GTID and Easy MySQL Replication Topology Management" id="talk_frame_295398" src="//speakerdeck.com/player/911758f5892942ccba530559d4af1d40" width="640" height="359" style="border:0; padding:0; margin:0; background:transparent;" frameborder="0" allowtransparency="true" allowfullscreen="allowfullscreen" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/speaking-at-percona-live-pseudo-gtid-and-easy-replication-topology-management/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7205</post-id>	</item>
+		<item>
+		<title>Speaking at FOSDEM: Pseudo GTID and easy replication management</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/speaking-at-fosdem-pseudo-gtid-and-easy-replication-management</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/speaking-at-fosdem-pseudo-gtid-and-easy-replication-management#respond</comments>
+				<pubDate>Thu, 29 Jan 2015 19:06:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[Speaking]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7194</guid>
+				<description><![CDATA[This coming Sunday I&#8217;ll be presenting Pseudo GTID and easy replication management at FOSDEM, Brussels. There&#8217;s been a lot of development on Pseudo GTID these last few weeks. In this talk I&#8217;ll show you how you can use Pseudo GTID instead of &#8220;normal&#8221; GTID to easily repoint your slaves, recover from intermediate master failure, promote slaves to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This coming Sunday I&#8217;ll be presenting <a href="https://fosdem.org/2015/schedule/event/pseudo_gtid/">Pseudo GTID and easy replication management</a> at FOSDEM, Brussels.</p>
+<p>There&#8217;s been a lot of development on <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo GTID</a> these last few weeks. In this talk I&#8217;ll show you how you can use Pseudo GTID instead of &#8220;normal&#8221; GTID to easily repoint your slaves, recover from intermediate master failure, promote slaves to masters as well as emply crash safe replication without crash safe replication.</p>
+<p>Moreover, I will show how you can achieve all the above with <em>less constraints</em> than GTID, and for bulk operations &#8212; with <em>less overhead</em> and in <em>shorter time</em>. You will also see that Pseudo GTID is a non intrusive solution which does not require you to change anything in your topologies.</p>
+<p>Moral: I&#8217;ll try and convince you to <em>drop your plans for using GTID</em> in favor of <em>Pseudo GTID</em>.</p>
+<p>We will be employing Pseudo GTID as the basis for high availability and failover at Booking.com on many topologies, and as a safety mechanism in other topologies where we will employ <a href="http://blog.booking.com/mysql_slave_scaling_and_more.html">Binlog servers</a>.</p>
+<p><iframe title="Pseudo gtid &amp; easy replication topology management" src="https://www.slideshare.net/slideshow/embed_code/key/xnbYxVn86UhAZp" width="427" height="356" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px; max-width: 100%;" allowfullscreen> </iframe> </p>
+<div style="margin-bottom:5px"> <strong> <a href="https://www.slideshare.net/shlominoach/pseudo-gtid-easy-replication-topology-management-fosdem" title="Pseudo gtid &amp; easy replication topology management" target="_blank">Pseudo gtid &amp; easy replication topology management</a> </strong> from <strong><a href="https://www.slideshare.net/shlominoach" target="_blank">Shlomi Noach</a></strong> </div>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/speaking-at-fosdem-pseudo-gtid-and-easy-replication-management/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7194</post-id>	</item>
+		<item>
+		<title>Semi-automatic slave/master promotion via Pseudo GTID</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/semi-automatic-slavemaster-promotion-via-pseudo-gtid</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/semi-automatic-slavemaster-promotion-via-pseudo-gtid#comments</comments>
+				<pubDate>Mon, 10 Nov 2014 05:56:58 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7119</guid>
+				<description><![CDATA[Orchestrator release 1.2.7-beta now supports semi-automatic slave promotion to master upon master death, via Pseudo GTID. When the master is dead, orchestrator automatically picks the most up-to-date slaves and marks them as &#8220;Master candidates&#8221;. It allows a /api/make-master call on such a slave (S), in which case it uses Pseudo GTID to enslave its siblings, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://github.com/outbrain/orchestrator">Orchestrator</a> release <a href="https://github.com/outbrain/orchestrator/releases">1.2.7-beta</a> now supports semi-automatic slave promotion to master upon master death, via <a href="code.openark.org/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo GTID</a>.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-highlighted.png"><img class="alignnone size-full wp-image-7150" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-highlighted.png" alt="orchestrator-make-master-highlighted" width="809" height="363" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-highlighted.png 809w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-highlighted-300x134.png 300w" sizes="(max-width: 809px) 100vw, 809px" /></a></p></blockquote>
+<p>When the master is dead, <em>orchestrator</em> automatically picks the most up-to-date slaves and marks them as <strong>&#8220;Master candidates&#8221;</strong>. It allows a <strong>/api/make-master</strong> call on such a slave (S), in which case it uses <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo GTID</a> to enslave its siblings, and set S as <strong>read-only = 0</strong>. All we need to do is click the <strong>&#8220;Make master&#8221;</strong> button.<span id="more-7119"></span></p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-confirm1.png"><img class="alignnone size-full wp-image-7145" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-confirm1.png" alt="orchestrator-make-master-confirm" width="946" height="367" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-confirm1.png 946w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-confirm1-300x116.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-confirm1-900x349.png 900w" sizes="(max-width: 946px) 100vw, 946px" /></a></p></blockquote>
+<p>Yes, <strong>&#8220;OK&#8221;</strong>. A moment later:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-refactored1.png"><img class="alignnone size-large wp-image-7146" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-refactored1-1024x256.png" alt="orchestrator-make-master-refactored" width="1024" height="256" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-refactored1-1024x256.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-refactored1-300x75.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-refactored1-900x225.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-make-master-refactored1.png 1098w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>See how the two slaves <strong>22988</strong>, <strong>22989</strong> are happily replicating from <strong>22990</strong>. Turning them into <strong>22990</strong>&#8216;s slave was possible even though their shared master was dead and were stopped at different replication positions.</p>
+<p><strong>22990</strong> is now writeable, and its on you to disconnect from its old master and to direct your application into this newly promoted instance.</p>
+<h4>Local master promotion</h4>
+<p>Likewise, a semi-automated solution for the corruption of a local master is in place. Consider the following, where <strong>22989</strong> is dead/inaccessible. <strong>22988</strong> and <strong>22990</strong> are stuck in replication:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master.png"><img class="alignnone size-large wp-image-7164" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-1024x263.png" alt="orchestrator-make-local-master" width="1024" height="263" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-1024x263.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-300x77.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-900x231.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master.png 1094w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p><em>Orchestrator</em> detects this situation and picks the most up-to-date slave, marking it as candidate for promotion. Click <strong>&#8220;Make lock master&#8221;</strong> to get:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-confirm.png"><img class="alignnone size-large wp-image-7165" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-confirm-1024x257.png" alt="orchestrator-make-local-master-confirm" width="1024" height="257" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-confirm-1024x257.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-confirm-300x75.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-confirm-900x226.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-confirm.png 1075w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>Sure, OK:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-refactored.png"><img class="alignnone size-large wp-image-7166" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-refactored-1024x276.png" alt="orchestrator-make-local-master-refactored" width="1024" height="276" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-refactored-1024x276.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-refactored-300x80.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-refactored-900x242.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/11/orchestrator-make-local-master-refactored.png 1064w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>And now <strong>22990</strong> takes over instead of <strong>22989</strong>, enslaving <strong>22988</strong>, both running happily ever after.</p>
+<h4> Automation</h4>
+<p>The above buttons are just convenience methods. You don&#8217;t strictly need visualization/GUI for that. Everything is supported by the API, and can be used by a fully automated monitoring system. More to come in <em>orchestrator</em>.</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/semi-automatic-slavemaster-promotion-via-pseudo-gtid/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7119</post-id>	</item>
+		<item>
+		<title>Refactoring replication topologies with Pseudo GTID: a visual tour</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topologies-with-pseudo-gtid-a-visual-tour</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topologies-with-pseudo-gtid-a-visual-tour#respond</comments>
+				<pubDate>Mon, 27 Oct 2014 09:55:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7088</guid>
+				<description><![CDATA[Orchestrator 1.2.1-beta supports Pseudo GTID (read announcement): a means to refactor the replication topology and connect slaves even without direct relationship; even across failed servers. This post illustrates two such scenarios and shows the visual way of mathcing/re-synching slaves. Of course, orchestrator is not just a GUI tool; anything done with drag-and-drop is also done [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><em>Orchestrator</em> <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.2.1-beta">1.2.1-beta</a> supports Pseudo GTID (<a href="https://shlomi-noach.github.io/blog/mysql/orchestrator-1-2-1-beta-pseudo-gtid-support-reconnect-slaves-even-after-master-failure">read announcement</a>): a means to refactor the replication topology and connect slaves even without direct relationship; even across failed servers. This post illustrates two such scenarios and shows the visual way of mathcing/re-synching slaves.</p>
+<p>Of course, orchestrator is not just a GUI tool; anything done with drag-and-drop is also done via web API (in fact, the drag-and-drop invoke the web API) as well as via command line. I&#8217;m mentioning this as this is the grounds for failover automation planned for the future.</p>
+<h4>Scenario 1: the master unexpectedly dies</h4>
+<p>The master crashes and cannot be contacted. All slaves are stopped as effect, but each in a different position. Some managed to salvage relay logs just before the master dies, some didn&#8217;t. In our scenario, all three slaves are at least caught up with the relay log (that is, whatever they managed to pull through the network, they already managed to execute). So they&#8217;re otherwise sitting idle waiting for something to happen. Well, something&#8217;s about to happen.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master.png"><img class="alignnone size-large wp-image-7090" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-1024x323.png" alt="orchestrator-pseudo-gtid-dead-master" width="1024" height="323" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-1024x323.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-300x94.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-900x284.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master.png 1132w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>Note the green &#8220;Safe mode&#8221; button to the right. This means operation is through calculation of binary log files &amp; positions with relation to one&#8217;s master. But the master is now dead, so let&#8217;s switch to adventurous mode; in this mode we can drag and drop slaves onto instances normally forbidden. At this stage the web interface allows us to drop a slave onto its sibling or any of its ancestors (including its very own parent, which is a means of reconnecting a slave with its parent). Anyhow:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode.png"><img class="alignnone size-large wp-image-7091" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode-1024x296.png" alt="orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode" width="1024" height="296" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode-1024x296.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode-300x86.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode-900x260.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-pseudo-gtid-mode.png 1188w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>We notice that orchestrator is already kind enough to say which slave is best candidate to be the new master (<strong>127.0.0.1:22990</strong>): this is the slave (or one of the slaves) with most up-to-date data. So we choose to take another server and make it a slave of <strong>127.0.0.1:22990</strong>:<span id="more-7088"></span></p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag.png"><img class="alignnone size-full wp-image-7093" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag.png" alt="orchestrator-pseudo-gtid-dead-master-begin-drag" width="770" height="349" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag.png 770w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-300x135.png 300w" sizes="(max-width: 770px) 100vw, 770px" /></a></p></blockquote>
+<p>And drop:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-drop.png"><img class="alignnone size-full wp-image-7094" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-drop.png" alt="orchestrator-pseudo-gtid-dead-master-drop" width="799" height="366" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-drop.png 799w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-drop-300x137.png 300w" sizes="(max-width: 799px) 100vw, 799px" /></a></p></blockquote>
+<p>There we have it: although their shared master is inaccessible, and the two slave&#8217;s binary log file names &amp; position mean nothing to each other, we are able to correctly match the two and make one child of the other:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-1.png"><img class="alignnone size-large wp-image-7095" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-1-1024x269.png" alt="orchestrator-pseudo-gtid-dead-master-refactored-1" width="1024" height="269" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-1-1024x269.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-1-300x78.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-1-900x236.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-1.png 1068w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>Likewise, we do the same with <strong>127.0.0.1:22988</strong>:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-2.png"><img class="alignnone size-large wp-image-7096" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-2-1024x279.png" alt="orchestrator-pseudo-gtid-dead-master-begin-drag-2" width="1024" height="279" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-2-1024x279.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-2-300x81.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-2-900x245.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-begin-drag-2.png 1066w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>And end up with our (almost) final topology:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-2.png"><img class="alignnone size-large wp-image-7097" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-2-1024x255.png" alt="orchestrator-pseudo-gtid-dead-master-refactored-2" width="1024" height="255" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-2-1024x255.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-2-300x74.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-2-900x224.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-master-refactored-2.png 1080w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>Notice how the two slaves <strong>22988</strong>, <strong>22989</strong> are happily replicating from <strong>22990</strong>. As far as they&#8217;re concerned, there is no problem in the topology any more. Now it&#8217;s your decision: do you decommission the old master? You will need to <strong>RESET SLAVE</strong> on <strong>22990</strong> (can do via <em>orchestrator</em>), turn off <strong>22990</strong>&#8216;s <strong>read_only</strong> (can do via <em>orchestrator</em>) and change DNS entries (or what have you).</p>
+<h4>Scenario 2: a local master (&#8220;relay-master&#8221;) unexpectedly dies</h4>
+<p>In this scenario we have a <a href="https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies">deep nested topology</a>, and a local master died. What of its slaves?</p>
+<blockquote><p> <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master.png"><img class="alignnone size-large wp-image-7100" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-1024x237.png" alt="orchestrator-pseudo-gtid-dead-relay-master" width="1024" height="237" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-1024x237.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-300x69.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-900x208.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master.png 1168w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>We choose one of the children and drag it over onto the master, which is up and healthy:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png"><img class="alignnone size-large wp-image-7101" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-1024x292.png" alt="orchestrator-pseudo-gtid-dead-relay-master-begin-drag" width="1024" height="292" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-1024x292.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-300x85.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-900x256.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png 1097w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>As you can see we are allowed (green instances are allowed drop places) to drop <strong>22989</strong> on its sibling and on its grandparent, the latter bypassing a broken connection. There <em>is no</em> connection between the two!</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-drop.png"><img class="alignnone size-large wp-image-7102" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-drop-1024x282.png" alt="orchestrator-pseudo-gtid-dead-relay-master-drop" width="1024" height="282" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-drop-1024x282.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-drop-300x82.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-drop-900x248.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-drop.png 1120w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>And we get a new topology:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-1.png"><img class="alignnone size-large wp-image-7103" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-1-1024x264.png" alt="orchestrator-pseudo-gtid-dead-relay-master-refactored-1" width="1024" height="264" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-1-1024x264.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-1-300x77.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-1-900x232.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-1.png 1095w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p><strong>22989</strong> is now lagging, but on the right path! Let&#8217;s do the same for <strong>22988</strong>:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2.png"><img class="alignnone size-large wp-image-7104" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2-1024x276.png" alt="orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2" width="1024" height="276" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2-1024x276.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2-300x81.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2-900x243.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-2.png 1085w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p></blockquote>
+<p>And finally:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-2.png"><img class="alignnone size-full wp-image-7105" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-2.png" alt="orchestrator-pseudo-gtid-dead-relay-master-refactored-2" width="809" height="357" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-2.png 809w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-refactored-2-300x132.png 300w" sizes="(max-width: 809px) 100vw, 809px" /></a></p></blockquote>
+<p>Great success! <strong>22989</strong> already caught up, <strong>22988</strong> on the way, victory is ours!</p>
+<p>The real fun, of course, is to execute with <strong>&#8211;debug</strong> and review the DEBUG messages as orchestrator seeks, finds, matches and follows up on Pseudo GTID entries in the binary logs. We each have our pleasures.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topologies-with-pseudo-gtid-a-visual-tour/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7088</post-id>	</item>
+		<item>
+		<title>Orchestrator 1.2.1 BETA: Pseudo GTID support, reconnect slaves even after master failure</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-1-2-1-beta-pseudo-gtid-support-reconnect-slaves-even-after-master-failure</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-1-2-1-beta-pseudo-gtid-support-reconnect-slaves-even-after-master-failure#comments</comments>
+				<pubDate>Mon, 27 Oct 2014 09:51:51 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7114</guid>
+				<description><![CDATA[orchestrator 1.2.1 BETA is released. This version supports Pseudo GTID, and provides one with powerful refactoring of one&#8217;s replication topologies, even across failed instances. Depicted: moving a slave up the topology even though its local master is inaccessible Enabling Pseudo-GTID You will need to: Inject a periodic unique entry onto your binary logs Configure orchestrator [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><em>orchestrator</em> <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.2.1-beta">1.2.1 BETA is released</a>. This version supports <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo GTID</a>, and provides one with powerful refactoring of one&#8217;s replication topologies, even across failed instances.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png"><img class="alignnone size-large wp-image-7101" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-1024x292.png" alt="orchestrator-pseudo-gtid-dead-relay-master-begin-drag" width="1024" height="292" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-1024x292.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-300x85.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag-900x256.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/10/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png 1097w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p>
+<p>Depicted: moving a slave up the topology even though its local master is inaccessible</p></blockquote>
+<h4>Enabling Pseudo-GTID</h4>
+<p>You will need to:</p>
+<ol>
+<li>Inject a periodic unique entry onto your binary logs</li>
+<li>Configure <em>orchestrator</em> to recognize said entry.</li>
+</ol>
+<h4>Pseudo GTID injection example</h4>
+<p>We will use the <a href="http://dev.mysql.com/doc/refman/5.5/en/events.html">event scheduler</a> (must be enabled) to inject an entry every <strong>10</strong> seconds, recognized both in statement-based and row-based replication.</p>
+<blockquote>
+<pre>create database if not exists meta;
+
+drop event if exists meta.create_pseudo_gtid_view_event;
+
+delimiter ;;
+create event if not exists
+  meta.create_pseudo_gtid_view_event
+  on schedule every 10 second starts current_timestamp
+  on completion preserve
+  enable
+  do
+    begin
+      set @pseudo_gtid := uuid();
+      set @_create_statement := concat('create or replace view meta.pseudo_gtid_view as select \'', @pseudo_gtid, '\' as pseudo_gtid_unique_val from dual');
+      PREPARE st FROM @_create_statement;
+      EXECUTE st;
+      DEALLOCATE PREPARE st;
+    end
+;;
+
+delimiter ;
+
+set global event_scheduler := 1;</pre>
+</blockquote>
+<p>Make sure to enable <em>event_scheduler</em> in your <strong>my.cnf</strong> config file.</p>
+<p>An entry in the binary logs would look like this:<span id="more-7114"></span></p>
+<blockquote>
+<pre>mysql [localhost] {msandbox} (meta) &gt; show binlog events in 'mysql-bin.000002' LIMIT 2,1;
++------------------+-----+------------+-----------+-------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Log_name         | Pos | Event_type | Server_id | End_log_pos | Info                                                                                                                                                                                                               |
++------------------+-----+------------+-----------+-------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| mysql-bin.000002 | 388 | Query      |         1 |         669 | use `meta`; CREATE OR REPLACE ALGORITHM=UNDEFINED DEFINER=`msandbox`@`localhost` SQL SECURITY DEFINER VIEW `pseudo_gtid_view` AS select '2f6ad653-5db3-11e4-b91d-3c970ea31ea8' as pseudo_gtid_unique_val from dual |
++------------------+-----+------------+-----------+-------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>The above entry will be unique, and orchestrator will be able to find it in the binary log if configured with:</p>
+<blockquote>
+<pre>{
+    ...
+    "PseudoGTIDPattern": "CREATE OR REPLACE .*? VIEW `pseudo_gtid_view` AS select"
+}</pre>
+</blockquote>
+<p>The value of <strong>&#8220;PseudoGTIDPattern&#8221;</strong> is a regular expression which must match the Pseudo GTID entries in the binary log, and <em>nothing but those entries</em>.</p>
+<h4>Pre-release</h4>
+<p>This is BETA quality; though I have high confidence in its safety: the process of matching the binary log entries makes for a self-validating mechanism. The process will abort on any mismatch or uncertainty.</p>
+<p>Still there can be use cases I haven&#8217;t encountered yet. You input is appreciated!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-1-2-1-beta-pseudo-gtid-support-reconnect-slaves-even-after-master-failure/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7114</post-id>	</item>
+	</channel>
+</rss>

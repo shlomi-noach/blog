@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>video &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/video/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 19 Feb 2013 09:32:27 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>MySQL Stored Routines Debugger &#038; Debugging API: sneak preview video</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-stored-routines-debugger-debugging-api-sneak-preview-video</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-stored-routines-debugger-debugging-api-sneak-preview-video#comments</comments>
+				<pubDate>Tue, 19 Feb 2013 09:32:27 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[debug]]></category>
+		<category><![CDATA[Stored routines]]></category>
+		<category><![CDATA[video]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6086</guid>
+				<description><![CDATA[This is a sneak peek video introduction/preview of an in-development free and open source server side debugger &#38; debugging API for MySQL stored routines. MySQL does not provide server side debugging capabilities for stored routines. Some tools exist, including MySQL&#8217;s own, that assist in stored routine debugging. These are all GUI based and, to the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is a sneak peek video introduction/preview of an in-development free and open source server side debugger &amp; debugging API for MySQL stored routines.</p>
+<p>MySQL does not provide server side debugging capabilities for stored routines. Some tools exist, including MySQL&#8217;s own, that assist in stored routine debugging. These are all GUI based and, to the best of my knowledge, MS Windows based. There is one solution in alpha stage that is developed for Java/eclipse; I did not look at the code. See discussion <a href="http://www.xaprb.com/blog/2012/11/01/stored-procedure-debugging-in-mysql/">here</a> and <a href="http://blog.webyog.com/2011/12/06/debugging-stored-programs-in-mysql/">here</a>.</p>
+<p>An ideal solution would be to have debugging API in the server itself &#8211; independently of your client, programming language or operating system. To the best of my knowledge, nothing like that is being developed.</p>
+<p>I&#8217;m now presenting a <strong>rdebug</strong>: a stored routines server-side debugger, Pure-SQL, based on stored routines. <em>rdebug</em> is developed as part of <a href="http://code.google.com/p/common-schema">common_schema,</a> and actually relies on some of its power.</p>
+<p>Like some other tools, it uses code injection and manipulation: it injects debugging info into your stored routine. You need to &#8220;compile&#8221; your routine with debugging info.</p>
+<p>Unlike some other tools, it actually runs your stored routines. It does not mimic or simulate them on client side. It does not break them into smaller routines, attempting to assemble the original behavior from lego bricks.</p>
+<p><strong>The quick technical overview</strong> is that you use two processes (MySQL threads): the worker process running the routine (your natural <strong>call my_routine()</strong>), and the debugger process. The debugger process attaches itself to the worker process; it controls the worker by commands like <em>&#8220;step over&#8221;</em>; it gets data from the worker: what&#8217;s the current stack trace? What variables are now available and what are their values?; it manipulates the worker&#8217;s data: it can utilize breakpoints to modify worker&#8217;s local &amp; session variables.<span id="more-6086"></span></p>
+<p>The debugger code is itself written with stored routines. Your own routines are analyzed by stored routine code. Stored routines inject code into your routine. Stored routines invoke and control the debugging progress. Stored routines manipulate your routine&#8217;s data. All access to the debugger is via (did I mention?) stored routines. This leads to <em>server-side</em> (alas not server-code) <em>debugger &amp; debugger API</em>: any tool, GUI or command line, can utilize these stored routine calls so as to implement a debugger.</p>
+<p>Since the solution is written with stored routines &#8212; thus allowing you to debug your existing <strong>5.1</strong>, <strong>5.5</strong> &amp; <strong>5.6</strong> servers &#8212; it is also limited by what info can be retrieved by stored routines. One can view/modify local routine variables &amp; user defined variables, set breakpoints etc. One cannot get the &#8220;state of a cursor&#8221;, though, since no such info exists for a stored routine code.</p>
+<p>having injected code operate from within your routine does mean a lot more actions are taken, like hidden <strong>INSERT</strong>s and <strong>UPDATE</strong>s. Calls to <strong>ROW_COUNT()</strong> and <strong>LAST_INSERT_ID()</strong> can be skewed. That&#8217;s a limitation I&#8217;m unsure as yet how to overcome; but not overcoming it won&#8217;t bring everything down as far as I&#8217;m concerned.</p>
+<p>Some of the injected code calls upon dynamic SQL. This means at current stored functions are not possible to debug &#8211; just stored procedures. There&#8217;s a way around this for future development. There is no support for triggers, and I don&#8217;t expect there will be in the near future. No investigation into events as yet.<br />
+<a name="video"></a></p>
+<h4>A video is worth a thousand blogs</h4>
+<p>Watch a live demo of debugging a simple routine; the demo presents a step-by-step debugging of a routine, listing, getting and setting variables.</p>
+<div class="jetpack-video-wrapper"><iframe class='youtube-player' type='text/html' width='640' height='360' src='https://www.youtube.com/embed/yOCERssiHMA?version=3&#038;rel=1&#038;fs=1&#038;autohide=2&#038;showsearch=0&#038;showinfo=1&#038;iv_load_policy=1&#038;wmode=transparent' allowfullscreen='true' style='border:0;'></iframe></div>
+<h4>What&#8217;s the status?</h4>
+<p>What you&#8217;ve seen in the video is a first actual milestone &#8211; not a POC. Still need to implement nested stack level, step-in and step-out commands, conditional breakpoints, worker temporary table access from debugger process. Lot&#8217;s of stuff, but looking good.</p>
+<p>This work is the result of a personal interest. All input, feedback, profound mistakes, feature requests, <em>&#8220;dude, there&#8217;s already a far better tool that does all that&#8221;</em> comments, questions &#8212; are welcome!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-stored-routines-debugger-debugging-api-sneak-preview-video/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6086</post-id>	</item>
+	</channel>
+</rss>

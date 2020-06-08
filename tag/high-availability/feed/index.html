@@ -1,0 +1,1093 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>High availability &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/high-availability/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 22 May 2018 08:45:32 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>MySQL master discovery methods, part 5: Service discovery &#038; Proxy</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy#respond</comments>
+				<pubDate>Mon, 14 May 2018 08:08:32 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7869</guid>
+				<description><![CDATA[This is the fifth in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master. These posts are not concerned with the manner by [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the fifth in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master.</p>
+<p>These posts are not concerned with the manner by which the replication failure detection and recovery take place. I will share <code>orchestrator</code> specific configuration/advice, and point out where cross DC <code>orchestrator/raft</code> setup plays part in discovery itself, but for the most part any recovery tool such as <code>MHA</code>, <code>replication-manager</code>, <code>severalnines</code> or other, is applicable.</p>
+<p>We discuss asynchronous (or semi-synchronous) replication, a classic single-master-multiple-replicas setup. A later post will briefly discuss synchronous replication (Galera/XtraDB Cluster/InnoDB Cluster).</p>
+<h3>Master discovery via Service discovery and Proxy</h3>
+<p><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics">Part 4</a> presented with an anti-pattern setup, where a proxy would infer the identify of the master by drawing conclusions from backend server checks. This led to split brains and undesired scenarios. The problem was the loss of context.</p>
+<p>We re-introduce a service discovery component (illustrated in <a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery">part 3</a>), such that:</p>
+<ul>
+<li>The app does not own the discovery, and</li>
+<li>The proxy behaves in an expected and consistent way.</li>
+</ul>
+<p>In a failover/service discovery/proxy setup, there is clear ownership of duties:</p>
+<ul>
+<li>The failover tool own the failover itself and the master identity change notification.</li>
+<li>The service discovery component is the source of truth as for the identity of the master of a cluster.</li>
+<li>The proxy routes traffic but does not make routing decisions.</li>
+<li>The app only ever connects to a single target, but should allow for a brief outage while failover takes place.</li>
+</ul>
+<p>Depending on the technologies used, we can further achieve:</p>
+<ul>
+<li>Hard cut for connections to old, demoted master <code>M</code>.</li>
+<li>Black/hold off for incoming queries for the duration of failover.</li>
+</ul>
+<p>We explain the setup using the following assumptions and scenarios:</p>
+<ul>
+<li>All clients connect to master via <code>cluster1-writer.example.net</code>, which resolves to a proxy box.</li>
+<li>We fail over from master <code>M</code> to promoted replica <code>R</code>.</li>
+</ul>
+<p><span id="more-7869"></span></p>
+<h3>A non planned failover illustration #1</h3>
+<p>Master <code>M</code> has died, the box had a power failure. <code>R</code> gets promoted in its place. Our recovery tool:</p>
+<ul>
+<li>Updates service discovery component that <code>R</code> is the new master for <code>cluster1</code>.</li>
+</ul>
+<p>The proxy:</p>
+<ul>
+<li>Either actively or passively learns that <code>R</code> is the new master, rewires all writes to go to <code>R</code>.</li>
+<li>If possible, kills existing connections to <code>M</code>.</li>
+</ul>
+<p>The app:</p>
+<ul>
+<li>Needs to know nothing. Its connections to <code>M</code> fail, it reconnects and gets through to <code>R</code>.</li>
+</ul>
+<h3>A non planned failover illustration #2</h3>
+<p>Master <code>M</code> gets network isolated for <code>10</code> seconds, during which time we failover. <code>R</code> gets promoted.</p>
+<p>Everything is as before.</p>
+<p>If the proxy kills existing connections to <code>M</code>, then the fact <code>M</code> is back alive turns meaningless. No one gets through to <code>M</code>. Clients were never aware of its identity anyhow, just as they are unaware of <code>R</code>&#8216;s identity.</p>
+<h3>Planned failover illustration</h3>
+<p>We wish to replace the master, for maintenance reasons. We successfully and gracefully promote <code>R</code>.</p>
+<ul>
+<li>In the process of promotion, <code>M</code> turned read-only.</li>
+<li>Immediately following promotion, our failover tool updates service discovery.</li>
+<li>Proxy reloads having seen the changes in service discovery.</li>
+<li>Our app connects to <code>R</code>.</li>
+</ul>
+<h3>Discussion</h3>
+<p>This is a setup we use at GitHub in production. Our components are:</p>
+<ul>
+<li><code>orchestrator</code> for failover tool.</li>
+<li><em>Consul</em> for service discovery.</li>
+<li>GLB (HAProxy) for proxy</li>
+<li><em>Consul template</em> running on proxy hosts:
+<ul>
+<li>listening on changes to Consul&#8217;s KV data</li>
+<li>Regenerate <code>haproxy.cfg</code> configuration file</li>
+<li><code>reload</code> haproxy</li>
+</ul>
+</li>
+</ul>
+<p>As mentioned earlier, the apps need not change anything. They connect to a name that is always resolved to proxy boxes. There is never a DNS change.</p>
+<p>At the time of failover, the service discovery component must be up and available, to catch the change. Otherwise we do not strictly require it to be up at all times.</p>
+<p>For high availability we will have multiple proxies. Each of whom must listen on changes to K/V. Ideally the name (<code>cluster1-writer.example.net</code> in our example) resolves to any available proxy box.</p>
+<ul>
+<li>This, in itself, is a high availability issue. Thankfully, managing the HA of a proxy layer is simpler than that of a MySQL layer. Proxy servers tend to be stateless and equal to each other.</li>
+<li>See GLB as one example for a highly available proxy layer. Cloud providers, Kubernetes, two level layered proxies, Linux Heartbeat, are all methods to similarly achieve HA.</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li><a href="https://blog.pythian.com/mysql-high-availability-with-haproxy-consul-and-orchestrator/">MySQL High Availability With HAProxy, Consul And Orchestrator</a></li>
+<li><a href="https://www.percona.com/live/18/sessions/automatic-failovers-with-kubernetes-using-orchestrator-proxysql-and-zookeeper">Automatic Failovers with Kubernetes using Orchestrator, ProxySQL and Zookeeper</a></li>
+<li><a href="https://www.percona.com/live/e17/sessions/orchestrating-proxysql-with-orchestrator-and-consul">Orchestrating ProxySQL with Orchestrator and Consul</a></li>
+</ul>
+<h3>Sample orchestrator configuration</h3>
+<p>An <code>orchestrator</code> configuration would look like this:</p>
+<pre><code class="json">  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "KVClusterMasterPrefix": "mysql/master",
+  "ConsulAddress": "127.0.0.1:8500",
+  "ZkAddress": "srv-a,srv-b:12181,srv-c",
+  "PostMasterFailoverProcesses": [
+    “/just/let/me/know about failover on {failureCluster}“,
+  ],
+</code></pre>
+<p>In the above:</p>
+<ul>
+<li>If <code>ConsulAddress</code> is specified, <code>orchestrator</code> will update given <em>Consul</em> setup with K/V changes.</li>
+<li>At <code>3.0.10</code>, <em>ZooKeeper</em>, via <code>ZkAddress</code>, is still not supported by <code>orchestrator</code>.</li>
+<li><code>PostMasterFailoverProcesses</code> is here just to point out hooks are not strictly required for the operation to run.</li>
+</ul>
+<p>See <a href="https://github.com/github/orchestrator/blob/master/docs/configuration.md">orchestrator configuration</a> documentation.</p>
+<h3>All posts in this series</h3>
+<ul>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">MySQL master discovery methods, part 1: DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns">MySQL master discovery methods, part 2: VIP &amp; DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery">MySQL master discovery methods, part 3: app &amp; service discovery</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics">MySQL master discovery methods, part 4: Proxy heuristics</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy">MySQL master discovery methods, part 5: Service discovery &amp; Proxy</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-6-other-methods">MySQL master discovery methods, part 6: other methods</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7869</post-id>	</item>
+		<item>
+		<title>MySQL master discovery methods, part 4: Proxy heuristics</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics#respond</comments>
+				<pubDate>Thu, 10 May 2018 06:10:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7867</guid>
+				<description><![CDATA[Note: the method described here is an anti pattern This is the fourth in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><em>Note: the method described here is an anti pattern</em></p>
+<p>This is the fourth in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master.</p>
+<p>These posts are not concerned with the manner by which the replication failure detection and recovery take place. I will share <code>orchestrator</code> specific configuration/advice, and point out where cross DC <code>orchestrator/raft</code> setup plays part in discovery itself, but for the most part any recovery tool such as <code>MHA</code>, <code>replication-manager</code>, <code>severalnines</code> or other, is applicable.</p>
+<p>We discuss asynchronous (or semi-synchronous) replication, a classic single-master-multiple-replicas setup. A later post will briefly discuss synchronous replication (Galera/XtraDB Cluster/InnoDB Cluster).</p>
+<h3>Master discovery via Proxy Heuristics</h3>
+<p>In Proxy Heuristics all clients connect to the master through a proxy. The proxy observes the backend MySQL servers and determines who the master is.</p>
+<p><strong>This setup is simple and easy, but is an anti pattern. I recommend against using this method, as explained shortly</strong>.</p>
+<p>Clients are all configured to connect to, say, <code>cluster1-writer.proxy.example.net:3306</code>. The proxy will intercept incoming requests either based on hostname or by port. It is aware of all/some MySQL backend servers in that cluster, and will route traffic to the master <code>M</code>.</p>
+<p>A simple heuristic that I&#8217;ve seen in use is: pick the server that has <code>read_only=0</code>, a very simple check.</p>
+<p>Let&#8217;s take a look at how this works and what can go wrong.</p>
+<p><span id="more-7867"></span></p>
+<h3>A non planned failover illustration #1</h3>
+<p>Master <code>M</code> has died, the box had a power failure. <code>R</code> gets promoted in its place. Our recovery tool:</p>
+<ul>
+<li>Fails over, but doesn&#8217;t need to run any hooks.</li>
+</ul>
+<p>The proxy:</p>
+<ul>
+<li>Knows both about <code>M</code> and <code>R</code>.</li>
+<li>Notices <code>M</code> fails health checks (<code>select @@global.read_only</code> returns error since the box is down).</li>
+<li>Notices <code>R</code> reports healthy and with <code>read_only=0</code>.</li>
+<li>Routes all traffic to <code>R</code>.</li>
+</ul>
+<p>Success, we&#8217;re happy.</p>
+<h3>Configuration tip</h3>
+<p>With an automated failover solution, use <code>read_only=1</code> in <code>my.cnf</code> at all times. Only the failover solution will set a server to <code>read_only=0</code>.</p>
+<p>With this configuration, when <code>M</code> restarts, MySQL starts up as <code>read_only=1</code>.</p>
+<h3>A non planned failover illustration #2</h3>
+<p>Master <code>M</code> gets network isolated for <code>10</code> seconds, during which time we failover. <code>R</code> gets promoted. Our tool:</p>
+<ul>
+<li>Fails over, but doesn&#8217;t need to run any hooks.</li>
+</ul>
+<p>The proxy:</p>
+<ul>
+<li>Knows both about <code>M</code> and <code>R</code>.</li>
+<li>Notices <code>M</code> fails health checks (<code>select @@global.read_only</code> returns error since the box is down).</li>
+<li>Notices <code>R</code> reports healthy and with <code>read_only=0</code>.</li>
+<li>Routes all traffic to <code>R</code>.</li>
+<li><code>10</code> seconds later <code>M</code> comes back to life, claiming <code>read_only=0</code>.</li>
+<li>The proxy now sees two servers reporting as healthy and with <code>read_only=0</code>.</li>
+<li>The proxy has no context. It does not know why both are reporting the same. It is unaware of failovers. All it sees is what the backend MySQL servers report.</li>
+</ul>
+<p>Therein lies the problem: you can not trust multiple servers (MySQL backends) to deterministically pick a leader (the master) without them collaborating on some elaborate consensus communication.</p>
+<h3>A non planned failover illustration #3</h3>
+<p>Master <code>M</code> box is overloaded, issuing <code>too many connections</code> for incoming connections.</p>
+<p>Our tool decides to failover.</p>
+<ul>
+<li>And doesn&#8217;t need to run any hooks.</li>
+</ul>
+<p>The proxy:</p>
+<ul>
+<li>Notices <code>M</code> fails health checks (<code>select @@global.read_only</code> does not respond because of the load).</li>
+<li>Notices <code>R</code> reports healthy and with <code>read_only=0</code>.</li>
+<li>Routes all traffic to <code>R</code>.</li>
+<li>Shortly followed by <code>M</code> recovering (since no more writes are sent its way), claiming <code>read_only=0</code>.</li>
+<li>The proxy now sees two servers reporting as healthy and with <code>read_only=0</code>.</li>
+</ul>
+<p>Again, the proxy has no context, and neither do <code>M</code> and <code>R</code>, for that matter. The context (the fact we failed over from <code>M</code> to <code>R</code>) was known to our failover tool, but was lost along the way.</p>
+<h3>Planned failover illustration</h3>
+<p>We wish to replace the master, for maintenance reasons. We successfully and gracefully promote <code>R</code>.</p>
+<ul>
+<li><code>M</code> is available and responsive, we set it to <code>read_only=1</code>.</li>
+<li>We set <code>R</code> to <code>read_only=0</code>.</li>
+<li>All new connections route to <code>R</code>.</li>
+<li>We should also instruct our Proxy to kill all previous connections to <code>M</code>.</li>
+</ul>
+<p>This works very nicely.</p>
+<h3>Discussion</h3>
+<p>There is a substantial risk to this method. Correlation between failover and network partitioning/load (illustrations #2 and #3) is reasonable.</p>
+<p>The root of the problem is that we expect individual servers to resolve conflicts without speaking to each other: we expect the MySQL servers to correctly claim &#8220;I&#8217;m the master&#8221; without context.</p>
+<p>We then add to that problem by using the proxy to &#8220;pick a side&#8221; without giving it any context, either.</p>
+<h3>Sample orchestrator configuration</h3>
+<p>By way of discouraging use of this method I do not present an <code>orchestrator</code> configuration file.</p>
+<h3>All posts in this series</h3>
+<ul>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">MySQL master discovery methods, part 1: DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns">MySQL master discovery methods, part 2: VIP &amp; DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery">MySQL master discovery methods, part 3: app &amp; service discovery</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics">MySQL master discovery methods, part 4: Proxy heuristics</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy">MySQL master discovery methods, part 5: Service discovery &amp; Proxy</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-6-other-methods">MySQL master discovery methods, part 6: other methods</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7867</post-id>	</item>
+		<item>
+		<title>MySQL master discovery methods, part 3: app &#038; service discovery</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery#respond</comments>
+				<pubDate>Tue, 08 May 2018 08:02:19 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7865</guid>
+				<description><![CDATA[This is the third in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master. These posts are not concerned with the manner by [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the third in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master.</p>
+<p>These posts are not concerned with the manner by which the replication failure detection and recovery take place. I will share <code>orchestrator</code> specific configuration/advice, and point out where cross DC <code>orchestrator/raft</code> setup plays part in discovery itself, but for the most part any recovery tool such as <code>MHA</code>, <code>replication-manager</code>, <code>severalnines</code> or other, is applicable.</p>
+<p>We discuss asynchronous (or semi-synchronous) replication, a classic single-master-multiple-replicas setup. A later post will briefly discuss synchronous replication (Galera/XtraDB Cluster/InnoDB Cluster).</p>
+<h3>App &amp; service discovery</h3>
+<p><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">Part 1</a> and <a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns">part 2</a> presented solutions where the app remained ingorant of master&#8217;s identity. This part takes a complete opposite direction and gives the app ownership on master access.</p>
+<p>We introduce a service discovery component. Commonly known are <em>Consul</em>, <em>ZooKeeper</em>, <em>etcd</em>, highly available stores offering key/value (K/V) access, leader election or full blown service discovery &amp; health.</p>
+<p>We satisfy ourselves with K/V functionality. A key would be <code>mysql/master/cluster1</code> and a value would be the master&#8217;s hostname/port.</p>
+<p>It is the app&#8217;s responsibility at all times to fetch the identity of the master of a given cluster by querying the service discovery component, thereby opening connections to the indicated master.</p>
+<p>The service discovery component is expected to be up at all times and to contain the identity of the master for any given cluster.</p>
+<p><span id="more-7865"></span></p>
+<h3>A non planned failover illustration #1</h3>
+<p>Master <code>M</code> has died. <code>R</code> gets promoted in its place. Our recovery tool:</p>
+<ul>
+<li>Updates the service discovery component, key is <code>mysql/master/cluster1</code>, value is <code>R</code>&#8216;s hostname.</li>
+</ul>
+<p>Clients:</p>
+<ul>
+<li>Listen on K/V changes, recognize that master&#8217;s value has changed.</li>
+<li>Reconfigure/refresh/reload/do what it takes to speak to new master and to drop connections to old master.</li>
+</ul>
+<h3>A non planned failover illustration #2</h3>
+<p>Master <code>M</code> gets network isolated for <code>10</code> seconds, during which time we failover. <code>R</code> gets promoted. Our tool (as before):</p>
+<ul>
+<li>Updates the service discovery component, key is <code>mysql/master/cluster1</code>, value is <code>R</code>&#8216;s hostname.</li>
+</ul>
+<p>Clients (as before):</p>
+<ul>
+<li>Listen on K/V changes, recognize that master&#8217;s value has changed.</li>
+<li>Reconfigure/refresh/reload/do what it takes to speak to new master and to drop connections to old master.</li>
+<li>Any changes not taking place in a timely manner imply some connections still use old master <code>M</code>.</li>
+</ul>
+<h3>Planned failover illustration</h3>
+<p>We wish to replace the master, for maintenance reasons. We successfully and gracefully promote <code>R</code>.</p>
+<ul>
+<li>App should start connecting to <code>R</code>.</li>
+</ul>
+<h3>Discussion</h3>
+<p>The app is the complete owner. This calls for a few concerns:</p>
+<ul>
+<li>How does a given app refresh and apply the change of master such that no stale connections are kept?
+<ul>
+<li>Highly concurrent apps may be more difficult to manage.</li>
+</ul>
+</li>
+<li>In a polyglot app setup, you will need all clients to use the same setup. Implement same listen/refresh logic for Ruby, golang, Java, Python, Perl and notably shell scripts.
+<ul>
+<li>The latter do not play well with such changes.</li>
+</ul>
+</li>
+<li>How can you validate that the change of master has been detected by all app nodes?</li>
+</ul>
+<p>As for the service discovery:</p>
+<ul>
+<li>What load will you be placing on your service discovery component?
+<ul>
+<li>I was familiar with a setup where there were so many apps and app nodes and app instances, such that the amount of connections was too much for the service discovery . In that setup caching layers were created, which introduced their own consistency problems.</li>
+</ul>
+</li>
+<li>How do you handle service discovery outage?
+<ul>
+<li>A reasonable approach is to keep using last known master idendity should service discovery be down. This, again, plays better wih higher level applications, but less so with scripts.</li>
+</ul>
+</li>
+</ul>
+<p>It is worth noting that this setup does not suffer from geographical limitations to the master&#8217;s identity. The master can be anywhere; the service discovery component merely points out where the master is.</p>
+<h3>Sample orchestrator configuration</h3>
+<p>An <code>orchestrator</code> configuration would look like this:</p>
+<pre><code class="json">  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "KVClusterMasterPrefix": "mysql/master",
+  "ConsulAddress": "127.0.0.1:8500",
+  "ZkAddress": "srv-a,srv-b:12181,srv-c",
+  "PostMasterFailoverProcesses": [
+    “/just/let/me/know about failover on {failureCluster}“,
+  ],
+</code></pre>
+<p>In the above:</p>
+<ul>
+<li>If <code>ConsulAddress</code> is specified, <code>orchestrator</code> will update given <em>Consul</em> setup with K/V changes.</li>
+<li>At <code>3.0.10</code>, <em>ZooKeeper</em>, via <code>ZkAddress</code>, is still not supported by <code>orchestrator</code>.</li>
+<li><code>PostMasterFailoverProcesses</code> is here just to point out hooks are not strictly required for the operation to run.</li>
+</ul>
+<p>See <a href="https://github.com/github/orchestrator/blob/master/docs/configuration.md">orchestrator configuration</a> documentation.</p>
+<h3>All posts in this series</h3>
+<ul>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">MySQL master discovery methods, part 1: DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns">MySQL master discovery methods, part 2: VIP &amp; DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery">MySQL master discovery methods, part 3: app &amp; service discovery</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics">MySQL master discovery methods, part 4: Proxy heuristics</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy">MySQL master discovery methods, part 5: Service discovery &amp; Proxy</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-6-other-methods">MySQL master discovery methods, part 6: other methods</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7865</post-id>	</item>
+		<item>
+		<title>MySQL master discovery methods, part 2: VIP &#038; DNS</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns#comments</comments>
+				<pubDate>Mon, 07 May 2018 06:46:22 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7863</guid>
+				<description><![CDATA[This is the second in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master. These posts are not concerned with the manner by [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the second in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master.</p>
+<p>These posts are not concerned with the manner by which the replication failure detection and recovery take place. I will share <code>orchestrator</code> specific configuration/advice, and point out where cross DC <code>orchestrator/raft</code> setup plays part in discovery itself, but for the most part any recovery tool such as <code>MHA</code>, <code>replication-manager</code>, <code>severalnines</code> or other, is applicable.</p>
+<p>We discuss asynchronous (or semi-synchronous) replication, a classic single-master-multiple-replicas setup. A later post will briefly discuss synchronous replication (Galera/XtraDB Cluster/InnoDB Cluster).</p>
+<h3>Master discovery via VIP</h3>
+<p>In <a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">part 1</a> we saw that one the main drawbacks of DNS discovery is the time it takes for the apps to connect to the promoted master. This is the result of both DNS deployment time as well as client&#8217;s <code>TTL</code>.</p>
+<p>A quicker method is offered: use of VIPs (Virtual IPs). As before, apps would connect to <code>cluster1-writer.example.net</code>, <code>cluster2-writer.example.net</code>, etc. However, these would resolve to specific VIPs.</p>
+<p>Say <code>cluster1-writer.example.net</code> resolves to <code>10.10.0.1</code>. We let this address float between servers. Each server has its own IP (say <code>10.20.0.XXX</code>) but could also potentially claim the VIP <code>10.10.0.1</code>.</p>
+<p>VIPs can be assigned by switches and I will not dwell into the internals, because I&#8217;m not a network expert. However, the following holds:</p>
+<ul>
+<li>Acquiring a VIP is a very quick operation.</li>
+<li>Acquiring a VIP must take place on the acquiring host.</li>
+<li>A host may be unable to acquire a VIP should another host holds the same VIP.</li>
+<li>A VIP can only be assigned within a bounded space: hosts connected to the same switch; hosts in the same Data Center or availability zone.</li>
+</ul>
+<p><span id="more-7863"></span></p>
+<h3>A non planned failover illustration #1</h3>
+<p>Master <code>M</code> has died, the box had a power failure. <code>R</code> gets promoted in its place. Our recovery tool:</p>
+<ul>
+<li>Attempts to connect to <code>M</code> so that it can give up the VIP. The attempt fails because <code>M</code> is dead.</li>
+<li>Connects to <code>R</code> and instructs it to acquire the VIP. Since <code>M</code> is dead there is no objection, and <code>R</code> successfully grabs the VIP.</li>
+<li>Any new connections immediately route to the new master <code>R</code>.</li>
+<li>Clients with connections to <code>M</code> cannot connect, issue retries, immediately route to <code>R</code>.</li>
+</ul>
+<h3>A non planned failover illustration #2</h3>
+<p>Master <code>M</code> gets network isolated for <code>30</code> seconds, during which time we failover. <code>R</code> gets promoted. Our tool:</p>
+<ul>
+<li>Attempts to connect to <code>M</code> so that it can give up the VIP. The attempt fails because <code>M</code> is network isolated.</li>
+<li>Connects to <code>R</code> and instructs it to acquire the VIP. Since <code>M</code> is network isolated there is no objection, and <code>R</code> successfully grabs the VIP.</li>
+<li>Any new connections immediately route to the new master <code>R</code>.</li>
+<li>Clients with connections to <code>M</code> cannot connect, issue retries, immediately route to <code>R</code>.</li>
+<li><code>30</code> seconds later <code>M</code> reappears, but no one pays any attention.</li>
+</ul>
+<h3>A non planned failover illustration #3</h3>
+<p>Master <code>M</code> box is overloaded. It is not responsive to new connections but may slowly serves existing connections. Our tool decides to failover:</p>
+<ul>
+<li>Attempts to connect to <code>M</code> so that it can give up the VIP. The attempt fails because <code>M</code> is very loaded.</li>
+<li>Connects to <code>R</code> and instructs it to acquire the VIP. Unfortunately, <code>M</code> hasn&#8217;t given up the VIP and still shows up as owning it.</li>
+<li>All existing and new connections keep on routing to <code>M</code>, even as <code>R</code> is the new master.</li>
+<li>This continues until some time has passed and we are able to manually grab the VIP on <code>R</code>, or until we forcibly network isolate <code>M</code> or forcibly shut it down.</li>
+</ul>
+<p>We suffer outage.</p>
+<h3>Planned failover illustration</h3>
+<p>We wish to replace the master, for maintenance reasons. We successfully and gracefully promote <code>R</code>.</p>
+<ul>
+<li><code>M</code> is available and responsive, we ask it to give up the VIP, which is does.</li>
+<li>We ask <code>R</code> to grab the VIP, which it does.</li>
+<li>All new connections route to <code>R</code>.</li>
+<li>We may still see old connections routing to <code>M</code>. We can forcibly network isolate <code>M</code> to break those connections so as to cause reconnects, or restart apps.</li>
+</ul>
+<h3>Discussion</h3>
+<p>As with DNS discovery, the apps are never told of the change. They may be forcibly restarted though.</p>
+<p>Grabbing a VIP is a quick operation. However, consider:</p>
+<ul>
+<li>It is not guaranteed to succeed. I have seen it fail in various situations.</li>
+<li>Since releasing/acquiring of VIP can only take place on the demoted/promoted servers, respectively, our failover tool will need to:
+<ul>
+<li>Remote SSH onto both boxes, or</li>
+<li>Remote exec a command on those boxes</li>
+</ul>
+</li>
+<li>Moreover, the tool will do so sequentially. First we must connect to demoted master to give up the VIP, then to promoted master to acquire it.</li>
+<li>This means the time at which the new master grabs the VIP depends on how long it takes to connect to the old master to give up the VIP. Seeing that the old master had <em>trouble</em> causing failover, we can expect correlation to not being able to connect to old master, or seeing slow connect time.</li>
+<li>An alternative exists, in the form of <a href="http://clusterlabs.org/pacemaker/">Pacemaker</a>. Consider <a href="https://github.com/Percona-Lab/pacemaker-replication-agents/blob/master/doc/PRM-setup-guide.rst">Percona&#8217;s Replication Manager</a> guide for more insights. Pacemaker provides a single point of access from where the VIP can be moved, and behind the scenes it will communicate to relevant nodes. This makes it simpler on the failover solution configuration.</li>
+<li>We are constrained by physical location.</li>
+<li>It is still possible for existing connection to keep on communicating to the demoted master, even while the VIP has been moved.</li>
+</ul>
+<h3>VIP &amp; DNS combined</h3>
+<p>Per physical location, we could choose to use VIP. But should we need to failover to a server in another DC, we could choose to combine the DNS discovery, discussed in <a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">part 1</a>.</p>
+<p>We can expect to see faster failover time on a local physical location, and longer failover time on remote location.</p>
+<h3>Sample orchestrator configuration</h3>
+<p>What kind of remote exec method will you have? In this sample we will use remote (passwordless) SSH.</p>
+<p>An <code>orchestrator</code> configuration would look like this:</p>
+<pre><code class="json">  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PostMasterFailoverProcesses": [
+    "ssh {failedHost} 'sudo ifconfig the-vip-interface down'",
+    "ssh {successorHost} 'sudo ifconfig the-vip-interface up'",
+    "/do/what/you/gotta/do to apply dns change for {failureClusterAlias}-writer.example.net to {successorHost}"
+  ],  
+</code></pre>
+<p>In the above:</p>
+<ul>
+<li>Replace <code>SSH</code> with any remote exec method you may use.
+<ul>
+<li>But you will need to set up the access/credentials for <code>orchestrator</code> to run those operations.</li>
+</ul>
+</li>
+<li>Replace <code>ifconfig</code> with <code>service quagga stop/start</code> or any method you use to release/grab VIPs.</li>
+</ul>
+<p>See <a href="https://github.com/github/orchestrator/blob/master/docs/configuration.md">orchestrator configuration</a> documentation.</p>
+<h3>All posts in this series</h3>
+<ul>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">MySQL master discovery methods, part 1: DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns">MySQL master discovery methods, part 2: VIP &amp; DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery">MySQL master discovery methods, part 3: app &amp; service discovery</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics">MySQL master discovery methods, part 4: Proxy heuristics</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy">MySQL master discovery methods, part 5: Service discovery &amp; Proxy</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-6-other-methods">MySQL master discovery methods, part 6: other methods</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7863</post-id>	</item>
+		<item>
+		<title>MySQL master discovery methods, part 1: DNS</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns#respond</comments>
+				<pubDate>Thu, 03 May 2018 10:56:46 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7861</guid>
+				<description><![CDATA[This is the first in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master. These posts are not concerned with the manner by [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the first in a series of posts reviewing methods for MySQL master discovery: the means by which an application connects to the master of a replication tree. Moreover, the means by which, upon master failover, it identifies and connects to the newly promoted master.</p>
+<p>These posts are not concerned with the manner by which the replication failure detection and recovery take place. I will share <code>orchestrator</code> specific configuration/advice, and point out where cross DC <code>orchestrator/raft</code> setup plays part in discovery itself, but for the most part any recovery tool such as <code>MHA</code>, <code>replication-manager</code>, <code>severalnines</code> or other, is applicable.</p>
+<p>We discuss asynchronous (or semi-synchronous) replication, a classic single-master-multiple-replicas setup. A later post will briefly discuss synchronous replication (Galera/XtraDB Cluster/InnoDB Cluster).</p>
+<h3>Master discovery via DNS</h3>
+<p>In DNS master discovery applications connect to the master via a name that gets resolved to the master&#8217;s box. By way of example, apps would target the masters of different clusters by connecting to <code>cluster1-writer.example.net</code>, <code>cluster2-writer.example.net</code>, etc. It is up for the DNS to resolve those names to IPs.</p>
+<p><span id="more-7861"></span></p>
+<p>Issues for concern are:</p>
+<ul>
+<li>You will likely have multiple DNS servers. How many? In which data centers / availability zones?</li>
+<li>What is your method for distributing/deploying a name change to all your DNS servers?</li>
+<li>DNS will indicate a <code>TTL</code> (Time To Live) such that clients can cache the IP associated with a name for a given number of seconds. What is that <code>TTL</code>?</li>
+</ul>
+<p>As long as things are stable and going well, discovery via DNS makes sense. Trouble begins when the master fails over. Assume <code>M</code> used to be the master, but got demoted. Assume <code>R</code> used to be a replica, that got promoted and is now effectively the master of the topology.</p>
+<p>Our failover solution has promoted <code>R</code>, and now needs to somehow apply the change, such that the apps connect to <code>R</code> instead of <code>M</code>. Some notes:</p>
+<ul>
+<li>The apps need not change configuration. They should still connect to <code>cluster1-writer.example.net</code>, <code>cluster2-writer.example.net</code>, etc.</li>
+<li>Our tool instructs DNS servers to make the change.</li>
+<li>Clients will still resolve to old IP based on <code>TTL</code>.</li>
+</ul>
+<h3>A non planned failover illustration #1</h3>
+<p>Master <code>M</code> dies. <code>R</code> gets promoted. Our tool instructs all DNS servers on all DCs to update the IP address.</p>
+<p>Say <code>TTL</code> is <code>60</code> seconds. Say update to all DNS servers takes <code>10</code> seconds. We will have between <code>10</code> and <code>70</code> seconds until all clients connect to the new master <code>R</code>.</p>
+<p>During that time they will continue to attempt connecting to <code>M</code>. Since <code>M</code> is dead, those attempts will fail (thankfully).</p>
+<h3>A non planned failover illustration #2</h3>
+<p>Master <code>M</code> gets network isolated for <code>30</code> seconds, during which time we failover. <code>R</code> gets promoted. Our tool instructs all DNS servers on all DCs to update the IP address.</p>
+<p>Again, assume <code>TTL</code> is <code>60</code> seconds. As before, it will take between <code>10</code> and <code>70</code> seconds for clients to learn of the new IP.</p>
+<p>Clients who will require between <code>40</code> and <code>70</code> seconds to learn of the new IP will, however, hit an unfortunate scenario: the old master <code>M</code> reappears on the grid. Those clients will successfully reconnect to <code>M</code> and issue writes, leading to data loss (writes to <code>M</code> no longer replicate anywhere).</p>
+<h3>Planned failover illustration</h3>
+<p>We wish to replace the master, for maintenance reasons. We successfully and gracefully promote <code>R</code>. We need to change DNS records. Since this is a planned failover, we set the old master to <code>read_only=1</code>, or even better, we network isolated it.</p>
+<p>And still our clients take <code>10</code> to <code>70</code> seconds to recognize the new master.</p>
+<h3>Discussion</h3>
+<p>The above numbers are just illustrative. Perhaps DNS deployment is quicker than <code>10</code> seconds. You should do your own math.</p>
+<p><code>TTL</code> is a compromise which you can tune. Setting lower <code>TTL</code> will mitigate the problem, but will cause more hits on the DNS servers.</p>
+<p>For planned takeover we can first deploy a change to the <code>TTL</code>, to, say, <code>2sec</code>, wait <code>60sec</code>, then deploy the IP change, then restore <code>TTL</code> to <code>60</code>.</p>
+<p>You may choose to restart apps upon DNS deployment. This emulates apps&#8217; awareness of the change.</p>
+<h3>Sample orchestrator configuration</h3>
+<p><code>orchestrator</code> configuration would look like this:</p>
+<pre><code class="json">  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PostMasterFailoverProcesses": [
+    "/do/what/you/gotta/do to apply dns change for {failureClusterAlias}-writer.example.net to {successorHost}"
+  ],  
+</code></pre>
+<p>In the above:</p>
+<ul>
+<li><code>ApplyMySQLPromotionAfterMasterFailover</code> instructs <code>orchestrator</code> to <code>set read_only=0; reset slave all</code> on promoted server.</li>
+<li><code>PostMasterFailoverProcesses</code> really depends on your setup. But <code>orchestrator</code> will supply with hints to your scripts: identity of cluster, identity of successor.</li>
+</ul>
+<p>See <a href="https://github.com/github/orchestrator/blob/master/docs/configuration.md">orchestrator configuration</a> documentation.</p>
+<h3>All posts in this series</h3>
+<ul>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns">MySQL master discovery methods, part 1: DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-2-vip-dns">MySQL master discovery methods, part 2: VIP &amp; DNS</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-3-app-service-discovery">MySQL master discovery methods, part 3: app &amp; service discovery</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-4-proxy-heuristics">MySQL master discovery methods, part 4: Proxy heuristics</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-5-service-discovery-proxy">MySQL master discovery methods, part 5: Service discovery &amp; Proxy</a></li>
+<li><a href="https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-6-other-methods">MySQL master discovery methods, part 6: other methods</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-master-discovery-methods-part-1-dns/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7861</post-id>	</item>
+		<item>
+		<title>orchestrator 3.0.6: faster crash detection &#038; recoveries, auto Pseudo-GTID, semi-sync and more</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-3-0-6-faster-crash-detection-recoveries-auto-pseudo-gtid-semi-sync-and-more</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-3-0-6-faster-crash-detection-recoveries-auto-pseudo-gtid-semi-sync-and-more#respond</comments>
+				<pubDate>Mon, 29 Jan 2018 09:40:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7833</guid>
+				<description><![CDATA[orchestrator 3.0.6 is released and includes some exciting improvements and features. It quickly follows up on 3.0.5 released recently, and this post gives a breakdown of some notable changes: Faster failure detection Recall that orchestrator uses a holistic approach for failure detection: it reads state not only from the failed server (e.g. master) but also [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><code>orchestrator</code> <a href="https://github.com/github/orchestrator/releases/tag/v3.0.6"><strong>3.0.6</strong> is released</a> and includes some exciting improvements and features. It quickly follows up on <a href="https://github.com/github/orchestrator/releases/tag/v3.0.5"><strong>3.0.5</strong></a> released recently, and this post gives a breakdown of some notable changes:</p>
+<h3>Faster failure detection</h3>
+<p>Recall that <code>orchestrator</code> uses a holistic approach for <a href="https://github.com/github/orchestrator/blob/master/docs/failure-detection.md#failure-detection">failure detection</a>: it reads state not only from the failed server (e.g. master) but also from its replicas. <code>orchestrator</code> now detects failure faster than before:</p>
+<ul>
+<li>A detection cycle has been eliminated, leading to quicker resolution of a failure. On our setup, where we poll servers every <code>5sec</code>, failure detection time dropped from <code>7-10sec</code> to <code>3-5sec</code>, <em>keeping reliability</em>. The reduction in time does not lead to increased false positives.<br />
+Side note: you may see increased not-quite-failure analysis such as &#8220;I can&#8217;t see the master&#8221; (<code>UnreachableMaster</code>).</li>
+<li>Better handling of network scenarios where packets are dropped. Instead of hanging till TCP timeout, <code>orchestrator</code> now observes server discovery asynchronously. We have <a href="https://githubengineering.com/mysql-testing-automation-at-github/#failovers">specialized failover tests</a> that simulate dropped packets. The change reduces detection time by some <code>5sec</code>.</li>
+</ul>
+<h3>Faster master recoveries</h3>
+<p>Promoting a new master is a complex task which attempts to promote the best replica out of the pool of replicas. It&#8217;s not always the most up-to-date replica. The choice varies depending on replica configuration, version, and state.</p>
+<p>With recent changes, <code>orchestrator</code> is able to to recognize, early on, that the replica it would like to promote as master is <em>ideal</em>. Assuming that is the case, <code>orchestrator</code> is able to immediate promote it (i.e. run hooks, set <code>read_only=0</code> etc.), and run the rest of the failover logic, i.e. the rewiring of replicas under the newly promoted master, asynchronously.</p>
+<p>This allows the promoted server to take writes sooner, even while its replicas are not yet connected. It also means external hooks are executed sooner.</p>
+<p>Between faster detection and faster recoveries, we&#8217;re looking at some <code>10sec</code> reduction in overall recovery time: from moment of crash to moment where a new master accepts writes. We stand now at <code>&lt; 20sec</code> in almost all cases, and <code>&lt; 15s</code> in optimal cases. Those times are measured on our failover tests.</p>
+<p>We are working on reducing failover time unrelated to <code>orchestrator</code> and hope to update soon.</p>
+<h3>Automated Pseudo-GTID</h3>
+<p>As reminder, Pseudo-GTID is an alternative to GTID, without the kind of commitment you make with GTID. It provides similar &#8220;point your replica under any other server&#8221; behavior GTID allows.<span id="more-7833"></span></p>
+<p>There&#8217;s still <em>many</em> setups out there where GTID is not (yet?) deployed and enabled. However, Pseudo-GTID is often misunderstood, and though I&#8217;ve blogged and presented Pseudo-GTID many times in the past, I still find myself explaining to people the setup is simple and does not involve change to one&#8217;s topologies.</p>
+<p>Well, it just got simpler. <code>orchestrator</code> is now able to automatically inject Pseudo-GTID for you.</p>
+<p>Say the word: <code>"AutoPseudoGTID": true</code>, grant <a href="https://github.com/github/orchestrator/blob/master/docs/configuration-discovery-pseudo-gtid.md#automated-pseudo-gtid-injection">the necessary privilege</a>, and your non-GTID topology is suddenly supercharged with magical Pseudo-GTID tokens that provide you with:</p>
+<ul>
+<li>Arbitrary relocation of replicas</li>
+<li>Automated or manual failovers (masters <em>and</em> intermediate masters)</li>
+<li>Vendor freedom: runs on Oracle MySQL, Percona Server, MariaDB, or all of the above at the very same time.</li>
+<li>Version freedom (still on <code>5.5</code>? No problem. Oh, this gets you crash-safe replication as extra bonus, too)</li>
+</ul>
+<p>Auto-Pseudo-GTID further simplifies the infrastructure in that you no longer need to take care of injecting Pseudo-GTID onto the master as well as handle master identity changes. No more <code>event_scheduler</code> to enable/disable nor services to <code>start/stop</code>.</p>
+<p>More and more setups are moving to GTID. We may, too! But I find it peculiar that Pseudo-GTID was suggested <code>4</code> years ago, when <code>5.6</code> GTID was already released, and still many setups are not yet running GTID. If you&#8217;re not using GTID, please try Pseudo-GTID! <a href="https://github.com/github/orchestrator/blob/master/docs/pseudo-gtid.md">Read more</a>.</p>
+<h3>Semi-sync support</h3>
+<p>Semi-sync has been internally supported via a specialized patch contributed by Vitess, to flag a server as semi-sync-able and handle enablement of semi-sync upon master failover.</p>
+<p><code>orchestrator</code> now supports semi-sync more generically. You may use <code>orchestrator</code> to enable/disable semi-sync master/replica side, via <code>orchestrator -c enable-semi-sync-master</code>, <code>orchestrator -c enable-semi-sync-replica</code>, <code>orchestrator -c disable-semi-sync-master</code>, <code>orchestrator -c disable-semi-sync-replica</code> commands (or API equivalent).</p>
+<p>The API will also tell you whether semi-sync is enabled on instances. Noteworthy that configured != enabled. A server can be configured with <code>rpl_semi_sync_master_enabled=ON</code>, but if no semi-sync replicas are found, the <code>Rpl_semi_sync_master_status</code> state is <code>OFF</code>.</p>
+<h3>More</h3>
+<p>UI changes, removal of prepared statements, documentation updates, raft updates&#8230;</p>
+<p><a href="https://github.com/github/orchestrator"><code>orchestrator</code></a> is free and open source and released under the Apache 2 license. It is authored at and used by GitHub.</p>
+<p>I&#8217;ll be presenting <code>orchestrator/raft</code> in <a href="https://fosdem.org/2018/schedule/event/orchestrator_raft/">FOSDEM next week</a>, at the MySQL and Friends Room.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-3-0-6-faster-crash-detection-recoveries-auto-pseudo-gtid-semi-sync-and-more/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7833</post-id>	</item>
+		<item>
+		<title>orchestrator/raft: Pre-Release 3.0</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0#comments</comments>
+				<pubDate>Thu, 03 Aug 2017 08:41:11 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7740</guid>
+				<description><![CDATA[orchestrator 3.0 Pre-Release is now available. Most notable are Raft consensus, SQLite backend support, orchestrator-client no-binary-required client script. TL;DR You may now set up high availability for orchestrator via raft consensus, without need to set up high availability for orchestrator&#8216;s backend MySQL servers (such as Galera/InnoDB Cluster). In fact, you can run a orchestrator/raft setup [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><code>orchestrator</code> <strong>3.0 Pre-Release</strong> is <a href="https://github.com/github/orchestrator/releases/tag/v3.0.pre-release">now available</a>. Most notable are <strong>Raft</strong> consensus, <strong>SQLite</strong> backend support, <strong>orchestrator-client</strong> no-binary-required client script.</p>
+<h3>TL;DR</h3>
+<p>You may now set up high availability for <code>orchestrator</code> via <code>raft</code> consensus, without need to set up high availability for <code>orchestrator</code>&#8216;s backend MySQL servers (such as Galera/InnoDB Cluster). In fact, you can run a <code>orchestrator/raft</code> setup using embedded <code>SQLite</code> backend DB. Read on.</p>
+<p><code>orchestrator</code> still supports the existing shared backend DB paradigm; nothing dramatic changes if you upgrade to <strong>3.0</strong> and do not configure <code>raft</code>.</p>
+<h3>orchestrator/raft</h3>
+<p><a href="https://raft.github.io/">Raft</a> is a consensus protocol, supporting leader election and consensus across a distributed system.  In an <code>orchestrator/raft</code> setup <code>orchestrator</code> nodes talk to each other via raft protocol, form consensus and elect a leader. Each <code>orchestrator</code> node has its own <em>dedicated</em> backend database. The backend databases do not speak to each other; only the <code>orchestrator</code> nodes speak to each other.</p>
+<p>No MySQL replication setup needed; the backend DBs act as standalone servers. In fact, the backend server doesn&#8217;t have to be MySQL, and <code>SQLite</code> is supported. <code>orchestrator</code> now ships with <code>SQLite</code> embedded, no external dependency needed.<span id="more-7740"></span></p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png"><img class="alignnone size-full wp-image-7743" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png" alt="" width="824" height="326" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png 824w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft-300x119.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft-768x304.png 768w" sizes="(max-width: 824px) 100vw, 824px" /></a></p></blockquote>
+<p>In a <code>orchestrator/raft</code> setup, all <code>orchestrator</code> nodes talk to each other. One and only one is elected as <em>leader</em>. To become a leader a node must be part of a <em>quorum</em>. On a <code>3</code> node setup, it takes <code>2</code> nodes to form a quorum. On a <code>5</code> node setup, it takes <code>3</code> nodes to form a quorum.</p>
+<p>Only the leader will run failovers. This much is similar to the existing shared-backend DB setup. However in a <code>orchestrator/raft</code> setup each node is independent, and each <code>orchestrator</code> node <em>runs discoveries</em>. This means a MySQL server in your topology will be routinely visited and probed by not one <code>orchestrator</code> node, but by all <code>3</code> (or <code>5</code>, or what have you) nodes in your raft cluster.</p>
+<p>Any communication to <code>orchestrator</code> must take place through the leader. One may not tamper directly with the backend DBs anymore, since the <code>leader</code> is the one authoritative entity to replicate and announce changes to its peer nodes. See <strong>orchestrator-client</strong> section following.</p>
+<p>For details, please refer to the documentation:</p>
+<ul>
+<li><a href="https://github.com/github/orchestrator/blob/master/docs/raft.md">orchestrator/raft: overview</a></li>
+<li><a href="https://github.com/github/orchestrator/blob/master/docs/raft-vs-sync-repl.md">orchestrator/raft vs. shared backend DB setup, comparison</a></li>
+</ul>
+<p>The <code>orchetrator/raft</code> setup comes to solve several issues, the most obvious is high availability for the <code>orchestrator</code> service: in a <code>3</code> node setup any single <code>orchestrator</code> node can go down and <code>orchestrator</code> will reliably continue probing, detecting failures and recovering from failures.</p>
+<ul>
+<li>See all <a href="https://github.com/github/orchestrator/blob/master/docs/high-availability.md">orchestrator high availability solutions</a></li>
+</ul>
+<p>Another issue solve by <code>orchestrator/raft</code> is network isolation, in particularly cross-DC, also refered to as <em>fencing</em>. Some visualization will help describe the issue.</p>
+<p>Consider this 3 data-center replication setup. The master, along with a few replicas, resides on <strong>DC1</strong>. Two additional DCs have intermediate masters, aka local-masters, that relay replication to local replicas.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1.png"><img class="alignnone wp-image-7752 size-medium" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1-300x252.png" alt="" width="300" height="252" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1-300x252.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>We place <code>3 orchestrator</code> nodes in a <code>raft</code> setup, each in a different DC. Note that traffic between <code>orchestrator</code> nodes is very low, and cross DC latencies still conveniently support the <code>raft</code> communication. Also note that backend DB writes have nothing to do with cross-DC traffic and are unaffected by latencies.</p>
+<p>Consider what happens if DC1 gets network isolated: no traffic in or out DC1</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated.png"><img class="alignnone size-medium wp-image-7755" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-300x249.png" alt="" width="300" height="249" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-300x249.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>Each <code>orchestrator</code> nodes operates independently, and each will see a different state. DC1&#8217;s <code>orchestrator</code> will see all servers in DC2, DC3 as dead, but figure the master itself is fine, along with its local DC1 replicas:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view.png"><img class="alignnone size-medium wp-image-7756" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view-300x248.png" alt="" width="300" height="248" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view-300x248.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>However both <code>orchestrator</code> nodes in DC2 and DC3 will see a different picture: they will see all DC1&#8217;s servers as dead, with local masters in DC2 and DC3 having broken replication:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view.png"><img class="alignnone size-medium wp-image-7757" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view-300x255.png" alt="" width="300" height="255" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view-300x255.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>Who gets to choose?</p>
+<p>In the <code>orchestrator/raft</code> setup, only the leader runs failovers. The leader must be part of a quorum. Hence the leader will be an <code>orchestrator</code> node in either DC2 or DC3. DC1&#8217;s <code>orchestrator</code> will <em>know</em> it is isolated, that it isn&#8217;t part of the quorum, hence will step down from leadership (that&#8217;s the premise of the <code>raft</code> consensus protocol), hence will not run recoveries.</p>
+<p>There will be no split brain in this scenario. The <code>orchestrator</code> leader, be it in DC2 or DC3, will act to recover and promote a master from within DC2 or DC3. A possible outcome would be:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered.png"><img class="alignnone size-medium wp-image-7758" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered-300x259.png" alt="" width="300" height="259" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered-300x259.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered.png 680w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>What if you only have 2 data centers?</p>
+<p>In such case it is advisable to put two <code>orchestrator</code> nodes, one in each of your DCs, and a <em>third</em> <code>orchestrator</code> node as a mediator, in a 3rd DC, or in a different availability zone. A cloud offering should do well:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator.png"><img class="alignnone size-medium wp-image-7759" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator-300x254.png" alt="" width="300" height="254" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator-300x254.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator.png 688w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>The <code>orchestrator/raft</code> setup plays nice and allows one to <a href="https://github.com/openark/raft/pull/1">nominate</a> a preferred leader.</p>
+<h3>SQLite</h3>
+<p>Suggested and requested by many, is to remove <code>orchestrator</code>&#8216;s own dependency on a MySQL backend. <code>orchestrator</code> now supports a SQLite backend.</p>
+<p><code>SQLite</code> is a transactional, relational, embedded database, and as of <code>3.0</code> it is embedded within <code>orchestrator</code>, no external dependency required.</p>
+<p><code>SQLite</code> doesn&#8217;t replicate, doesn&#8217;t support client/server protocol. As such, it cannot work as a shared database backend. <code>SQLite</code> is only available on:</p>
+<ul>
+<li>A single node setup: good for local dev installations, testing server, CI servers (indeed, <code>SQLite</code> now runs in <code>orchestrator</code>&#8216;s CI)</li>
+<li><code>orchestrator/raft</code> setup, where, as noted above, backend DBs do not communicate with each other in the first place and are each dedicated to their own <code>orchestrator</code> node.</li>
+</ul>
+<p>It should be pointed out that <code>SQLite</code> is a great transactional database, however <code>MySQL</code> is more performant. Load on backend DB is directly (and mostly linearly) affected by the number of probed servers. If you have <code>50</code> servers in your topologies or <code>500</code> servers, that matters. The probing frequency of course also matters for the write frequency on your backend DB. I would suggest if you have thousands of backend servers, to stick with <code>MySQL</code>. If dozens, <code>SQLite</code> should be good to go. In between is a gray zone, and at any case run your own experiments.</p>
+<p>At this time <code>SQLite</code> is configured to commit to file; there is a different setup where <code>SQLite</code> places data in-memory, which makes it faster to execute. Occasional dumps required for durability. <code>orchestrator</code> may support this mode in the future.</p>
+<h3>orchestrator-client</h3>
+<p>You install <code>orchestrator</code> as a service on a few boxes; but then how do you access it from other hosts?</p>
+<ul>
+<li>Either <code>curl</code> the <code>orchestrator</code> API</li>
+<li>Or, as most do, install <code>orchestrator-cli</code> package, which includes the <code>orchestrator</code> binary, everywhere.</li>
+</ul>
+<p>The latter implies:</p>
+<ul>
+<li>Having the <code>orchestrator</code> binary installed everywhere, hence updated everywhere.</li>
+<li>Having the <code>/etc/orchestrator.conf.json</code>deployed everywhere, along with credentials.</li>
+</ul>
+<p>The <code>orchestrator/raft</code> setup does not support running <code>orchestrator</code> in command-line mode. Reason: in this mode <code>orchestrator</code> talks directly to the shared backend DB. There is no shared backend DB in the <code>orchestrator/raft</code> setup, and all communication must go through the leader service. This is a change of paradigm.</p>
+<p>So, back to <code>curl</code>ing the HTTP API. Enter <a href="https://github.com/github/orchestrator/blob/master/docs/orchestrator-client.md"><strong>orchestrator-client</strong></a> which mimics the command line interface, while running <code>curl | jq</code> requests against the HTTP API. <code>orchestrator-client</code>, however, is just a shell script.</p>
+<p><code>orchestrator-client</code> will work well on either <code>orchestrator/raft</code> or on your existing non-raft setups. If you like, you may replace your remote <code>orchestrator</code> installations and your <code>/etc/orchestrator.conf.json</code> deployments with this script. You will need to provide the script with a hint: the <code>$ORCHESTRATOR_API</code> environment variable should be set to point to the <code>orchestrator</code> HTTP API.</p>
+<p>Here&#8217;s the fun part:</p>
+<ul>
+<li>You will either have a proxy on top of your <code>orchestrator</code> service cluster, and you would <code>export ORCHESTRATOR_API=http://my.orchestrator.service/api</code></li>
+<li>Or you will provide <code>orchestrator-client</code> with all <code>orchestrator</code> node identities, as in <code>export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"</code> .<br />
+<code>orchestrator-client</code> will <strong>figure the identity of the leader</strong> and will forward requests to the leader. At least scripting-wise, you will not require a proxy.</li>
+</ul>
+<h3>Status</h3>
+<p><code>orchestrator 3.0</code> is a <strong>Pre-Release</strong>. We are running a mostly-passive <code>orchestrator/raft</code> setup in production. It is mostly-passive in that it is not in charge of failovers yet. Otherwise it probes and analyzes our topologies, as well as runs failure detection. We will continue to improve operational aspects of the <code>orchestrator/raft</code> setup (see <a href="https://github.com/github/orchestrator/issues/246">this issue</a>).</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7740</post-id>	</item>
+		<item>
+		<title>What&#8217;s so complicated about a master failover?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover#comments</comments>
+				<pubDate>Thu, 29 Jun 2017 15:01:58 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7726</guid>
+				<description><![CDATA[The more work on orchestrator, the more user input and the more production experience, the more insights I get into MySQL master recoveries. I&#8217;d like to share the complexities in correctly running general-purpose master failovers; from picking up the right candidates to finalizing the promotion. The TL;DR is: we&#8217;re often unaware of just how things [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The more work on <a href="https://github.com/github/orchestrator">orchestrator</a>, the more user input and the more production experience, the more insights I get into MySQL master recoveries. I&#8217;d like to share the complexities in correctly running general-purpose master failovers; from picking up the right candidates to finalizing the promotion.</p>
+<p>The TL;DR is: we&#8217;re often unaware of just how things can turn at the time of failover, and the impact of every single decision we make. Different environments have different requirements, and different users wish to have different policies. Understanding the scenarios can help you make the right choice.</p>
+<p>The scenarios and considerations below are ones I picked while browsing through the <code>orchestrator</code> code and through Issues and questions. There are more. There are always more scenarios.</p>
+<p>I discuss &#8220;normal replication&#8221; scenarios below; some of these will apply to synchronous replication setups (Galera, XtraDB Cluster, InnoDB Cluster) where using cross DC, where using intermediate masters, where working in an evolving environment.</p>
+<p><code>orchestrator</code>-wise, please refer to <a title="Permanent Link to &quot;MySQL High Availability tools&quot; followup, the missing piece: orchestrator" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" rel="bookmark">&#8220;MySQL High Availability tools&#8221; followup, the missing piece: orchestrator</a>, an earlier post. Some notions from that post are re-iterated here. <span id="more-7726"></span></p>
+<h3>Who to promote?</h3>
+<p>Largely covered by <a href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator">the missing piece</a> post (skip this section if you&#8217;ve read said post), consider the following:</p>
+<ul>
+<li>You run with a mixed versions setup. Your master is <code>5.6</code>, most your replicas are <code>5.6</code> but you&#8217;ve upgraded a couple replicas to <code>5.7</code>. You must not promote those <code>5.7</code> servers since you cannot replicate <code>5.7</code>-&gt;<code>5.6</code>. You may lose these servers upon failover.</li>
+<li>But perhaps by now you&#8217;ve upgraded <em>most</em> of your replicas to <code>5.7</code>, in which case you prefer to promote a <code>5.7</code> server in the event the alternative is losing your <code>5.7</code> fleet.</li>
+<li>You run with both <code>STATEMENT</code> based replication and <code>ROW</code> based. You must not promote a <code>ROW</code> based replica because a <code>STATEMENT</code> based server cannot replicate from it. You may lose <code>ROW</code> servers during the failover.</li>
+<li>But perhaps by now you&#8217;ve upgraded <em>most</em> of your replicas to <code>ROW</code>, in which case you prefer to promote a <code>ROW</code> server in the event the alternative is losing your <code>ROW</code> fleet.</li>
+<li>Some servers can&#8217;t be promoted because they don&#8217;t use binary logging or <code>log_slave_updates</code>. They could be lost in action.</li>
+</ul>
+<p>Noteworthy that <a href="https://github.com/yoshinorim/mha4mysql-manager">MHA</a> solves the above by syncing relay logs across the replicas. I had an attempt at doing the same for <code>orchestrator</code> but was unsatisfied with the results and am wary of hidden assumptions. I do not expect to continue working on that.</p>
+<h3>Intermediate masters</h3>
+<p>Recovery of intermediate masters, while simpler, also adds many more questions to the table.</p>
+<ul>
+<li>An intermediate master crashes. What is the correct handling? Should you move all of its orphaned replicas under another server? Or does this group of replicas form some pact that must stick together? Perhaps you insist on promoting one of them on top of its siblings.</li>
+<li>On failure, you are likely to prefer promoted server from same DC; this will have least impact on your application.
+<ul>
+<li>But are you willing to <em>lose a server or two </em>to make that so? Or do you prefer switching to a different DC and not lose any server in the process?</li>
+<li>A specific, large <code>orchestrator</code> user actually <em>wants to failover to a different DC</em>. Not only that, the customer then prefers flipping <em>all other cluster masters</em> to the other DC (a full-DC failover)</li>
+</ul>
+</li>
+<li>An intermediate master had replication filters (scenario: you were working to extract and refactor a subtree onto its own cluster, but the IM crashed before you did so)
+<ul>
+<li>What do you do? Did you have all subsequent replicas run with same filters?</li>
+<li>If not, do you have the playbook to do so at time of failure?</li>
+</ul>
+</li>
+<li>An intermediate master was <em>writable</em>. It crashed. What do you do? Who is a legitimate replacement? How can you even reconnect the subtree with the main tree?</li>
+</ul>
+<h3>Candidates</h3>
+<ul>
+<li>Do you prefer some servers over others? Some servers have stronger hardware; you&#8217;d like them to be promoted if possible
+<ul>
+<li><code>orchestrator</code> can juggle with that to some extent.</li>
+</ul>
+</li>
+<li>Are there servers you never want to promote? Servers used by developers; used for backups with open logical volumes; weaker hardware; a DC you don&#8217;t want to failover to; &#8230;
+<ul>
+<li>But then again, maybe it&#8217;s fine if those servers act as intermediate masters? So that they must not be promoted as masters, but are good to participate in an intermediate master failover?</li>
+</ul>
+</li>
+<li>How do you even define the promotion types for those servers?
+<ul>
+<li>We strongly prefer to do this live. Service discovery dictates the type of &#8220;promotion rule&#8221;; a recurring cronjob keeps updating <code>orchestrator</code> with the server&#8217;s choice of promotion rule.</li>
+<li>We strongly discourage configuration based rules, unless for servers which are obviously-never-promote.</li>
+</ul>
+</li>
+</ul>
+<h3>What to respond to?</h3>
+<p>What is a scenario that kicks a failover?</p>
+<p>Relate to <a href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator">the missing piece</a> post for the holistic approach <code>orchestrator</code> takes to make a reliable detection. But regardless, do you want to take action where:</p>
+<ul>
+<li>The master is completely dead and everyone sees that and agrees? (resounding <strong>yes</strong>)</li>
+<li>The master is dead to the application but replication seems to be working? (master is at deadlock, but replication threads seem to be happy)</li>
+<li>The master is half-dead to the application? (no new connections; old connections includign replication connections keep on running!)</li>
+<li>A DC is network partitioned, the master is alive with some replicas in that DC; but the majority of the replicas are in other DCs, unable to see the master?
+<ul>
+<li>Is this a question of majority? Of DC preference? Is there at all an answer?</li>
+</ul>
+</li>
+</ul>
+<h3>Upon promotion</h3>
+<p>Most people expect <code>orchestrator</code> to <code>RESET SLAVE ALL</code> and <code>SET read_only=0</code> upon promotion. This is possible, but the default is <em>not to do so</em>. Why?</p>
+<ul>
+<li>What if your promoted server still has unapplied relay logs? This can happen in the event all replicas were lagging at the time of master failure. Do you prefer:
+<ul>
+<li>To promote, <code>RESET SLAVE ALL</code> and lose all those relay logs? You gain availability at the expense of losing data.</li>
+<li>To wait till <code>SQL_THREAD</code> has consumed the logs? You keep your data at the expense of availability.</li>
+<li>To abort? You let a human handle this; this is likely to take more time.</li>
+</ul>
+</li>
+<li>What do you do with delayed/slow replicas? It could take a while to connect them back to the promoted master. Do you prefer:
+<ul>
+<li>Waiting for them to connect; delay promotion</li>
+<li>Advertise new master, then asynchronously work to connect them: you may have improved availability, but at reduced capacity, which is an availability issue in itself.</li>
+</ul>
+</li>
+</ul>
+<h3>Flapping</h3>
+<p>You wish to avoid flapping. A scenario could be that you&#8217;re placing such load on your master that it crashes; the next server to promote as master will have the same load, will similarly crash. You do not wish to exhaust your fleet.</p>
+<p>What makes a reasonable anti-flapping rule? Options:</p>
+<ul>
+<li>Upon any failure in a cluster, block any other failover on that cluster for X minutes
+<ul>
+<li>What happens if a major power down issue requires two or three failovers on the same cluster?</li>
+</ul>
+</li>
+<li>Only block further master failovers, but allow intermediate master failovers as much as needed
+<ul>
+<li>There could be intermediate master exhaustion, as well</li>
+</ul>
+</li>
+<li>Only allow one of each (master and intermediate master), then block for X minutes?</li>
+<li>Allow a burst of failovers for a duration of N seconds, then block for X minutes?</li>
+</ul>
+<h3>Detection spam</h3>
+<p>You don&#8217;t always take action on failure detection. Maybe you&#8217;re blocked via anti-flapping on an earlier failure; or have configured to not automatically failover.</p>
+<p>Detection is the basis to, but independent of failover. You should have detection in place even if not failing over.</p>
+<p>You wish to run detection continuously.</p>
+<ul>
+<li>So if failover does not take place, detection will keep noticing the same problem again and again.
+<ul>
+<li>You get spammed by alerts</li>
+</ul>
+</li>
+<li>Only detect <em>once</em>?
+<ul>
+<li>Been there. When you really need that detection to alert you find out it alerted once 6 hours ago and you ignored it because it was not actionable at the time.</li>
+</ul>
+</li>
+<li>Only detect a change in diagnosis?
+<ul>
+<li>Been there. Diagnosis itself can flap back and forth. You get noise.</li>
+</ul>
+</li>
+<li>Block detection for X minutes?
+<ul>
+<li>What is a good tradeoff between noise and visibility?</li>
+</ul>
+</li>
+</ul>
+<h3>Back to life</h3>
+<p>And old sub-tree comes back to life. Scenario: DC power failure.</p>
+<p>This subtree claims &#8220;I&#8217;m cluster X&#8221;. What happens?</p>
+<ul>
+<li>Your infrastructure needs to have memory and understanding that there&#8217;s already a running cluster called X.</li>
+<li>Any failures within that subtree must not be interpreted as a &#8220;cluster X failure&#8221;, or else you kick a cluster X failover when there is, in fact, a running cluster X. See <a href="https://github.com/github/orchestrator/pull/159">this PR</a> and related links. At this time <code>orchestrator</code> handles this scenario correctly.</li>
+<li>When do you consider a previously-dead server to be alive and well?
+<ul>
+<li>I do mean, automatically and reliably so? See same PR for <code>orchestrator</code>&#8216;s take.</li>
+</ul>
+</li>
+</ul>
+<h3>User control</h3>
+<p>Failover tooling must always let a human decide something is broken. It must always allow for an urgent failover, even if nothing seems to be wrong to the system.</p>
+<h3>Isn&#8217;t this just so broken? Isn&#8217;t synchronous replication the answer?</h3>
+<p>The world is broken, and distributed systems are hard.</p>
+<p>Synchronous replication is <em>an</em> answer, and solves many (I think) of the above issues, creating its own issues, but I&#8217;m not an expert on that.</p>
+<p>However noteworthy that when some people think about synchronous replication they forget about cross-DC replication and cross-DC failovers,on upgrades and experiments. The moment you put intermediate masters at play, you&#8217;re almost back to square one with many of the above questions again applicable to your use case.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7726</post-id>	</item>
+		<item>
+		<title>&#8220;MySQL High Availability tools&#8221; followup, the missing piece: orchestrator</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator#comments</comments>
+				<pubDate>Thu, 06 Apr 2017 12:56:45 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7690</guid>
+				<description><![CDATA[I read with interest MySQL High Availability tools &#8211; Comparing MHA, MRM and ClusterControl by SeveralNines. I thought there was a missing piece in the comparison: orchestrator, and that as result the comparion was missing scope and context. I&#8217;d like to add my thoughts on topics addressed in the post. I&#8217;m by no means an [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I read with interest <a href="https://severalnines.com/blog/mysql-high-availability-tools-comparing-mha-mrm-and-clustercontrol">MySQL High Availability tools &#8211; Comparing MHA, MRM and ClusterControl</a> by SeveralNines. I thought there was a missing piece in the comparison: <a href="https://github.com/github/orchestrator">orchestrator</a>, and that as result the comparion was missing scope and context.</p>
+<p>I&#8217;d like to add my thoughts on topics addressed in the post. I&#8217;m by no means an expert on MHA, MRM or ClusterControl, and will mostly focus on how <code>orchestrator</code> tackles high availability issues raised in the post.</p>
+<h3>What this is</h3>
+<p>This is to add insights on the complexity of failovers. Over the duration of three years, I always think I&#8217;ve seen it all, and then get hit by yet a new crazy scenario. Doing the right thing automatically is <em>difficult</em>.</p>
+<p>In this post, I&#8217;m not trying to convince you to use <code>orchestrator</code> (though I&#8217;d be happy if you did). To be very clear, I&#8217;m not claiming it is <em>better</em> than any other tool. As always, each tool has pros and cons.</p>
+<p>This post does <em>not</em> claim other tools are not good. Nor that <code>orchestrator</code> has all the answers. At the end of the day, pick the solution that works best for you. I&#8217;m happy to use a solution that reliably solves <strong>99%</strong> of the cases as opposed to an unreliable solution that claims to solve <strong>99.99%</strong> of the cases.</p>
+<h3>Quick background</h3>
+<p><code>orchestrator</code> is actively maintained by GitHub. It manages <a href="http://githubengineering.com/orchestrator-github/">automated failovers at GitHub</a>. It manages automated failovers at Booking.com, one of the largest MySQL setups on this planet. It manages automated failovers as part of <a href="http://vitess.io/">Vitess</a>. These are some names I&#8217;m free to disclose, and browsing the <a href="https://github.com/github/orchestrator/issues">issues</a> shows a few more users running failovers in production. Otherwise, it is used for topology management and visualization in a large number of companies such as Square, Etsy, Sendgrid, Godaddy and more.</p>
+<p>Let&#8217;s now follow one-by-one the observations on the SeveralNines post.<span id="more-7690"></span></p>
+<h3>Flapping</h3>
+<p><code>orchestrator</code> supports an <a href="https://github.com/github/orchestrator/blob/master/docs/topology-recovery.md#blocking-acknowledgements-anti-flapping">anti-flapping mechanism</a>. Once an automated failover kicks off, no additional automated failover will run <em>on the same cluster</em> for the duration of a pre-configured <code>&lt;code&gt;RecoveryPeriodBlockSeconds&lt;/code&gt;</code>.  We, for example, set that time to <strong>1 hour</strong>.</p>
+<p>However, <code>orchestrator</code> also supports <em>acknowledgements</em>. A human (or a bot, for that matter, accessing the API or just running the command line) can <em>acknowledge</em> a failover. Once a failover is acknowledged, the block is removed. The next incident requiring a failover is free to proceed.</p>
+<p>Moreover, a human is always allowed to forcibly invoke a failover (e.g. via <code>orchestrator -c graceful-master-takeover</code> or  <code>orchestrator -c force-master-takeover</code>). In such case, any blocking is ignored and <code>orchestrator</code> immediately kicks in the failover sequence.</p>
+<h3>Lost transactions</h3>
+<p><code>orchestrator</code> does not pull binlog data from the failed master and only works with the data available on the replicas. There is a potential for data loss.</p>
+<p><strong>Note:</strong> There was actually some work into a MHA-like synching of relay logs, and in fact most of it is available right now in <code>orchestrator</code>, synching relaylogs via remote SSH and without agents. See https://github.com/github/orchestrator/issues/45 for some pointers. We looked into this for a couple months but saw some dangers and issues such as non-atomic relay log entries in RBR and others. We chose to put this on-hold, and I advise to not use this functionality in <code>orchestrator</code>.</p>
+<h3>Lost transactions, notes on semi-sync</h3>
+<p>Vitess <a href="https://github.com/outbrain/orchestrator/pull/187">have contributed</a> a semi-sync failover mechanism (<a href="https://github.com/outbrain/orchestrator/issues/156">discussion</a>). So you are using semi-sync? That&#8217;s wonderful. You&#8217;ve failed over and have greatly reduced the amount of lost data. What happens with your new setup? Will your recovery re-apply semi sync? Vitess&#8217;s contribution does just that and makes sure a new relica takes the semi-sync role.</p>
+<h3>Lost transactions, notes on &#8220;most up to date replica&#8221;</h3>
+<p>There is this fallacy. It has been proven to be a fallacy many time in production, that I&#8217;ve witnessed. I&#8217;m sure this happened somewhere else in the universe that I haven&#8217;t witnessed.</p>
+<p>The fallacy says: &#8220;when master fails, we will promote the most up-to-date replica&#8221;. The most up-to-date may well be the wrong choice. You may wish to <em>skip and lose</em> the most up-to-date replica. The assumption is a fallacy, because many times <em>our production environment is not sterile.</em></p>
+<p>Consider:</p>
+<ul>
+<li>You&#8217;re running <strong>5.6</strong> and wish to experiment/upgrade to <strong>5.7</strong>. You will like upgrade a replica or two, measure their replication capacity, their query latency, etc. You now have a non-sterile topology. When the master fails, <em>you must not promote your 5.7 replica</em> because you will not be able to (or wouldn&#8217;t want to take the chance) replicate from that <strong>5.7</strong> onto the rest of your fleet, which is <strong>5.6</strong>.
+<ul>
+<li>We are looking into <strong>5.7</strong> upgrade for a few months now. Most careful places I know likewise take months to run such an upgrade. These are <em>months</em> where your topology is not sterile.</li>
+</ul>
+</li>
+</ul>
+<p>So you&#8217;d rather lose the most up-to-date replica than lose the other <strong>10</strong> replicas you have.</p>
+<ul>
+<li>Likewise, you run with <strong>STATEMENT</strong> based replication. You wish to experiment with <strong>ROW</strong> based replication. Your topology is not sterile. You <em>must not</em> upgrade your <strong>ROW</strong> replica, because the rest of the replicas (assuming <code>log_slave_updates</code>) would not be able to replicate.</li>
+</ul>
+<p><code>orchestrator</code> understands all the above and makes the right call. It would promote the replica that would ensure the survival of your fleet, and prefers to lose data.</p>
+<ul>
+<li>You have a special replica with replication filters. More often than desired, this happens. Perhaps you&#8217;re splitting out a new sub-cluster, functionally partitioning away some tables. Or you&#8217;re running some exporter to Hadoop and only filter specific events. Or&#8230; You must not promote that replica.</li>
+</ul>
+<p><code>orchestrator</code> would not promote that replica.</p>
+<p>Let&#8217;s look at something crazy now:</p>
+<ul>
+<li>Getting back to the <strong>5.7</strong> upgrade, you have now upgraded <strong>8</strong> out of your <strong>10</strong> replicas to <strong>5.7</strong>. You now <em>do want</em> to promote the <strong>5.7</strong> replica. It&#8217;s a matter of how many replicas you&#8217;d lose if you promoted _this one_ as opposed to _that one_.</li>
+</ul>
+<p><code>orchestrator</code> makes that calculation. Hey, the same applies for <strong>STATEMENT</strong> and <strong>ROW</strong> based replicas. Or maybe you have <em>both </em><strong>5.7</strong> and <strong>RBR</strong> experiments (tsk tsk tsk, but life is challanging) at the same time. <code>orchestrator</code> will still pick the replica whose promotion will get the majority of your fleet intact.</p>
+<ul>
+<li>The most up-to-date replica is on a different data center.</li>
+</ul>
+<p><code>orchestrator</code> <em>can</em>, but prefer <em>not</em> to promote it. But then, it also supports a <strong>2 step</strong> promotion. If possible, it would first promote that most up-to-date replica from the other DC, then let local DC replicas catch up, then reverse replication and place a local replica <em>on top</em>, making the master on local DC again.</p>
+<p>I cannot stress enough how useful and important this is.</p>
+<p>This conveniently leads us to&#8230;</p>
+<h3>Roles</h3>
+<p>Fallacy: <em>using configuration to white-list or black-list servers.</em></p>
+<p>You&#8217;d expect to overcome the above <strong>5.7</strong> or <strong>ROW</strong> etc. issues by carefully marking your servers as blacklisted.</p>
+<p>We&#8217;ve been there. This works on a setup with <strong>10</strong> servers. I claim this doesn&#8217;t scale.</p>
+<p>Again, I wish to be clear: if this works for you, great! Ignore the rest of this section. I suggest that as you grow, this becomes more and more a difficult problem. At the scale of a <strong>100</strong> servers, it&#8217;s a serious pain. Examples:</p>
+<ul>
+<li>You <code>set global binlog_format='ROW'</code>. Do you then immediately follow up to reconfigure your HA service to blacklist your server?</li>
+<li>You provision a new box. Do you need to go and reconfigure your HA service, adding the box as white-listed?</li>
+<li>You need to run maintenance on a server. Do you rush to reconfigure HA service?</li>
+</ul>
+<p>You can invest in automating the reconfiguration of servers; I&#8217;ve been there as well, to some extent. This is a difficult task on its own.</p>
+<ul>
+<li>You&#8217;d use service discovery to assign tags to hosts</li>
+<li>And then <code>puppet</code> would distribute configuration.
+<ul>
+<li>How fast would it do that?</li>
+</ul>
+</li>
+<li>I&#8217;m not aware and am happy to learn if any of the mentioned solutions can be reconfigured by <code>consul</code>. You need to do the job yourself.</li>
+</ul>
+<p>Also consider how flexible your tools are: suppose you reconfigure; how easy it is for your tools to <em>reload</em> and pick the new config?</p>
+<ul>
+<li><code>orchestrator</code> does its best, and reloads most configuration live, but even <code>orchestrator</code> has some &#8220;read-only&#8221; variables.</li>
+</ul>
+<p>How easy it is to restart your HA services? Can you restart them in a rolling fashion, such that at any given point you have HA up and running?</p>
+<ul>
+<li>This is well supported by <code>orchestrator</code></li>
+</ul>
+<p><code>orchestrator</code> recognizes those crazy <strong>5.7</strong> &#8211;<strong>ROW-</strong>replication filters topologies by magic. Well, not magic. It just observes the state of the topologies. It learns the state of the topologies, so that at time of crash it has all the info. Its logic is based on that info. It knows and understands replication rules. It computes a good promotion path, taking data centers and configurations into consideration.</p>
+<p>Initially, <code>orchestrator</code> started with blacklists in configuration. They&#8217;re still supported. But today it&#8217;s more about labels.</p>
+<ul>
+<li>One of your replicas serves as a backup server. It runs extra tasks, or configured differently (no <code>log_slave_updates</code>? Different buffer pool settings?) and is not good to serve as a master. You should not promote that replica.</li>
+</ul>
+<p>Instead of saying &#8220;this server is a backup server and should never be promoted&#8221; in configuration &#8212; (and that&#8217;s possible to do!), <code>orchestrator</code> lets you dynamically announce that this server should not be promoted. Such that maybe <strong>10</strong> minutes ago this wasn&#8217;t a backup server, but now it is. You can advertise that fact to orchestrator. We do that via:</p>
+<blockquote>
+<pre>orchestrator -c register-candidate -i {::fqdn} --promotion-rule=${promotion_rule}</pre>
+</blockquote>
+<p>where <code>${promotion_rule}</code> is <code>candidate</code>, <code>neutral</code> or <code>must_not</code>. We run this from <code>cron</code>, every couple minutes. How we choose the right rule comes from our service discovery. <code>orchestrator</code> is always up-to-date (up to a couple minutes) at worst of role changes (and urgent role changes get propagated immediately).</p>
+<p>Also, each host can self-declare its role, so that <code>orchestrator</code> discovers the role on discover, as per <code>DetectPromotionRuleQuery</code>. Vitess is known to use this approach, and they contributed the code.</p>
+<h3>Network partitioning</h3>
+<p>First, about general failure detection.</p>
+<p><code>orchestrator</code> uses a holistic approach to detecting failures, and instead of <em>justifying</em> that it is a really good approach, I will <em>testify</em> that it is. <code>orchestrator</code>&#8216;s accuracy in recognizing a failover scenario is very high. Booking.com has <strong>X,000</strong> MySQL servers in production. at that scale, servers and networks break enough that there&#8217;s always something breaking. Quoting (with permission) Simon J. Mudd from Booking.com:</p>
+<blockquote><p>We have at least one failure a day which it handles automatically. that’s really neat. people don’t care about dead masters any more.</p></blockquote>
+<p><code>orchestrator</code> looks not only at the master, but at its replicas. If <code>orchestrator</code> can&#8217;t see the master, but the replicas are happily running and replicating, then it&#8217;s just <code>orchestrator</code> who can&#8217;t see the master. But if <code>orchestrator</code> doesn&#8217;t see the master`, <strong>and</strong> all the replicas are broken, then there&#8217;s a failover scenario.</p>
+<p>With ClusterControl, there seems to be danger of false positives: &#8220;&#8230;therefore it can take an action if there are network issues between the master and the ClusterControl host.&#8221;</p>
+<p>As for fencing:</p>
+<p>MHA uses multiple nodes for detecting the failure. Especially if these nodes run on different DCs, this gives MHA a better view when fencing is involved.</p>
+<p>Last September we gathered at an improvised BoF session on Percona Live Amsterdam. We were looking at observing a failure scenario where fencing is involved.</p>
+<p>We mostly converged onto having multiple observers, such as 3 observers on 3 different data centers, a quorum of which would decide if there&#8217;s a failure scenario or not.</p>
+<p>The problem is difficult. If the master is seen by 2 nodes, but all of its replicas are broken, does that make a failure scenario or not? What if a couple replicas are happy but ten others are not?</p>
+<p><code>orchestrator</code> has it on the roadmap to run a quorum based failover decision. My estimation is that it will do the right thing <em>most times</em> and that it would be very difficult to push towards <strong>99.99%</strong>.</p>
+<h3>Integration</h3>
+<p><code>orchestrator</code> provides HTTP API as well as a command line interface. We use those at GitHub, for example, to integrate <code>orchestrator</code> into our chatops. We command <code>orchestrator</code> via chat and get information via chat.</p>
+<p>Or we and others have automated, scheduled jobs, that use the <code>orchestrator</code> command line to rearrange topologies.</p>
+<p>There is no direct integration between <code>orchestrator</code> and other tools. Recently there have been requests to integrate <code>orchestrator</code> with <a href="http://www.proxysql.com/">ProxySQL</a>. I see multiple use cases for that. Plug: in the upcoming <a href="https://www.percona.com/live/17/">Percona Live conference in Santa Clara</a>, René Cannaò and myself will co-present a BoF on potential ProxySQL-orchestrator integration. It will be an open discussion. Please come and share your thoughts! (The talk hasn&#8217;t been scheduled yet, I will update this post with the link once it&#8217;s scheduled).</p>
+<p>Addressing the issue of <code>read_only</code> as an indicator to master/replica roles, please see the discussion on <a href="https://github.com/sysown/proxysql/issues/789">https://github.com/sysown/proxysql/issues/789</a>. Hint: this isn&#8217;t trivial and many times not reliable. It can work in some cases.</p>
+<h3>Conclusion</h3>
+<p>Is it time already? I have much to add; but let&#8217;s stay focus on the SeveralNines blog. Addressing the comparison chart at the &#8220;Conclusion&#8221; section:</p>
+<h4>Replication support</h4>
+<p><code>orchestrator</code> supports failovers on:</p>
+<ul>
+<li>Oracle GTID</li>
+<li>MariaDB GTID</li>
+<li>Pseudo-GTID</li>
+<li>Semi-sync</li>
+<li>Binlog servers</li>
+</ul>
+<p>GTID support is ongoing (<a href="https://github.com/github/orchestrator/issues/78">recent example</a>). Traditionally <code>orchestrator</code> is very focused on Pseudo-GTID.</p>
+<p>I should add: Pseudo-GTID is a thing. It runs, it runs well. Pseudo-GTID provides with almost all the Oracle GTID advantages without actually using GTID, and without GTID limitations. The obvious disclaimer is that Pseudo-GTID has its own limitations, too. But I will leave the PSeudo-GTID preaching for another time, and just note that GitHub and Booking.com both run automated failovers based on Pseudo-GTID.</p>
+<h4>Flapping</h4>
+<p>Time based blocking per cluster, acknowledgements supported; human overrides permitted.</p>
+<h4>Lost transactions</h4>
+<p>No checking for transactions on master</p>
+<h4>Network Partitioning</h4>
+<p>Excellent false positive detection. Seems like other tools like MRM and ClusterControl are following up by adopting the <code>orchestrator</code> approach, and I&#8217;m happy for that.</p>
+<h4>Roles</h4>
+<p>State-based automatic detection and decision making; also dynamic roles via advertising; also support for self- declaring roles; also support for configuration based black lists</p>
+<h4>Integration</h4>
+<p>HTTP API, command line interfaces. No direct integration with other products. Looking into ProxySQL with no promises held.</p>
+<h3>Further</h3>
+<blockquote><p>If you use non-GTID replication, MHA is the only option for you</p></blockquote>
+<p>That is incorrect. <code>orchestrator</code> is an excellent choice in my biased opinion. GitHub and Booking.com both run <code>orchestrator</code> automated failovers without using GTIDs.</p>
+<blockquote><p>Only ClusterControl &#8230; is flexible enough to handle both types of GTID under one tool</p></blockquote>
+<p>That is incorrect. <code>orchestrator</code> supports both types of GTID. I&#8217;m further working towards better and better supports of Oracle GTID.</p>
+<blockquote><p>&#8230;this could be very useful if you have a mixed environment while you still would like to use one single tool to ensure high availability of your replication setup</p></blockquote>
+<p>Just to give you an impression: <code>orchestrator</code> works on topologies mixed with Oracle <strong>and</strong> MariaDB servers, normal replication <strong>and</strong> binlog servers, STATEMENT <strong>and</strong> ROW based replication, three major versions in the same cluster (as I recall I&#8217;ve seen that; I don&#8217;t run this today), and mixed combination of the above. Truly.</p>
+<h3>Finally</h3>
+<p>Use whatever tool works best for you.</p>
+<h3>Oh, and I forgot!</h3>
+<p>Please consider attending my talk, <a href="https://www.percona.com/live/17/sessions/practical-orchestrator">Practical Orchestrator</a>, where I will share practical advice and walkthough on `orchestrator setup.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7690</post-id>	</item>
+		<item>
+		<title>State of automated recovery via Pseudo-GTID &#038; Orchestrator @ Booking.com</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com#respond</comments>
+				<pubDate>Fri, 20 Nov 2015 09:41:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Pseudo GTID]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7453</guid>
+				<description><![CDATA[This post sums up some of my work on MySQL resilience and high availability at Booking.com by presenting the current state of automated master and intermediate master recoveries via Pseudo-GTID &#38; Orchestrator. Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post sums up some of my work on MySQL resilience and high availability at <a href="http://www.booking.com">Booking.com</a> by presenting the current state of automated master and intermediate master recoveries via <a href="https://shlomi-noach.github.io/blog/mysql/refactoring-replication-topology-with-pseudo-gtid">Pseudo-GTID</a> &amp; <strong><a href="https://github.com/outbrain/orchestrator">Orchestrator</a></strong>.</p>
+<p>Booking.com uses many different MySQL topologies, of varying vendors, configurations and workloads: Oracle MySQL, MariaDB, statement based replication, row based replication, hybrid, OLTP, OLAP, GTID (few), no GTID (most), Binlog Servers, filters, hybrid of all the above.</p>
+<p>Topologies size varies from a single server to many-many-many. Our typical topology has a master in one datacenter, a bunch of slaves in same DC, a slave in another DC acting as an intermediate master to further bunch of slaves in the other DC. Something like this, give or take:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample.png"><img class="alignnone wp-image-7480 size-medium" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-300x169.png" alt="booking-topology-sample" width="300" height="169" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-300x169.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-1024x576.png 1024w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample-900x506.png 900w, https://shlomi-noach.github.io/blog/wp-content/uploads/2015/11/booking-topology-sample.png 1600w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>However as we are building our third data center (with MySQL deployments mostly completed) the graph turns more complex.</p>
+<p>Two high availability questions are:</p>
+<ul>
+<li>What happens when an intermediate master dies? What of all its slaves?</li>
+<li>What happens when the master dies? What of the entire topology?</li>
+</ul>
+<p>This is not a technical drill down into the solution, but rather on overview of the state. For more, please refer to recent presentations in <a href="https://speakerdeck.com/shlominoach/managing-and-visualizing-your-replication-topologies-with-orchestrator">September</a> and <a href="https://speakerdeck.com/shlominoach/pseudo-gtid-and-easy-mysql-replication-topology-management">April</a>.</p>
+<p>At this time we have:</p>
+<ul>
+<li>Pseudo-GTID deployed on all chains
+<ul>
+<li>Injected every 5 seconds</li>
+<li>Using the <a href="https://shlomi-noach.github.io/blog/mysql/pseudo-gtid-ascending">monotonically ascending</a> variation</li>
+</ul>
+</li>
+<li>Pseudo-GTID based automated failover for intermediate masters on all chains</li>
+<li>Pseudo-GTID based automated failover for masters on roughly 30% of the chains.
+<ul>
+<li>The rest of 70% of chains are set for manual failover using Pseudo-GTID.</li>
+</ul>
+</li>
+</ul>
+<p>Pseudo-GTID is in particular used for:</p>
+<ul>
+<li>Salvaging slaves of a dead intermediate master</li>
+<li>Correctly grouping and connecting slaves of a dead master</li>
+<li>Routine refactoring of topologies. This includes:
+<ul>
+<li>Manual repointing of slaves for various operations (e.g. offloading slaves from a busy box)</li>
+<li>Automated refactoring (for example, used by our automated upgrading script, which consults with <em>orchestrator</em>, upgrades, shuffles slaves around, updates intermediate master, suffles back&#8230;)</li>
+</ul>
+</li>
+<li>(In the works), failing over binlog reader apps that audit our binary logs.</li>
+</ul>
+<p><span id="more-7453"></span>Furthermore, Booking.com is also <a href="https://www.percona.com/live/europe-amsterdam-2015/sessions/binlog-servers-bookingcom">working on Binlog Servers</a>:</p>
+<ul>
+<li>These take production traffic and offload masters and intermediate masters</li>
+<li>Often co-serve slaves using round-robin VIP, such that failure of one Binlog Server makes for simple slave replication self-recovery.</li>
+<li>Are interleaved alongside standard replication
+<ul>
+<li>At this time we have no &#8220;pure&#8221; Binlog Server topology in production; we always have normal intermediate masters and slaves</li>
+</ul>
+</li>
+<li>This hybrid state makes for greater complexity:
+<ul>
+<li>Binlog Servers are not designed to participate in a game of changing masters/intermediate master, unless <a href="http://jfg-mysql.blogspot.nl/2015/09/abstracting-binlog-servers-and-mysql-master-promotion-wo-reconfiguring-slaves.html">successors come from their own sub-topology</a>, which is not the case today.
+<ul>
+<li>For example, a Binlog Server that replicates directly from the master, cannot be repointed to just any new master.</li>
+<li>But can still hold valuable binary log entries that other slaves may not.</li>
+</ul>
+</li>
+<li>Are not actual MySQL servers, therefore of course cannot be promoted as masters</li>
+</ul>
+</li>
+</ul>
+<p><em>Orchestrator</em> &amp; Pseudo-GTID makes this hybrid topology still resilient:</p>
+<ul>
+<li><em>Orchestrator</em> understands the limitations on the hybrid topology and can salvage slaves of 1st tier Binlog Servers via Pseudo-GTID</li>
+<li>In the case where the Binlog Servers were the most up to date slaves of a failed master, <em>orchestrator</em> knows to first move potential candidates under the Binlog Server and then extract them out again.</li>
+<li>At this time Binlog Servers are still unstable. Pseudo-GTID allows us to comfortably test them on a large setup with reduced fear of losing slaves.</li>
+</ul>
+<p>Otherwise <em>orchestrator</em> already understands pure Binlog Server topologies and can do master promotion. When pure binlog servers topologies will be in production <em>orchestrator</em> will be there to watch over.</p>
+<h3>Summary</h3>
+<p>To date, Pseudo-GTID has high scores in automated failovers of our topologies; <em>orchestrator&#8217;s</em> <a href="https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case">holistic approach</a> makes for reliable diagnostics; together they reduce our dependency on specific servers &amp; hardware, physical location, latency implied by SAN devices.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/state-of-automated-recovery-via-pseudo-gtid-orchestrator-booking-com/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7453</post-id>	</item>
+	</channel>
+</rss>

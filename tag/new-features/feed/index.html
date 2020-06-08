@@ -1,0 +1,1025 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>New Features &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/new-features/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 06 Sep 2016 09:44:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more#respond</comments>
+				<pubDate>Tue, 06 Sep 2016 09:44:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Open Source]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7632</guid>
+				<description><![CDATA[gh-ost version 1.0.17 is now released, with various additions and fixes. Here are some notes of interest: Hooks gh-ost now supports hooks. These are your own executables that gh-ost will invoke at particular points of interest (validation pass, about to cut-over, success, failure, status, etc.) gh-ost will set various environment variables for your executables to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://github.com/github/gh-ost">gh-ost</a> version <a href="https://github.com/github/gh-ost/releases/tag/v1.0.17">1.0.17</a> is now released, with various additions and fixes. Here are some notes of interest:</p>
+<h3>Hooks</h3>
+<p><code>gh-ost</code> now supports <a href="https://github.com/github/gh-ost/blob/master/doc/hooks.md">hooks</a>. These are your own executables that <code>gh-ost</code> will invoke at particular points of interest (validation pass, about to cut-over, success, failure, status, etc.)</p>
+<p><code>gh-ost</code> will set various environment variables for your executables to pick up, passing along such information as migrated/<em>ghost</em> table name, elapsed time, processed rows, migrated host etc.</p>
+<h3>Sub-second lag control</h3>
+<p>At GitHub we&#8217;re very strict about replication lag. We keep it well under <code>1</code> second at most times. <code>gh-ost</code> can now identify <a href="https://github.com/github/gh-ost/blob/master/doc/subsecond-lag.md">sub-second lag on replicas</a> (well, you need to supply with the right query). Our current production migrations are set by default with <code>--max-lag-millis=500</code> or less, and our most intensive migrations keep replication lag well below <code>1sec</code> or even below <code>500ms</code></p>
+<h3>No SUPER</h3>
+<p>The <code>SUPER</code> privilege is required to <code>set global binlog_format='ROW'</code> and for <code>STOP SLAVE; START SLAVE;</code></p>
+<p>If you <em>know</em> your replica has RBR, you can pass <code>--assume-rbr</code> and skips those steps.</p>
+<h3>RDS</h3>
+<p>Hooks + No Super = RDS, as seems to be the case. For <code>--test-on-replica</code> you will need to supply your own <code>gh-ost-on-stop-replication</code> hook, to stop your RDS replica at cut-over phase. See <a href="https://github.com/github/gh-ost/issues/163#issuecomment-244694616">this tracking issue</a><span id="more-7632"></span></p>
+<h3>master-master</h3>
+<p>While active-active are still not supported, you now have greater control over master-master topologies by being able to explicitly pick your master (as <code>gh-ost</code> arbitrarily picks one of the co-masters). Do so by passing <code>--assume-master-host</code>. See <a href="https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md">cheatsheet</a>.</p>
+<h3>tungsten replicator</h3>
+<p>Similarly, <code>gh-ost</code> cannot crawl your <code>tungsten</code> topology, and you are able to specify <code>--tungsten --assume-master-host=the.master.com</code>. See <a href="https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md">cheatsheet</a>.</p>
+<h3>Concurrent-rowcount</h3>
+<p><code>--exact-rowcount</code> is awesomeness, keeping quite accurate estimate of progress. With <code>--concurrent-rowcount</code> we begin migration with a rough estimate, and execute <code>select count(*) from your_table</code> in parallel, updating our estimate later on throughout the migration</p>
+<h3>Stricter, safer</h3>
+<p><code>gh-ost</code> works in <code>STRICT_ALL_TABLES</code> mode, meaning it would fail rather than set the wrong value to a column.</p>
+<p>In addition to unit-testing and production continuous test, a set of <a href="https://github.com/github/gh-ost/blob/master/doc/local-tests.md">local tests</a> is growing, hopefully to run as CI tests later on.</p>
+<h3>Fixed problems</h3>
+<p>Fixed <code>time_zone</code> related bug, high <code>unsigned</code> values bug; added strict check for triggers, relaxed config file parsing, and more. Thank you to community contributors for PRs, from <code>ipv6</code> to typos!</p>
+<h3>Known issues</h3>
+<p>Issues coming and going at all times &#8212; thank you for reporting Issues!</p>
+<p>We have a confirmed <a href="https://github.com/github/gh-ost/issues/226">bug with non-UTF charsets</a> at this time. Some other minor issues and feature requests are open &#8212; we&#8217;ll take them as we go along.</p>
+<h3>Feedback requests</h3>
+<p>We are not testing <code>gh-ost</code> on RDS ourselves. We appreciate community feedback on <a href="https://github.com/github/gh-ost/issues/163">this tracking issue</a>.</p>
+<p>We are not testing <code>gh-ost</code> on Galera/XtraDB cluster ourselves. We appreciate community feedback on <a href="https://github.com/github/gh-ost/issues/224">this tracking issue</a>.</p>
+<p>We value submitted Issues and questions.</p>
+<h3>Speaking</h3>
+<p>We will be presenting <code>gh-ost</code> in the next month:</p>
+<ul>
+<li>I will be <a href="http://githubuniverse.com/program/sessions/#gh-ost">presenting gh-ost at GitHub Universe</a>, Sep. 14th</li>
+<li>Tom Krouper will be <a href="https://datalayer.com/">presenting gh-ost at DataLayer</a>, Seattle, Sep 28th</li>
+<li>Tom Krouper and myself will be <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">presenting gh-ost at PerconaLive</a>, Amsterdam, Oct 5th</li>
+</ul>
+<p>Hope to see you there, and thank you again to all contributors!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7632</post-id>	</item>
+		<item>
+		<title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path#comments</comments>
+				<pubDate>Fri, 07 Aug 2015 12:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[performance_schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7327</guid>
+				<description><![CDATA[MySQL 5.7 introduces a change in the way we query for global variables and status variables: the INFORMATION_SCHEMA.(GLOBAL&#124;SESSION)_(VARIABLES&#124;STATUS) tables are now deprecated and empty. Instead, we are to use the respective performance_schema.(global&#124;session)_(variables&#124;status) tables. But the change goes farther than that; there is also a security change. Oracle created a pitfall of 2 changes at the same time: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL <strong>5.7</strong> introduces a change in the way we query for global variables and status variables: the <strong>INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)</strong> tables are now deprecated and empty. Instead, we are to use the respective <strong>performance_schema.(global|session)_(variables|status)</strong> tables.</p>
+<p>But the change goes farther than that; there is also a security change. Oracle created a pitfall of <strong>2</strong> changes at the same time:</p>
+<ol>
+<li>Variables/status moved to a different table</li>
+<li>Privileges required on said table</li>
+</ol>
+<p>As an example, my non-root user gets:</p>
+<blockquote>
+<pre>mysql&gt; show session variables like 'tx_isolation';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'session_variables'</pre>
+</blockquote>
+<p>Who gets affected by this? Nearly <em>everyone and everything</em>.</p>
+<ul>
+<li>Your Nagios will not be able to read status variables</li>
+<li>Your ORM will not be able to determine session variables</li>
+<li>Your replication user will fail connecting (see <a href="http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html">this post by Giuseppe</a>)</li>
+<li>And most everyone else.</li>
+</ul>
+<p>The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:</p>
+<ol>
+<li>Change your app code to choose the correct schema (information_schema vs. performance_schema)</li>
+<li><strong>GRANT</strong> the permissions on your database</li>
+</ol>
+<p>Perhaps at this point you still do not consider this to be a problem. You may be thinking: <em>well, let&#8217;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code</em>.</p>
+<p>Not so fast. Can you really that simply create those GRANTs?<span id="more-7327"></span></p>
+<h3>Migration woes</h3>
+<p>How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.</p>
+<p>This should not be any different for <strong>5.7</strong>. We would like to provision a <strong>5.7</strong> slave in our topologies and just see that everything works. Well, we have, and things don&#8217;t just work. Our Nagios stops working for that <strong>5.7</strong> slave. <em>Orchestrator</em> started complaining (by this time I&#8217;ve <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.4.291">already fixed it</a> to be more tolerant for the <strong>5.7</strong> problems so no crashes here).</p>
+<p>I hope you see the problem by now.</p>
+<blockquote><p>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO &#8216;&#8230;&#8217;</strong> on your <strong>5.6</strong> master.</p></blockquote>
+<p>The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your <strong>5.7</strong> slave, which means you will not be able to <strong>SHOW GLOBAL VARIABLES</strong> on your slave, which means everything remains broken.</p>
+<p>Yes, you can issue this directly on your <strong>5.7</strong> slaves. It&#8217;s <em>doable</em>, but <em>undesired</em>. It&#8217;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#8217;s unfriendly to GTID (make sure to <strong>SET SQL_LOG_BIN=0</strong> before that).</p>
+<h3>WHY in the first place?</h3>
+<p>It seems like a security thing. I&#8217;m not sure whether this was intended. So you prevent a <strong>SHOW GLOBAL VARIABLES</strong> for a normal user. Makes sense. And yet:</p>
+<blockquote>
+<pre>mysql&gt; show global variables like 'hostname';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'global_variables'
+
+mysql&gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+</pre>
+</blockquote>
+<p>Seems like I&#8217;m allowed access to that info after all. So it&#8217;s not strictly a security design decision. For status variable, I admit, I don&#8217;t have a similar workaround.</p>
+<h3>Solutions?</h3>
+<p>The following are meant to be solutions, but do not really solve the problem:</p>
+<ul>
+<li><strong>SHOW</strong> commands. <strong>SHOW GLOBAL|SESSION VARIABLES|STATUS</strong> will work properly, and will implicitly know whether to provide the results via <strong>information_schema</strong> or <strong>performance_schema</strong> tables.
+<ul>
+<li>But, aren&#8217;t we meant to be happier with <strong>SELECT</strong> queries? So that I can really do stuff that is smarter than <strong>LIKE &#8216;variable_name%&#8217;</strong>?</li>
+<li>And of course you cannot use <strong>SHOW</strong> in server side cursors. Your stored routines are in a mess now.</li>
+<li>This does not solve the GRANTs problem.</li>
+</ul>
+</li>
+<li><strong><a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56">show_compatibility_56</a></strong>: an introduced variable in <strong>5.7</strong>, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+<ul>
+<li>Documentation introduces it, and says it is deprecated.
+<ul>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>But it actually works in <strong>5.7.8</strong> (latest)
+<ul>
+<li>time-travel-paradox plot thickens</li>
+</ul>
+</li>
+<li>Your automation scripts do not know in advance whether your MySQL has this variable
+<ul>
+<li>Hence <strong>SELECT @@global.show_compatibility_56</strong> will produce an error on <strong>5.6</strong></li>
+<li>But the &#8220;safe&#8221; way of <strong>SHOW GLOBAL VARIABLES LIKE &#8216;show_compatibility_56&#8217;</strong> will fail on a privilege error on <strong>5.7</strong></li>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>Actually advised by my colleague Simon J. Mudd, <strong>show_compatibility_56</strong> defaults to <strong>OFF</strong>. I <em>support</em> this line of thought. Or else it&#8217;s <strong>old_passwords=1</strong> all over again.</li>
+<li><strong>show_compatibility_56</strong> doesn&#8217;t solve the GRANTs problem.</li>
+<li>This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from <strong>&#8220;1&#8221;</strong> to <strong>&#8220;0&#8221;</strong>, I&#8217;m back at square one.</li>
+</ul>
+</li>
+</ul>
+<h3>Suggestion</h3>
+<p>I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in <strong>5.6</strong> if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:</p>
+<ol>
+<li><strong>Flow 1</strong>: keep <strong>information_schema</strong>, later migration into <strong>performance_schema</strong>
+<ul>
+<li>In <strong>5.7</strong>, <strong>information_schema</strong> tables should still produce the data.</li>
+<li>No security constraints on <strong>information_schema</strong></li>
+<li>Generate WARNINGs on reading from <strong>information_schema</strong> (&#8220;&#8230;this will be deprecated&#8230;&#8221;)</li>
+<li><strong>performance_schema </strong><em>also available</em>. With security constraints, whatever.</li>
+<li>In <strong>5.8</strong> remove <strong>information_schema</strong> tables; we are left with <strong>performance_schema</strong> only.</li>
+</ul>
+</li>
+<li><strong>Flow 2</strong>: easy migration into <strong>performance_schema</strong>:
+<ul>
+<li>In <strong>5.7</strong>, <strong>performance_schema</strong> tables should not require any special privileges. Any user can read from them.</li>
+<li>Keep <strong>show_compatibility_56 </strong>as it is.</li>
+<li><strong>SHOW</strong> commands choose between <strong>information_schema</strong> or <strong>performance_schema</strong> on their own &#8212; just as things are done now.</li>
+<li>In <strong>5.8</strong>, <strong>performance_schema</strong> tables will require <strong>SELECT</strong> privileges.</li>
+</ul>
+</li>
+</ol>
+<p>As always, I love the work done by the engineers; and I love how they listen to the community.</p>
+<p>Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?</p>
+<h3>[UPDATE 2015-08-19]</h3>
+<p>Please <a href="http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html">see this followup</a> by Morgan Tocker of Oracle.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7327</post-id>	</item>
+		<item>
+		<title>common_schema: 1.3: security goodies, parameterized split(), json-to-xml, query checksum</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum#respond</comments>
+				<pubDate>Mon, 14 Jan 2013 06:25:07 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5941</guid>
+				<description><![CDATA[common_schema 1.3 is released and is available for download. New and noteworthy in this version: Parameterized split(): take further control over huge transactions by breaking them down into smaller chunks, now manually tunable if needed duplicate_grantee(): copy+paste existing accounts along with their full set of privileges similar_grants: find which accounts share the exact same set [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>common_schema <strong>1.3</strong> is released and is <a href="http://code.google.com/p/common-schema">available for download</a>. New and noteworthy in this version:</p>
+<ul>
+<li>Parameterized <strong><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">split()</a></strong>: take further control over huge transactions by breaking them down into smaller chunks, now manually tunable if needed</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html"><strong>duplicate_grantee()</strong></a>: copy+paste existing accounts along with their full set of privileges</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html"><strong>similar_grants</strong></a>: find which accounts share the exact same set of privileges (i.e. have the same <em>role</em>)</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/json_to_xml.html"><strong>json_to_xml()</strong></a>: translate any valid JSON object into its equivalent XML form</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/extract_json_value.html"><strong>extract_json_value()</strong></a>: use XPath notation to extract info from JSON data, just as you would from XML</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_checksum.html"><strong>query_checksum()</strong></a>: given a query, calculate a checksum on the result set</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/random_hash.html"><strong>random_hash()</strong></a>: get a 40 hexadecimal digits random hash, using a reasonably large changing input</li>
+</ul>
+<p>Let&#8217;s take a closer look at the above:</p>
+<h4>Parameterized split()</h4>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> takes your bulk query and automagically breaks it down into smaller pieces. So instead of one huge <strong>UPDATE</strong> or <strong>DELETE</strong> or <strong>INSERT..SELECT</strong> transaction, you get many smaller transactions, each with smaller impact on I/O, locks, CPU.</p>
+<p>As of <strong>1.3</strong>, <em>split()</em> gets more exposed: you can have some control on its execution, and you also get a lot of very interesting info during operation.</p>
+<p>Here&#8217;s an example of <em>split()</em> control:</p>
+<blockquote>
+<pre>set @script := "
+  <strong>split</strong>({<em>start</em>:7015, <em>step</em>:2000} : <span style="color: #3366ff;">UPDATE sakila.rental SET return_date = return_date + INTERVAL 1 DAY</span>) 
+    <strong>throttle</strong> 1;
+";
+call common_schema.run(@script);</pre>
+</blockquote>
+<p>In the above we choose a split size of 2,000 rows at a time; but we also choose to only start with <strong>7015</strong>, skipping all rows prior to that value. Just what is that value? It depends on the splitting key (and see next example for just that); but in this table we can safely assume this is the <strong>rental_id</strong> <strong>PRIMARY KEY</strong> of the table.</p>
+<p>You don&#8217;t <em>have to</em> use these control <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters">parameters</a>. But they can save you some time and effort.<span id="more-5941"></span></p>
+<p>And, look at some interesting info about the <em>splitting</em> process:</p>
+<blockquote>
+<pre>set @script := "
+  <strong>split</strong>(<span style="color: #339966;">sakila.film_actor</span>) 
+    <span style="color: #3366ff;"><strong>select</strong></span> $split_columns <span style="color: #3366ff;">as columns</span>, $split_range_start <span style="color: #3366ff;">as range_start</span>, $split_range_end <span style="color: #3366ff;">as range_end</span>
+";
+call common_schema.run(@script);
++----------------------+-------------+------------+
+| columns              | range_start | range_end  |
++----------------------+-------------+------------+
+| `actor_id`,`film_id` | '1','1'     | '39','293' |
++----------------------+-------------+------------+
+
++----------------------+-------------+------------+
+| columns              | range_start | range_end  |
++----------------------+-------------+------------+
+| `actor_id`,`film_id` | '39','293'  | '76','234' |
++----------------------+-------------+------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '76','234'  | '110','513' |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '110','513' | '146','278' |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '146','278' | '183','862' |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '183','862' | '200','993' |
++----------------------+-------------+-------------+</pre>
+</blockquote>
+<p>In the above you get to be told exactly how table splitting occurs: you are being told what columns are used to split the table, and what range of values is used in each step. There&#8217;s more to it: read the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">split() documentation</a>.</p>
+<h4>similar_grants</h4>
+<p>Out of your <strong>100</strong> different grants, which ones share the exact same set of privileges? MySQL has non notion of <em>roles</em>, but that doesn&#8217;t mean the notion does not exist. Multiple accounts share the same restrictions and privileges. Use <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html"><strong>similar_grants</strong></a> to find out which. You might just realize there&#8217;s a few redundant accounts in your system.</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM similar_grants;
++-------------------------------+----------------+-------------------------------------------------------+
+| sample_grantee                | count_grantees | similar_grantees                                      |
++-------------------------------+----------------+-------------------------------------------------------+
+| 'root'@'127.0.0.1'            |              3 | <span style="color: #3366ff;">'root'@'127.0.0.1'</span>,<span style="color: #0000ff;">'root'@'myhost'</span>,<span style="color: #333399;">'root'@'localhost'</span> |
+| 'repl'@'10.%'                 |              2 | <span style="color: #008000;">'repl'@'10.%'</span>,<span style="color: #808000;">'replication'@'10.0.0.%'</span>                |
+| 'apps'@'%'                    |              1 | 'apps'@'%'                                            |
+| 'gromit'@'localhost'          |              1 | 'gromit'@'localhost'                                  |
+| 'monitoring_user'@'localhost' |              1 | 'monitoring_user'@'localhost'                         |
++-------------------------------+----------------+-------------------------------------------------------+</pre>
+</blockquote>
+<h4>duplicate_grantee()</h4>
+<p>Provide an existing account, and name your new, exact duplicate account. The complete set of privileges is copied, and so is the password. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html"><strong>duplicate_grantee()</strong></a> is your Copy+Paste of MySQL accounts.</p>
+<p>Let&#8217;s begin with some pre-existing account and see how it duplicates:</p>
+<blockquote>
+<pre>mysql&gt; show grants for <span style="color: #000080;">'world_user'@'localhost'</span>;
++------------------------------------------------------------------------------------------------------------------------+
+| Grants for world_user@localhost                                                                                        |
++------------------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO 'world_user'@'localhost' IDENTIFIED BY PASSWORD '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9'      |
+| GRANT ALL PRIVILEGES ON `world`.* TO 'world_user'@'localhost'                                                          |
+| GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `sakila`.`get_customer_balance` TO 'world_user'@'localhost' WITH GRANT OPTION |
++------------------------------------------------------------------------------------------------------------------------+
+
+mysql&gt; call <strong>duplicate_grantee</strong>(<span style="color: #000080;">'world_user@localhost'</span>, <span style="color: #000080;">'copied_user@10.0.0.%'</span>);
+Query OK, 0 rows affected (0.06 sec)
+
+mysql&gt; show grants for <span style="color: #000080;">'copied_user'@'10.0.0.%'</span>;
++------------------------------------------------------------------------------------------------------------------------+
+| Grants for copied_user@10.0.0.%                                                                                        |
++------------------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO 'copied_user'@'10.0.0.%' IDENTIFIED BY PASSWORD '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9'      |
+| GRANT ALL PRIVILEGES ON `world`.* TO 'copied_user'@'10.0.0.%'                                                          |
+| GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `sakila`.`get_customer_balance` TO 'copied_user'@'10.0.0.%' WITH GRANT OPTION |
++------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>The routine is quite relaxed in grantee format. <strong>copied_user@10.0.0.%</strong>, <strong>copied_user@&#8217;10.0.0.%&#8217;</strong> and <strong>&#8216;copied_user&#8217;@&#8217;10.0.0.%&#8217;</strong> are all just fine, and represent the same account. Saves trouble with all that quoting.</p>
+<h4>json_to_xml()</h4>
+<p>JSON is becoming increasingly popular in storing dynamically-structured data. XML&#8217;s tags overhead and its human unfriendliness make it less popular today. However, the two share similar concepts, and conversion between the two is possible. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/json_to_xml.html"><strong>json_to_xml()</strong></a> will translate your valid JSON data into its equivalent XML format. The rules are simple (all-nodes-and-data, no attributes, arrays as repeating nodes, objects as subnodes) and the results are valid XML objects.</p>
+<p>Sample data taken from <a href="http://json.org/example.html">json.org</a>:</p>
+<blockquote>
+<pre>mysql&gt; SET @json := '
+<span style="color: #000080;">{
+  "menu": {
+    "id": "file",
+    "value": "File",
+    "popup": {
+      "menuitem": [
+        {"value": "New", "onclick": "CreateNewDoc()"},
+        {"value": "Open", "onclick": "OpenDoc()"},
+        {"value": "Close", "onclick": "CloseDoc()"}
+      ]
+    }
+  }
+}</span>
+';
+
+mysql&gt; SELECT <strong>json_to_xml(@json)</strong> AS <strong>xml</strong> \G
+*************************** 1. row ***************************
+<strong>xml:</strong> &lt;menu&gt;&lt;id&gt;file&lt;/id&gt;&lt;value&gt;File&lt;/value&gt;&lt;popup&gt;&lt;menuitem&gt;&lt;value&gt;New&lt;/value&gt;&lt;onclick&gt;CreateNewDoc()&lt;/onclick&gt;&lt;/menuitem&gt;&lt;menuitem&gt;&lt;value&gt;Open&lt;/value&gt;&lt;onclick&gt;OpenDoc()&lt;/onclick&gt;&lt;/menuitem&gt;&lt;menuitem&gt;&lt;value&gt;Close&lt;/value&gt;&lt;onclick&gt;CloseDoc()&lt;/onclick&gt;&lt;/menuitem&gt;&lt;/popup&gt;&lt;/menu&gt;</pre>
+</blockquote>
+<p>Beautified form of the above result:</p>
+<blockquote>
+<pre>&lt;menu&gt;
+  &lt;id&gt;file&lt;/id&gt;
+  &lt;value&gt;File&lt;/value&gt;
+  &lt;popup&gt;
+    &lt;menuitem&gt;
+      &lt;value&gt;New&lt;/value&gt;
+      &lt;onclick&gt;CreateNewDoc()&lt;/onclick&gt;
+    &lt;/menuitem&gt;
+    &lt;menuitem&gt;
+      &lt;value&gt;Open&lt;/value&gt;
+      &lt;onclick&gt;OpenDoc()&lt;/onclick&gt;
+    &lt;/menuitem&gt;
+    &lt;menuitem&gt;
+      &lt;value&gt;Close&lt;/value&gt;
+      &lt;onclick&gt;CloseDoc()&lt;/onclick&gt;
+    &lt;/menuitem&gt;
+  &lt;/popup&gt;
+&lt;/menu&gt;</pre>
+</blockquote>
+<p>Note that linked examples page uses sporadically invented attributes; <em>common_schema</em> prefers using well-defined nodes.</p>
+<h4>extract_json_value()</h4>
+<p>Which means things you can do with XML can also be done with JSON. XPath is a popular extraction DSL, working not only for XML but also for Object Oriented structures (see Groovy&#8217;s nice integration of XPath into the language, or just commons-beans for conservative approach). JSON is a perfect data store for XPath expressions; by utilizing the translation between JSON and XML, one is now easily able to extract value from JSON (using same example as above):</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>extract_json_value</strong>(@json, <span style="color: #000080;">'//id'</span>) AS result;
++--------+
+| result |
++--------+
+| file   |
++--------+
+
+mysql&gt; SELECT <strong>extract_json_value</strong>(@json, <span style="color: #000080;">'count(/menu/popup/menuitem)'</span>) AS count_items;
++-------------+
+| count_items |
++-------------+
+| 3           |
++-------------+</pre>
+</blockquote>
+<p>Implementations of <strong>json_to_xml()</strong> and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/extract_json_value.html"><strong>extract_json_value()</strong></a> are CPU intensive. There is really just one justification for having these written in Stored Procedures: their lack in the standard MySQL function library. This is reason enough. Just be aware; test with <a href="http://dev.mysql.com/doc/refman/5.5/en/information-functions.html#function_benchmark">BENCHMARK()</a>.</p>
+<h4>query_checksum()</h4>
+<p>It looks like this:</p>
+<blockquote>
+<pre>mysql&gt; call <strong>query_checksum</strong>(<span style="color: #000080;">'select id from world.City where id in (select capital from world.Country) order by id'</span>);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 5f35070b90b0c079ba692048c51a89fe |
++----------------------------------+
+
+mysql&gt; call <strong>query_checksum</strong>(<span style="color: #000080;">'select capital from world.Country where capital is not null order by capital'</span>);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 5f35070b90b0c079ba692048c51a89fe |
++----------------------------------+</pre>
+</blockquote>
+<p>The two queries above yield with the same result set. As consequence, <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_checksum.html"><strong>query_checksum()</strong></a> produces the same checksum value for both. The next query produces a different result set, hence a different checksum:</p>
+<blockquote>
+<pre>mysql&gt; call <strong>query_checksum</strong>(<span style="color: #000080;">'select id from world.City where id in (select capital from world.Country) order by id limit 10'</span>);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 997079c2dfca34ba87ae44ed8965276e |
++----------------------------------+</pre>
+</blockquote>
+<p>The routine actually invokes the given queries (modifying them a bit along the way) and uses a deterministic incremental checksum to get the final result.</p>
+<p>Its use? As a handy built-in mechanism for comparing your table data. This is meant for relatively small result sets &#8211; not for your <strong>20GB</strong> table. Inspired by Baron&#8217;s <a href="http://www.xaprb.com/blog/2009/03/25/mysql-command-line-tip-compare-result-sets/">old trick</a>, and works on server side (Windows/GUI/automated clients to benefit).</p>
+<h4>random_hash()</h4>
+<p>Random hashes come handy. The naive way to produce them is by executing something like <strong>SELECT SHA1(RAND())</strong>. However the <strong>RAND()</strong> function just doesn&#8217;t provide enough plaintext for the hash function. The <strong>SHA</strong>/<strong>MD5</strong> functions expect a textual input, and produce a <strong>160</strong>/<strong>128</strong> bit long hash. The maximum char length of a <strong>RAND()</strong> result is <strong>20</strong> characters or so, and these are limited to the <strong>0-9</strong> digits. So at about <strong>10^20</strong> options for input, which is about <strong>64</strong> bit. Hmmmm. a 64 bit input to generate a <strong>160</strong> bit output? I don&#8217;t think so! <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/random_hash.html"><strong>random_hash()</strong></a> provides additional input in the form of your current status (at about 830 characters) as well as <strong>RAND()</strong>, <strong>SYSDATE()</strong> and server ID.</p>
+<h4>Bugfixes</h4>
+<p>Any bugfix adds at least one test; typically more. Currently with over <strong>470</strong> tests, <em>common_schema</em> is built to work.</p>
+<h4>Get common_schema</h4>
+<p><em>common_schema</em> <strong>1.3</strong> is available under the permissive New BSD License. <a href="http://code.google.com/p/common-schema/">Find the latest download here</a>.</p>
+<p>If you like to support <em>common_schema</em>, I&#8217;m always open for ideas and contributions. Or you can just spread the word!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5941</post-id>	</item>
+		<item>
+		<title>State of InnDB Online DDL in MySQL 5.6.9-RC (good news included)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-9-rc-good-news-included</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-9-rc-good-news-included#comments</comments>
+				<pubDate>Tue, 18 Dec 2012 11:21:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Review]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5882</guid>
+				<description><![CDATA[5.6.9-RC is out, and I was curious to see how the online DDL has improved since my 5.6.8 review. I also owe James Day this review, since he came up with results inconsistent with my own. We both agreed the dataset I was using was too small, but I got similar results even on larger [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>5.6.9-RC</strong> is <a href="https://blogs.oracle.com/MySQL/entry/mysql_5_6_9_release">out</a>, and I was curious to see how the <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-online-ddl.html">online DDL</a> has improved since <a href="https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc">my 5.6.8 review</a>. I also owe James Day this review, since he came up with results inconsistent with my own.</p>
+<p>We both agreed the dataset I was using was too small, but I got similar results even on larger scale. Then some time passed, and <strong>5.6.9</strong> was announced.</p>
+<p>So for the <strong>5.6.9</strong> test I took one of my real tables on production. It is not extremely large: it&#8217;s a ~ <strong>300MB</strong> <strong>.ibd</strong> file, in the following format:</p>
+<blockquote>
+<pre>mysql&gt; show create table tbl \G
+
+CREATE TABLE `tbl` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `a` varchar(255) CHARACTER SET utf8 NOT NULL DEFAULT '',
+  `w` smallint(11) NOT NULL DEFAULT '0',
+  `d` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `icount` smallint(5) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`) KEY_BLOCK_SIZE=8,
+  UNIQUE KEY `u_idx` (`a`,`w`,`d`) KEY_BLOCK_SIZE=8,
+  KEY `d` (`d`) KEY_BLOCK_SIZE=8
+) ENGINE=InnoDB AUTO_INCREMENT=16960441 DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=16</pre>
+</blockquote>
+<p>Got some <strong>2.5M</strong> rows in the table; desktop machine, <strong>64</strong> bit Linux, mysqlsandbox.</p>
+<p>I have crossed several DDL statements with several DML statements. The DDL statements in this test are (<strong>ALTER TABLE&#8230;</strong>):<span id="more-5882"></span></p>
+<ul>
+<li><strong>ROW_FORMAT=COMPACT</strong></li>
+<li><strong>AUTO_INCREMENT=16960441</strong></li>
+<li><strong>ADD INDEX (w)</strong></li>
+<li><strong>DROP INDEX w</strong></li>
+<li><strong>ADD COLUMN c CHAR(1) NOT NULL</strong></li>
+<li><strong>DROP COLUMN c</strong></li>
+</ul>
+<p>The DML statements are:</p>
+<ol>
+<li><strong>select max(id) from test.tbl;</strong> &#8212; this queries the AUTO_INCREMENT value, which is of course a PRIMARY KEY</li>
+<li><strong>select min(d) from test.tbl;</strong> &#8212; there is an index on d, and normal execution plan is to optimize table away and just use the index</li>
+<li><strong>select min(icount) from test.tbl;</strong> &#8212; there is no index on icount, and full table scan is required</li>
+<li><strong>update test.tbl set d = d + interval 1 second where id = 8057370;</strong> &#8212; the UPDATE uses the PRIMARY KEY</li>
+<li><strong>update test.tbl set d = d + interval 1 second where icount = 200;</strong> &#8212; will affect <strong>4</strong> rows, but requires full scan.</li>
+</ol>
+<p>The results?</p>
+<table border="0" cellspacing="0">
+<colgroup width="243"></colgroup>
+<colgroup width="92"></colgroup>
+<colgroup width="131"></colgroup>
+<colgroup span="5" width="85"></colgroup>
+<tbody>
+<tr>
+<td align="LEFT" bgcolor="#E6E6FF" height="47"><strong>ALTER TABLE&#8230;</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>Time (sec)</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>General comments</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>select max PK</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>select min by index</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>select min by full scan</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>update by PK</strong></td>
+<td align="LEFT" bgcolor="#E6E6FF"><strong>update by full scan</strong></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">ROW_FORMAT=COMPACT</td>
+<td align="RIGHT" bgcolor="#FFFFCC">183</td>
+<td align="LEFT" bgcolor="#FFFFCC"></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="16">AUTO_INCREMENT=16960441</td>
+<td align="RIGHT" bgcolor="#FFFFCC">0.24</td>
+<td align="LEFT" bgcolor="#FFFFCC">[Instant operation]</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">ADD INDEX (w)</td>
+<td align="RIGHT" bgcolor="#FFFFCC">21</td>
+<td align="LEFT" bgcolor="#FFFFCC"></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="16">DROP INDEX w</td>
+<td align="RIGHT" bgcolor="#FFFFCC">0.1</td>
+<td align="LEFT" bgcolor="#FFFFCC">[Instant operation]</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+<td align="LEFT" bgcolor="#FFFFCC">n/a</td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">ADD COLUMN c CHAR(1) NOT NULL</td>
+<td align="RIGHT" bgcolor="#FFFFCC">103</td>
+<td align="LEFT" bgcolor="#FFFFCC"></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">DROP COLUMN c</td>
+<td align="RIGHT" bgcolor="#FFFFCC">110</td>
+<td align="LEFT" bgcolor="#FFFFCC"></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+<td align="LEFT" bgcolor="#FFFFCC"><span style="color: #00ae00;">online</span></td>
+</tr>
+</tbody>
+</table>
+<h4>Notes</h4>
+<ul>
+<li>All operations were online: operations did not wait for <strong>ALTER</strong> to complete.</li>
+<li>I executed all operations multiple times during each <strong>ALTER</strong>.</li>
+<li>In addition, I executed operations from another client.</li>
+<li>Some operations were fast, others sometimes took as long as <strong>7.34</strong> seconds to complete. This is no small matter: the time it took for each DML was indeterministic, and longer than what it would usually take it. That&#8217;s perfectly understandable. Just note that some operations took exceedingly long time to complete. My understanding is that the <strong>ALTER</strong> operations happens in chunks. DML statements are allowed in between these chunks. This is the reason why on smaller tables there didn&#8217;t seem to be any &#8220;online&#8221; statement: the chunks were just too large in relation to table size. And so, and this is still my own understanding, your query may get lucky or unlucky depending on the exact moment it has been issued.</li>
+<li>I did not try it with <strong>FOREIGN KEY</strong>s. I previously concluded that foreign keys were a no-go for online DDL. I&#8217;m not sure if this is still the case. Another time for this test &#8211; but it must take place.</li>
+</ul>
+<h4>Conclusions</h4>
+<p>Still RC &#8211; but for the first time the online DDL seem to deliver what&#8217;s promised. I&#8217;m very happy to see this.</p>
+<p>I am yet to understand how the <strong>ALTER</strong> works via replication. With single threaded replication I would assume it&#8217;s back to &#8220;wait till I&#8217;m done&#8221; on the slave, in which case the <em>&#8220;online&#8221;</em> term is not there yet. Even on multi-threaded replication DML on same schema would hang. I&#8217;m happy to be corrected on this by an authority.</p>
+<p>My predicament is that <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a> or <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-online-schema-change.html">pt-online-schema-change</a> are here to stay for the next couple of years at least. Some operations, like partitioning, are not supported by current online InnoDB DDL. Also, these scripts allow you some control over the speed at which the <strong>ALTER</strong> process works, allowing for pre-defined sleep time in between chunks, so as to let the server &#8211; and its slaves &#8211; recover their breath.</p>
+<p>Nonetheless, big kudos for the InnoDB team at Oracle for pulling this one out!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-9-rc-good-news-included/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5882</post-id>	</item>
+		<item>
+		<title>State of InnDB Online DDL in MySQL 5.6.8-RC</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc#comments</comments>
+				<pubDate>Tue, 20 Nov 2012 09:49:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Review]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5823</guid>
+				<description><![CDATA[5.6.8-rc is out, and so I&#8217;m following up on InnoDB&#8217;s online DDL new feature: the ability to SELECT, INSERT, DELETE, UPDATE a table even while an ALTER TABLE is executing on same table. The brief summary Not as advertised; many things can&#8217;t be done. The longer review I&#8217;m using 5.6.8-rc 64bit binary distribution for Linux, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>5.6.8-rc</strong> is out, and so I&#8217;m following up on InnoDB&#8217;s online DDL new feature: the ability to SELECT, INSERT, DELETE, UPDATE a table even while an ALTER TABLE is executing on same table.</p>
+<h4>The brief summary</h4>
+<p>Not as advertised; many things can&#8217;t be done.</p>
+<h4>The longer review</h4>
+<p>I&#8217;m using <strong>5.6.8-rc 64bit</strong> binary distribution for Linux, installed via <a href="http://mysqlsandbox.net/">mysqlsandbox</a>. My hardware is irrelevant, but the fact I&#8217;m testing on my laptop assists me in that <strong>ALTER TABLE</strong> operations take a while, so that I&#8217;m able to easily type commands in two terminals and have the time to watch them being executed. Query cache is disabled.<span id="more-5823"></span></p>
+<p>I&#8217;m using the sakila sample database, and in particular I&#8217;m working with the rental table. Here&#8217;s the table definition:</p>
+<blockquote>
+<pre>CREATE TABLE `rental` (
+  `rental_id` int(11) NOT NULL AUTO_INCREMENT,
+  `rental_date` datetime NOT NULL,
+  `inventory_id` mediumint(8) unsigned NOT NULL,
+  `customer_id` smallint(5) unsigned NOT NULL,
+  `return_date` datetime DEFAULT NULL,
+  `staff_id` tinyint(3) unsigned NOT NULL,
+  `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`rental_id`),
+  UNIQUE KEY `rental_date` (`rental_date`,`inventory_id`,`customer_id`),
+  KEY `idx_fk_inventory_id` (`inventory_id`),
+  KEY `idx_fk_customer_id` (`customer_id`),
+  KEY `idx_fk_staff_id` (`staff_id`),
+  CONSTRAINT `fk_rental_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff` (`staff_id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_rental_inventory` FOREIGN KEY (`inventory_id`) REFERENCES `inventory` (`inventory_id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_rental_customer` FOREIGN KEY (`customer_id`) REFERENCES `customer` (`customer_id`) ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=16050 DEFAULT CHARSET=utf8</pre>
+</blockquote>
+<p>Highlights for the table: <strong>AUTO_INCREMENT PRIMARY KEY</strong>, some columns indexed, some not, and Foreign Keys in place. Pretty much a standard table. It contains <strong>16,044</strong> rows. Row format is <strong>COMPACT</strong>.</p>
+<p>What I want to know is: which DDL commands allow for which online DML commands?</p>
+<p>So, on terminal #1 I will issue queries like:</p>
+<blockquote>
+<pre>node1 5.6.8-rc-log sakila&gt; alter table <strong>sakila.rental</strong> ROW_FORMAT=COMPACT <strong>/* or whatever */</strong>;
+Query OK, 0 rows affected (10.57 sec)
+Records: 0  Duplicates: 0  Warnings: 0</pre>
+</blockquote>
+<p>And during the above operation, I will execute the following on terminal #2:</p>
+<ol>
+<li><strong>select max(rental_id) from sakila.rental;</strong> this queries the AUTO_INCREMENT value, which is of course a PRIMARY KEY</li>
+<li><strong>select min(rental_date) from sakila.rental</strong>; there is an index on rental_date, and normal execution plan is to optimize table away and just use the index</li>
+<li><strong>select min(return_date) from sakila.rental</strong>; there is no index on return_date, and full table scan is required</li>
+<li><strong>update rental set return_date = return_date + interval 1 second where rental_id=3</strong>; the UPDATE uses the PRIMARY KEY</li>
+<li><strong>update rental set return_date = return_date + interval 1 second where return_date = NOW()</strong>; won&#8217;t actually affect anything, but requires full scan.</li>
+</ol>
+<p>So here are the results:</p>
+<blockquote>
+<pre>+-------------------------------------------------------------+-------+---------------------------+---------------+---------------------+-------------------------+--------------+---------------------+
+| ALTER statement                                             | Time  | General comments          | select max PK | select min by index | select min by full scan | update by PK | update by full scan |
++-------------------------------------------------------------+-------+---------------------------+---------------+---------------------+-------------------------+--------------+---------------------+
+| ROW_FORMAT=COMPACT                                          | 10.92 |                           | <span style="color: #008000;">Instant</span>       | <span style="color: #008000;">Instant</span>             | <span style="color: #008000;">Instant</span>                 | <span style="color: #800000;">blocked</span>      | <span style="color: #800000;">blocked</span>             |
+| AUTO_INCREMENT=16051                                        |  0.06 | Instant, no table rebuild | N/A           | N/A                 | N/A                     | N/A          | N/A                 |
+| ADD INDEX(last_update)                                      |  2.37 |                           | <span style="color: #800000;">blocked</span>       | <span style="color: #800000;">blocked</span>             | <span style="color: #800000;">blocked</span>                 | <span style="color: #800000;">blocked</span>      | <span style="color: #800000;">blocked</span>             |
+| ADD INDEX(last_update), ALGORITHM=INPLACE                   |  1.83 |                           | <span style="color: #800000;">blocked</span>       | <span style="color: #800000;">blocked</span>             | <span style="color: #800000;">blocked</span>                 | <span style="color: #800000;">blocked</span>      | <span style="color: #800000;">blocked</span>             |
+| ADD INDEX(last_update), ALGORITHM=INPLACE, LOCK=NONE        |  0.00 | ERROR 1235 (42000): ...   | N/A           | N/A                 | N/A                     | N/A          | N/A                 |
+| ADD COLUMN c CHAR(1) NOT NULL                               | 11.20 |                           | <span style="color: #008000;">Instant</span>       | <span style="color: #008000;">Instant</span>             | <span style="color: #008000;">Instant</span>                 | <span style="color: #800000;">blocked</span>      | <span style="color: #800000;">blocked</span>             |
+| ADD COLUMN c CHAR(1) NOT NULL, ALGORITHM=INPLACE, LOCK=NONE |  0.00 | ERROR 1235 (42000): .     | N/A           | N/A                 | N/A                     | N/A          | N/A                 |
++-------------------------------------------------------------+-------+---------------------------+---------------+---------------------+-------------------------+--------------+---------------------+</pre>
+</blockquote>
+<p>Rather surprising, I would say.</p>
+<ul>
+<li><em>None</em> of my tests resolved with online write (<strong>UPDATE</strong>). At best I could get online read (<strong>SEELCT</strong>).<br />
+<strong></strong></li>
+<li><strong>AUTO_INCREMENT</strong> is instantaneous. High time for that! It&#8217;s just some number in the <strong>.frm</strong> file, never understood the need for table rebuild.</li>
+<li>Apparently <strong>ADD COLUMN</strong> is <em>more online</em> than <strong>ADD INDEX</strong>, and I&#8217;ve tested this again and again and again to make sure I was doing it right. This is quite weird, even according to the <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-online-ddl.html">docs</a>.</li>
+<li>In none of the above tests (and others, non listed), have I been able to specify <strong>LOCK=NONE</strong>. It&#8217;s always <strong>ERROR 1235 (42000): This version of MySQL doesn&#8217;t yet support &#8216;alter table sakila.rental &lt;whatever&gt;, algorithm=inplace, lock=none&#8217;</strong>.</li>
+</ul>
+<p>So what&#8217;s so online about this? Online reads are nice, but most everyone cannot accept blocking writes (for same reason no one would use <em>mysqlhotcopy</em>, also so wrongly named). This leaves us again with <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a> and <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-online-schema-change.html">pt-online-schema-change</a>.</p>
+<h4>The butler did it</h4>
+<p>Apologies to the butler, the <strong>FOREIGN KEY</strong>s did it. Let&#8217;s try the same again without foreign keys:</p>
+<blockquote>
+<pre>node1 5.6.8-rc-log sakila&gt; create table rental2 like rental;
+node1 5.6.8-rc-log sakila&gt; insert into rental2 select * from rental;
+node1 5.6.8-rc-log sakila&gt; rename table rental to rental_old, rental2 to rental;
+Query OK, 0 rows affected (0.31 sec)</pre>
+</blockquote>
+<p>Here are the results:</p>
+<blockquote>
+<pre>+-------------------------------------------------------------+-------+---------------------------+----------------+---------------------+-------------------------+----------------+---------------------+
+| ALTER statement                                             | Time  | General comments          | select max PK  | select min by index | select min by full scan | update by PK   | update by full scan |
++-------------------------------------------------------------+-------+---------------------------+----------------+---------------------+-------------------------+----------------+---------------------+
+| ROW_FORMAT=COMPACT                                          | 11.03 |                           | <span style="color: #008000;">Instant</span>        | <span style="color: #008000;">Instant</span>             | <span style="color: #008000;">Instant</span>                 | <span style="color: #008000;">Instant</span>        | <span style="color: #008000;">Instant</span>             |
+| AUTO_INCREMENT=16051                                        |  0.05 | Instant, no table rebuild | N/A            | N/A                 | N/A                     | N/A            | N/A                 |
+| ADD INDEX(last_update)                                      |  2.04 |                           | * <span style="color: #ff6600;">Inconsistent</span> | * <span style="color: #ff6600;">Inconsistent</span>      | * <span style="color: #ff6600;">Inconsistent</span>          | <span style="color: #800000;">blocked</span>        | <span style="color: #800000;">blocked</span>             |
+| ADD INDEX(last_update), ALGORITHM=INPLACE, LOCK=NONE        |  3.14 |                           | * <span style="color: #ff6600;">Inconsistent</span> | * <span style="color: #ff6600;">Inconsistent</span>      | * <span style="color: #ff6600;">Inconsistent</span>          | <span style="color: #800000;">blocked</span>        | <span style="color: #800000;">blocked</span>             |
+| ADD COLUMN c CHAR(1) NOT NULL                               |    ** |                           | * <span style="color: #ff6600;">Inconsistent</span> | * <span style="color: #ff6600;">Inconsistent</span>      | * <span style="color: #ff6600;">Inconsistent</span>          | * <span style="color: #ff6600;">Inconsistent</span> | * <span style="color: #ff6600;">Inconsistent</span>      |
+| ADD COLUMN c CHAR(1) NOT NULL, ALGORITHM=INPLACE, LOCK=NONE |    ** |                           | * <span style="color: #ff6600;">Inconsistent</span> | * <span style="color: #ff6600;">Inconsistent</span>      | * <span style="color: #ff6600;">Inconsistent</span>          | * <span style="color: #ff6600;">Inconsistent</span> | * <span style="color: #ff6600;">Inconsistent</span>      |
++-------------------------------------------------------------+-------+---------------------------+----------------+---------------------+-------------------------+----------------+---------------------+</pre>
+</blockquote>
+<p>What&#8217;s going on here?</p>
+<ul>
+<li><strong>ALGORITHM=INPLACE, LOCK=NONE</strong> is accepted! Bad, bad foreign keys!<br />
+<strong></strong></li>
+<li><strong>* ADD INDEX</strong> usually allows for concurrent reads, but after repeated tests <strong>SELECT</strong>s start to block. Then they don&#8217;t work concurrently anymore until table is recreated. But even that not always, so I&#8217;m not sure what the inconsistency is.</li>
+<li><strong>* ADD COLUMN</strong> is still more concurrent than <strong>ADD INDEX</strong>, and actually allows for concurrent writes! Though, inconsistently. Sometimes it does not allow for concurrent writes.</li>
+<li><strong>** ADD COLUMN</strong> runtime highly affected by concurrent queries. It wents as high as <strong>45</strong> seconds on my laptop. Now, to make things clear, I&#8217;m not running an automated benchmark here: I&#8217;m copying+pasting the statements from my editor to the mysql CLI. So, maybe <strong>10</strong> or <strong>15</strong><strong>SELECT</strong> and <strong>UPDATE</strong> queries executes. How does that justify <strong>35</strong> seconds delay in table rebuild?</li>
+</ul>
+<h4>Some conclusions:</h4>
+<ul>
+<li>The documentation does not specify anything about <strong>FOREIGN KEY</strong>s crashing the party. It should.</li>
+<li>The documentation specifically mentions the <strong>ADD/DROP INDEX</strong> statements to be online. <strong>ADD INDEX</strong> is less online than <strong>ADD COLUMN</strong>.</li>
+<li>Everything is still shaky. Sometimes things work, sometimes they don&#8217;t.</li>
+<li>Runtimes are unproportionally affected by concurrent queries.</li>
+<li>For the meantime, I keep to my online alter table scripts. Been using them for <strong>3.5</strong> years now.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5823</post-id>	</item>
+		<item>
+		<title>MySQL 5.6 RC: further thoughts and questions</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-5-6-rc-further-thoughts-and-questions</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-5-6-rc-further-thoughts-and-questions#comments</comments>
+				<pubDate>Mon, 19 Nov 2012 10:21:25 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[New Features]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5754</guid>
+				<description><![CDATA[Here are a few questions I came up with while experimenting with MySQL 5.6.7 &#38; 5.6.8. They are the impressions of a first-time encounter with 5.6, which is a single opportunity for a person to point out the things that strike as odd. Bugs-wise, just submitted another crashing bug for 5.6.8. I&#8217;m just one man, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here are a few questions I came up with while experimenting with MySQL <strong>5.6.7</strong> &amp; <strong>5.6.8</strong>. They are the impressions of a first-time encounter with <strong>5.6</strong>, which is a single opportunity for a person to point out the things that strike as odd.</p>
+<p>Bugs-wise, just submitted another crashing bug for <strong>5.6.8</strong>. I&#8217;m just one man, so I extrapolate to realize there is still much work to be done.</p>
+<p>The below list does not necessarily make for a bug list; mostly things that puzzle me. I hope it can stir some additional thinking.</p>
+<ol>
+<li>Transportable tablespace: what&#8217;s the difference between <strong>FLUSH TABLES</strong> my_table <strong>WITH READ LOCK</strong> and <strong>FLUSH TABLES</strong> my_table <strong>FOR EXPORT</strong>? Both create the <strong>.cfg</strong> file, and both seem to operate just as well. <a href="http://blogs.innodb.com/wp/2012/04/innodb-transportable-tablespaces/">One document</a> says <strong>READ LOCK</strong>, <a href="http://dev.mysql.com/doc/innodb/1.1/en/glossary.html#glos_transportable_tablespace">another</a> says <strong>FOR EXPORT</strong>.</li>
+<li>What&#8217;s the <strong>ALGORITHM=?</strong> flag in online <strong>ALTER TABLE</strong>? Apparently one can write to altered table even on <strong>ALGORITHM=COPY</strong>. There&#8217;s not enough documentation to explain.</li>
+<li>How come there&#8217;s not a single example of online InnoDB DDL in official docs?</li>
+<li>Why the inconsistency of putting <strong>ALGORITHM=&#8230;</strong>, <strong>LOCK=&#8230;</strong> in between commas, as opposed to other flags/commands not between commas? For example: <strong>ALTER TABLE my_table ADD COLUMN i INT, ALGORITHM=COPY, LOCK=SHARED, ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=4</strong></li>
+<li>Why would anyone care about <strong>FULLTEXT</strong> search word <a href="http://blogs.innodb.com/wp/2011/07/innodb-full-text-search-tutorial/">proximity</a><em> by bytes</em>? Typically, one would want proximity by <em>words</em>. I can find the excuse for proximity by <em>characters</em>. By <em>bytes</em>? A user is not interested in the low level representation of the text!</li>
+<li>Could we get a distinct tablespace for the mysql internal InnoDB tables? (I understand there&#8217;s a separate tablespace for UNDO logs)</li>
+<li>Why the need to configure <strong>gtid_mode=ON</strong> as well as <strong>disable-gtid-unsafe-statements</strong> so as to enable GTID replication? If only the first is set, an error is produced upon <strong>CHANGE MASTER TO MASTER_AUTO_POSITION=1</strong></li>
+<li>And when said error is produced, why does it not mention <strong>disable-gtid-unsafe-statements</strong>, and instead read out a cryptic message? Also note <a href="http://datacharmer.blogspot.co.il/2012/11/mysql-568-broken-compatibility-ahead.html">this post</a> by Giuseppe Maxia.</li>
+</ol>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-5-6-rc-further-thoughts-and-questions/feed</wfw:commentRss>
+		<slash:comments>12</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5754</post-id>	</item>
+		<item>
+		<title>Further experiments with MySQL 5.6.7-RC: submit your bugs</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/further-experiments-with-mysql-5-6-7-rc-submit-your-bugs</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/further-experiments-with-mysql-5-6-7-rc-submit-your-bugs#comments</comments>
+				<pubDate>Mon, 22 Oct 2012 05:52:40 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5710</guid>
+				<description><![CDATA[Here&#8217;s the background: I&#8217;m testing many features of MySQL 5.6.7-RC due to two reasons: I&#8217;m verifying my common_schema installs and works properly on 5.6 I promised I would present a 45 minute &#8220;what&#8217;s new in MySQL 5.6&#8221; seminar in the upcoming OracleWeek (Israel) In the case of common_schema, I have managed to find one weird [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here&#8217;s the background: I&#8217;m testing many features of MySQL <strong>5.6.7-RC</strong> due to two reasons:</p>
+<ul>
+<li>I&#8217;m verifying my <a href="http://code.google.com/p/common-schema">common_schema</a> installs and works properly on <strong>5.6</strong></li>
+<li>I promised I would present a <strong>45</strong> minute <em>&#8220;what&#8217;s new in MySQL 5.6&#8221;</em> seminar in the upcoming <a href="http://www.oracleweek.com/">OracleWeek (Israel)</a></li>
+</ul>
+<p>In the case of <em>common_schema</em>, I have managed to find one <a href="http://bugs.mysql.com/67313">weird bug</a> (a behavior regression from <strong>5.5</strong>) and one <a href="http://bugs.mysql.com/67315">server-crashing bug</a>, by merely running the project&#8217;s<strong></strong> tests, known to pass on <strong>5.1</strong> and <strong>5.5</strong> (and not utilizing any <strong>5.6</strong> features).</p>
+<p>In the case of my presentation, I&#8217;m getting acquainted with new syntax and functionality, and am getting <a href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features">unexpected results</a>. I&#8217;ve hit replication issues and <a href="https://shlomi-noach.github.io/blog/mysql/innodb-ddl-kudos-to-quick-responders-on-bugs-mysql-com">locking issues</a> in online DDL.</p>
+<p>If I am able to find these bugs within a few hours of experimenting &amp; testing, then it is safe to assume we can extrapolate to many more bugs. This is not surprising; <strong>5.6</strong> boasts some <strong>120</strong> new features (I didn&#8217;t actually count them). Of course they would introduce new bugs.</p>
+<p>The moral is this: if you&#8217;re interested in <strong>5.6</strong> as I am &#8211; and there&#8217;s a lot to wait for &#8211; please consider experimenting with it, and report as many bugs to <a href="http://bugs.mysql.com/">bugs.mysql.com</a> as possible. Reporting bugs is the user&#8217;s authoritative way of improving an open source product and pushing towards a stable release. Provide your feedback today!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/further-experiments-with-mysql-5-6-7-rc-submit-your-bugs/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5710</post-id>	</item>
+		<item>
+		<title>InnoDB DDL: kudos to quick responders on bugs.mysql.com</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/innodb-ddl-kudos-to-quick-responders-on-bugs-mysql-com</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/innodb-ddl-kudos-to-quick-responders-on-bugs-mysql-com#comments</comments>
+				<pubDate>Thu, 18 Oct 2012 16:55:29 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[New Features]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5696</guid>
+				<description><![CDATA[Continuing my experiments with 5.6 InnoDB online DDL, a bug which I&#8217;ve opened, and another which I commented on were quickly answered and explained by the Oracle/MySQL team. On both accounts I&#8217;m happy to acknowledge the issue is resolved; in both cases I failed to produce a real bug scenario. Good lesson. Kudos for quick [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Continuing my <a href="https://shlomi-noach.github.io/blog/mysql/experimenting-with-5-6-innodb-online-ddl-bugs-included">experiments with 5.6 InnoDB online DDL</a>, a bug which I&#8217;ve opened, and another which I commented on were quickly answered and explained by the Oracle/MySQL team.</p>
+<p>On both accounts I&#8217;m happy to acknowledge the issue is resolved; in both cases I failed to produce a real bug scenario. Good lesson. <em>Kudos for quick and informative responses!</em></p>
+<p>What&#8217;s left of my experiment, then? Still a lot to check.</p>
+<p>I am mainly still confused with which operations exactly can use <strong>LOCK=NONE</strong> (allowing for updated to table while <strong>ALTER</strong>ing). So far I am only able to produce <strong>ALTER</strong>s with <strong>LOCK=SHARED</strong>, meaning table is readable, but cannot be updated.</p>
+<p>I will want to test speeds. I&#8217;ve so far been content with slow response times for queries over altered tables. How well will that endure under heavy load?</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/innodb-ddl-kudos-to-quick-responders-on-bugs-mysql-com/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5696</post-id>	</item>
+		<item>
+		<title>Experimenting with 5.6 InnoDB Online DDL (bugs included)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/experimenting-with-5-6-innodb-online-ddl-bugs-included</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/experimenting-with-5-6-innodb-online-ddl-bugs-included#comments</comments>
+				<pubDate>Thu, 18 Oct 2012 12:41:46 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5673</guid>
+				<description><![CDATA[MySQL 5.6 offers the groundbreaking online DDL operations for InnoDB. Most common use cases will enjoy this feature, and the need for online alter table scripts will decrease. This is a killer feature! I&#8217;ve put this new feature to the usability test. How did it go? Not too well, I&#8217;m afraid. [Updates to this text [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL <strong>5.6</strong> offers the groundbreaking online DDL operations for InnoDB. Most common use cases will enjoy this feature, and the need for <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">online alter table</a> scripts will decrease. This is a killer feature!</p>
+<p>I&#8217;ve put this new feature to the usability test. How did it go? Not too well, I&#8217;m afraid.</p>
+<p>[Updates to this text inline], also see <a href="https://shlomi-noach.github.io/blog/mysql/innodb-ddl-kudos-to-quick-responders-on-bugs-mysql-com">this followup</a>.</p>
+<h4>sakila &amp; DDL</h4>
+<p><a href="http://dev.mysql.com/doc/sakila/en/index.html">sakila</a> is still a very useful database. I say &#8220;still&#8221; because it is not very large, and computing power is getting stronger; yet on my laptop some operations can still take many seconds to complete, which is just fine for my tests.</p>
+<p>Sakila tables are mostly InnoDB, and rental being the largest, I do:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; <strong>alter table sakila.rental engine=InnoDB;</strong>
+Query OK, 16044 rows affected (<strong>6.94</strong> sec)
+Records: 16044  Duplicates: 0  Warnings: 0</pre>
+</blockquote>
+<p>So what can be executed during these <strong>6.94</strong> seconds? In a second terminal, I try the following:<span id="more-5673"></span></p>
+<h4>Meta</h4>
+<blockquote>
+<pre>node1 (sakila) &gt; show create table sakila.rental\G
+*************************** 1. row ***************************
+       Table: rental
+Create Table: CREATE TABLE `rental` (
+  `rental_id` int(11) NOT NULL AUTO_INCREMENT,
+  `rental_date` datetime NOT NULL,
+  `inventory_id` mediumint(8) unsigned NOT NULL,
+  `customer_id` smallint(5) unsigned NOT NULL,
+  `return_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `staff_id` tinyint(3) unsigned NOT NULL,
+  `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`rental_id`),
+  UNIQUE KEY `rental_date` (`rental_date`,`inventory_id`,`customer_id`),
+  KEY `idx_fk_inventory_id` (`inventory_id`),
+  KEY `idx_fk_customer_id` (`customer_id`),
+  KEY `idx_fk_staff_id` (`staff_id`),
+  CONSTRAINT `fk_rental_customer` FOREIGN KEY (`customer_id`) REFERENCES `customer` (`customer_id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_rental_inventory` FOREIGN KEY (`inventory_id`) REFERENCES `inventory` (`inventory_id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_rental_staff` FOREIGN KEY (`staff_id`) REFERENCES `staff` (`staff_id`) ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=16050 DEFAULT CHARSET=utf8
+1 row in set (<strong>1.08 sec</strong>)</pre>
+</blockquote>
+<p><strong>1.08</strong> seconds for <strong>SHOW CREATE TABLE</strong>. Consider: up till <strong>5.5</strong> you can&#8217;t run <strong>SHOW CREATE TABLE</strong> while an <strong>ALTER</strong> was running on that table.</p>
+<h4>Read</h4>
+<p>While ALTER TABLE runs, I execute:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; select min(rental_date), max(return_date) from sakila.rental;
++---------------------+---------------------+
+| min(rental_date)    | max(return_date)    |
++---------------------+---------------------+
+| 2005-05-24 22:53:30 | 2005-09-02 02:35:22 |
++---------------------+---------------------+
+1 row in set (2.77 sec)</pre>
+</blockquote>
+<p>So <strong>2.77</strong> seconds for a query which uses a full table scan to return. I&#8217;m not measuring performance here; am satisfies that query did actually succeed even while table was being altered.</p>
+<h4>Read &amp; bug</h4>
+<p>But, unfortunately, being the type of geek who likes to make trouble, I am also able to consistently fail the <strong>ALTER TABLE</strong>. Hang it, actually:</p>
+<p>See session <strong>#1</strong>:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; alter table sakila.rental engine=innodb; 
+
+... (waiting forever)</pre>
+</blockquote>
+<p>And session <strong>#2</strong>:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; show processlist;
++----+----------+-----------+--------+---------+------+---------------------------------+-----------------------------------------+
+| Id | User     | Host      | db     | Command | Time | State                           | Info                                    |
++----+----------+-----------+--------+---------+------+---------------------------------+-----------------------------------------+
+|  6 | msandbox | localhost | sakila | Query   |  <strong>219</strong> | <strong>Waiting for table metadata lock</strong> | <strong>alter table sakila.rental engine=innodb</strong> |
+|  4 | msandbox | localhost | sakila | Query   |    0 | init                            | show processlist                        |
++----+----------+-----------+--------+---------+------+---------------------------------+-----------------------------------------+</pre>
+</blockquote>
+<p>Read all about it in <a href="http://bugs.mysql.com/bug.php?id=67286">bug report #67286</a> .</p>
+<h4>Write: not so simple</h4>
+<p>The following <strong>UPDATE</strong> query hangs till the <strong>ALTER</strong> process is over:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; update sakila.rental set return_date=now() where rental_id = floor(rand()*100);
+Query OK, 3 rows affected, 1 warning (6.10 sec)</pre>
+</blockquote>
+<p>No online DDL for writes?</p>
+<p>Was I unfair? Is &#8220;ENGINE=InnoDB&#8221; really an online DDL operation? OK, let&#8217;s try with:</p>
+<blockquote>
+<pre>alter table sakila.rental <strong>row_format=compact</strong>;</pre>
+</blockquote>
+<p>Which is documented as one of the supported online DDL operations. Same.</p>
+<p>The <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-online-ddl.html">manual</a> says I can define the <strong>ALGORITHM</strong> and the <strong>LOCK</strong> properties for the <strong>ALTER TABLE</strong> operation. But is gives no example, so I try my own:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; alter table sakila.rental row_format=compact <strong>ALGORITHM=INPLACE LOCK=NONE</strong>;
+ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALGORITHM=INPLACE LOCK=NONE' at line 1</pre>
+</blockquote>
+<p>Ummm&#8230;. then maybe:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; alter table sakila.rental <strong>ALGORITHM=INPLACE LOCK=NONE</strong> row_format=compact;
+ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LOCK=NONE row_format=compact' at line 1</pre>
+</blockquote>
+<p>OK, how about:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; alter table sakila.rental <strong>ALGORITHM=INPLACE</strong> row_format=compact <strong>LOCK=NONE</strong>;
+ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'row_format=compact LOCK=NONE' at line 1</pre>
+</blockquote>
+<p>Reading, rereading, re-verifying <a href="http://dev.mysql.com/doc/refman/5.6/en/alter-table.html">the manual</a> &#8212; I am typing a valid statement! What&#8217;s wrong here?</p>
+<p>Yes, I&#8217;m on <strong>5.6.7-rc-log</strong>. No, I can&#8217;t find, in <strong>5.6</strong> documentation and slides from <a href="https://oracleus.activeevents.com/connect/search.ww?event=openworld#loadSearch-event=openworld&amp;searchPhrase=&amp;searchType=session&amp;tc=0&amp;sortBy=&amp;p=&amp;i%2810942%29=15982&amp;i%2811425%29=&amp;i%2810053%29=&amp;i%2811404%29=&amp;i%2811562%29=&amp;i%2811488%29=&amp;i%2810089%29=&amp;i%2811840%29=">MySQL connect</a>, any code sample that actually uses <strong>ALGORITHM</strong> and <strong>LOCK</strong> (!?)</p>
+<p><strong>[UPDATE]</strong>, as Marc Alff point out, I did in fact use the wrong syntax, and was missing commas. The right syntax is:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; <strong>alter table sakila.rental row_format=compact, algorithm=inplace, lock=none;</strong>
+ERROR 1235 (42000): This version of MySQL doesn't yet support 'alter table sakila.rental row_format=compact, algorithm=inplace, lock=none'</pre>
+</blockquote>
+<p>Unfortunately this still results with an error. Another attempt shows that:</p>
+<blockquote>
+<pre>node1 (sakila) &gt; alter table sakila.rental row_format=compact, algorithm=inplace, lock=shared;
+Query OK, 0 rows affected (11.08 sec)</pre>
+</blockquote>
+<p>works well. So, apparently, you can only run <em>this type</em> of <strong>ALTER TABLE</strong> a with a <strong>SHARED</strong> lock. The bad news?</p>
+<blockquote>
+<pre>node1 (sakila) &gt; alter table sakila.rental <strong>add index(return_date)</strong>, algorithm=inplace, lock=<strong>none</strong>;
+ERROR 1235 (42000): This version of MySQL doesn't yet support 'alter table sakila.rental add index(return_date), algorithm=inplace, lock=none'
+node1 (sakila) &gt; alter table sakila.rental <strong>add column c char</strong>, algorithm=inplace, lock=<strong>none</strong>;
+ERROR 1235 (42000): This version of MySQL doesn't yet support 'alter table sakila.rental add column c char, algorithm=inplace, lock=none'</pre>
+</blockquote>
+<p>So I&#8217;m not sure as yet what kind of DDL operations are available with <strong>LOCK=NONE</strong>.</p>
+<h4>Conclusion</h4>
+<p>Little success with online DDL. SHARED-only is many times as good as completely blocked.</p>
+<p>My personal conclusion is (and I do take into account <strong>5.6</strong> is RC at this time, not GA): <em>not there yet!</em> Stick to <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html">openark-kit</a>, <a href="http://www.percona.com/doc/percona-toolkit/2.1/">Percona-toolkit</a> or <a href="http://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932">Facebook OSC</a> for some time. They all provide with online-alter-table operations via external scripts.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/experimenting-with-5-6-innodb-online-ddl-bugs-included/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5673</post-id>	</item>
+		<item>
+		<title>Thoughts on MySQL 5.6 new replication features</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features#comments</comments>
+				<pubDate>Mon, 15 Oct 2012 07:50:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5651</guid>
+				<description><![CDATA[After playing a little bit with MySQL 5.6 (RC), and following closely on Giuseppe&#8217;s MySQL 5.6 replication gotchas (and bugs), I was having some thoughts. These are shared for a few reasons: Maybe I didn&#8217;t understand it well, and someone could correct me Or I understood it well, and my input could be of service [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>After playing a little bit with MySQL <strong>5.6</strong> (RC), and following closely on Giuseppe&#8217;s <a href="http://datacharmer.blogspot.co.il/2012/08/mysql-56-replication-gotchas-and-bugs.html">MySQL 5.6 replication gotchas (and bugs)</a>, I was having some thoughts.</p>
+<p>These are shared for a few reasons:</p>
+<ul>
+<li>Maybe I didn&#8217;t understand it well, and someone could correct me</li>
+<li>Or I understood it well, and my input could be of service to the developers</li>
+<li>Or it could be of service to the users</li>
+</ul>
+<h4>InnoDB tables in mysql schema</h4>
+<p>The introduction of InnoDB tables in <strong>mysql</strong> makes for crash-safe replication information: the exact replication position (master log file+pos, relay log file+pos etc.) is updated on InnoDB tables; with <strong>innodb_flush_logs_at_trx_commit=1</strong> this means replication status is durable and consistent with server data. This is great news!</p>
+<p>However, the introduction of InnoDB tables to the mysql schema also breaks some common usage on installation and setup of MySQL servers. You can&#8217;t just drop your <strong>ib_data1</strong> file upon dump+restore, since it also contains internal data. Giuseppe outlines the workaround for that.</p>
+<p>I was thinking: would it be possible to have a completely different tablespace for MySQL&#8217;s internal InnoDB tables? That could be a single tablespace file (who cares about file-per-table on a few internal tables). And I&#8217;m throwing an idea without being intimate with the internals: you know how it is possible to span the shared tablespace across multiple files, as in:<span id="more-5651"></span></p>
+<blockquote>
+<pre>[mysqld]
+innodb_data_file_path=ibdata1:50M;ibdata2:50M:autoextend</pre>
+</blockquote>
+<p>Would it be possible to, for example, force the first file in this setup to be the internal database? It would look like:</p>
+<blockquote>
+<pre>[mysqld]
+innodb_data_file_path=<strong>ibdata_internal_do_not_touch</strong>:2M;<strong>ibdata1_this_one_is_yours</strong>:50M:autoextend</pre>
+</blockquote>
+<p>Only the user would not have to actually set this thing up: the internal tablespace would be there by default (and always first).</p>
+<p>Then we would be able to drop our own table space as much as we would like to, but never touch the internal tablespace. It would always extend into our own <strong>ibdata1</strong> file.</p>
+<p>I&#8217;m wondering if I&#8217;m making sense at all and if this is possible.</p>
+<h4>GTID and settings</h4>
+<p>The fact that you have to specify both <strong>gtid_mode=ON</strong> as well as <strong>disable-gtid-unsafe-statements</strong> is a bit of a bummer. I wouldn&#8217;t mind as much if error messages would be informative. But as it turned out, when I wanted to test GTID I did the following:</p>
+<blockquote>
+<pre>mysql&gt; STOP SLAVE;
+mysql&gt; change master to MASTER_AUTO_POSITION=1;
+ERROR 1777 (HY000): CHANGE MASTER TO MASTER_AUTO_POSITION = 1 can only be executed when GTID_MODE = ON.
+
+-- OK, setting <strong>gtid_mode=ON</strong> in config file, restarting server.
+--
+-- <strong>Oooops</strong>, server won't restart!
+-- Getting this error message in log: <strong>"--gtid-mode=UPGRADE_STEP_1 or --gtid-mode=UPGRADE_STEP_2 are not yet supported"</strong>
+-- What?</pre>
+</blockquote>
+<p>Checking up on Giuseppe&#8217;s post I realized I didn&#8217;t set the <strong>disable-gtid-unsafe-statements</strong> param. But this was not mentioned on the above <strong>ERROR 1777</strong>, and the log error was quite cryptic.</p>
+<p>TODO: just mention this <em>other</em> variable.</p>
+<h4>GTID, internal InnoDB tables &amp; wreckage</h4>
+<p>OK, I managed to completely crash my replication setup. I setup GTID, and then:</p>
+<blockquote>
+<pre>set global master_info_repository:='table';
+set global relay_log_info_repository='table';</pre>
+</blockquote>
+<p>Then shut down mysql; I wanted to see how reverting back to <strong>gtid_mode=OFF</strong> works. Oh, I didn&#8217;t set the two params in the config file, so their effect was lost.</p>
+<p>Starting mysql, I get:</p>
+<blockquote>
+<pre>ERROR 1794 (HY000) at line 1: Slave is not configured or failed to initialize properly. You must at least set --server-id to enable either a master or a slave. Additional error messages can be found in the MySQL error log.</pre>
+</blockquote>
+<p>The error log says:</p>
+<blockquote>
+<pre>121015  9:38:58 [ERROR] Error creating master info: Multiple replication metadata repository instances found with data in them. Unable to decide which is the correct one to choose.
+121015  9:38:58 [ERROR] Failed to create or recover replication info repository.
+121015  9:38:58 [Note] Check error log for additional messages. You will not be able to start replication until the issue is resolved and the server restarted.</pre>
+</blockquote>
+<p>What&#8217;s interesting is that the data is still in the tables:</p>
+<blockquote>
+<pre>mysql&gt; select * from mysql.slave_master_info\G
+*************************** 1. row ***************************
+       Number_of_lines: 23
+       Master_log_name: mysql-bin.000003
+        Master_log_pos: 2623
+                  Host: 127.0.0.1
+             User_name: rsandbox
+         User_password: rsandbox
+                  Port: 14701
+         Connect_retry: 60
+           Enabled_ssl: 0
+                Ssl_ca: 
+            Ssl_capath: 
+              Ssl_cert: 
+            Ssl_cipher: 
+               Ssl_key: 
+Ssl_verify_server_cert: 0
+             Heartbeat: 1800
+                  Bind: 
+    Ignored_server_ids: 0
+                  Uuid: 10fa73da-13ac-11e2-bdcd-0024e8cd3122
+           Retry_count: 86400
+               Ssl_crl: 
+           Ssl_crlpath: 
+ Enabled_auto_position: 1</pre>
+</blockquote>
+<p>I&#8217;ve tried restarting, setting variables in the config file, changing them dynamically. To no avail.</p>
+<p>No, I haven&#8217;t filed a bug report yet.</p>
+<p>These are still my first steps into 5.6 replication and my very first impressions.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features/feed</wfw:commentRss>
+		<slash:comments>12</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5651</post-id>	</item>
+	</channel>
+</rss>

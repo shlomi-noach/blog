@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>SQL &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/sql/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 25 Mar 2019 10:48:45 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Some observations on MySQL to sqlite migration &#038; compatibility</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/some-observations-on-mysql-to-sqlite-migration-compatibility</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/some-observations-on-mysql-to-sqlite-migration-compatibility#comments</comments>
+				<pubDate>Mon, 30 Jan 2017 09:14:33 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[sqlite]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7663</guid>
+				<description><![CDATA[I&#8217;m experimenting with sqlite as backend database for orchestrator. While orchestrator manages MySQL replication topologies, it also uses MySQL as backend. For some deployments, and I&#8217;m looking into such one, having MySQL as backend is a considerable overhead. This sent me to the route of looking into a self contained orchestrator binary + backend DB. I would [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m experimenting with <a href="https://www.sqlite.org/">sqlite</a> as backend database for <a href="https://github.com/github/orchestrator">orchestrator</a>. While <code>orchestrator</code> manages MySQL replication topologies, it also uses MySQL as backend. For some deployments, and I&#8217;m looking into such one, having MySQL as backend is a considerable overhead.</p>
+<p>This sent me to the route of looking into a self contained <code>orchestrator</code> binary + backend DB. I would have <code>orchestrator</code> spawn up its own backend database instead of connecting to an external one.</p>
+<h3>Why even relational?</h3>
+<p>Can&#8217;t <code>orchestrator</code> just use a key-value backend?</p>
+<p>Maybe it could. But frankly I enjoy the power of relational databases, and the versatility they offer has proven itself multiple times with <code>orchestrator</code>, being able to answer interesting, new, complex questions about one&#8217;s topology by crafting SQL queries.</p>
+<p>Moreover, <code>orchestrator</code> is already heavily invested in the relational model. At this time, replacing all SQL queries with key-value reads seems to me as a significant investment in time and risk. So I was looking for a relational, SQL accessible embeddable database for <code>orchestrator</code>.</p>
+<h3>Why sqlite?</h3>
+<p>I am in particular looking at two options: sqlite (via the <a href="https://github.com/mattn/go-sqlite3">go-sqlite3</a> binding) and <a href="https://github.com/pingcap/tidb">TiDB</a>. sqlite does not need much introduction, and I&#8217;ll just say it&#8217;s embeddable within the golang-built binary.<span id="more-7663"></span></p>
+<p>TiDB is a pure-Go, MySQL dialect compatible server which provides relational model on top of key-value store. The store could be local or distributed, and the TiDB project cleverly separates involved layers.</p>
+<p>Of the two, sqlite is mature, alas uses a different SQL dialect and has different behavior. TiDB&#8217;s compatibility with MySQL is an impressive feat, but still ongoing.</p>
+<p>Both require adaptations of SQL code. Here are some observations on adaptations required when moving an existing app from MySQL backend to sqlite backend.</p>
+<h3>Differences</h3>
+<p>Just to answer an obvious question: can&#8217;t everything be abstracted away by an ORM that speaks both dialects?</p>
+<p>I don&#8217;t think so. I always exploit SQL beyond the standard <code>insert</code>/<code>delete</code>/<code>update</code>/<code>select</code>, exploits that ORMs just don&#8217;t support.</p>
+<p>Here&#8217;s an incomplete list of differences I found. Some purely syntactical, some semantical, some behavioral, and some operational.</p>
+<ul>
+<li>Data types: no <code>CHARACTER SET</code> clause</li>
+<li>Data types: you can&#8217;t associate <code>UNSIGNED</code> to any int type</li>
+<li>Data types: no <code>enum</code>. However there&#8217;s an alternative in the form of:<br />
+<code>race text check (race in ('human', 'dog', 'alien'))</code></li>
+<li><code>auto_increment</code> is called <code>integer</code></li>
+<li>Data types: timestamps are not a thing. There&#8217;s no timezone info.</li>
+<li><code>TIMESTAMP</code> has no <code>ON UPDATE</code> clause.</li>
+<li>No <code>after</code> clause for adding columns</li>
+<li>Indexes are not part of table creation. Only <code>PRIMARY KEY</code> is. The rest of indexes are created via <code>CREATE INDEX</code> statement</li>
+<li>Indexes have unique names across the schema. This is unfortunate, since it forces me to use longer names for indexes so as to differentiate them. For example, in MySQL I can have an index named <code>name_idx</code> in two different tables; in <code>sqlite</code> I append table name for &#8220;namespacing&#8221;</li>
+<li>Temporal values and functions: poor support for time arithmetic.
+<ul>
+<li>Getting the diff between two datetimes is non-trivial (what&#8217;s the diff in months for a leap year?)<br />
+<code></code></li>
+<li><code>INTERVAL</code> keyword not respected. Appending/subtracting dates can be done via:<br />
+<code>datetime('now', '-3 hour')</code><br />
+Can you see the problem in the above? What is the number <code>3</code> is a positional argument? In MySQL I would use <code>NOW() - INTERVAL ? HOUR</code>. To make positional arguments work in <code>sqlite</code>, the above gets to be <code>datetime('now', printf('-%d hour', ?))</code>. How would you even translate <code>NOW() - INTERVAL (? * 2) SECOND</code>?</li>
+<li><code>UNIX_TIMESTAMP</code> not respected. Instead using <code>strftime('%s', 'now')</code>, I dislike the use of string functions to generate times.</li>
+</ul>
+</li>
+<li><code>insert ignore</code> turns to <code>insert or ignore</code></li>
+<li><code>replace into</code> remains <code>replace into</code>. Yay!</li>
+<li><code>insert on duplicate key update</code> has no equivalent. It&#8217;s worthwhile noting a <code>replace into</code> does not <em>replace</em> (pun intended) an <code>insert ... on duplicate key</code> as the latter can choose to only update a subset of column in the event of a constraint violation. It&#8217;s really very powerful.</li>
+<li><code>IS TRUE</code> and <code>IS FALSE</code> are not respected.</li>
+<li><code>ALTER TABLE</code>:
+<ul>
+<li>When adding a <code>not null</code> column one must specify the default value (e.g. <code>0</code> for an <code>int</code>)</li>
+<li>You cannot add a timestamp column that defaults to <code>CURRENT_TIMESTAMP</code>. You can have such column in your <code>CREATE TABLE</code> definition, but you cannot add such a column. The reason being that <code>CURRENT_TIMESTAMP</code> is not a constant value. When adding a column to a table, <code>sqlite</code> does not actually apply the change to all existing rows, but only to newly created ones. It therefore does not know what value to provide to those older rows.</li>
+<li>You cannot <code>DROP COLUMN</code>. I&#8217;ll say it again. You cannot <code>DROP COLUMN</code></li>
+<li>You cannot modify a <code>PRIMARY KEY</code></li>
+<li>You cannot rename a column or change its datatype.</li>
+<li>In fact, the only supported <code>ALTER TABLE</code> statements are <code>ADD COLUMN </code>and <code>RENAME</code> (renaming the table itself)</li>
+</ul>
+</li>
+</ul>
+<p>Regarding the <code>ALTER TABLE</code> limitations, the advice for dropping/changing/renaming columns or changing the primary key is to &#8220;create a new table with the new format, copy the rows, drop the old table, rename&#8221;. This is certainly feasible, but requires a substantial overhead from the user. And it&#8217;s non atomic. It requires a change in the state of mind but also a change in state of operations, the latter being non-trivial when moving from one DBMS to another, or when wishing to support both.</p>
+<p>I&#8217;m still looking into this, and trying to work my way around differences with cheap regular expressions for as much as possible. I&#8217;m mainly interested right now in finding all semantic/logic differences that would require application changes. So far the <code>TIMESTAMP</code> behavior is such, and so is the <code>INSERT ... ON DUPLICATE KEY</code> statement.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/some-observations-on-mysql-to-sqlite-migration-compatibility/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7663</post-id>	</item>
+		<item>
+		<title>Three wishes for a new year</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4#comments</comments>
+				<pubDate>Wed, 28 Sep 2016 14:20:54 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[GTID]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7643</guid>
+				<description><![CDATA[(Almost) another new year by Jewish calendar. What do I wish for the following year? World peace Good health to all Relaxed GTID constraints I&#8217;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>(Almost) another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Relaxed GTID constraints</li>
+</ol>
+<p>I&#8217;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? <code>gh-ost</code> has to write something to the binary log. Thus, it &#8220;corrupts&#8221; the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but&#8230;</p>
+<p>I understand the idea and need for the <code>Executed GTID Set</code>. It will certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a <code>flush tables with read lock</code> without disabling <code>sql_log_bin</code>. Things just happen.</p>
+<p>For that, I would like to suggest GTID control levels, such as:</p>
+<ol>
+<li><em>Strict</em>: same as Oracle&#8217;s existing implementation. Executed sets, purged sets, whatnot.</li>
+<li><em>Last executed</em>: a mode where the only thing that counts is the last executed GTID value. If I repoint replica, all it needs to check is &#8220;hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don&#8217;t care about comparing executed and purged sets, I will trust you and keep running from that point on&#8221;</li>
+<li><em>Declarative</em>: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.</li>
+</ol>
+<p>I realize Oracle MySQL GTID is out for some over 3 years now, but I&#8217;m sorry &#8211; I still have reservations and see use cases where I fear it will not serve me right.</p>
+<p>How about my previous years wishes? World peace and good health never came through, however:</p>
+<ul>
+<li>My <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-2015">2015 wish</a> for &#8220;decent, operations friendly built in online table refactoring&#8221; was unmet, however <code>gh-ost</code> is a thing now and exceeds my expectations. No, really. Please come see <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">Tom &amp; myself present gh-ost</a> and how it changed our migration paradigm.</li>
+<li>My <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201">2012 wish</a> for &#8220;decent, long waited for, implementation of <a href="http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function">Window Functions</a> (aka Analytic Functions) for MySQL&#8221; was met by MariaDB&#8217;s <a href="https://mariadb.com/kb/en/mariadb/window-functions/">window functions</a>.<br />
+Not strictly Window Functions, but Oracle MySQL 8.0 will <a href="http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/">support CTE</a> (hierarchial/recursive), worth a mention.</li>
+</ul>
+<p>See you in Amsterdam!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7643</post-id>	</item>
+		<item>
+		<title>SQL mini hack of the day, inverted IN clause</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause#comments</comments>
+				<pubDate>Fri, 13 Nov 2015 15:28:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7451</guid>
+				<description><![CDATA[We are used to issue queries with an IN clause of the form: However I&#8217;ve had a few cases where I used an inverted format. Here&#8217;s one use case followed by an inverted IN clause. Dynamic query building Say we have this function: Which, based on whether given clusterName is empty or not, would return [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>We are used to issue queries with an <strong>IN</strong> clause of the form:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">... where state in ('started', 'completed', 'failed') ...</pre>
+</blockquote>
+<p>However I&#8217;ve had a few cases where I used an inverted format. Here&#8217;s one use case followed by an inverted <strong>IN</strong> clause.</p>
+<h3>Dynamic query building</h3>
+<p>Say we have this function:</p>
+<blockquote>
+<p>GetLaggingSlaves(clusterName string)</p>
+</blockquote>
+<p>Which, based on whether given <strong>clusterName</strong> is empty or not, would return list of all lagging slaves, or only those in the given cluster, respectively:<span id="more-7451"></span></p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">SELECT hostname FROM database_instance WHERE slave_lag_seconds &gt; 60</pre>
+</blockquote>
+<p>or</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">SELECT hostname FROM database_instance WHERE cluster_name = 'mycluster:3306' AND slave_lag_seconds &gt; 60</pre>
+</blockquote>
+<p>To avoid SQL injection you would create a prepared statement, but you don&#8217;t want to copy+paste everything, and so you build your query dynamically based on the value of <strong>clusterName</strong>. You want to end up with either:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">SELECT hostname FROM database_instance WHERE slave_lag_seconds &gt; ?</pre>
+<p><strong>, acceptableLag</strong></p></blockquote>
+<p>or</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">SELECT hostname FROM database_instance WHERE cluster_name = ? AND slave_lag_seconds &gt; ?</pre>
+<p><strong>, clusterName, acceptableLag</strong></p></blockquote>
+<p>Dynamic query building is good practice, but a little pain (BTW I&#8217;m designing a new, simple &amp; non intrusive query builder for golang). Is there a way to just get away with one query that has it all?</p>
+<p>This is one option:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">SELECT hostname FROM database_instance WHERE (cluster_name = ? OR ? = '') AND slave_lag_seconds &gt; ?</pre>
+<p><strong>,clusterName, clusterName, acceptableLag</strong></p></blockquote>
+<p>and it is somewhat painful to list clusterName twice in the arguments list. This is where the inverted <strong>IN</strong> clause kicks in. It will negate usage of an index, and may look strange at first glance, but as you get used to it it just becomes another pattern:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">SELECT hostname FROM database_instance WHERE ? IN (cluster_name, '') AND slave_lag_seconds &gt; ?</pre>
+<p><strong>, clusterName, acceptableLag</strong></p></blockquote>
+<p>So when <strong>clusterName</strong> is empty, all rows where <strong>slave_lag_seconds &gt; acceptableLag</strong> are fetched; when non empty, only those where <strong>cluster_name</strong> equals our value.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7451</post-id>	</item>
+		<item>
+		<title>Leader election using MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql#comments</comments>
+				<pubDate>Wed, 14 Oct 2015 05:52:21 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7384</guid>
+				<description><![CDATA[Being a stateful, centralized datastore, MySQL can serve in negotiating leadership: a mechanism to elect a single service out of multiple services; moreover, a mechanism to promote a new leader should the existing leader cease to function. What of Zookeeper? Zookeeper makes for an excellent leader election mechanism. This is one of the most recognized uses for [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Being a stateful, centralized datastore, MySQL can serve in negotiating leadership: a mechanism to elect a single service out of multiple services; moreover, a mechanism to promote a new leader should the existing leader cease to function.</p>
+<h3>What of Zookeeper?</h3>
+<p>Zookeeper makes for an excellent leader election mechanism. This is one of the most recognized uses for Zookeeper. It has HA via multiple nodes &amp; quorum,  ephemeral nodes, all you need. To achieve similar benefits with MySQL you&#8217;d need to use Galera or NDB Cluster; so why not use Zk? The use case at hand is</p>
+<p><strong><a href="https://github.com/outbrain/orchestrator">orchestrator</a></strong>, a multi-node, mostly stateless service that happens to use MySQL as backend datastore. Ir relies on MySQL to exist in backend. It already <em>expects it to be there</em>. If the MySQL server is down, so is the service, effectively. In such case it doesn&#8217;t hurt adding another dependency on MySQL; this does not reduce HA. You need to take care of MySQL HA anyhow so there&#8217;s no additional cost. In fact, going to Zookeeper makes the additional cost as you introduce a new component to the system that can be avoided.</p>
+<h3>Terms of the solution</h3>
+<p>Our proposed solution offers:</p>
+<ul>
+<li>Single leader election out of multiple nodes</li>
+<li>Leader actively reaffirms its leadership periodically</li>
+<li>Timeout based re-election: decision to re-elect new leader based on the fact current leader has not reaffirmed its leadership over X seconds</li>
+<li>A way to forcibly assume leadership for a specific node</li>
+<li>A way to forcibly call for re-elections by demoting existing leader</li>
+<li>A node/service can easily tell whether it&#8217;s the leader or not</li>
+<li>Anyone can tell who the leader is</li>
+</ul>
+<h3>SQL solution</h3>
+<p>The solution is composed of a single table and a set of queries which implement the above offers. We assume a service can uniquely identify itself; this is easy to achieve:</p>
+<ul>
+<li>If services are running from different hosts (as should be the case, this is service HA), use hostname for ID
+<ul>
+<li>But what if the service restarts? Are you good with calling this &#8220;the same service&#8221; or is this now a new service running on the same host?</li>
+</ul>
+</li>
+<li>In such case use combination of hostname &amp; OS process ID
+<ul>
+<li>Or generate a random token upon startup</li>
+<li>Or use startup timestamp Whichever solution you pick, make sure it is human readable, such that it is easy to tell </li>
+</ul>
+</li>
+</ul>
+<p><em>which service is the leader</em>. This helps operations. We note this as <strong>service_id</strong></p>
+<h4>Table</h4>
+<p>The following table will have a single row; the</p>
+<p><strong>service_id</strong> in that row is the active leader.</p>
+<pre><code class="sql">CREATE TABLE service_election ( 
+  anchor tinyint(3) unsigned NOT NULL, 
+  service_id varchar(128) NOT NULL, 
+  last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, 
+  PRIMARY KEY (anchor) 
+) ENGINE=InnoDB 
+</code></pre>
+<h4>Attempt election</h4>
+<p><span id="more-7384"></span> All services issue the following, periodically. Say every service issues this once per second:</p>
+<pre><code class="sql">insert ignore into service_election ( anchor, service_id, last_seen_active ) values ( 1, 'my_service_number_7', now() ) on duplicate key update service_id = if(last_seen_active &lt; now() - interval 20 second, values(service_id), service_id), last_seen_active = if(service_id = values(service_id), values(last_seen_active), last_seen_active) ;
+</code></pre>
+<ul>
+<li>Replace <strong>&#8216;my_service_number_7&#8217;</strong> with specific <strong>service_id</strong> per service.* The above is the most complex query in our solution; breakdown: </li>
+<li>Assume timeout is set for <strong>20</strong> seconds</li>
+<li>The first ever service (<strong>my_service_number_7</strong>) succeeds in registering (inserting its own <strong>service_id</strong> into the table)</li>
+<li>The next time this service issues the query, it finds that it is already the owner, hence updates <strong>last_seen_active</strong>.
+<ul>
+<li>And while it is alive and keeps on polling, it remains the leader.</li>
+</ul>
+</li>
+<li>Immediately following, another service (<strong>my_service_number_12</strong>) does not update anything: since <strong>last_seen_active &lt; now() &#8211; interval 20 second</strong> is <strong>false</strong>, <strong>service_id</strong> is unchanged, nor is <strong>last_seen_active</strong>.</li>
+<li>Assuming said service (<strong>my_service_number_7</strong>) has died and hasn&#8217;t injected anything in the last <strong>20</strong> seconds, a different service will inject its own <strong>service_id</strong> as well as update <strong>last_seen_active</strong>. It will become the leader.</li>
+</ul>
+<h4>Forcibly assume leadership</h4>
+<p>Make a certain service the leader:</p>
+<pre><code class="sql">replace into service_election ( anchor, service_id, last_seen_active ) values ( 1, 'my_service_number_12', now() ) 
+</code></pre>
+<p>The next time <strong>my_service_number_12</strong> attempts to register its own leadership, it finds out it&#8217;s <em>already</em> the leader and updates <strong>last_seen_active</strong>.</p>
+<h4>Force re-elections</h4>
+<p>The next service to attempt election will succeed after this:</p>
+<pre><code class="sql">delete from service_election;
+</code></pre>
+<h4>Am I the leader?</h4>
+<p>A service can query as follows:</p>
+<pre><code class="sql">select count(*) as is_leader from service_election where anchor=1 and service_id='my_service_number_7';
+</code></pre>
+<h4>Who is the leader?</h4>
+<p>This is of course very simple:</p>
+<pre><code class="sql">select max(service_id) as leader from service_election where anchor=1;
+</code></pre>
+<h3>What of GET_LOCK()?</h3>
+<p><a href="https://dev.mysql.com/doc/refman/5.6/en/miscellaneous-functions.html#function_get-lock">GET_LOCK()</a> allows one to acquire a helper-lock of arbitrary name; this lock is reserved as long as the connection that acquired it lives. No other connection can acquire lock of same name.</p>
+<pre><code class="sql">SELECT GET_LOCK("my_service_leadership", 0)
+</code></pre>
+<p>Returns <strong>1</strong> on success, <strong>0</strong> on failure to obtain lock. This supposedly makes a much simpler leader election mechanism. However I don&#8217;t like it for the following reasons: * You must allocate a dedicated connection that lives for the duration of your service * This doesn&#8217;t play too well with ORMs or typical connection pools * There is no visibility (&lt; MySQL 5.7) into <em>who</em> is holding the lock. You only know that it&#8217;s being held. * If your service hangs (but does not die), the lock is still being held. There is no &#8220;keepalive&#8221; requirement on the lock&#8217;s side.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7384</post-id>	</item>
+		<item>
+		<title>Tool of the day: q</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/tool-of-the-day-q</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/tool-of-the-day-q#comments</comments>
+				<pubDate>Thu, 08 Aug 2013 09:26:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Linux]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[command line]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[tools]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6417</guid>
+				<description><![CDATA[If you work with command line and know your SQL, q is a great tool to use: q allows you to query your text files or standard input with SQL. You can: SELECT c1, COUNT(*) FROM /home/shlomi/tmp/my_file.csv GROUP BY c1 And you can: SELECT all.c2 FROM /tmp/all_engines.txt AS all LEFT JOIN /tmp/innodb_engines.txt AS inno USING [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>If you work with command line and know your SQL, <strong>q</strong> is a great tool to use:</p>
+<p><a href="https://github.com/harelba/q"><strong>q</strong></a> allows you to query your text files or standard input with SQL. You can:</p>
+<blockquote>
+<pre>SELECT c1, COUNT(*) FROM /home/shlomi/tmp/my_file.csv GROUP BY c1</pre>
+</blockquote>
+<p>And you can:</p>
+<blockquote>
+<pre>SELECT all.c2 FROM /tmp/all_engines.txt AS all LEFT JOIN /tmp/innodb_engines.txt AS inno USING (c1, c2) WHERE inno.c3 IS NULL</pre>
+</blockquote>
+<p>And you can also combine with your favourite shell commands and tools:</p>
+<blockquote>
+<pre>grep "my_term" /tmp/my_file.txt | q "SELECT c4 FROM - JOIN /home/shlomi/static.txt USING (c1)" | xargs touch</pre>
+</blockquote>
+<p>Some of <strong>q</strong>&#8216;s functionality (and indeed, SQL functionality) can be found in command line tools. You can use <strong>grep</strong> for pseudo <strong>WHERE</strong> filtering, or <strong>cut</strong> for projecting, but you can only get so far with <strong>cat my_file.csv | sort | uniq -c | sort -n</strong>. SQL is way more powerful for working with tabulated data, and so <strong>q</strong> makes for a great addition into one&#8217;s toolbox.</p>
+<p>The tool is authored by my colleague <a href="https://github.com/harelba">Harel Ben-Attia</a>, and is in daily use over at our company (it is in fact installed on all production servers).</p>
+<p>It is of course free and open source (<a href="https://github.com/harelba/q">get it on GitHub</a>, where you can also find documentation), and very easy to setup. Enjoy!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/tool-of-the-day-q/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6417</post-id>	</item>
+		<item>
+		<title>Merging tables with INSERT&#8230;ON DUPLICATE KEY UPDATE</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/merging-tables-with-insert-on-duplicate-key-update</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/merging-tables-with-insert-on-duplicate-key-update#comments</comments>
+				<pubDate>Thu, 21 Feb 2013 12:12:48 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6120</guid>
+				<description><![CDATA[Had a case recently where I had to merge data from two identically structured tables containing nearly identical data. &#8220;Nearly identical&#8221; meaning most table data is identical in both; sometimes a row is missing from one of the tables; sometimes same row (according to PK) appears in both, but some columns are NULL is one [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Had a case recently where I had to merge data from two identically structured tables containing nearly identical data.</p>
+<p>&#8220;Nearly identical&#8221; meaning most table data is identical in both; sometimes a row is missing from one of the tables; sometimes same row (according to PK) appears in both, but some columns are NULL is one tables (while others can be NULL in the second).</p>
+<p>Otherwise no contradicting data: it was not possible for some data to be &#8220;3&#8221; in one table and &#8220;4&#8221; in the other.</p>
+<h4>How do you create a merge of the tables, such that all missing rows are completed, and NULLs replaced by actual values when possible?</h4>
+<p><a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-table-sync.html">pt-table-sync</a> comes to mind: one can do a bidirectional syncing of two tables, and actually stating how to resolve ambiguities (like &#8220;greater value wins&#8221;). Very powerful! An example would be:</p>
+<blockquote>
+<pre>pt-table-sync --bidirectional --conflict-column=a --conflict-comparison=greatest --tables ...</pre>
+</blockquote>
+<p>However I didn&#8217;t actually have any problem with the tables themselves. The two tables were just fine as they were; missing or NULL data does not indicate an error on their part. I wanted to get their merge. <em>pt-table-sync</em> is still up for the job: we can duplicate them, merge on the copy&#8230; But I prefer a query over an external script when possible.</p>
+<h4>INSERT&#8230;ON DUPLICATE KEY UPDATE</h4>
+<p>This <a href="http://dev.mysql.com/doc/refman/5.5/en/insert-on-duplicate.html">MySQL-specific syntax</a> is actually quite powerful. It basically says &#8220;if the insert fails due to unique constraint, you get a chance to update the row causing the failure&#8221;. But it also allows for smart setting of the column via the <strong>VALUES()</strong> clause. Let&#8217;s present some sample data and then see the solution.<span id="more-6120"></span></p>
+<p>Assume the following table definition:</p>
+<blockquote>
+<pre>create table t1 (
+  pkdt datetime,
+  pki int,
+  a int,
+  b int,
+  c int,
+  primary key (pkdt, pki)
+);</pre>
+</blockquote>
+<p>Same structure holds for <strong>t1</strong>, <strong>t2</strong> and <strong>tmerge</strong> &#8212; our target table. Looking at table data we have:</p>
+<blockquote>
+<pre>&gt; select * from t1;
++---------------------+-----+------+------+------+
+| pkdt                | pki | a    | b    | c    |
++---------------------+-----+------+------+------+
+| 2012-01-01 00:00:00 |   1 |    4 |    5 |    6 |
+| 2012-01-02 00:00:00 |   2 | NULL |    5 |    6 |
+| 2012-01-04 00:00:00 |   4 |    4 | NULL | NULL |
+| 2012-01-05 00:00:00 |   5 | NULL |    8 | NULL |
++---------------------+-----+------+------+------+
+
+&gt; select * from t2;
++---------------------+-----+------+------+------+
+| pkdt                | pki | a    | b    | c    |
++---------------------+-----+------+------+------+
+| 2012-01-01 00:00:00 |   1 |    4 | NULL |    6 |
+| 2012-01-03 00:00:00 |   3 |    4 |    5 |    6 |
+| 2012-01-04 00:00:00 |   4 |    4 |    5 |    6 |
+| 2012-01-05 00:00:00 |   5 |    7 | NULL |    9 |
++---------------------+-----+------+------+------+</pre>
+</blockquote>
+<p>We can see a row with <strong>pki=2</strong> appears in <strong>t1</strong> but not in <strong>t2</strong>; a row with <strong>pki=3</strong> appears in <strong>t2</strong> but not in <strong>t2</strong>, and various <strong>NULL</strong>s appear throughout the rows that are shared.</p>
+<p>To get the shared table, we throw in the data from <strong>t1</strong> and <strong>t2</strong> into <strong>tmerge</strong>, in such way that a real value overwrites a <strong>NULL</strong>, like this:</p>
+<blockquote>
+<pre>insert into tmerge select * from t1;
+
+insert into tmerge select * from t2
+on duplicate key update
+  a = <strong>ifnull</strong>(tmerge.a, <strong>values</strong>(a)),
+  b = <strong>ifnull</strong>(tmerge.b, <strong>values</strong>(b)),
+  c = <strong>ifnull</strong>(tmerge.c, <strong>values</strong>(c))
+;</pre>
+</blockquote>
+<p>So even while I&#8217;m inserting values to <strong>tmerge</strong>, I&#8217;m able to check for current value, compared to the value I wish to insert, and have time to make a decision. This is really cool! The result:</p>
+<blockquote>
+<pre>&gt; select * from tmerge;
++---------------------+-----+------+------+------+
+| pkdt                | pki | a    | b    | c    |
++---------------------+-----+------+------+------+
+| 2012-01-01 00:00:00 |   1 |    4 |    5 |    6 |
+| 2012-01-02 00:00:00 |   2 | NULL |    5 |    6 |
+| 2012-01-03 00:00:00 |   3 |    4 |    5 |    6 |
+| 2012-01-04 00:00:00 |   4 |    4 |    5 |    6 |
+| 2012-01-05 00:00:00 |   5 |    7 |    8 |    9 |
++---------------------+-----+------+------+------+</pre>
+</blockquote>
+<p>Just what we wanted: all possible rows inside; real value takes over <strong>NULL</strong> whenever possible.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/merging-tables-with-insert-on-duplicate-key-update/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6120</post-id>	</item>
+		<item>
+		<title>Hierarchical data in INFORMATION_SCHEMA and derivatives</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/hierarchical-data-in-information_schema-and-derivatives</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/hierarchical-data-in-information_schema-and-derivatives#comments</comments>
+				<pubDate>Tue, 08 Jan 2013 11:19:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5311</guid>
+				<description><![CDATA[Just how often do you encounter hierarchical data? Consider a table with some parent-child relation, like the this classic employee table: CREATE TABLE employee (   employee_id INT UNSIGNED PRIMARY KEY,   employee_name VARCHAR(100),   manager_id INT UNSIGNED,   CONSTRAINT `employee_manager_fk` FOREIGN KEY (manager_id) REFERENCES employee (employee_id) ) engine=innodb ; +-------------+---------------+------------+ &#124; employee_id &#124; employee_name [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Just how often do you encounter hierarchical data? Consider a table with some parent-child relation, like the this classic <strong>employee</strong> table:</p>
+<blockquote>
+<pre>CREATE TABLE employee (
+  employee_id INT UNSIGNED PRIMARY KEY,
+  employee_name VARCHAR(100),
+  manager_id INT UNSIGNED,
+  CONSTRAINT `employee_manager_fk` FOREIGN KEY (manager_id) REFERENCES employee (employee_id)
+) engine=innodb
+;
++-------------+---------------+------------+
+| employee_id | employee_name | manager_id |
++-------------+---------------+------------+
+|           1 | Rachel        |       NULL |
+|           2 | John          |          1 |
+|           3 | Stan          |          1 |
+|           4 | Naomi         |          2 |
++-------------+---------------+------------+</pre>
+</blockquote>
+<p>Questions like <em>&#8220;What is the (nested) list of employees managed by Rachel?&#8221;</em> or <em>&#8220;Get Naomi&#8217;s managers chain of command&#8221;</em> are classical questions. There are sometimes dependencies: if John leaves, does that mean Naomi loses her job, or does she get promoted, or something else? If John and Stan are on sick leave, does Rachel have any reason to come to work?</p>
+<p>Hierarchical data is not limited to a single-table structure. Sometimes it takes a combination of a few tables (it&#8217;s just a <strong>JOIN</strong>) to make out the parent-child relation.</p>
+<p>Hierarchical data is difficult to manage with SQL. This is especially true for MySQL, which does not support the <strong>WITH</strong> recursive query syntax.</p>
+<h4>Where can you find hierarchical data?</h4>
+<p>Even if you do not provide it by yourself, MySQL&#8217;s <strong>INFORMATION_SCHEMA</strong> has some for you. Partly obvious, partly implicit, here are some examples:<span id="more-5311"></span></p>
+<h4>Foreign Keys</h4>
+<p>This is probably the most obvious hierarchical dataset in <strong>INFORMATION_SCHEMA</strong>. The <strong>KEY_COLUMN_USAGE</strong> table lists the table dependencies based on foreign key constraints. It&#8217;s a bit confusing, as it also lists <strong>UNIQUE</strong> constraints, and the complete list of FKs are in <strong>REFERENTIAL_CONSTRAINTS</strong> &#8212; but the latter table does not list the dependencies. You typically want to join both tables to get the complete information.</p>
+<p>So, taking <strong>sakila</strong>&#8216;s DVD rental shop sample,  <strong>film_actor</strong> table depends on <strong>film</strong> as well as on <strong>actor</strong> via foreign keys. <strong>film</strong> can depend on the <strong>category</strong> table, etc. The hierarchies can turn to be very complex, with multiple roots an very deep branches.</p>
+<p>Dependency questions are very clear when speaking of foreign keys: what happens when we delete some <strong>film</strong> record? Does it hold that we also delete all references to that film on <strong>film_actor</strong>? Or do we deny deletion of said film in such case?</p>
+<h4>Redundant Keys</h4>
+<p>The <strong>KEY (col1, col2)</strong> makes the <strong>KEY (col1)</strong> redundant. The latter is not strictly required (though you may wish to keep it for covering index performance reason). The list of <em>dominant-redundant</em> keys makes for hierarchical data. It is typically very shallow (keys can only be redundant within the scope of a single table &#8212; how deep can you get with such small dataset?)</p>
+<p>There is no immediate reference in <strong>INFORMATION_SCHEMA</strong> as for redundant keys, but it can be inferred by self joining the <strong>STATISTICS</strong> table onto itself. It is not immediate, since you need to do some aggregation and check for particular cases. For example, <strong>UNIQUE KEY (col1, col2)</strong> is actually made redundant by <strong>UNIQUE KEY (col1)</strong>, which is just the opposite from our previous example.</p>
+<p><a href="http://code.google.com/p/common-schema">common_schema</a> provides with this implicit information now turned explicit, in the for of the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">redundant_keys</a> view: the <strong>redundant_index_name</strong> and <strong>dominant_index_name</strong> columns make for parent-child relationship.</p>
+<p>Dependency questions are a bit redundant here: the general objective is to <em>not have</em> dependencies. So get rid of redundant keys &#8211; and do so wisely. There&#8217;s a good discussion of index redundancies on <strong>redundant_keys</strong>&#8216;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">documentation</a>.</p>
+<h4>Locked transactions</h4>
+<p>A transaction is locked. It is locked because another transaction holds some locks needed by locked transaction. But this transaction in itself can obtain locks needed by yet other transactions. And so we can get a hierarchy of locked transaction. The &#8220;parent&#8221; is the one blocking the &#8220;child&#8221;.</p>
+<p>Combining InnoDB&#8217;s <strong>INNODB_TRX</strong> &#8211; <strong>INNODB_LOCK_WAITS</strong> &#8211; <strong>INNODB_TRX</strong> tables, we get this information. <em>common_schema</em> provides with this inferred data in the form of <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_locked_transactions.html">innodb_locked_transactions</a>.</p>
+<p>Hierarchies in locked-transactions could be deep, and they can most commonly be <em>wide</em>. A single transaction can lock dozens of others.</p>
+<p>Dependency questions are <em>&#8220;would killing this transaction release all other waiting transactions?&#8221;</em>; <em>&#8220;What is </em>the one<em> transaction I need to kill in order to release the bottleneck?&#8221;</em>; <em>&#8220;Why are these transactions related in the first place? Can I remove this dependency?&#8221;</em>. etc.</p>
+<h4>Locks</h4>
+<p>You can look at the same dataset as above from a different angle. Instead of looking at transaction-lock-transaction, you can look at lock-transaction-lock. Which locks are causing other locks to be held? This is counter-intuitive to our understanding of how things work, but is valid nonetheless.</p>
+<h4>Views</h4>
+<p>A <strong>VIEW</strong> can query a table or another view. It can join multiple views. This hierarchy of view-reading-from-view can turn out to be complex; if not for the human mind then for the optimizer.</p>
+<p>Surprisingly, there is no data in <strong>INFORMATION_SCHEMA</strong>, other than the <strong>CREATE VIEW</strong> clause, to help us out in resolving these dependencies. Even more surprising is MySQL&#8217;s own inability to get clear conclusions itself. The view definition clause is parsed, re-parsed and re-evaluated whenever information on &#8220;parent&#8221; views is required. For example, try to <strong>DESCRIBE</strong> a view. How does MySQL deduce the data types of columns? It dives in head first into the hierarchy, crawls and parses view definitions, till it resolves the answer. The <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> projects uses view hierarchies intensively. It draws powers from the hierarchy and produces some surprising data (<a href="http://code.openark.org/forge/mycheckpoint/documentation/generating-google-charts">charts</a> from raw data, for example). But it also suffers from MySQL indirect inference of views. Checking up a deep-nested <em>mycehckpoint</em> view in <strong>INFORMATION_SCHEMA</strong> makes for a heavyweight dive for MySQL into locks and table handles.</p>
+<p>Dependency questions are <em>&#8220;what is the type of this column?&#8221;</em>, <em>&#8220;are there any <strong>TEMPTABLE</strong> views along the chain of execution? Or are all <strong>MERGE</strong> views?&#8221;</em> and more.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/hierarchical-data-in-information_schema-and-derivatives/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5311</post-id>	</item>
+		<item>
+		<title>Pop quiz: funny syntax</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/pop-quiz-funny-syntax</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/pop-quiz-funny-syntax#comments</comments>
+				<pubDate>Mon, 05 Nov 2012 18:22:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5445</guid>
+				<description><![CDATA[The following questions are of little importance, yet I find them entertaining. I stumbled upon these while developing QueryScript. Can you guess the results of the following statements? Pop quiz 1 SET @x := 7; SELECT ++@x; What is the computation result? What will be the value of @x? Pop quiz 2 SET @ := [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The following questions are of little importance, yet I find them entertaining. I stumbled upon these while developing QueryScript.</p>
+<p>Can you guess the results of the following statements?</p>
+<h4>Pop quiz 1</h4>
+<blockquote>
+<pre>SET @x := 7;
+SELECT ++@x;</pre>
+</blockquote>
+<p>What is the computation result? What will be the value of <strong>@x</strong>?</p>
+<h4>Pop quiz 2</h4>
+<blockquote>
+<pre>SET @ := 4;
+SELECT @ + @'' + @``</pre>
+</blockquote>
+<p>What is the computation result?</p>
+<h4>Pop quiz 3</h4>
+<blockquote>
+<pre>SET @a := 2;
+SELECT @a = @'a' = @`a`</pre>
+</blockquote>
+<p>Do we get <strong>TRUE</strong> or <strong>FALSE</strong>? When?<span id="more-5445"></span></p>
+<h4>Hints</h4>
+<p>Consider the following queries as hints to the above questions:</p>
+<blockquote>
+<pre>SELECT +++++-@x;
+SELECT @ = @'', @ = @``
+SELECT (@a = @'a') = @`a`</pre>
+</blockquote>
+<h4>Answers</h4>
+<ul>
+<li><strong>Pop quiz 1</strong></li>
+</ul>
+<p style="padding-left: 30px;"><strong>++@x</strong> is interpreted as <strong>+(+(@x))</strong>, which is in turn evaluated as <strong>0+(0+(@x))</strong>. No relation to <strong>C</strong>&#8216;s <strong>++</strong> operator. <strong>@x</strong> is unchanged.</p>
+<ul>
+<li><strong>Pop quiz 2</strong></li>
+</ul>
+<p style="padding-left: 30px;"><strong>@x</strong> is the same as <strong>@&#8217;x&#8217;</strong> and as <strong>@`x`</strong>. What&#8217;s funny is that one is allowed to create the empty-named user defined variable <strong>@&#8221;</strong>. Makes for a weird looking syntax, but nothing special about it. Computation result is <strong>12</strong>.</p>
+<ul>
+<li><strong>Pop quiz 3</strong></li>
+</ul>
+<p style="padding-left: 30px;">We&#8217;ve already established that <strong>@a</strong>, <strong>@&#8217;a&#8217;</strong> and <strong>@`a`</strong> are the same, I just used this notation for adding pepper to the quiz. The real question is whether <strong>2 = 2 = 2</strong> holds true.  It does not. There is no 3-way comparison. All comparisons are in pairs, which is why the expression evaluates as <strong>(2 = 2) = 2</strong>, leading to <strong>1 = 2</strong>, <strong>&#8220;1&#8221;</strong> being the <strong>TRUE</strong> value of <strong>(2 = 2)</strong>. The only value of <strong>@a</strong> for which the expression holds true is <strong>1</strong>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/pop-quiz-funny-syntax/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5445</post-id>	</item>
+		<item>
+		<title>Three wishes for a new year</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201#comments</comments>
+				<pubDate>Sun, 16 Sep 2012 04:20:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5398</guid>
+				<description><![CDATA[Another new year by Jewish calendar. What do I wish for the following year? World peace Good health to all Get a decent, long waited for, implementation of Window Functions (aka Analytic Functions) for MySQL. I mean, I like GROUP_CONCAT, and the many hacks it provides: [1], [2], [3], [4], [5], [6], [7], [8], [9], [&#8230;]]]></description>
+								<content:encoded><![CDATA[<div>
+<p>Another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Get a decent, long waited for, implementation of <a href="http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function">Window Functions</a> (aka Analytic Functions) for MySQL.</li>
+</ol>
+<p>I mean, I like <a href="http://dev.mysql.com/doc/refman/5.5/en/group-by-functions.html#function_group-concat"><strong>GROUP_CONCAT</strong></a>, and the many hacks it provides: [<a href="https://shlomi-noach.github.io/blog/mysql/selecting-a-specific-non-aggregated-column-data-in-group-by">1</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/unwalking-a-string-with-group_concat">2</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/rotating-sql-graphs-horizontally">3</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/sql-graphics">4</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart">5</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/sql-multi-line-chart">6</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/checking-for-string-permutation">7</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group">8</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/another-use-for-top-n-records-per-group-query">9</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution">10</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-i">11</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals">12</a>]. But it makes for a poor substitution to Window Functions, and only solves a subset of issues.</p>
+<p>My wishes in previous two years [<a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year">2010</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-2">2011</a>] have not come true. I&#8217;m still willing to settle for two out of three.</p>
+</div>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5398</post-id>	</item>
+		<item>
+		<title>SQL: selecting top N records per group, another solution</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution#comments</comments>
+				<pubDate>Tue, 21 Aug 2012 04:49:43 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5249</guid>
+				<description><![CDATA[A while back I presented SQL: selecting top N records per group, a &#8220;give me the top 5 countries in each continent&#8221; type of query, and which used an external numbers table and a lot of tedious casting. Here&#8217;s another solution I came up with (*). Still using GROUP_CONCAT (how else?), but no external table [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A while back I presented <a title="Permanent Link to SQL: selecting top N records per group" href="https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group" rel="bookmark">SQL: selecting top N records per group</a>, a &#8220;give me the top <strong>5</strong> countries in each continent&#8221; type of query, and which used an external <em>numbers</em> table and a lot of tedious casting.</p>
+<p>Here&#8217;s another solution I came up with (<a href="#update">*</a>). Still using <strong>GROUP_CONCAT</strong> (how else?), but no external table and no casting. The query outputs the largest <strong>5</strong> countries (by surface area) per continent.</p>
+<blockquote>
+<pre>SELECT
+  Continent,
+  Name,
+  SurfaceArea,
+  Population
+FROM
+  world.Country,
+  (
+    SELECT 
+      GROUP_CONCAT(top_codes_per_group) AS top_codes
+    FROM
+      (
+        SELECT 
+          SUBSTRING_INDEX(GROUP_CONCAT(<strong>Code ORDER BY SurfaceArea DESC</strong>), ',', <strong>5</strong>) AS top_codes_per_group
+        FROM
+          world.Country
+        GROUP BY
+          Continent
+      ) s_top_codes_per_group
+  ) s_top_codes
+WHERE
+  FIND_IN_SET(Code, top_codes)
+ORDER BY
+  Continent,
+  SurfaceArea DESC
+;
+
++---------------+----------------------------------------------+-------------+------------+
+| Continent     | Name                                         | SurfaceArea | Population |
++---------------+----------------------------------------------+-------------+------------+
+| Asia          | China                                        |  9572900.00 | 1277558000 |
+| Asia          | India                                        |  3287263.00 | 1013662000 |
+| Asia          | Kazakstan                                    |  2724900.00 |   16223000 |
+| Asia          | Saudi Arabia                                 |  2149690.00 |   21607000 |
+| Asia          | Indonesia                                    |  1904569.00 |  212107000 |
+| Europe        | Russian Federation                           | 17075400.00 |  146934000 |
+| Europe        | Ukraine                                      |   603700.00 |   50456000 |
+| Europe        | France                                       |   551500.00 |   59225700 |
+| Europe        | Spain                                        |   505992.00 |   39441700 |
+| Europe        | Sweden                                       |   449964.00 |    8861400 |
+| North America | Canada                                       |  9970610.00 |   31147000 |
+| North America | United States                                |  9363520.00 |  278357000 |
+| North America | Greenland                                    |  2166090.00 |      56000 |
+| North America | Mexico                                       |  1958201.00 |   98881000 |
+| North America | Nicaragua                                    |   130000.00 |    5074000 |
+| Africa        | Sudan                                        |  2505813.00 |   29490000 |
+| Africa        | Algeria                                      |  2381741.00 |   31471000 |
+| Africa        | Congo, The Democratic Republic of the        |  2344858.00 |   51654000 |
+| Africa        | Libyan Arab Jamahiriya                       |  1759540.00 |    5605000 |
+| Africa        | Chad                                         |  1284000.00 |    7651000 |
+| Oceania       | Australia                                    |  7741220.00 |   18886000 |
+| Oceania       | Papua New Guinea                             |   462840.00 |    4807000 |
+| Oceania       | New Zealand                                  |   270534.00 |    3862000 |
+| Oceania       | Solomon Islands                              |    28896.00 |     444000 |
+| Oceania       | New Caledonia                                |    18575.00 |     214000 |
+| Antarctica    | Antarctica                                   | 13120000.00 |          0 |
+| Antarctica    | French Southern territories                  |     7780.00 |          0 |
+| Antarctica    | South Georgia and the South Sandwich Islands |     3903.00 |          0 |
+| Antarctica    | Heard Island and McDonald Islands            |      359.00 |          0 |
+| Antarctica    | Bouvet Island                                |       59.00 |          0 |
+| South America | Brazil                                       |  8547403.00 |  170115000 |
+| South America | Argentina                                    |  2780400.00 |   37032000 |
+| South America | Peru                                         |  1285216.00 |   25662000 |
+| South America | Colombia                                     |  1138914.00 |   42321000 |
+| South America | Bolivia                                      |  1098581.00 |    8329000 |
++---------------+----------------------------------------------+-------------+------------+
+</pre>
+</blockquote>
+<p>In bold are the conditions by which we nominate our selected rows (condition is <strong>SurfaceArea DESC</strong>, number of rows is <strong>5</strong>, so 5 largest countries).</p>
+<h4><span id="more-5249"></span>What&#8217;s going on here?</h4>
+<p>So the inner <strong>s_top_codes_per_group</strong> query produces the codes for largest countries per continent:</p>
+<blockquote>
+<pre>+---------------------+
+| top_codes_per_group |
++---------------------+
+| CHN,IND,KAZ,SAU,IDN |
+| RUS,UKR,FRA,ESP,SWE |
+| CAN,USA,GRL,MEX,NIC |
+| SDN,DZA,COD,LBY,TCD |
+| AUS,PNG,NZL,SLB,NCL |
+| ATA,ATF,SGS,HMD,BVT |
+| BRA,ARG,PER,COL,BOL |
++---------------------+</pre>
+</blockquote>
+<p>The wrapping <strong>s_top_codes</strong> query concatenates all the above to one long text:</p>
+<blockquote>
+<pre>+---------------------------------------------------------------------------------------------------------------------------------------------+
+| top_codes                                                                                                                                   |
++---------------------------------------------------------------------------------------------------------------------------------------------+
+| CHN,IND,KAZ,SAU,IDN,RUS,UKR,FRA,ESP,SWE,CAN,USA,GRL,MEX,NIC,SDN,DZA,COD,LBY,TCD,AUS,PNG,NZL,SLB,NCL,ATA,ATF,SGS,HMD,BVT,BRA,ARG,PER,COL,BOL |
++---------------------------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>And the final query simply demands that <strong>Code</strong> must be found within this string, by calling upon <strong>FIND_IN_SET(Code, top_codes)</strong>.</p>
+<h4>Notes</h4>
+<ul>
+<li>This solution works for <strong>PRIMARY KEY</strong>s or otherwise <strong>UNIQUE KEY</strong>s of all sorts (a <strong>CHAR(3)</strong> in our example, but same for integers etc.)</li>
+<li>And you still have to have a sufficient <strong>group_concat_max_len</strong> (see <a title="Those oversized, undersized variables defaults" href="https://shlomi-noach.github.io/blog/mysql/those-oversized-undersized-variables-defaults">this post</a>). You <em>must</em> have a large enough value to fit in the very long text you may be expecting in <strong>s_top_codes</strong>.</li>
+<li>Performance-wise there are full scans here, as well as string searching.</li>
+</ul>
+<p><a name="update"></a></p>
+<h4>* UPDATE</h4>
+<p>I should pay closer attention. <a href="http://www.xaprb.com/blog/2006/12/07/how-to-select-the-firstleastmax-row-per-group-in-sql/#comment-13284">This comment</a> had it <strong>5</strong> years ago.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5249</post-id>	</item>
+	</channel>
+</rss>

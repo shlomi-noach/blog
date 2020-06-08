@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: State of InnDB Online DDL in MySQL 5.6.8-RC	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 28 Nov 2012 21:49:48 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: James Day				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/state-of-inndb-online-ddl-in-mysql-5-6-8-rc/comment-page-1#comment-140967</link>
+		<dc:creator><![CDATA[James Day]]></dc:creator>
+		<pubDate>Wed, 28 Nov 2012 21:49:48 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5823#comment-140967</guid>
+					<description><![CDATA[It&#039;s still an active work in progress at the moment but there are some improvements to the documentation for this that may help. See http://dev.mysql.com/doc/refman/5.6/en/innodb-online-ddl.html .
+
+The inconsistency you saw is probably explained in this paragraph: &quot;An online DDL statement for an InnoDB table always waits for currently executing transactions that are accessing the table to commit or roll back, because it requires exclusive access to the table for a brief period while the DDL statement is being prepared. Likewise, it requires exclusive access to the table for a brief time before finishing. Thus, an online DDL statement waits for any transactions that are started while the DDL is in progress, and query or modify the table, to commit or roll back before the DDL completes.&quot;
+
+So an open SELECT can prevent the commit (final) phase from getting its lock until the SELECT has finished, delaying the ALTER in a time when it&#039;s locking exclusively. We&#039;re looking into improving this since it&#039;s not really desirable to hold an exclusive lock while waiting for a SELECT to finish, no guarantee that this will happen, nor when.
+
+Best to check the documentation from time to time as it improves and use bug reports for feedback and requests for clarifications of things, that feedback is at least as welcome as blog posts. This applies to all new (and existing) feature descriptions. Lots of ongoing work on their documentation.
+
+Please do keep up the feedback, it&#039;s much appreciated!
+
+Views are my own, for an official view, seek a PR person.
+
+James Day, MySQL Senior Principal Support Engineer, Oracle]]></description>
+		<content:encoded><![CDATA[<p>It&#8217;s still an active work in progress at the moment but there are some improvements to the documentation for this that may help. See <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-online-ddl.html" rel="nofollow ugc">http://dev.mysql.com/doc/refman/5.6/en/innodb-online-ddl.html</a> .</p>
+<p>The inconsistency you saw is probably explained in this paragraph: &#8220;An online DDL statement for an InnoDB table always waits for currently executing transactions that are accessing the table to commit or roll back, because it requires exclusive access to the table for a brief period while the DDL statement is being prepared. Likewise, it requires exclusive access to the table for a brief time before finishing. Thus, an online DDL statement waits for any transactions that are started while the DDL is in progress, and query or modify the table, to commit or roll back before the DDL completes.&#8221;</p>
+<p>So an open SELECT can prevent the commit (final) phase from getting its lock until the SELECT has finished, delaying the ALTER in a time when it&#8217;s locking exclusively. We&#8217;re looking into improving this since it&#8217;s not really desirable to hold an exclusive lock while waiting for a SELECT to finish, no guarantee that this will happen, nor when.</p>
+<p>Best to check the documentation from time to time as it improves and use bug reports for feedback and requests for clarifications of things, that feedback is at least as welcome as blog posts. This applies to all new (and existing) feature descriptions. Lots of ongoing work on their documentation.</p>
+<p>Please do keep up the feedback, it&#8217;s much appreciated!</p>
+<p>Views are my own, for an official view, seek a PR person.</p>
+<p>James Day, MySQL Senior Principal Support Engineer, Oracle</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

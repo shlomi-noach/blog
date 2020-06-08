@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: DELETE, don&#8217;t INSERT	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 23 Jul 2012 13:50:15 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Eelko de Vos				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/comment-page-1#comment-109154</link>
+		<dc:creator><![CDATA[Eelko de Vos]]></dc:creator>
+		<pubDate>Mon, 23 Jul 2012 13:50:15 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008#comment-109154</guid>
+					<description><![CDATA[Due to the fact that large tables are usually continually used by a live system, I found that lock-delays of a few seconds or more (minutes, hours) are unacceptable. Therefore I took a different approach to this problem.
+
+I&#039;ve created a script that:
+ - creates a new table MY_TABLE_NEW
+ - creates a merge-table MY_TABLE_MERGE combining MY_TABLE_NEW and MY_TABLE whereby inserts are done in MY_TABLE_NEW
+ - renames MY_TABLE into MY_TABLE_OLD and at the same time MY_TABLE_MERGE into MY_TABLE
+
+This effectively creates a merge table with all the data, still accessible through the name MY_TABLE where all new records are moved into MY_TABLE_NEW - which is optimized of course as it is empty.
+
+Then the script slowly starts moving records from MY_TABLE to MY_TABLE. It takes a record (or fifty), deletes them and inserts them. That effectively moves them from MY_TABLE_OLD to MY_TABLE_NEW. That slowly builds a MY_TABLE_NEW which is optimized, while the system continues to work.
+
+The chances of the system needing a specific record while it&#039;s being deleted and inserted are very, very small with the tables I&#039;ve used. Of course that depends highly on the way your system processes data. But for me, it worked flawlessly.
+
+I&#039;ve used this script dozens of times on production systems. It&#039;s coping with interruptions, can be run in parallel on several tables at the same time and has virtually no downsides.
+
+Of course you cannot merge merge-tables, so when you already have merge-tables, this solution may not be for you.
+
+If you&#039;d like to take a look at the script, let me know in a comment below.
+
+Cheers,
+  Eelko de Vos]]></description>
+		<content:encoded><![CDATA[<p>Due to the fact that large tables are usually continually used by a live system, I found that lock-delays of a few seconds or more (minutes, hours) are unacceptable. Therefore I took a different approach to this problem.</p>
+<p>I&#8217;ve created a script that:<br />
+ &#8211; creates a new table MY_TABLE_NEW<br />
+ &#8211; creates a merge-table MY_TABLE_MERGE combining MY_TABLE_NEW and MY_TABLE whereby inserts are done in MY_TABLE_NEW<br />
+ &#8211; renames MY_TABLE into MY_TABLE_OLD and at the same time MY_TABLE_MERGE into MY_TABLE</p>
+<p>This effectively creates a merge table with all the data, still accessible through the name MY_TABLE where all new records are moved into MY_TABLE_NEW &#8211; which is optimized of course as it is empty.</p>
+<p>Then the script slowly starts moving records from MY_TABLE to MY_TABLE. It takes a record (or fifty), deletes them and inserts them. That effectively moves them from MY_TABLE_OLD to MY_TABLE_NEW. That slowly builds a MY_TABLE_NEW which is optimized, while the system continues to work.</p>
+<p>The chances of the system needing a specific record while it&#8217;s being deleted and inserted are very, very small with the tables I&#8217;ve used. Of course that depends highly on the way your system processes data. But for me, it worked flawlessly.</p>
+<p>I&#8217;ve used this script dozens of times on production systems. It&#8217;s coping with interruptions, can be run in parallel on several tables at the same time and has virtually no downsides.</p>
+<p>Of course you cannot merge merge-tables, so when you already have merge-tables, this solution may not be for you.</p>
+<p>If you&#8217;d like to take a look at the script, let me know in a comment below.</p>
+<p>Cheers,<br />
+  Eelko de Vos</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Aaron Brown				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/comment-page-1#comment-103710</link>
+		<dc:creator><![CDATA[Aaron Brown]]></dc:creator>
+		<pubDate>Thu, 28 Jun 2012 01:29:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008#comment-103710</guid>
+					<description><![CDATA[@Rick I agree, if you know ahead of time that you are going to purging large amounts of data regularly, using partitioned tables is an ideal solution.]]></description>
+		<content:encoded><![CDATA[<p>@Rick I agree, if you know ahead of time that you are going to purging large amounts of data regularly, using partitioned tables is an ideal solution.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/comment-page-1#comment-103685</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Wed, 27 Jun 2012 22:14:33 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008#comment-103685</guid>
+					<description><![CDATA[My discussion on the problem:
+
+http://mysql.rjweb.org/doc.php/deletebig
+
+For time-based purging, PARTITION by &quot;range&quot; is an excellent solution to large DELETEs.]]></description>
+		<content:encoded><![CDATA[<p>My discussion on the problem:</p>
+<p><a href="http://mysql.rjweb.org/doc.php/deletebig" rel="nofollow ugc">http://mysql.rjweb.org/doc.php/deletebig</a></p>
+<p>For time-based purging, PARTITION by &#8220;range&#8221; is an excellent solution to large DELETEs.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/comment-page-1#comment-103564</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Wed, 27 Jun 2012 15:56:03 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008#comment-103564</guid>
+					<description><![CDATA[@Art + Aaron,
+Nor did I mean to suggest Aaron&#039;s solution was universally inferior.
+There are always cases where the standard solution to a problem would perform worse than an unconventional ad-hoc one.
+For that matter, I think Aaron&#039;s trick is cool!]]></description>
+		<content:encoded><![CDATA[<p>@Art + Aaron,<br />
+Nor did I mean to suggest Aaron&#8217;s solution was universally inferior.<br />
+There are always cases where the standard solution to a problem would perform worse than an unconventional ad-hoc one.<br />
+For that matter, I think Aaron&#8217;s trick is cool!</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Aaron Brown				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/comment-page-1#comment-103545</link>
+		<dc:creator><![CDATA[Aaron Brown]]></dc:creator>
+		<pubDate>Wed, 27 Jun 2012 15:13:11 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008#comment-103545</guid>
+					<description><![CDATA[Hi Shlomi, 
+
+Thanks for responding to my post.  I agree with all the points that you have made above.  I didn&#039;t intend to imply that the INSERT technique was universally better, only that it was faster in some cases, which was an important factor to me.  It certainly has a number of limitations, particularly if you have foreign key relationships or cannot stop writes to the table.  My specific use was to get rid of about 50MM rows in over a dozen tables with only soft foreign key relationships (Rails application) and also have an easy rollback in the event that something broke.  By doing this, you end up with a complete copy of your table which you can drop at your leisure or move back into place if something goes wrong.
+
+@Art - I brought up the stall issue in my post along with problems caused by ext filesystems.  I can&#039;t see this technique being very effective on a live server unless you can guarantee no writes to the table.]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi, </p>
+<p>Thanks for responding to my post.  I agree with all the points that you have made above.  I didn&#8217;t intend to imply that the INSERT technique was universally better, only that it was faster in some cases, which was an important factor to me.  It certainly has a number of limitations, particularly if you have foreign key relationships or cannot stop writes to the table.  My specific use was to get rid of about 50MM rows in over a dozen tables with only soft foreign key relationships (Rails application) and also have an easy rollback in the event that something broke.  By doing this, you end up with a complete copy of your table which you can drop at your leisure or move back into place if something goes wrong.</p>
+<p>@Art &#8211; I brought up the stall issue in my post along with problems caused by ext filesystems.  I can&#8217;t see this technique being very effective on a live server unless you can guarantee no writes to the table.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Art van Scheppingen				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/comment-page-1#comment-103511</link>
+		<dc:creator><![CDATA[Art van Scheppingen]]></dc:creator>
+		<pubDate>Wed, 27 Jun 2012 12:59:51 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008#comment-103511</guid>
+					<description><![CDATA[I largely agree with your statements, but we do have a corner case where the lockdown isn&#039;t an issue: the application only writes to the tables at a set interval, so we were able to utilize Aaron&#039;s suggested solution a couple of times. In that particular case we needed to remove 95% of all records and deleting them in a loop would have taken us days instead of minutes.
+
+At the same I do want to add that Aaron&#039;s suggestion also has a problem on high concurrent MySQL systems where the create/drop will certainly cause stalls in the LRU.]]></description>
+		<content:encoded><![CDATA[<p>I largely agree with your statements, but we do have a corner case where the lockdown isn&#8217;t an issue: the application only writes to the tables at a set interval, so we were able to utilize Aaron&#8217;s suggested solution a couple of times. In that particular case we needed to remove 95% of all records and deleting them in a loop would have taken us days instead of minutes.</p>
+<p>At the same I do want to add that Aaron&#8217;s suggestion also has a problem on high concurrent MySQL systems where the create/drop will certainly cause stalls in the LRU.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

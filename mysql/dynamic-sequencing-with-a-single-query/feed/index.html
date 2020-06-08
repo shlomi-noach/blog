@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Dynamic sequencing with a single query	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 13 May 2009 15:17:19 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Jannes				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-1916</link>
+		<dc:creator><![CDATA[Jannes]]></dc:creator>
+		<pubDate>Wed, 13 May 2009 15:17:19 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-1916</guid>
+					<description><![CDATA[I think the reason your first UNION attempt failed is because the ORDER BY ... LIMIT 10 is interpreted for the whole union, not just for the last query.
+
+I didn&#039;t try, but I would expect something like this to at least give the correct result (but of course the JOIN solutions are much cleaner anyway) :
+
+SELECT NULL AS rank, NULL AS Code, NULL AS Name, NULL AS Population
+  FROM DUAL WHERE (@rank := 0)&#060;0
+UNION ALL
+(SELECT @rank := @rank + 1 AS rank, Code, Name, Population
+  FROM Country ORDER BY Population DESC LIMIT 10)]]></description>
+		<content:encoded><![CDATA[<p>I think the reason your first UNION attempt failed is because the ORDER BY &#8230; LIMIT 10 is interpreted for the whole union, not just for the last query.</p>
+<p>I didn&#8217;t try, but I would expect something like this to at least give the correct result (but of course the JOIN solutions are much cleaner anyway) :</p>
+<p>SELECT NULL AS rank, NULL AS Code, NULL AS Name, NULL AS Population<br />
+  FROM DUAL WHERE (@rank := 0)&lt;0<br />
+UNION ALL<br />
+(SELECT @rank := @rank + 1 AS rank, Code, Name, Population<br />
+  FROM Country ORDER BY Population DESC LIMIT 10)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-76</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 05 Dec 2008 05:38:09 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-76</guid>
+					<description><![CDATA[Sheeri,
+Sorry, no go! When executing on a new client, I get:
+
+
+
+&lt;pre&gt;select @rank:=COALESCE(@rank,0)+1 AS rank, Code, Name, Population FROM Country ORDER BY Population DESC LIMIT 10;
++------+------+--------------------+------------+
+&#124; rank &#124; Code &#124; Name               &#124; Population &#124;
++------+------+--------------------+------------+
+&#124;    1 &#124; CHN  &#124; China              &#124; 1277558000 &#124;
+&#124;    1 &#124; IND  &#124; India              &#124; 1013662000 &#124;
+&#124;    1 &#124; USA  &#124; United States      &#124;  278357000 &#124;
+&#124;    1 &#124; IDN  &#124; Indonesia          &#124;  212107000 &#124;
+&#124;    1 &#124; BRA  &#124; Brazil             &#124;  170115000 &#124;
+&#124;    1 &#124; PAK  &#124; Pakistan           &#124;  156483000 &#124;
+&#124;    1 &#124; RUS  &#124; Russian Federation &#124;  146934000 &#124;
+&#124;    1 &#124; BGD  &#124; Bangladesh         &#124;  129155000 &#124;
+&#124;    1 &#124; JPN  &#124; Japan              &#124;  126714000 &#124;
+&#124;    1 &#124; NGA  &#124; Nigeria            &#124;  111506000 &#124;
++------+------+--------------------+------------+&lt;/pre&gt;
+
+I think you may have tried your query in an already &quot;used&quot; client.
+See, if I then run the same query again, I get:
+&lt;pre&gt;+------+------+--------------------+------------+
+&#124; rank &#124; Code &#124; Name               &#124; Population &#124;
++------+------+--------------------+------------+
+&#124;    2 &#124; CHN  &#124; China              &#124; 1277558000 &#124;
+&#124;    3 &#124; IND  &#124; India              &#124; 1013662000 &#124;
+&#124;    4 &#124; USA  &#124; United States      &#124;  278357000 &#124;
+&#124;    5 &#124; IDN  &#124; Indonesia          &#124;  212107000 &#124;
+&#124;    6 &#124; BRA  &#124; Brazil             &#124;  170115000 &#124;
+&#124;    7 &#124; PAK  &#124; Pakistan           &#124;  156483000 &#124;
+&#124;    8 &#124; RUS  &#124; Russian Federation &#124;  146934000 &#124;
+&#124;    9 &#124; BGD  &#124; Bangladesh         &#124;  129155000 &#124;
+&#124;   10 &#124; JPN  &#124; Japan              &#124;  126714000 &#124;
+&#124;   11 &#124; NGA  &#124; Nigeria            &#124;  111506000 &#124;
++------+------+--------------------+------------+&lt;/pre&gt;
+
+
+Regards,
+Shlomi]]></description>
+		<content:encoded><![CDATA[<p>Sheeri,<br />
+Sorry, no go! When executing on a new client, I get:</p>
+<pre>select @rank:=COALESCE(@rank,0)+1 AS rank, Code, Name, Population FROM Country ORDER BY Population DESC LIMIT 10;
++------+------+--------------------+------------+
+| rank | Code | Name               | Population |
++------+------+--------------------+------------+
+|    1 | CHN  | China              | 1277558000 |
+|    1 | IND  | India              | 1013662000 |
+|    1 | USA  | United States      |  278357000 |
+|    1 | IDN  | Indonesia          |  212107000 |
+|    1 | BRA  | Brazil             |  170115000 |
+|    1 | PAK  | Pakistan           |  156483000 |
+|    1 | RUS  | Russian Federation |  146934000 |
+|    1 | BGD  | Bangladesh         |  129155000 |
+|    1 | JPN  | Japan              |  126714000 |
+|    1 | NGA  | Nigeria            |  111506000 |
++------+------+--------------------+------------+</pre>
+<p>I think you may have tried your query in an already &#8220;used&#8221; client.<br />
+See, if I then run the same query again, I get:</p>
+<pre>+------+------+--------------------+------------+
+| rank | Code | Name               | Population |
++------+------+--------------------+------------+
+|    2 | CHN  | China              | 1277558000 |
+|    3 | IND  | India              | 1013662000 |
+|    4 | USA  | United States      |  278357000 |
+|    5 | IDN  | Indonesia          |  212107000 |
+|    6 | BRA  | Brazil             |  170115000 |
+|    7 | PAK  | Pakistan           |  156483000 |
+|    8 | RUS  | Russian Federation |  146934000 |
+|    9 | BGD  | Bangladesh         |  129155000 |
+|   10 | JPN  | Japan              |  126714000 |
+|   11 | NGA  | Nigeria            |  111506000 |
++------+------+--------------------+------------+</pre>
+<p>Regards,<br />
+Shlomi</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-75</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 05 Dec 2008 05:36:24 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-75</guid>
+					<description><![CDATA[Roland - thanks for the nitpick :), I stand corrected. My choice of terms was indeed misleading.]]></description>
+		<content:encoded><![CDATA[<p>Roland &#8211; thanks for the nitpick :), I stand corrected. My choice of terms was indeed misleading.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Sheeri K. Cabral				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-73</link>
+		<dc:creator><![CDATA[Sheeri K. Cabral]]></dc:creator>
+		<pubDate>Fri, 05 Dec 2008 03:33:45 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-73</guid>
+					<description><![CDATA[You were so close early on!
+
+SELECT
+  @rank := IFNULL(@rank,0)+1 AS rank,
+  Code, Name, Population
+FROM Country ORDER BY Population DESC LIMIT 10;
+
+If you use COALESCE instead of IFNULL, for the same purpose you were trying to achieve, you would have achieved it!
+
+http://dev.mysql.com/doc/refman/5.0/en/comparison-operators.html#function_coalesce
+
+select @rank:=COALESCE(@rank,0)+1 AS rank,
+  Code, Name, Population
+FROM Country ORDER BY Population DESC LIMIT 10;]]></description>
+		<content:encoded><![CDATA[<p>You were so close early on!</p>
+<p>SELECT<br />
+  @rank := IFNULL(@rank,0)+1 AS rank,<br />
+  Code, Name, Population<br />
+FROM Country ORDER BY Population DESC LIMIT 10;</p>
+<p>If you use COALESCE instead of IFNULL, for the same purpose you were trying to achieve, you would have achieved it!</p>
+<p><a href="http://dev.mysql.com/doc/refman/5.0/en/comparison-operators.html#function_coalesce" rel="nofollow ugc">http://dev.mysql.com/doc/refman/5.0/en/comparison-operators.html#function_coalesce</a></p>
+<p>select @rank:=COALESCE(@rank,0)+1 AS rank,<br />
+  Code, Name, Population<br />
+FROM Country ORDER BY Population DESC LIMIT 10;</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Roland Bouman				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-72</link>
+		<dc:creator><![CDATA[Roland Bouman]]></dc:creator>
+		<pubDate>Thu, 04 Dec 2008 18:55:52 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-72</guid>
+					<description><![CDATA[Hi Shlomi!
+
+Just a nitpick - a &quot;rank&quot; is commonly understood as assigning a grade corresponding to the sorting order of the attribute *value* - not necessarily the same as the occurrence. 
+
+In the case you present, the top 10 countries by population all have a different value for population, so you get to assign a unique number. But what if two (or more) of the top 10 happen to have the same value for population? 
+
+Well, the common notion for rank is that it should assign a number the occurrence of distinct values - not the occurrence of rows. This means that the same rank can appear if the population value happened to be the same. 
+
+What you are doing here is number the rows in order of appearance by population. 
+
+Here&#039;s a good explanation of the difference between rank and ordered numbering:
+
+http://technology.amis.nl/blog/189/analytical-sql-functions-theory-and-examples-part-2-on-the-order-by-and-windowing-clauses
+
+kind regards,
+
+ROland Bouman]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi!</p>
+<p>Just a nitpick &#8211; a &#8220;rank&#8221; is commonly understood as assigning a grade corresponding to the sorting order of the attribute *value* &#8211; not necessarily the same as the occurrence. </p>
+<p>In the case you present, the top 10 countries by population all have a different value for population, so you get to assign a unique number. But what if two (or more) of the top 10 happen to have the same value for population? </p>
+<p>Well, the common notion for rank is that it should assign a number the occurrence of distinct values &#8211; not the occurrence of rows. This means that the same rank can appear if the population value happened to be the same. </p>
+<p>What you are doing here is number the rows in order of appearance by population. </p>
+<p>Here&#8217;s a good explanation of the difference between rank and ordered numbering:</p>
+<p><a href="http://technology.amis.nl/blog/189/analytical-sql-functions-theory-and-examples-part-2-on-the-order-by-and-windowing-clauses" rel="nofollow ugc">http://technology.amis.nl/blog/189/analytical-sql-functions-theory-and-examples-part-2-on-the-order-by-and-windowing-clauses</a></p>
+<p>kind regards,</p>
+<p>ROland Bouman</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-70</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 04 Dec 2008 07:52:37 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-70</guid>
+					<description><![CDATA[Robert, many thanks!]]></description>
+		<content:encoded><![CDATA[<p>Robert, many thanks!</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Robert Stewart				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-69</link>
+		<dc:creator><![CDATA[Robert Stewart]]></dc:creator>
+		<pubDate>Thu, 04 Dec 2008 06:49:49 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-69</guid>
+					<description><![CDATA[http://dev.mysql.com/doc/refman/5.0/en/unnamed-views.html
+
+   &quot;Subqueries in the FROM clause are executed even for the EXPLAIN statement (that is, derived temporary tables are built). This occurs because upper-level queries need information about all tables during the optimization phase, and the table represented by a subquery in the FROM clause is unavailable unless the subquery is executed.&quot;
+
+So, it sounds like the derived query will be executed before the optimizer even creates the plan for the outer query, assuming the outer query references tables.
+
+That page also has an interesting example demonstrating how this side effect can result in the modification of table data if you do an EXPLAIN SELECT when the subquery contains a call to a stored procedure.]]></description>
+		<content:encoded><![CDATA[<p><a href="http://dev.mysql.com/doc/refman/5.0/en/unnamed-views.html" rel="nofollow ugc">http://dev.mysql.com/doc/refman/5.0/en/unnamed-views.html</a></p>
+<p>   &#8220;Subqueries in the FROM clause are executed even for the EXPLAIN statement (that is, derived temporary tables are built). This occurs because upper-level queries need information about all tables during the optimization phase, and the table represented by a subquery in the FROM clause is unavailable unless the subquery is executed.&#8221;</p>
+<p>So, it sounds like the derived query will be executed before the optimizer even creates the plan for the outer query, assuming the outer query references tables.</p>
+<p>That page also has an interesting example demonstrating how this side effect can result in the modification of table data if you do an EXPLAIN SELECT when the subquery contains a call to a stored procedure.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-68</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 04 Dec 2008 04:43:15 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-68</guid>
+					<description><![CDATA[William - thanks! Looks the same as Ryan&#039;s.
+I wonder by what rule MySQL decides to first perform the assignment in the second SELECT.
+
+Toby - do you have an example?
+
+Shlomi]]></description>
+		<content:encoded><![CDATA[<p>William &#8211; thanks! Looks the same as Ryan&#8217;s.<br />
+I wonder by what rule MySQL decides to first perform the assignment in the second SELECT.</p>
+<p>Toby &#8211; do you have an example?</p>
+<p>Shlomi</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Toby				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-66</link>
+		<dc:creator><![CDATA[Toby]]></dc:creator>
+		<pubDate>Thu, 04 Dec 2008 01:18:59 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-66</guid>
+					<description><![CDATA[You can also use a self JOIN with no variable to do ranking.]]></description>
+		<content:encoded><![CDATA[<p>You can also use a self JOIN with no variable to do ranking.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: William				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query/comment-page-1#comment-65</link>
+		<dc:creator><![CDATA[William]]></dc:creator>
+		<pubDate>Wed, 03 Dec 2008 23:44:55 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=271#comment-65</guid>
+					<description><![CDATA[My version:
+
+SELECT @rank := @rank+1 AS rank, Code, Name, Population
+FROM Country, (SELECT @rank := 0) d
+ORDER BY Population DESC LIMIT 10;]]></description>
+		<content:encoded><![CDATA[<p>My version:</p>
+<p>SELECT @rank := @rank+1 AS rank, Code, Name, Population<br />
+FROM Country, (SELECT @rank := 0) d<br />
+ORDER BY Population DESC LIMIT 10;</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

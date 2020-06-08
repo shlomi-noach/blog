@@ -1,0 +1,1026 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Triggers &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/triggers/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 07 Mar 2011 07:08:21 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Limiting table disk quota in MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/limiting-table-disk-quota-in-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/limiting-table-disk-quota-in-mysql#comments</comments>
+				<pubDate>Mon, 07 Mar 2011 07:08:21 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[File System]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3359</guid>
+				<description><![CDATA[Question asked by a student: is there a way to limit a table&#8217;s quote on disk? Say, limit a table to 2GB, after which it will refuse to grow? Note that the requirement is that rows are never DELETEd. The table must simply refuse to be updated once it reaches a certain size. There is [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Question asked by a student: is there a way to limit a table&#8217;s quote on disk? Say, limit a table to 2GB, after which it will refuse to grow? Note that the requirement is that rows are never DELETEd. The table must simply refuse to be updated once it reaches a certain size.</p>
+<p>There is no built-in way to limit a table&#8217;s quota on disk. First thing to observe is that MySQL has nothing to do with this. It is entirely up to the storage engine to provide with such functionality. The storage engine is the one to handle data storage: how table and keys are stored on disk. Just consider the difference between MyISAM&#8217;s <strong>.MYD</strong> &amp; <strong>.MYI</strong> to InnoDB&#8217;s shared tablespace <strong>ibdata1</strong> to InnoDB&#8217;s file-per table <strong>.ibd</strong> files.</p>
+<p>The only engine I know of that has a quota is the MEMORY engine: it accepts the <strong>max_heap_table_size</strong>, which limits the size of a single table in memory. Hrmmm&#8230; In memory&#8230;</p>
+<h4>Why limit?</h4>
+<p>I&#8217;m not as yet aware of the specific requirements of said company, but this is not the first time I heard this question.</p>
+<p>The fact is: when MySQL runs out of disk space, it goes with a BOOM. It crashed ungracefully, with binary logs being out of sync, replication being out of sync. To date, and I&#8217;ve seen some cases, InnoDB merely crashes and manages to recover once disk space is salvaged, but I am not certain this is guaranteed to be the case. Anyone?</p>
+<p>And, with MyISAM&#8230;, who knows?</p>
+<p>Rule #1 of MySQL disk usage: <em>don&#8217;t run out of disk space.</em></p>
+<h4>Workarounds</h4>
+<p>I can think of two workarounds, none of which is pretty. The first involves triggers (actually, a few variations for this one), the second involves privileges.<span id="more-3359"></span></p>
+<h4>Triggers</h4>
+<p>The following code (first presented in <a title="Permanent Link to Triggers Use Case Compilation, Part II" rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">Triggers Use Case Compilation, Part II</a>) assumed the DATA_LENGTH and INDEX_LENGTH values in INFORMATION_SCHEMA to be good indicators:</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `world`.`logs`;
+CREATE TABLE  `world`.`logs` (
+  `logs_id` int(11) NOT NULL auto_increment,
+  `ts` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
+  `message` varchar(255) character set utf8 NOT NULL,
+  PRIMARY KEY  (`logs_id`)
+) ENGINE=MyISAM;
+
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT DATA_LENGTH+INDEX_LENGTH FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='world' AND TABLE_NAME='LOGS' INTO @estimated_table_size;
+  IF (@estimated_table_size &gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;
+</pre>
+</blockquote>
+<p>Or, you could write your own UDF, e.g. <strong>get_table_file_size(fully_qualified_table_name)</strong> and be more accurate:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT get_table_file_size('world.logs') INTO @table_size;
+  IF (@table_size &gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;
+</pre>
+</blockquote>
+<p>(Same should be done for <strong>UPDATE</strong> operations)</p>
+<p>In both workarounds above, triggers are pre-defined. But triggers are performance-killers.</p>
+<p>How about preventing writing to the table only when it&#8217;s truly on the edge? A simple shell script, spawned by a cronjob, could do this well: get the file size of a specific table, and test if it&#8217;s larger than <em>n</em> bytes. If not, the script exits. If the file is indeed too large, the scripts invokes the following on <em>mysql</em>:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT 0 FROM `logs table is full` INTO @error;
+END $$
+
+DELIMITER ;
+</pre>
+</blockquote>
+<p>So, during most of the time, there is no trigger. Only when the external script detects that table is too large, does it create a trigger. The trigger has no logic: it simply raises an error (PS, use <strong>raise</strong> in MySQL <strong>5.5</strong>).</p>
+<h4>Privileges</h4>
+<p>Another way to work around the problem is to use security features. Instead of creating a trigger on the table, <strong>REVOKE</strong> the <strong>INSERT</strong> &amp; <strong>UPDATE</strong> privileges from the appropriate user on that table.</p>
+<p>This may turn out to be a difficult task, since MySQL has no notion of <em>fine grain changes</em>. That is, suppose we have:</p>
+<blockquote>
+<pre>GRANT INSERT, UPDATE, DELETE, SELECT ON mydb.* TO 'webuser'@'%.webdomain'</pre>
+</blockquote>
+<p>If we just do:</p>
+<blockquote>
+<pre>REVOKE SELECT ON mydb.logs FROM 'webuser'@'%.webdomain'</pre>
+</blockquote>
+<p>We get:</p>
+<blockquote>
+<pre>There is no such grant defined for user 'webuser' on host '%.webdomain' on table 'logs'.</pre>
+</blockquote>
+<p>So this requires setting up privileges on the table level in the first place. Plus note that as long as the grants on the database level do allow for INSERTs, you cannot override it on the table level.</p>
+<h4>Other ideas?</h4>
+<p>I never actually implemented table disk quota. I&#8217;m not sure this is a viable solution; but I haven&#8217;t heard all the arguments in favor as yet, so I don&#8217;t want to rule this out.</p>
+<p>Please share below if you are using other means of table size control, other than the trivial cleanup of old records.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/limiting-table-disk-quota-in-mysql/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3359</post-id>	</item>
+		<item>
+		<title>Thoughts and ideas for Online Schema Change</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change#comments</comments>
+				<pubDate>Thu, 07 Oct 2010 08:29:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Schema]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3005</guid>
+				<description><![CDATA[Here&#8217;s a few thoughts on current status and further possibilities for Facebook&#8217;s Online Schema Change (OSC) tool. I&#8217;ve had these thoughts for months now, pondering over improving oak-online-alter-table but haven&#8217;t got around to implement them nor even write them down. Better late than never. The tool has some limitations. Some cannot be lifted, some could. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here&#8217;s a few thoughts on current status and further possibilities for Facebook&#8217;s <a href="http://www.facebook.com/note.php?note_id=430801045932">Online Schema Change</a> (OSC) tool. I&#8217;ve had these thoughts for months now, pondering over improving <a href="../../forge/openark-kit/oak-online-alter-table">oak-online-alter-table</a> but haven&#8217;t got around to implement them nor even write them down. Better late than never.</p>
+<p>The tool has some limitations. Some cannot be lifted, some could. Quoting from the <a href="http://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932">announcement</a> and looking at the code, I add a few comments. I conclude with a general opinion on the tool&#8217;s abilities.</p>
+<h4>&#8220;The original table must have PK. Otherwise an error is returned.&#8221;</h4>
+<p>This restriction could be lifted: it&#8217;s enough that the table has a UNIQUE KEY. My original <em>oak-online-alter-table</em> handled that particular case. As far as I see from their code, the Facebook code would work just as well with any unique key.</p>
+<p>However, this restriction is of no real interest. As we&#8217;re mostly interested in InnoDB tables, and since any InnoDB table <em>should have</em> a PRIMARY KEY, we shouldn&#8217;t care too much.</p>
+<h4>&#8220;No foreign keys should exist. Otherwise an error is returned.&#8221;</h4>
+<p>Tricky stuff. With <em>oak-online-alter-table</em>, changes to the original table were immediately reflected in the <em>ghost</em> table. With InnoDB tables, that meant same transaction. And although I never got to update the text and code, there shouldn&#8217;t be a reason for not using child-side foreign keys (the child-side is the table on which the FK constraint is defined).</p>
+<p>The Facebook patch works differently: it captures changes and writes them to a <strong>delta</strong> table,  to be later (asynchronously) analyzed and make for a <em>replay</em> of actions on the <em>ghost</em> table.<span id="more-3005"></span></p>
+<p>So in the Facebook code, some cases will lead to undesired behavior. Consider two tables, <strong>country</strong> and <strong>city</strong>, with city holding a RESTRICT/NO ACTION foreign key on <strong>country</strong>&#8216;s id. Now consider the scenario:</p>
+<ol>
+<li>Rows from <strong>city</strong> are DELETEd, where the country Id is Spain&#8217;s.
+<ul>
+<li><strong>city</strong>&#8216;s ghost table is still unaffected, Spain&#8217;s cities are still there.</li>
+<li>A change is written to the delta table to mark these rows for deletion.</li>
+</ul>
+</li>
+<li>A DELETE is issued on <strong>country</strong>&#8216;s Spain record.
+<ul>
+<li>The DELETE should work, from the user&#8217;s perspective</li>
+<li>But it will fail: city&#8217;s ghost table has not received the changes yet. There&#8217;s still matching rows. The NO ACTION constraint will fail the DELETE statement.</li>
+</ul>
+</li>
+</ol>
+<p>Now, this does not lead to corruption, just to seemingly unreasonable behavior on the database part. This behavior is probably undesired. NO ACTION constraint won&#8217;t do.</p>
+<p>However, with CASCADE or SET NULL options, there is less of an issue: operations on the parent table (e.g. <strong>country</strong>) cannot fail. We must make sure operations on the ghost table make it consistent with the original table (e.g. <strong>city</strong>).</p>
+<p>Consider the following scenario:</p>
+<ol>
+<li>A new country is created, called &#8220;Sleepyland&#8221;. An INSERT is made to <strong>country</strong>.
+<ul>
+<li>Both <strong>city</strong> and <strong>city</strong>&#8216;s ghost are immediately aware of it.</li>
+</ul>
+</li>
+<li>A new town is created and INSERTed to <strong>city</strong>. The town is called &#8220;Naphaven&#8221;.
+<ul>
+<li>The change takes time to propagate to <strong>city</strong>&#8216;s ghost table.</li>
+</ul>
+</li>
+<li>Meanwhile, we realized we made a mistake. We&#8217;ve been had. There&#8217;s no such city nor country.
+<ol>
+<li>We DELETE &#8220;Naphaven&#8221; from <strong>city</strong>.</li>
+<li>We DELETE &#8220;Sleepyland&#8221; from <strong>country</strong>.</li>
+</ol>
+<ul>
+<li>Note that <strong>city</strong>&#8216;s ghost table still hasn&#8217;t caught up with the changes.</li>
+</ul>
+</li>
+<li>Eventually, the INSERT statement for &#8220;Naphaven&#8221; reaches <strong>city</strong>&#8216;s ghost table.
+<ul>
+<li>What should happen now? The INSERT cannot succeed.</li>
+<li>Will this fail the entire process?</li>
+</ul>
+</li>
+</ol>
+<p>Looking at the PHP code, I see that changes written on the <strong>delta</strong> table are blindly replayed on the ghost table.</p>
+<p>Since the process is asynchronous, this should not be the case. We can solve the above if we use INSERT IGNORE instead of INSERT. The statement will fail without failing anything else. The row cannot exist, and that&#8217;s because the original row does not exist anymore.</p>
+<p>Unlike a replication corruption, this does not lead to accumulation mistakes. The <strong>replay</strong> is static, somewhat like in <em>binary log format</em>. Changes are <em>just written</em>, regardless of existing data.</p>
+<p>I have given this considerable thought, and I can&#8217;t say I&#8217;ve covered all the possible scenario. However I believe that with proper use of INSERT IGNORE and REPLACE INTO (two statements I heavily relied on with <em>oak-online-alter-table</em>), correctness can be achieved.</p>
+<p>There&#8217;s the small pain of re-generating the foreign key definition on the &#8220;ghost&#8221; table (<strong>CREATE TABLE LIKE &#8230;</strong> does not copy FK definitions). And since foreign key names are unique, a new name must be picked up. Not pretty, but perfectly doable.</p>
+<h4>&#8220;No AFTER_{INSERT/UPDATE/DELETE} triggers must exist.&#8221;</h4>
+<p>It would be nicer if MySQL had an ALTER TRIGGER statement. There isn&#8217;t such statement. If there were such an atomic statement, then we would be able to rewrite the trigger, so as to add our own code to the <em>end of the trigger&#8217;s code</em>. Yuck. Would be even nicer if we were <a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">allowed to have multiple triggers</a> of same event.</p>
+<p>So, we are left with DROP and CREATE triggers. Alas, this makes for a short period where the trigger does not exist. Bad. The easy solution would be to LOCK WRITE the table, but apparently you can&#8217;t DROP the trigger (*) when the table is locked. Sigh.</p>
+<p>(*) Happened to me, apparently to Facebook too; With latest 5.1 (5.1.51) version this actually works. With 5.0 it didn&#8217;t use to; this needs more checking.</p>
+<h4>Use of INFORMATION_SCHEMA</h4>
+<p>As with oak-online-alter-table, the OSC checks for triggers, indexes, column by searching on the INFORMATION_SCHEMA tables. This makes for nice SQL for getting the exact listing and types of PRIMARY KEY columns, whether or not AFTER triggers exist, and so on.</p>
+<p>I&#8217;ve always considered this to be the weak part of <a href="http://code.openark.org/forge/openark-kit">openark-kit</a>, that it relies on INFORMATION_SCHEMA so much. It&#8217;s easier, it&#8217;s cleaner, it&#8217;s even <em>more correct</em> to work that way &#8212; but it just puts too much locks. I think Baron Schwartz (and now Daniel Nichter) did amazing work on analyzing table schemata by parsing the SHOW CREATE TABLE and other SHOW commands regex-wise with <a href="http://www.maatkit.org/">Maatkit</a>. It&#8217;s a crazy work! Had I written <em>openark-kit</em> in Perl, I would have just import their code. But I&#8217;m too <span style="text-decoration: line-through;">lazy</span> busy to do the conversion from Perl to Python, and rewrite that code, what with all the debugging.</p>
+<p>OSC is written in PHP. Again, much conversion work. I think performance-wise this is an important step to make.</p>
+<h4>A word for the critics</h4>
+<p>Finally, a word for the critics. I&#8217;ve read some Facebook/MySQL bashing comments and wish to relate.</p>
+<p>In his <a href="http://www.theregister.co.uk/2010/09/21/facebook_online_schema_change_for_mysql/">interview to The Register</a>, Mark Callaghan gave the example that &#8220;Open Schema Change lets the company update indexes without user downtime, according to Callaghan&#8221;.</p>
+<p>PostgreSQL was mentioned for being able to add index with only read locks taken, or being able to do the work with no locks using CREATE INDEX CONCURRENTLY. I wish MySQL had that feature! Yes, MySQL has a lot to improve upon, and the latest PostgreSQL 9.0 brings valuable new features. (Did I make it clear I have no intention of bashing PostgreSQL? If not, please re-read this paragraph until convinced).</p>
+<p>Bashing related to the notion of MySQL being so poor that Facebook used an even poorer mechanism to work out the ALTER TABLE.</p>
+<p>Well, allow me to add a few words: the CREATE INDEX is by far not the only thing you can achieve with OSC (although it may be Facebook&#8217;s major concern). You should be able to:</p>
+<ul>
+<li>Add columns</li>
+<li>Drop columns</li>
+<li>Convert character sets</li>
+<li>Modify column types</li>
+<li>Add partitioning</li>
+<li>Reorganize partitioning</li>
+<li>Compress the table</li>
+<li>Otherwise changing table format</li>
+<li>Heck, you could even modify the storage engine! (To other transactional engine)</li>
+</ul>
+<p>These are giant steps. How easy would it be to write these down into the database? It only takes a few weeks time to work out a working solution with reasonable limitations, just using the resources the MySQL server provides you with. The <a href="http://www.facebook.com/MySQLatFacebook">MySQL@Facebook team</a> should be given credit for that.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3005</post-id>	</item>
+		<item>
+		<title>Triggers Use Case Compilation, Part III</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii#comments</comments>
+				<pubDate>Mon, 02 Feb 2009 11:23:38 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Event Scheduler]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=412</guid>
+				<description><![CDATA[The previous two parts have looked at some solutions offered by triggers. Let&#8217;s look now at some wishful triggers solutions, which are currently unavailable because of triggers limitations. Triggers Use Case Compilation, Part I Triggers Use Case Compilation, Part II Limitations and wishful features Triggers are slow The overhead of adding triggers is usually an [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The previous two parts have looked at some solutions offered by triggers. Let&#8217;s look now at some wishful triggers solutions, which are currently unavailable because of triggers limitations.</p>
+<p><a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-i">Triggers Use Case Compilation, Part I</a></p>
+<p><a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">Triggers Use Case Compilation, Part II</a></p>
+<h4>Limitations and wishful features</h4>
+<p>Triggers are slow</p>
+<p style="padding-left: 30px;">The overhead of adding triggers is usually an even breaker. But I would like to believe speed will improve in time!</p>
+<p>Triggers cannot act on the same table which activated them.</p>
+<p style="padding-left: 30px;">A thing I would like to do is have a rotating table. A log table is a perfect example: I only want to store logs up to 7 days back, or up to 1M rows. ON INSERT, (or once every 1000 inserts or so), I wish to remove oldest rows. This is not possible today since I can&#8217;t DELETE rows from the same table which caused the ON INSERT trigger to run. It can&#8217;t be hacked by calling on another table, then doing a circular trigger trick. MySQL will raise an error on run time, complaining about a loop.</p>
+<p><span id="more-412"></span>Triggers cannot act on system tables.</p>
+<p style="padding-left: 30px;">Now why would I want to do that? Well, one of the first things I look at when reviewing a database is the users grants. I <em>always</em> find a list of users which is just too permissive, with far too many users than required. I once came upon a database with 273 users, where only 5 of them were actually in use. &#8220;When were these added?&#8221;, I asked &#8211; but nobody knew.</p>
+<p style="padding-left: 30px;">I would love to have an ON INSERT and an ON UPDATE trigger on the mysql.user table, which lists down the time of user creation and the invoking user (who would usually be &#8216;root&#8217;) and host, so it&#8217;s easier to track down who did what.</p>
+<p>You cannot execute prepared statements from within a trigger.</p>
+<p style="padding-left: 30px;">Not much to add here. The possibilities are too many.</p>
+<p>You can&#8217;t spawn an ANALYZE TABLE from a trigger</p>
+<p style="padding-left: 30px;">What I want to do is to run an ANALYZE TABLE once every 10K inserts or deletes, so the table takes care of itself. I&#8217;ve tried hacking this with prepared statements (you can&#8217;t use them); with cursors (you can only run a cursor on SELECT queries) or otherwise SQL hacks (none worked). If anyone finds a hack around it &#8211; please let me know!</p>
+<p>You can&#8217;t have more than one trigger on the same event per table</p>
+<p style="padding-left: 30px;">This is more of a design issue. If I want to have two things BEFORE INSERT on City, I need to code both in the same trigger. This means adding functionality involves editing existing, tested, working code. It would be much nicer if two such triggers could play along.</p>
+<h4>A dirty workaround to problematic issues</h4>
+<p>There is a dirty workaround to some issues.</p>
+<p>Take, for example, the rotating tables problem. Instead of the trigger executing the following query:</p>
+<blockquote>
+<pre>DELETE FROM logs WHERE time &lt; DATE_ADD(NOW(), INTERVAL -7 DAY)</pre>
+</blockquote>
+<p>(as we&#8217;ve already noted was impossible), the triggers can write down the query as TEXT into some <strong>queries_to_run</strong> table. A cronjob can periodically check this table and execute whatever is in it, removing executed rows.</p>
+<p>MySQL 5.1&#8217;s event scheduler can also be used for such statements which are invokable (like said DELETE).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">412</post-id>	</item>
+		<item>
+		<title>Triggers Use Case Compilation, Part II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii#comments</comments>
+				<pubDate>Thu, 15 Jan 2009 08:01:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=388</guid>
+				<description><![CDATA[In Triggers Use Case Compilation, Part I, I&#8217;ve demonstrated some triggers use scenarios. We continue our examples of triggers usage. Counters and aggregations bookkeeping Consider the City table: each city belongs to a certain country. Some questions we may be interested in are: How many cities are there per country? What&#8217;s the sum of cities [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In <a title="Triggers Use Case Compilation, Part I" href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-i">Triggers Use Case Compilation, Part I</a>, I&#8217;ve demonstrated some triggers use scenarios.</p>
+<p>We continue our examples of triggers usage.</p>
+<h4>Counters and aggregations bookkeeping</h4>
+<p>Consider the City table: each city belongs to a certain country. Some questions we may be interested in are:</p>
+<ul>
+<li>How many cities are there per country?</li>
+<li>What&#8217;s the sum of cities population per country?</li>
+<li>What&#8217;s the population of the largest city per country?</li>
+</ul>
+<p>Answering any of these questions is an easy SQL excercise. But aggregation is required, and full table scan (or full index scan, if we&#8217;re lucky) is essentially part of any execution plan. What if we can&#8217;t pay the price for these queries? What if we need immediate, or near immediate response?</p>
+<p><span id="more-388"></span>One solution is to use counter tables, or summary tables. For example, to answer the first questions, we create the following table:</p>
+<blockquote>
+<pre>CREATE TABLE  CityCount (
+  `CountryCode` char(3) NOT NULL,
+  `NumCities` int(11) NOT NULL,
+  PRIMARY KEY  (`CountryCode`)
+);</pre>
+</blockquote>
+<p>By following all INSERTs and DELETEs on the <strong>City</strong> table, we can manage the <strong>CityCount</strong> table&#8217;s data.</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS City_ai $$
+CREATE TRIGGER City_ai AFTER INSERT ON City
+FOR EACH ROW
+BEGIN
+  INSERT INTO CityCount (CountryCode, NumCities)
+    VALUES (NEW.CountryCode, 1)
+    ON DUPLICATE KEY
+    UPDATE NumCities = NumCities+1;
+END $$
+
+DROP TRIGGER IF EXISTS City_au $$
+CREATE TRIGGER City_au AFTER UPDATE ON City
+FOR EACH ROW
+BEGIN
+  IF (OLD.CountryCode != NEW.CountryCode) THEN
+    UPDATE CityCount SET NumCities = NumCities-1
+      WHERE CountryCode = OLD.CountryCode;
+    INSERT INTO CityCount (CountryCode, NumCities)
+      VALUES (NEW.CountryCode, 1)
+      ON DUPLICATE KEY
+      UPDATE NumCities = NumCities+1;
+  END IF;
+END $$
+
+DROP TRIGGER IF EXISTS City_ad $$
+CREATE TRIGGER City_ad AFTER DELETE ON City
+FOR EACH ROW
+BEGIN
+  UPDATE CityCount SET NumCities = NumCities-1
+    WHERE CountryCode = OLD.CountryCode;
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>To illustrate the impact of triggers, let&#8217;s do a &#8216;massive&#8217; data load here:</p>
+<blockquote>
+<pre>mysql&gt; CREATE TABLE City_2 LIKE City;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; INSERT INTO City_2 SELECT * FROM City;
+<span style="color: #008000;">Query OK, 3998 rows affected (0.23 sec)</span>
+Records: 3998  Duplicates: 0  Warnings: 0
+
+mysql&gt; TRUNCATE TABLE City;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; INSERT INTO City SELECT * FROM City_2;
+<span style="color: #993300;">Query OK, 3998 rows affected (3.58 sec)</span>
+Records: 3998  Duplicates: 0  Warnings: 0
+
+mysql&gt; SELECT * FROM CityCount LIMIT 10;
++-------------+-----------+
+| CountryCode | NumCities |
++-------------+-----------+
+| AFG         |         4 |
+| NLD         |        28 |
+| ANT         |         1 |
+| ALB         |         1 |
+| DZA         |        18 |
+| ASM         |         2 |
+| AND         |         1 |
+| AGO         |         5 |
+| AIA         |         2 |
+| ATG         |         1 |
++-------------+-----------+
+10 rows in set (0.01 sec)</pre>
+</blockquote>
+<p>The results seem satisfactory. We can now query <strong>CityCount</strong> directly, no need for complex queries on <strong>City</strong>. But look at the times: INSERTing data into <strong>City_2</strong> took 0.23 seconds. INSERTing the same data into <strong>City</strong> took 3.58 seconds. That&#8217;s the triggers overhead. There is an advantage to using triggers here (and in general) if you&#8217;re doing many SELECTs, but few INSERT/UPDATE/DELETE.</p>
+<h4>Enhance security</h4>
+<p>In <a title="Using triggers to block malicious code: an example" href="https://shlomi-noach.github.io/blog/mysql/using-triggers-to-block-malicious-code-an-example">Using triggers to block malicious code: an example</a>, I have shown how a trigger may block changes to sensitive data. A trigger is aware of the invoker, and can implement a row-based privileges system.</p>
+<p>As another example, let&#8217;s see how we can do a &#8220;privileges table partitioning&#8221;. We look at the <a title="MySQL's world database setup" href="http://dev.mysql.com/doc/world-setup/en/world-setup.html">world</a>&#8216;s City table. What if we&#8217;re working on some world-nations-wiki, and we want to assign users to countries, in such way that a user can only modify data for a country she is assigned to?</p>
+<p>We create a privileges table which maps users to countries:</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `CountryUser`;
+CREATE TABLE `CountryUser` (
+  `CountryCode` char(3) NOT NULL,
+  `mysql_User` char(16) collate utf8_bin NOT NULL default '',
+  PRIMARY KEY  (`CountryCode`, `mysql_User`)
+);</pre>
+</blockquote>
+<p>And then add the security triggers on <strong>City</strong>:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS City_bi $$
+CREATE TRIGGER City_bi BEFORE INSERT ON City
+FOR EACH ROW
+BEGIN
+  SELECT SUBSTRING_INDEX(USER(),'@',1) INTO @current_mysql_user;
+  IF (@current_mysql_user NOT IN (SELECT mysql_User FROM CountryUser WHERE CountryCode = NEW.CountryCode)) THEN
+    SELECT 0 FROM `Unauthorized access` INTO @error;
+  END IF;
+END $$
+
+DROP TRIGGER IF EXISTS City_bu $$
+CREATE TRIGGER City_bu BEFORE UPDATE ON City
+FOR EACH ROW
+BEGIN
+  SELECT SUBSTRING_INDEX(USER(),'@',1) INTO @current_mysql_user;
+  IF (@current_mysql_user NOT IN (SELECT mysql_User FROM CountryUser WHERE CountryCode = OLD.CountryCode)) THEN
+    SELECT 0 FROM `Unauthorized access` INTO @error;
+  END IF;
+END $$
+
+DROP TRIGGER IF EXISTS City_bd $$
+CREATE TRIGGER City_bd BEFORE DELETE ON City
+FOR EACH ROW
+BEGIN
+  SELECT SUBSTRING_INDEX(USER(),'@',1) INTO @current_mysql_user;
+  IF (@current_mysql_user NOT IN (SELECT mysql_User FROM CountryUser WHERE CountryCode = OLD.CountryCode)) THEN
+    SELECT 0 FROM `Unauthorized access` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>Testing (as user root):</p>
+<blockquote>
+<pre>mysql&gt; INSERT INTO CountryUser (CountryCode, mysql_User) VALUES ('NLD', 'root');
+Query OK, 1 row affected (0.00 sec)
+
+mysql&gt; DELETE FROM City WHERE Name = 'Milano';
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.Unauthorized access' doesn't exist</span>
+
+mysql&gt; DELETE FROM City WHERE Name = 'Amsterdam';
+<span style="color: #008000;">Query OK, 1 row affected (0.05 sec)</span></pre>
+</blockquote>
+<p><strong>Managing cache (e.g. invalidating memcached)</strong></p>
+<p>In <a title="Using memcached functions for MySQL; an automated alternative to Query Cache" href="https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache">Using memcached functions for MySQL; an automated alternative to Query Cache</a>, I&#8217;ve shown how triggers can be used to invalidate memcached values. But cache management can apply to local tables as well.</p>
+<p>It is common practice to have summary tables (we used such one in our <em>counters</em> example). Summary tables are just normal tables which are filled with aggregated data, and save the need to re-aggregate that data. Much like the memcached example, triggers can be used to invalidate or reload the summary table data when relevant changes occur in underlying tables.</p>
+<p><strong>Limiting table size</strong></p>
+<p>Out last use case shows how it is possible to limit table size using triggers.</p>
+<p>By &#8220;limiting table size&#8221; we can think of row-count limitation, or storage limitation. In the following example, the <strong>logs</strong> table is limited by a certain byte size.</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `world`.`logs`;
+CREATE TABLE  `world`.`logs` (
+  `logs_id` int(11) NOT NULL auto_increment,
+  `ts` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
+  `message` varchar(255) character set utf8 NOT NULL,
+  PRIMARY KEY  (`logs_id`)
+) ENGINE=MyISAM;
+
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON City
+FOR EACH ROW
+BEGIN
+  SELECT DATA_LENGTH+INDEX_LENGTH FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='world' AND TABLE_NAME='LOGS' INTO @estimated_table_size;
+  IF (@estimated_table_size &gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>No more than 25KB of storage is allowed for this table. Let&#8217;s put it to the test:</p>
+<blockquote>
+<pre>mysql&gt; INSERT INTO logs (message) VALUES ('this line is 31 characters long');
+<span style="color: #339966;">Query OK, 1 row affected (0.00 sec)</span>
+
+mysql&gt; INSERT INTO logs SELECT * FROM logs;
+<span style="color: #339966;">Query OK, 1 row affected (0.00 sec)</span>
+Records: 1  Duplicates: 0  Warnings: 0
+
+mysql&gt; INSERT INTO logs SELECT * FROM logs;
+<span style="color: #339966;">Query OK, 2 rows affected (0.01 sec)</span>
+Records: 2  Duplicates: 0  Warnings: 0
+
+...
+
+mysql&gt; INSERT INTO logs SELECT * FROM logs;
+<span style="color: #008000;">Query OK, 256 rows affected (1.84 sec)</span>
+Records: 256  Duplicates: 0  Warnings: 0
+
+mysql&gt; INSERT INTO logs SELECT * FROM logs;
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.logs table is full' doesn't exist
+</span>
+mysql&gt; INSERT INTO logs (message) VALUES ('this line is 31 characters long');
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.logs table is full' doesn't exist</span></pre>
+</blockquote>
+<p>A few important notes:</p>
+<ul>
+<li>INFORMATION_SCHEMA only presents estimated size.</li>
+<li>For InnoDB, small tables may claim to possess much more storage than they really do (see this <a title="How much space does empty Innodb table take ?" href="http://www.mysqlperformanceblog.com/2008/12/16/how-much-space-does-empty-innodb-table-take/">post</a> by <a title="MySQL Performance Blog" href="http://www.mysqlperformanceblog.com/">MySQL Performance Blog</a>).</li>
+<li>InnoDB does not release storage (unless you use TRUNCATE or ALTER TABLE), which means even if you delete rows from the table, it still occupies the same storage.</li>
+<li>Memory tables do not release memory unless you use TRUNCATE or ALTER TABLE.</li>
+<li>You may wish to limit table size by row count. There, again, INFORMATION_SCHEMA only provides an estimated value, and querying InnoDB for count(*) is a lengthy operation.</li>
+</ul>
+<p>A more interesting implementation of table size limitation is the notion of <em>rotating tables</em>. More on that in the next post.</p>
+<h4>More to come</h4>
+<p>In the next and final part we will look at some problems which cannot be solved with triggers due to current trigger limitations.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">388</post-id>	</item>
+		<item>
+		<title>Triggers Use Case Compilation, Part I</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-i</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-i#comments</comments>
+				<pubDate>Mon, 05 Jan 2009 09:55:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=313</guid>
+				<description><![CDATA[I&#8217;ve run by quite a few triggers lately on production systems. In previous posts, I&#8217;ve written about problems solved with triggers. So here&#8217;s a compilation of some solutions based on triggers; and some problems which are not (yet?) solvable due to current triggers limitations. Triggers can be used to: Maintain integrity Enhance security Enhance logging [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;ve run by quite a few triggers lately on production systems. In previous posts, I&#8217;ve written about problems solved with triggers. So here&#8217;s a compilation of some solutions based on triggers; and some problems which are not (yet?) solvable due to current triggers limitations.</p>
+<p>Triggers can be used to:</p>
+<ul>
+<li>Maintain integrity</li>
+<li>Enhance security</li>
+<li>Enhance logging</li>
+<li>Assist with archiving</li>
+<li>Restrict table size</li>
+<li>Manage caching</li>
+<li>Manage counters</li>
+</ul>
+<p>Triggers are not fast. In fact, they can add quite an overhead if misused. Some of the triggers presented here are known to work on real life production systems, though, and work well. But make sure you benchmark before embarking on extensive application changes.<span id="more-313"></span></p>
+<p>I&#8217;ll be using <a title="MySQL's world database setup" href="http://dev.mysql.com/doc/world-setup/en/world-setup.html">MySQL&#8217;s world database</a> in some of the examples.</p>
+<h4>Maintaining value integrity</h4>
+<p>MySQL can enforce (is you&#8217;re using the right sql_mode), some of the values you set for a column. For example, you should not be allowed to set a TINYINT column value to 500. You may not be allowed to set NULL, or you may have to provide default values.</p>
+<p>However, within allowed range, SQL or MySQL in general won&#8217;t help you. Assume you have a &#8220;percent&#8221; column, which holds integer values 0..100. It would be a TINYINT, of course. But setting the value to 103 is perfectly valid in MySQL&#8217;s point of view, though not so in yours.</p>
+<p>This is where triggers come in handy. With a trigger, you may truncate illegal values or completely abort the operation if something doesn&#8217;t seem right. For example, we may wish to enforce a city&#8217;s district to be non-empty. We may also wish to ensure that the city&#8217;s population does not exceed its country&#8217;s population:</p>
+<blockquote>
+<pre>DELIMITER $$
+DROP TRIGGER IF EXISTS City_bu $$
+CREATE TRIGGER City_bu BEFORE UPDATE ON City
+FOR EACH ROW
+BEGIN
+  DECLARE country_population INT;
+
+  IF (CHAR_LENGTH(NEW.District) = 0) THEN
+    SELECT 0 FROM `District must not be empty` INTO @error;
+  END IF;
+
+  SELECT MAX(Population) FROM Country
+    WHERE Code = NEW.CountryCode INTO country_population;
+  IF (NEW.Population &gt; country_population) THEN
+    SELECT 0 FROM `City population cannot exceed that of country!` INTO @error;
+  END IF;
+END $$
+DELIMITER ;</pre>
+</blockquote>
+<p>For example:</p>
+<blockquote>
+<pre>mysql&gt; UPDATE City SET Population=100000000 WHERE Name='London';
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.City population cannot exceed that of country!' doesn't exist</span></pre>
+</blockquote>
+<p>We force the trigger to fail under certain circumstances. Since this is a BEFORE INSERT trigger, failure of the trigger causes aborting the INSERT itself.</p>
+<h4>Forcing referential integrity</h4>
+<p>If you&#8217;re using MyISAM, Memory or even Maria or Falcon, you don&#8217;t get to use Foreign Keys. MySQL&#8217;s plan is to add foreign keys for all storage engines. The plan is on print for quite a few years now. Till then, you may use triggers to simulate foreign keys, including cascading deletes and updates.</p>
+<p>Let&#8217;s consider the tables <strong>City</strong> and <strong>Country</strong>. If we could, we would add the contraint that <strong>City.CountryCode</strong> references <strong>Country.Code</strong>. How can this be achieved with triggers? Here&#8217;s a partial solution, showing a DELETE CASCADE:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS City_bi $$
+CREATE TRIGGER City_bi BEFORE INSERT ON City
+FOR EACH ROW
+BEGIN
+  IF (NOT EXISTS (SELECT NULL FROM Country WHERE Code=NEW.CountryCode)) THEN
+    SELECT 0 FROM `CountryCode does not exist in Country table` INTO @error;
+  END IF;
+END $$
+
+DROP TRIGGER IF EXISTS Country_ad $$
+CREATE TRIGGER Country_ad AFTER DELETE ON Country
+FOR EACH ROW
+BEGIN
+  DELETE FROM City WHERE CountryCode = OLD.Code;
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>Trying out some queries:</p>
+<blockquote>
+<pre>mysql&gt; INSERT INTO City (Name, CountryCode) VALUES ('zzimbwawa', 'ZWZ');
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.CountryCode does not exist in Country table' doesn't exist
+</span>
+mysql&gt; INSERT INTO City (Name, CountryCode) VALUES ('zzimbwawa', 'GBR');
+Query OK, 1 row affected (0.00 sec)
+
+mysql&gt; SELECT COUNT(*) FROM City WHERE CountryCode = 'GBR';
++----------+
+| COUNT(*) |
++----------+
+|       82 |
++----------+
+1 row in set (0.01 sec)
+
+mysql&gt; DELETE FROM Country WHERE Code='GBR';
+Query OK, 1 row affected (0.04 sec)
+
+mysql&gt; SELECT COUNT(*) FROM City WHERE CountryCode = 'GBR';
++----------+
+| COUNT(*) |
++----------+
+|        0 |
++----------+
+1 row in set (0.00 sec)</pre>
+</blockquote>
+<p>The above example is partial. It does not handle UPDATEs on both tables. You may also modify it to simulate ON DELETE SET NULL instead of ON DELETE CASCADE.</p>
+<h4>Maintaining denormalized data integrity</h4>
+<p>Denormalized tables can hold data duplicated in several places. When such data changes in one place, triggers can help out with updating the change in the rest occurrences. A <a href="http://karlssonondatabases.blogspot.com/2008/12/using-triggers-for-performance.html">post</a> was recently written which discusses this issue.</p>
+<h4>Archiving</h4>
+<p>Assume the following table:</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `logs`;
+CREATE TABLE  `logs` (
+  `id` int(11) NOT NULL auto_increment,
+  `subject` varchar(64) NOT NULL,
+  `message` varchar(255) NOT NULL,
+  `severity` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`id`)
+);</pre>
+</blockquote>
+<p>Logs are something that you want to cleanup regularly, on one hand, but keep at a safe place on the other hand. Let&#8217;s create a <strong>logs_archive</strong> table:</p>
+<blockquote>
+<pre>CREATE TABLE logs_archive LIKE logs;</pre>
+</blockquote>
+<p>We can automatically move records from the logs table to the logs_archive table:</p>
+<blockquote>
+<pre>DELIMITER $$
+DROP TRIGGER IF EXISTS logs_bd $$
+CREATE TRIGGER logs_bd BEFORE DELETE ON logs
+FOR EACH ROW
+BEGIN
+  INSERT INTO logs_archive SELECT * FROM logs WHERE id=OLd.id;
+END $$
+DELIMITER ;</pre>
+</blockquote>
+<p>Example:</p>
+<blockquote>
+<pre>mysql&gt; INSERT INTO logs (subject, message) VALUES ('info', 'new user created');
+Query OK, 1 row affected (0.00 sec)
+
+mysql&gt; INSERT INTO logs (subject, message) VALUES ('info', 'cleanup completed');
+Query OK, 1 row affected (0.00 sec)
+
+mysql&gt; SELECT * FROM logs;
++----+---------+-------------------+----------+
+| id | subject | message           | severity |
++----+---------+-------------------+----------+
+|  1 | info    | new user created  |        0 |
+|  2 | info    | cleanup completed |        0 |
++----+---------+-------------------+----------+
+2 rows in set (0.00 sec)
+
+mysql&gt; DELETE FROM logs WHERE id = 1;
+Query OK, 1 row affected (0.01 sec)
+
+mysql&gt; SELECT * FROM logs;
++----+---------+-------------------+----------+
+| id | subject | message           | severity |
++----+---------+-------------------+----------+
+|  2 | info    | cleanup completed |        0 |
++----+---------+-------------------+----------+
+1 row in set (0.01 sec)
+
+mysql&gt; SELECT * FROM logs_archive;
++----+---------+------------------+----------+
+| id | subject | message          | severity |
++----+---------+------------------+----------+
+|  1 | info    | new user created |        0 |
++----+---------+------------------+----------+
+1 row in set (0.00 sec)</pre>
+</blockquote>
+<p>We can see that the <strong>logs_archive</strong> table has been filled with rows deleted from <strong>logs</strong> table.</p>
+<h4>Logging</h4>
+<p>Triggers can be used to automatically log significant events. As an example, let&#8217;s say I have a social network application, in which an &#8216;online_user&#8217; table lists those users which have logged in and have not yet logged out (hence they are assumed to be online):</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `online_user`;
+CREATE TABLE `online_user` (
+  `online_user_id` int(11) NOT NULL auto_increment,
+  `login` VARCHAR(64) CHARSET ascii NOT NULL,
+  `ipv4` INT UNSIGNED NOT NULL,
+  `ts` TIMESTAMP,
+  PRIMARY KEY  (`online_user_id`)
+);</pre>
+</blockquote>
+<p>Our application knows how to handle this table. I can enhance my database with logging by adding a logs table, and additional triggers:</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `logs`;
+CREATE TABLE `logs` (
+  `logs_id` int(11) NOT NULL auto_increment,
+  `ts` TIMESTAMP,
+  `message` VARCHAR(255) CHARSET utf8 NOT NULL,
+  PRIMARY KEY  (`logs_id`)
+);
+
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS online_user_ai $$
+CREATE TRIGGER online_user_ai AFTER INSERT ON online_user
+FOR EACH ROW
+BEGIN
+  INSERT INTO logs (message) VALUES (CONCAT('User ',NEW.login, ' has logged in from ', INET_NTOA(NEW.ipv4)));
+END $$
+
+DROP TRIGGER IF EXISTS online_user_ad $$
+CREATE TRIGGER online_user_ad AFTER DELETE ON online_user
+FOR EACH ROW
+BEGIN
+  INSERT INTO logs (message) VALUES (CONCAT('User ',OLD.login, ' has logged out'));
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>Let&#8217;s see the effect of managing online users:</p>
+<blockquote>
+<pre>INSERT INTO online_user (login, ipv4) VALUES ('john', 123456);
+INSERT INTO online_user (login, ipv4) VALUES ('mark', 654321);
+SELECT SLEEP(12);
+DELETE FROM online_user WHERE login = 'john';</pre>
+</blockquote>
+<p>Checking up on the logs table, we get:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM `logs`;
++---------+---------------------+------------------------------------------+
+| logs_id | ts                  | message                                  |
++---------+---------------------+------------------------------------------+
+|       1 | 2008-12-22 11:16:31 | User john has logged in from 0.1.226.64  |
+|       2 | 2008-12-22 11:16:31 | User mark has logged in from 0.9.251.241 |
+|       3 | 2008-12-22 11:16:43 | User john has logged out                 |
++---------+---------------------+------------------------------------------+
+3 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>The <strong>logs</strong> table can be used for logging any change in any table. The application need not be aware what exactly is being logged.</p>
+<p>If the <strong>logs</strong> table uses the MyISAM storage engine, the triggers may want to replace the <strong>INSERT</strong> with an <strong>INSERT DELAYED</strong>, so that they return immediately without waiting for locks on the <strong>logs</strong> table. Assuming no crash occurs right after, a separate thread will collect all inserts on the <strong>logs</strong> table, and handle them in its own free time.</p>
+<h4>More to come</h4>
+<p>More triggers use case, as well as limitations and workarounds, will be presented in following posts.</p>
+<p><a title="Triggers Use Case Compilation, Part II" href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">Triggers Use Case Compilation, Part II</a></p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-i/feed</wfw:commentRss>
+		<slash:comments>19</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">313</post-id>	</item>
+		<item>
+		<title>Using triggers to block malicious code: an example</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/using-triggers-to-block-malicious-code-an-example</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/using-triggers-to-block-malicious-code-an-example#comments</comments>
+				<pubDate>Thu, 01 Jan 2009 21:05:54 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=145</guid>
+				<description><![CDATA[Web applications face constant exploitation attempts. Those with a user base must keep their users&#8217; private data, well&#8230; private. While the MySQL security model allows restricting users access to databases, tables and even columns, it has no built in feature for restricting the rows access within the given table. One cannot allow a user to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Web applications face constant exploitation attempts. Those with a user base must keep their users&#8217; private data, well&#8230; private.</p>
+<p>While the MySQL security model allows restricting users access to databases, tables and even columns, it has no built in feature for restricting the rows access within the given table.</p>
+<p>One cannot allow a user to only update rows 0 through 99, but restrict that user from updating rows 100 to 199. Such restrictions are usually managed in the application level, by adding a necessary &#8220;&#8230; AND filtering_column = some_value&#8230;&#8221;</p>
+<p>Many web application have the notion of an &#8216;admin&#8217; account, or several such accounts, which provide greater control over the application. The &#8216;admin&#8217; account is one account to which many attacks are targeted. One such attack is an attempt to modify the admin&#8217;s password, such that the attacker can later log in with and access restricted data.<span id="more-145"></span></p>
+<p>Assume the following table:</p>
+<blockquote>
+<pre><strong>CREATE TABLE </strong>my_users (
+  ID <strong>INT NOT NULL AUTO_INCREMENT PRIMARY KEY</strong>,
+  username <strong>VARCHAR</strong>(32) <strong>CHARSET </strong>ascii <strong>NOT NULL</strong>,
+  password <strong>VARCHAR</strong>(32) <strong>CHARSET </strong>ascii <strong>NOT NULL COLLATE</strong> ascii_bin,
+  <strong>UNIQUE KEY</strong>(username)
+);</pre>
+</blockquote>
+<p>Let us also assume we are somewhat careful, so that the passwords are not plaintext, but rather encoded with MD5.</p>
+<blockquote>
+<pre><strong>INSERT INTO</strong> my_users (username, password) <strong>VALUES</strong>
+  ('admin', MD5('qwerty')) ; <span style="color: #008000;">-- Safe password as can be found!</span>
+<strong>INSERT INTO</strong> my_users (username, password) <strong>VALUES</strong>
+  ('alice', MD5('123456')) ; <span style="color: #008000;">-- Safer yet!</span>
+
+<strong>SELECT </strong>* <strong>FROM </strong>my_users;
++----+----------+----------------------------------+
+| ID | username | password                         |
++----+----------+----------------------------------+
+|  1 | admin    | d8578edf8458ce06fbc5bb76a58c5ca4 |
+|  2 | alice    | e10adc3949ba59abbe56e057f20f883e |
++----+----------+----------------------------------+
+2 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>An attacker will try to set the password for the admin account using security holes in the web application. The web application may execute the following query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>my_users <strong>SET </strong>password=MD5('att@cker!') <strong>WHERE </strong>username='admin';</pre>
+</blockquote>
+<p>The issued query is valid, and should generally be allowed. However, we may decide to block changes to the specific &#8216;admin&#8217; row, in the following manner:</p>
+<blockquote>
+<pre><code>DELIMITER $$
+DROP TRIGGER IF EXISTS my_users_bu $$
+CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
+FOR EACH ROW
+BEGIN
+  IF (NEW.username='admin') THEN
+    SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
+  END IF;
+END $$
+DELIMITER ;</code></pre>
+</blockquote>
+<p>Let&#8217;s try running again the query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>my_users <strong>SET </strong>password=MD5('att@cker!') <strong>WHERE </strong>username='admin';
+
+<span style="color: #993300;">ERROR 1146 (42S02): Table 'world.Cannot modify admin data!' doesn't exist</span></pre>
+</blockquote>
+<p>The query fails, since the <strong>BEFORE UPDATE</strong> trigger fails.<br />
+We can tweak the trigger to only allow specific users to modify the row:</p>
+<blockquote>
+<pre><code>DELIMITER $$
+DROP TRIGGER IF EXISTS my_users_bu $$
+CREATE TRIGGER my_users_bu BEFORE UPDATE ON my_users
+FOR EACH ROW
+BEGIN
+  IF (NEW.username='admin' AND USER() != 'root@localhost') THEN
+    SELECT 0 INTO @admin_error FROM `Cannot modify admin data!`;
+  END IF;
+END $$
+DELIMITER ;</code></pre>
+</blockquote>
+<p>This way it is possible for the root user to modify the password at will. We can further tweak the trigger to INSERT INTO some log table. The information we may wish to register is USER(), the CURRENT_TIMESTAMP(), old password and new password, and perhaps the CONNECTION_ID(). More data means more means to locate the security breach, and monitoring the log table allows for immediate response for such an attempt.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/using-triggers-to-block-malicious-code-an-example/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">145</post-id>	</item>
+		<item>
+		<title>Using memcached functions for MySQL; an automated alternative to Query Cache</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache#comments</comments>
+				<pubDate>Mon, 15 Dec 2008 05:56:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Query Cache]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=89</guid>
+				<description><![CDATA[There&#8217;s a lot of buzz around memcached. memcached is widely used, and has clients for many programming languages and platforms. TangentOrg have developed a memcached client in the form of MySQL UDFs (User Defined Functions). I wish to discuss the memcached functions for MySQL: if and how they should be used. Disclaimer: I do not [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s a lot of buzz around memcached. memcached is widely used, and has clients for many programming languages and platforms. <a href="http://tangent.org/">TangentOrg</a> have developed a memcached client in the form of MySQL UDFs (User Defined Functions).</p>
+<p>I wish to discuss the memcached functions for MySQL: if and how they should be used.</p>
+<p>Disclaimer: I do not work with memcached functions for MySQL on a production system; all that is written here reflects my opinion on how things should be done.</p>
+<p>With memcached functions for MySQL, we can do the following:</p>
+<blockquote>
+<pre><strong>SELECT </strong>memc_set('mykey', 'The answer is 42');
+<strong>SELECT </strong>memc_get('mykey');</pre>
+</blockquote>
+<p>(See my previous post on how to <a title="Installing memcached functions for MySQL" href="https://shlomi-noach.github.io/blog/mysql/installing-memcached-functions-for-mysql">install memcached functions for MySQL</a>).</p>
+<h4>In what scenario should we use these functions?</h4>
+<p>I believe memcached is the right tool for the application level. I am less enthusiastic about using it from MySQL. Sure, pushing it down to MySQL centralizes everything. Instead of having all my application code (PHP, Java etc.) access memcached separately, they can all access one single MySQL node, which gets to access memcached. I see two problems with this approach:<span id="more-89"></span></p>
+<ul>
+<li>Doing this adds load on the database. I think the greatest advantage of memcached is that it allows us to alleviate load from the database. By pushing everything into MySQL we counter that benefit. We pay here both for loading the MySQL network and for the CPU consumed by MySQL to do the job. In a distributed application which used memcached, every server gets to take some of the load.</li>
+<li>It seems to me as a flawed design. The database should be at an end point, and should not rely on anything except the operating system, file system and network. Sure, there could be applications talking to the database, but the database should be able to work all by itself. By putting memcached <em>behind</em> the database, we make the database dependent upon an external application.</li>
+</ul>
+<h4>How about memcached <em>increments</em>?</h4>
+<p>memcached provides an increment mechanism, which can be used by MySQL to create distinct PRIMARY KEYs, like sequences in other databases. While this seems attractive, this feature fits most into the second point above: it makes MySQL completely dependant on memcached. So if memcached is down, MySQL is unable to generate keys.</p>
+<h4>memcahced invalidation</h4>
+<p>I believe a very good use would be to let MySQL invalidate cached data. Not set or get anything, just invalidate. To explain, let&#8217;s compare with MySQL&#8217;s query cache. I&#8217;ll be using <a title="MySQL's world database setup" href="http://dev.mysql.com/doc/world-setup/en/world-setup.html">MySQL&#8217;s world database</a>.</p>
+<p>It is a known issue with the query cache, that if you change (INSERT/UPDATE/DELETE) data within a certain table, all queries involved with that table are invalidated. Take a look at the following:</p>
+<blockquote>
+<pre><strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';
+<strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';
+<strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';</pre>
+</blockquote>
+<p>The UPDATE does not affect the results for the SELECT query. Nevertheless, the second SELECT does not return from the query cache, since it&#8217;s invalidated by the UPDATE.</p>
+<p>memcached can be used to solve this problem in a programmatic way. Let&#8217;s look at a short python program:<strong> memcached_test.py</strong>. What is does (see blue highlighted rows) is connect to memcached; connect to MySQL, and try to get the results for following from memcached:</p>
+<blockquote>
+<pre><strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';
+<strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='CHE';</pre>
+</blockquote>
+<p>If these results are in memcached, they are returned immediately. If not, they are retrieved from MySQL, then inserted into memcached. The results for &#8216;CHE&#8217; are under the &#8216;City:CHE&#8217; key, and &#8216;BLZ&#8217; is under &#8216;City:BLZ&#8217;.</p>
+<blockquote>
+<pre><strong>import </strong>MySQLdb
+<strong>import </strong>memcache
+
+<strong>def </strong>select_cities_by_country(country_code):
+	key = <span style="color: #993300;"><strong>"City:"</strong></span>+country_code
+	<span style="color: #3366ff;">cities = memcache_client.get(key)</span>
+	<strong>if </strong>cities:
+		found_in_memcached = <strong>True</strong>
+	<strong>else</strong>:
+		cursor = conn.cursor()
+		cursor.execute(<span style="color: #993300;"><strong>"""
+			SELECT Name, CountryCode,
+			Population FROM City
+			WHERE CountryCode=%s"""</strong></span>,
+				country_code)
+		<span style="color: #3366ff;">cities = cursor.fetchall()</span>
+		<span style="color: #3366ff;">memcache_client.set(key, cities, 100)</span>
+		cursor.close()
+		found_in_memcached = <strong>False</strong>
+	<strong>for </strong>row <strong>in </strong>cities:
+		print <span style="color: #993300;"><strong>"%s, %s: %d"</strong></span> % (row[0], row[1], row[2])
+	print <span style="color: #993300;"><strong>"%s found in memcached? %s\n"</strong></span> % (
+                country_code, found_in_memcached)
+
+conn = <strong>None</strong>
+<strong>try</strong>:
+	<strong>try</strong>:
+		conn = MySQLdb.connect(
+			host=<span style="color: #993300;"><strong>"localhost"</strong></span>,
+                        user=<span style="color: #993300;"><strong>"myuser"</strong></span>,
+			passwd=<span style="color: #993300;"><strong>"mypassword"</strong></span>,
+			unix_socket=<span style="color: #993300;"><strong>"/tmp/mysql.sock"</strong></span>,
+                        db=<span style="color: #993300;"><strong>"world"</strong></span>)
+		memcache_client = memcache.Client([<span style="color: #993300;"><strong>"127.0.0.1:11211"</strong></span>])
+
+		select_cities_by_country(<span style="color: #993300;"><strong>"BLZ"</strong></span>);
+		select_cities_by_country(<span style="color: #993300;"><strong>"CHE"</strong></span>);
+	<strong>except </strong>Exception, err:
+		print err
+<strong>finally</strong>:
+	<strong>if </strong>conn:
+		conn.close()</pre>
+</blockquote>
+<p>Let&#8217;s run this program. This is a first time run, so obviously nothing is in memcached:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <strong>False</strong>
+
+Zurich, CHE: 336800
+Geneve, CHE: 173500
+Basel, CHE: 166700
+Bern, CHE: 122700
+Lausanne, CHE: 114500
+<strong>CHE </strong>found in memcached? <strong>False</strong></pre>
+</blockquote>
+<p>Immediately executed again, we get results from memcached:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <strong>True</strong>
+
+Zurich, CHE: 336800
+Geneve, CHE: 173500
+Basel, CHE: 166700
+Bern, CHE: 122700
+Lausanne, CHE: 114500
+<strong>CHE </strong>found in memcached? <strong>True</strong></pre>
+</blockquote>
+<p>We are going to execute the following query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';</pre>
+</blockquote>
+<p>But nothing as yet will invalidate our memcached values. Let&#8217;s set up TRIGGERs on the City table:</p>
+<blockquote>
+<pre><strong>DELIMITER </strong>$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AI $$
+<strong>CREATE TRIGGER</strong> City_AI <strong>AFTER INSERT ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>NEW</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AU $$
+<strong>CREATE TRIGGER</strong> City_AU <strong>AFTER UPDATE ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>OLD</strong>.CountryCode)) <strong>INTO </strong>@discard;
+  <strong>SELECT </strong>memc_delete(<strong>CONCAT</strong>('City:',<strong>NEW</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AD $$
+<strong>CREATE TRIGGER</strong> City_AD <strong>AFTER DELETE ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>OLD</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DELIMITER </strong>;</pre>
+</blockquote>
+<p>These triggers will cause any change to a city invalidates all cities in the same country. Naive? Far less than MySQL&#8217;s query cache. Let&#8217;s put this to the test:</p>
+<blockquote>
+<pre>mysql&gt; <strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';
+Query OK, 5 rows affected (0.01 sec)
+Rows matched: 5  Changed: 5  Warnings: 0</pre>
+</blockquote>
+<p>And run out python program one last time:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <span style="color: #339966;"><strong>True</strong></span>
+
+Zurich, CHE: 336801
+Geneve, CHE: 173501
+Basel, CHE: 166701
+Bern, CHE: 122701
+Lausanne, CHE: 114501
+<strong>CHE </strong>found in memcached? <span style="color: #339966;"><strong>False</strong></span></pre>
+</blockquote>
+<p>Right! The &#8216;CHE&#8217; values were invalidated, and could not be found in memcaches. &#8216;BLZ&#8217;, however, wasn&#8217;t disturbed.</p>
+<p>We can further improve our invalidation mechanism to check only for changes for desired columns. This will require some more code in our triggers.</p>
+<h4>Notes</h4>
+<p>The triggers themselves pose a performance penalty on our code. It is assumed that SELECTs are more important here, or else we would not use caching at all. At any case, the example provided here has not been benchmarked, and its value can only be estimated in your real life situation.</p>
+<h4>Conclusion</h4>
+<p>I believe invalidation is the most interesting part of memcached functions for MySQL. It makes the most sense:</p>
+<ul>
+<li>No data passes between MySQL and memcached.</li>
+<li>The application isn&#8217;t even aware that MySQL is talking to memcached. MySQL does everything internally using triggers.</li>
+<li>MySQL does not depend on memcached. If memcached goes away, the triggers will simply have no effect. It is still possible that due to temporary network failure, an invalidation is skipped. But memcached supports us by adding a timeout for cached values, so we have some kind of &#8220;backup plan&#8221;.</li>
+</ul>
+<p>Please share below your insights and real life experience with memcached functions for MySQL.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">89</post-id>	</item>
+	</channel>
+</rss>

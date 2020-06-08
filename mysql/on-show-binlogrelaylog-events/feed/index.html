@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: On SHOW BINLOG/RELAYLOG EVENTS	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/on-show-binlogrelaylog-events/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/on-show-binlogrelaylog-events</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sun, 09 Aug 2015 07:57:31 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Daniël van Eeden				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/on-show-binlogrelaylog-events/comment-page-1#comment-322950</link>
+		<dc:creator><![CDATA[Daniël van Eeden]]></dc:creator>
+		<pubDate>Sun, 09 Aug 2015 07:57:31 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7237#comment-322950</guid>
+					<description><![CDATA[It is possible to get info about RBR events with binlog_rows_query_log_events.
+
+
+mysql-5.6.25-log &#062; CREATE TABLE mytable1 (id int auto_increment primary key, name varchar(100));
+Query OK, 0 rows affected (0.02 sec)
+
+mysql-5.6.25-log &#062; INSERT INTO mytable1(name) VALUES(&#039;test1&#039;);
+Query OK, 1 row affected (0.01 sec)
+
+mysql-5.6.25-log &#062; SET binlog_format=&#039;ROW&#039;;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql-5.6.25-log &#062; INSERT INTO mytable1(name) VALUES(&#039;test2&#039;);
+Query OK, 1 row affected (0.00 sec)
+
+mysql-5.6.25-log &#062; SET binlog_rows_query_log_events=ON;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql-5.6.25-log &#062; INSERT INTO mytable1(name) VALUES(&#039;test3&#039;);
+Query OK, 1 row affected (0.01 sec)
+
+mysql-5.6.25-log &#062; SHOW BINLOG EVENTS;
+┌───────────────┬─────┬─────────────┬───────────┬─────────────┬──────────────────────────────────────────────────────────────────────────────────────────┐
+│ Log_name      │ Pos │ Event_type  │ Server_id │ End_log_pos │ Info                                                                                     │
+├───────────────┼─────┼─────────────┼───────────┼─────────────┼──────────────────────────────────────────────────────────────────────────────────────────┤
+│ binlog.000001 │   4 │ Format_desc │        10 │         120 │ Server ver: 5.6.25-log, Binlog ver: 4                                                    │
+│ binlog.000001 │ 120 │ Query       │        10 │         270 │ use `test`; CREATE TABLE mytable1 (id int auto_increment primary key, name varchar(100)) │
+│ binlog.000001 │ 270 │ Query       │        10 │         349 │ BEGIN                                                                                    │
+│ binlog.000001 │ 349 │ Intvar      │        10 │         381 │ INSERT_ID=1                                                                              │
+│ binlog.000001 │ 381 │ Query       │        10 │         497 │ use `test`; INSERT INTO mytable1(name) VALUES(&#039;test1&#039;)                                   │
+│ binlog.000001 │ 497 │ Xid         │        10 │         528 │ COMMIT /* xid=141 */                                                                     │
+│ binlog.000001 │ 528 │ Query       │        10 │         600 │ BEGIN                                                                                    │
+│ binlog.000001 │ 600 │ Table_map   │        10 │         654 │ table_id: 100 (test.mytable1)                                                            │
+│ binlog.000001 │ 654 │ Write_rows  │        10 │         700 │ table_id: 100 flags: STMT_END_F                                                          │
+│ binlog.000001 │ 700 │ Xid         │        10 │         731 │ COMMIT /* xid=143 */                                                                     │
+│ binlog.000001 │ 731 │ Query       │        10 │         803 │ BEGIN                                                                                    │
+│ binlog.000001 │ 803 │ Rows_query  │        10 │         869 │ # INSERT INTO mytable1(name) VALUES(&#039;test3&#039;)                                             │
+│ binlog.000001 │ 869 │ Table_map   │        10 │         923 │ table_id: 100 (test.mytable1)                                                            │
+│ binlog.000001 │ 923 │ Write_rows  │        10 │         969 │ table_id: 100 flags: STMT_END_F                                                          │
+│ binlog.000001 │ 969 │ Xid         │        10 │        1000 │ COMMIT /* xid=145 */                                                                     │
+└───────────────┴─────┴─────────────┴───────────┴─────────────┴──────────────────────────────────────────────────────────────────────────────────────────┘
+15 rows in set (0.00 sec)
+]]></description>
+		<content:encoded><![CDATA[<p>It is possible to get info about RBR events with binlog_rows_query_log_events.</p>
+<p>mysql-5.6.25-log &gt; CREATE TABLE mytable1 (id int auto_increment primary key, name varchar(100));<br />
+Query OK, 0 rows affected (0.02 sec)</p>
+<p>mysql-5.6.25-log &gt; INSERT INTO mytable1(name) VALUES(&#8216;test1&#8242;);<br />
+Query OK, 1 row affected (0.01 sec)</p>
+<p>mysql-5.6.25-log &gt; SET binlog_format=&#8217;ROW&#8217;;<br />
+Query OK, 0 rows affected (0.00 sec)</p>
+<p>mysql-5.6.25-log &gt; INSERT INTO mytable1(name) VALUES(&#8216;test2&#8217;);<br />
+Query OK, 1 row affected (0.00 sec)</p>
+<p>mysql-5.6.25-log &gt; SET binlog_rows_query_log_events=ON;<br />
+Query OK, 0 rows affected (0.00 sec)</p>
+<p>mysql-5.6.25-log &gt; INSERT INTO mytable1(name) VALUES(&#8216;test3&#8217;);<br />
+Query OK, 1 row affected (0.01 sec)</p>
+<p>mysql-5.6.25-log &gt; SHOW BINLOG EVENTS;<br />
+┌───────────────┬─────┬─────────────┬───────────┬─────────────┬──────────────────────────────────────────────────────────────────────────────────────────┐<br />
+│ Log_name      │ Pos │ Event_type  │ Server_id │ End_log_pos │ Info                                                                                     │<br />
+├───────────────┼─────┼─────────────┼───────────┼─────────────┼──────────────────────────────────────────────────────────────────────────────────────────┤<br />
+│ binlog.000001 │   4 │ Format_desc │        10 │         120 │ Server ver: 5.6.25-log, Binlog ver: 4                                                    │<br />
+│ binlog.000001 │ 120 │ Query       │        10 │         270 │ use `test`; CREATE TABLE mytable1 (id int auto_increment primary key, name varchar(100)) │<br />
+│ binlog.000001 │ 270 │ Query       │        10 │         349 │ BEGIN                                                                                    │<br />
+│ binlog.000001 │ 349 │ Intvar      │        10 │         381 │ INSERT_ID=1                                                                              │<br />
+│ binlog.000001 │ 381 │ Query       │        10 │         497 │ use `test`; INSERT INTO mytable1(name) VALUES(&#8216;test1&#8217;)                                   │<br />
+│ binlog.000001 │ 497 │ Xid         │        10 │         528 │ COMMIT /* xid=141 */                                                                     │<br />
+│ binlog.000001 │ 528 │ Query       │        10 │         600 │ BEGIN                                                                                    │<br />
+│ binlog.000001 │ 600 │ Table_map   │        10 │         654 │ table_id: 100 (test.mytable1)                                                            │<br />
+│ binlog.000001 │ 654 │ Write_rows  │        10 │         700 │ table_id: 100 flags: STMT_END_F                                                          │<br />
+│ binlog.000001 │ 700 │ Xid         │        10 │         731 │ COMMIT /* xid=143 */                                                                     │<br />
+│ binlog.000001 │ 731 │ Query       │        10 │         803 │ BEGIN                                                                                    │<br />
+│ binlog.000001 │ 803 │ Rows_query  │        10 │         869 │ # INSERT INTO mytable1(name) VALUES(&#8216;test3&#8217;)                                             │<br />
+│ binlog.000001 │ 869 │ Table_map   │        10 │         923 │ table_id: 100 (test.mytable1)                                                            │<br />
+│ binlog.000001 │ 923 │ Write_rows  │        10 │         969 │ table_id: 100 flags: STMT_END_F                                                          │<br />
+│ binlog.000001 │ 969 │ Xid         │        10 │        1000 │ COMMIT /* xid=145 */                                                                     │<br />
+└───────────────┴─────┴─────────────┴───────────┴─────────────┴──────────────────────────────────────────────────────────────────────────────────────────┘<br />
+15 rows in set (0.00 sec)</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

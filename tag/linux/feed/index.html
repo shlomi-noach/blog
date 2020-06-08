@@ -1,0 +1,722 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Linux &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/linux/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sun, 29 Sep 2013 13:44:19 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Trick: recovering from &#8220;no space left on device&#8221; issues with MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/trick-recovering-from-no-space-left-on-device-issues-with-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/trick-recovering-from-no-space-left-on-device-issues-with-mysql#comments</comments>
+				<pubDate>Fri, 23 Aug 2013 11:25:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[Monitoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6487</guid>
+				<description><![CDATA[Just read Ronald Bradford&#8217;s post on an unnecessary 3am (emergency) call. I sympathize! Running out of disk space makes for some weird MySQL behaviour, and in fact whenever I encounter weird behaviour I verify disk space. But here&#8217;s a trick I&#8217;ve been using for years to avoid such cases and to be able to recover [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Just read Ronald Bradford&#8217;s post on an <a href="http://ronaldbradford.com/blog/unnecessary-3am-emergency-call-2013-08-23/">unnecessary 3am (emergency) call</a>. I sympathize! Running out of disk space makes for some weird MySQL behaviour, and in fact whenever I encounter weird behaviour I verify disk space.</p>
+<p>But here&#8217;s a trick I&#8217;ve been using for years to avoid such cases and to be able to recover quickly. It helped me on such events as running out of disk space during ALTER TABLEs or avoiding purging of binary logs when slave is known to be under maintenance.</p>
+<p>Ronald suggested it &#8212; just put a dummy file in your <strong>@@datadir</strong>! I like putting a <strong>1GB</strong> dummy file: I typically copy+paste a <strong>1GB</strong> binary log file and call it <strong>&#8220;placeholder.tmp&#8221;</strong>. Then I forget all about it. My disk space should not run out &#8212; if it does it&#8217;s a cause for emergency. I have monitoring, but sometimes I&#8217;m hoping to make an operation on <strong>97%</strong>&#8211;<strong>99%</strong> utilization.</p>
+<p>If I do run out of disk space: well, MySQL won&#8217;t let me connect; won&#8217;t complete an important statement; not sync transaction to disk &#8212; bad situation. Not a problem in our case: we can magically recover <strong>1GB</strong> worth of data from the <strong>@@datadir</strong>, buying us enough time (maybe just minutes) to gracefully complete so necessary operations; connect, KILL, shutdown, abort etc.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/trick-recovering-from-no-space-left-on-device-issues-with-mysql/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6487</post-id>	</item>
+		<item>
+		<title>Installing MySQL from source/binary tarball as a Linux service</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/installing-mysql-from-sourcebinary-tarball-as-a-linux-service</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/installing-mysql-from-sourcebinary-tarball-as-a-linux-service#comments</comments>
+				<pubDate>Tue, 01 May 2012 08:10:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4858</guid>
+				<description><![CDATA[I&#8217;ve written before I prefer to do a manual install of MySQL over a repository one. I still do: I typically install from binary tarball or by compiling from source. I&#8217;d like to share my setup procedure for Linux installation and service setup. I&#8217;ve done this dozens of times, on different Linux flavors, and it [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;ve <a href="https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get">written before</a> I prefer to do a manual install of MySQL over a repository one. I still do: I typically install from binary tarball or by compiling from source.</p>
+<p>I&#8217;d like to share my setup procedure for Linux installation and service setup. I&#8217;ve done this dozens of times, on different Linux flavors, and it works well for me.</p>
+<h4>Installing from source</h4>
+<p>To get this straight: you sometimes have to compile the source files. I, for example, happen to use the Sphinx MySQLSE extension. You can only use it if compiled with MySQL. You had to compile a &#8220;vanilla&#8221; <strong>5.1</strong> version without query cache in order to completely remove the cache&#8217;s mutex contention.</p>
+<p>Anyway, I find the easiest way is to install onto a path associated with the server version. For example, I would install a <strong>5.5</strong> server onto <strong>/usr/local/mysql55</strong></p>
+<p>This way, a new version gets its own path, and no ambiguity.</p>
+<p>To do that, use the <strong>prefix</strong> option on configuration step:</p>
+<blockquote>
+<pre>cd /path/to/extracted/source/tarball
+sh BUILD/autorun.sh
+./configure --prefix=/usr/local/mysql55
+make
+sudo make install</pre>
+</blockquote>
+<p>Once this is complete, you have <em>everything</em> under <strong>/usr/local/mysql55</strong>. This means binaries, libraries, scripts, etc.</p>
+<p>To install the MySQL server as a service, copy the mysql.server script to <strong>/etc/init.d</strong>:</p>
+<blockquote>
+<pre>sudo cp /usr/local/mysql55/support-files/mysql.server /etc/init.d/mysql55</pre>
+</blockquote>
+<p>Again, I&#8217;m naming the script after the MySQL version. This avoids conflict with possible past or future installations of the MySQL server, which typically create a service named <strong>mysql</strong> or <strong>mysqld</strong>.<span id="more-4858"></span></p>
+<p>A thing to note about the mysql.server script is that it allows you (at around line <strong>#45</strong>) to set two variables:</p>
+<ul>
+<li><strong>basedir</strong>: path to your installation directory. When compiling from source this is already setup with the path provided to the <strong>configure</strong> script. Thus, in our example, you can expect this variable to read <strong>/usr/local/mysql55</strong>. So basically nothing to do here.</li>
+<li><strong>datadir</strong>: path to your data directory. If you&#8217;re putting your <strong>my.cnf</strong> file in <strong>/etc</strong> or <strong>/etc/mysql</strong>, then setting <strong>datadir</strong> in <strong>my.cnf</strong> suffices. However, if you&#8217;re going to put <strong>my.cnf</strong> itself on the data directory (e.g. so as to avoid collisions) then make sure to set the variable in the <strong>mysql.server</strong> init script.</li>
+</ul>
+<p>Depending on your <strong>$PATH</strong> configuration, it is also a good idea to specify <strong>basedir</strong> variable on your <strong>my.cnf</strong>&#8216;s <strong>[mysqld]</strong> section.</p>
+<p>Which leads us to <strong>$PATH</strong>: your linux system is still unaware of the many binaries you&#8217;ve got in there. I typically add the following line at the end of <strong>/etc/bash.bashrc</strong>:</p>
+<blockquote>
+<pre>export PATH=/usr/local/mysql55:${PATH}</pre>
+</blockquote>
+<p>This is the most global PATH settings one can do. Alternatively, use <strong>/etc/profile</strong>, <strong>~/.bashrc</strong> etc. (you may have noticed by now I&#8217;m working with <strong>bash</strong>).</p>
+<p>Finally, need to setup the init script to run at startup and stop at shutdown.</p>
+<ul>
+<li>On Debian/Ubuntu/related I use <strong>rcconf</strong> (I&#8217;m too lazy to remember the command line setup).</li>
+<li>On RedHat/CentOS/related I use <strong>chkconfig &#8211;add mysql55</strong>, or  <strong>linuxconf</strong> (since I&#8217;m lazy).</li>
+</ul>
+<h4>Installing from binary tarball</h4>
+<p>The only difference is that the <strong>mysql.server</strong> script is unaware of our deployment path. So the <strong>basedir</strong> variable must be set in that file. Other than that, follow same steps as for source installation (oh, of course no need to <strong>configure</strong> &amp; <strong>make</strong>&#8230;).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/installing-mysql-from-sourcebinary-tarball-as-a-linux-service/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4858</post-id>	</item>
+		<item>
+		<title>Test-driven SQL development</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/test-driven-sql-development</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/test-driven-sql-development#comments</comments>
+				<pubDate>Thu, 20 Oct 2011 17:55:04 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Ant]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4036</guid>
+				<description><![CDATA[I&#8217;m having a lot of fun writing common_schema, an SQL project which includes views, tables and stored routines. As the project grows (and it&#8217;s taking some interesting directions, in my opinion) more dependencies are being introduced, and a change to one routine or view may affect many others. This is why I&#8217;ve turned the development [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m having a lot of fun writing <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>, an SQL project which includes views, tables and stored routines.</p>
+<p>As the project grows (and it&#8217;s taking some interesting directions, in my opinion) more dependencies are being introduced, and a change to one routine or view may affect many others. This is why I&#8217;ve turned the development on <em>common_schema</em> to be <em>test driven</em>.</p>
+<p>Now, just how do you test drive an SQL project?</p>
+<p>Well, much like the way you test any other project in your favorite programming language. If its functions you&#8217;re testing, that&#8217;s all too familiar: functions get some input and provide some output. Hmmm, they might be changing SQL data during that time. With procedures it&#8217;s slightly more complex, since they do not directly return output but result sets.</p>
+<p>Here&#8217;s the testing scheme I use:<span id="more-4036"></span></p>
+<ul>
+<li>Tests are divided to families. For example, there is a family of tests for the <em>eval()</em> function.</li>
+<li>Each test in a family is responsible for checking the simplest, most &#8220;atomic&#8221; issue. This means many small tests.</li>
+<li>Each test can have a <em>&#8220;pre-test&#8221;</em> step, which prepares the ground (for example, create a table and populate it)</li>
+<li>Likewise, a test can have a <em>&#8220;post-test&#8221;</em> step, which is typically just cleanup code (since the test is already complete by the time the post step is invoked).</li>
+<li>Each test is an SQL file: a set of commands to be executed.</li>
+<li>A test may have an <em>&#8220;expected output&#8221;</em> file.</li>
+</ul>
+<ul>
+<li>If no explicit <em>expected</em> exists, the test is expected to return <strong>&#8220;1&#8221;</strong> (just as the most basic <em>JUnit</em> test assumes an &#8220;assert true&#8221;)</li>
+<li>A test family may also have <em>pre-</em> and <em>post-</em> steps.</li>
+<li>Any failure in any step fails the entire process. Failures may include:
+<ul>
+<li>Failure to prepare the grounds for a test or family of tests</li>
+<li>Failure in executing the test</li>
+<li>Mismatch between test&#8217;s output and expected result.</li>
+<li>Failure in executing the <em>post-</em> step (may indicate yet invalid test result not intercepted by the test)</li>
+</ul>
+</li>
+</ul>
+<h4>An example</h4>
+<p>The following image presents a single test family: the <em>eval</em> family, testing the <em>eval()</em> routine.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/10/test-driven-sql-development-01.png"><img class="size-full wp-image-4205 alignnone" title="test-driven-sql-development-01" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/10/test-driven-sql-development-01.png" alt="Test driven SQL development - sample" width="198" height="258" /></a></p></blockquote>
+<ul>
+<li>In this family, there are two tests.</li>
+<li>In both tests, we have a <em>pre-test</em> step, and a test.</li>
+<li>We have no <em>post-test</em> here.</li>
+<li>Nor do we have an <em>expected-output</em> sample, which means the tests expect to return with <strong>&#8220;1&#8221;</strong>.</li>
+</ul>
+<h4>Implementation</h4>
+<p>But how are tests conducted? Via <em>mysql</em>, of course. While tests are plain SQL text file, they are being executed against a running MySQL server using the <em>mysql</em> client. It is given the test files as input, and its output is directed to file as well.</p>
+<p>This makes it very easy to code the test using a simple shell script. It takes a small measure of file iteration, process invocation, exit code check, and <em>diff</em> execution.</p>
+<p>For example, to test <em>eval()</em>&#8216;s <strong>01</strong> test, we first execute <em>mysql</em> with <strong>01/pre.sql</strong> as input. Assuming success, we execute <em>mysql</em> again, this time with <strong>01/test.sql</strong>. We capture the output of this execution, and compare it with <em>expected-output</em>, or with <strong>&#8220;1&#8221;</strong> when no <em>expected-output</em> specified.</p>
+<h4>Tests pass, or no code!</h4>
+<p>Some <strong>12</strong> years ago, I worked with a less-known version system called <a href="http://aegis.sourceforge.net/documents.html">aegis</a>. The thing I remember most from <em>aegis</em> was that it had a good tests infrastructure. Long before &#8220;test-driven development&#8221; was coined, or was even commonly practiced, <em>aegis</em> supported tests right into your version control. &#8220;Right into&#8221;, in the sense that <em>you could not merge your code back to the baseline</em> if it didn&#8217;t pass all of the tests.</p>
+<p>I work with SVN for <em>common_schema</em>, and I do not know of such an option in SVN. But I also use <em>ant</em> to build this project, and the dependency is clear there: <strong>ant dist</strong>, my target which creates the distribution files, is dependent on <strong>ant test</strong>, the target which works out the tests.</p>
+<p>That is, you cannot generate the distribution files when tests fail.</p>
+<h4>Further notes</h4>
+<p>Since I&#8217;m now retroactively patching tests for already existing functionality, calling it <em>test-driven</em> development is an overstatement; nevertheless new tests are already proving invaluable when I keep changing and improving existing code. Suddenly dependent functionality no longer works as expected. What fun!</p>
+<p><a href="http://code.google.com/p/common-schema/source/browse/trunk/common_schema/tests/test_all.sh">The code</a> for the testing suite is actually much shorter than this blog post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/test-driven-sql-development/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4036</post-id>	</item>
+		<item>
+		<title>Where&#8217;s my cnf file?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/wheres-my-cnf-file</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/wheres-my-cnf-file#comments</comments>
+				<pubDate>Tue, 07 Dec 2010 10:24:44 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2981</guid>
+				<description><![CDATA[So you have a running MySQL server, it&#8217;s working well and everyone&#8217;s happy. You want to make a minor change to the configuration file, so you edit the file, restart MySQL &#8211; but the change doesn&#8217;t catch! Or maybe you want to check that some global variable has not been dynamically changed without an update [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>So you have a running MySQL server, it&#8217;s working well and everyone&#8217;s happy. You want to make a minor change to the configuration file, so you edit the file, restart MySQL &#8211; but the change doesn&#8217;t catch!</p>
+<p>Or maybe you want to check that some global variable has not been dynamically changed without an update to the configuration file. But the configuration file doesn&#8217;t make any sense &#8212; it looks like nothing is common between the file and the server.</p>
+<p>Wait, which <strong>my.cnf</strong> file does MySQL read? Rather, which <strong>my.cnf</strong> <em>files</em>?</p>
+<p>Ever happened to you? If you&#8217;re well organized, and only keep a single <strong>/etc/my.cnf</strong> file, you know exactly where everything is. But some systems are messier, with <em>lots</em> of configuration files hanging around. Which ones apply?</p>
+<p>Let&#8217;s find out which configuration files apply.</p>
+<h4>No direct information</h4>
+<p>It would all be easier if we could just <strong>SHOW GLOBAL VARIABLES LIKE &#8216;configuration_files_that_this_server_has_read_list&#8217;</strong>. There isn&#8217;t such an option.</p>
+<p><span id="more-2981"></span>The MySQL documentation <a href="http://dev.mysql.com/doc/refman/5.1/en/option-files.html">explains</a> about the configuration files search path, and that&#8217;s one path you can follow. Also, you can detect another estimated search path by invoking:</p>
+<blockquote>
+<pre><strong>root@myhost:~# mysqld --verbose --help | head -n 20
+</strong>100927 19:53:06 [ERROR] Fatal error: Please read "Security" section of the manual to find out how to run mysqld as root!
+
+mysqld  Ver 5.1.41 for unknown-linux-gnu on x86_64 (MySQL Community Server (GPL))
+Copyright (C) 2000-2008 MySQL AB, by Monty and others
+Copyright (C) 2008 Sun Microsystems, Inc.
+This software comes with ABSOLUTELY NO WARRANTY. This is free software,
+and you are welcome to modify and redistribute it under the GPL license
+
+Starts the MySQL database server
+
+Usage: mysqld [OPTIONS]
+
+Default options are read from the following files in the given order:
+<strong>/etc/my.cnf /etc/mysql/my.cnf /usr/local/mysql/etc/my.cnf ~/.my.cnf</strong>
+The following groups are read: mysqld server mysqld-5.1
+The following options may be given as the first argument:
+...</pre>
+</blockquote>
+<p>Easy enough, right? Just walk through that search path and you&#8217;ve covered it all. Better yet, see which of these even exist!</p>
+<blockquote>
+<pre><strong>root@myhost:~# ls -l /etc/my.cnf /etc/mysql/my.cnf /usr/local/mysql/etc/my.cnf ~/.my.cnf</strong>
+ls: cannot access /etc/my.cnf: No such file or directory
+ls: cannot access /etc/mysql/my.cnf: No such file or directory
+ls: cannot access /usr/local/mysql/etc/my.cnf: No such file or directory
+-rw-r--r-- 1 shlomi shlomi 32 2010-03-03 15:21 <strong>/home/shlomi/.my.cnf</strong></pre>
+</blockquote>
+<p>Seems like we got it. The <strong>mysqld</strong> process only reads <strong>/home/shlomi/.my.cnf</strong>. Right?</p>
+<h4>Wrong!</h4>
+<p>There are two running instances of MySQL running on my machine. Neither of the primary <strong>my.cnf</strong> files used by these instances is listed above.</p>
+<blockquote>
+<pre><strong>root@myhost:~# ps aux | grep mysqld
+</strong>shlomi   12092  0.0  0.0   4096   352 pts/1    S    Sep26   0:00 /bin/sh /home/shlomi/sandboxes/5.1/5.1.50/bin/mysqld_safe <strong>--defaults-file=/home/shlomi/sandboxes/msb_5_1_50/my.sandbox.cnf</strong>
+shlomi   12167  0.0 14.5 765520 587924 pts/1   Sl   Sep26   1:12 /home/shlomi/sandboxes/5.1/5.1.50/bin/mysqld <strong>--defaults-file=/home/shlomi/sandboxes/msb_5_1_50/my.sandbox.cnf</strong> --basedir=/home/shlomi/sandboxes/5.1/5.1.50 --datadir=/home/shlomi/sandboxes/msb_5_1_50/data --log-error=/home/shlomi/sandboxes/msb_5_1_50/data/msandbox.err --pid-file=/home/shlomi/sandboxes/msb_5_1_50/data/mysql_sandbox5150.pid --socket=/tmp/mysql_sandbox5150.sock --port=5150
+root     22827  0.0  0.0   4096   668 pts/3    S    16:50   0:00 /bin/sh /usr/local/mysql/bin/mysqld_safe --datadir=/usr/local/mysql/data --pid-file=/usr/local/mysql/data/eeyore.pid
+mysql    22960  0.1  2.2 274584 90188 pts/3    Sl   16:50   0:18 /usr/local/mysql/bin/mysqld <strong>--defaults-extra-file=/usr/local/mysql/data/my.cnf</strong> --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data --user=mysql --log-error=/usr/local/mysql/data/eeyore.err --pid-file=/usr/local/mysql/data/eeyore.pid --socket=/tmp/mysql.sock --port=3306</pre>
+</blockquote>
+<p>Can you see the mess above?</p>
+<p>The first two lines refer to a MySQL instance running under <a href="http://mysqlsandbox.net/">mysqlsandbox</a>. The <em>mysqld_safe</em> script is passed the defaults-file parameter, and passes it on to the <em>mysqld</em> service.</p>
+<p>However the next couple of lines refer to a MySQL server installed as a service; installed from a binary tarball, this instance reads configuration from the <strong>datadir</strong>. This time the <em>mysqld_safe</em> instance is passed nothing, but invokes <em>mysqld</em> with <strong>default-extra-file</strong>.</p>
+<p>To be fair, I wasn&#8217;t expecting the <strong>&#8220;mysqld &#8211;verbose &#8211;help&#8221;</strong> invocation to find the <em>mysqlsandbox</em> configuration files. I did expect it to find the <strong>/usr/local/mysql/data/my.cnf</strong> file which it eventually used.</p>
+<p>That&#8217;s nice &amp; ugly. I can see the <strong>my.cnf</strong> file used by peeking at <em>ps</em>. A bit overkill.</p>
+<h4>Not quite there yet&#8230;</h4>
+<p>Because there&#8217;s still my private configuration file (resides on <strong>/home/shlomi/.my.cnf</strong> on my account). Now I do not expect this file to be read by my standard MySQL server, since it does not run as user &#8220;shlomi&#8221;. However my command line clients do actually read this file, and so I am affected by its settings.</p>
+<p>I can verify whether such files have been used on a file system which is configured to support the <strong>atime</strong> option:</p>
+<blockquote>
+<pre><strong>root@myhost:~# ls -lt --time=atime $(locate *my.cnf)
+</strong></pre>
+</blockquote>
+<p>I usually keep the <strong>atime</strong> option enabled for my <em>&#8220;/&#8221;</em> and <em>&#8220;/home&#8221;</em> partitions, but disable it on data partitions.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/wheres-my-cnf-file/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2981</post-id>	</item>
+		<item>
+		<title>mylvmbackup HOWTO: minimal privileges &#038; filesystem copy</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mylvmbackup-howto-minimal-privileges-filesystem-copy</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mylvmbackup-howto-minimal-privileges-filesystem-copy#comments</comments>
+				<pubDate>Tue, 17 Aug 2010 17:42:40 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2839</guid>
+				<description><![CDATA[This HOWTO discusses two (unrelated) issues with mylvmbackup: The minimal privileges required to take MySQL backups with mylvmbackup. Making (non compressed) file system copy of one&#8217;s data files. Minimal privileges Some just give mylvmbackup the root account, which is far too permissive. We now consider what the minimal requirements of mylvmbackup are. The queries mylvmbackup [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This HOWTO discusses two (unrelated) issues with <a href="http://www.lenzg.net/mylvmbackup/"><em>mylvmbackup</em></a>:</p>
+<ul>
+<li>The minimal privileges required to take MySQL backups with <em>mylvmbackup.</em></li>
+<li>Making (non compressed) file system copy of one&#8217;s data files.</li>
+</ul>
+<h4>Minimal privileges</h4>
+<p>Some just give <em>mylvmbackup</em> the root account, which is far too permissive. We now consider what the minimal requirements of <em>mylvmbackup</em> are.</p>
+<p>The queries <em>mylvmbackup</em> issues are:</p>
+<ul>
+<li><strong>FLUSH TABLES</strong></li>
+<li><strong>FLUSH TABLES WITH READ LOCK</strong></li>
+<li><strong>SHOW MASTER STATUS</strong></li>
+<li><strong>SHOW SLAVE STATUS</strong></li>
+<li><strong>UNLOCK TABLES</strong></li>
+</ul>
+<p>Both <strong>SHOW MASTER STATUS</strong> &amp; <strong>SHOW SLAVE STATUS</strong> require either the <strong>SUPER</strong> or <strong>REPLICATION CLIENT</strong> privilege. Since <strong>SUPER</strong> is more powerful, we choose <strong>REPLICATION CLIENT</strong>.</p>
+<p>The <strong>FLUSH TABLES</strong> * and <strong>UNLOCK TABLES</strong> require the <strong>RELOAD</strong> privilege.</p>
+<p>However, we are not done yet. <em>mylvmbackup</em> connects to the <strong>mysql</strong> database, which means we must also have some privilege there, too. We choose the <strong>SELECT</strong> privilege.</p>
+<p><span id="more-2839"></span>Finally, here are the commands to create a <em>mylvmbackup</em> user with minimal privileges:</p>
+<blockquote>
+<pre>CREATE USER 'mylvmbackup'@'localhost' IDENTIFIED BY '12345';
+GRANT RELOAD, REPLICATION CLIENT ON *.* TO 'mylvmbackup'@'localhost';
+GRANT SELECT ON mysql.* TO 'mylvmbackup'@'localhost';
+</pre>
+</blockquote>
+<p>In the <strong>mylvmbackup.conf</strong> file, the correlating rows are:</p>
+<blockquote>
+<pre>[mysql]
+user=mylvmbackup
+password=12345
+host=localhost
+</pre>
+</blockquote>
+<h4>Filesystem copy</h4>
+<p>By default, <em>mylvmbackup</em> creates a <strong>.tar.gz</strong> compressed backup file of your data. This is good if the reason you&#8217;re running <em>mylvmbackup</em> is to, well, make a backup. However, as with all backups, one may be making the backup so as to create a replication server. But in this case you don&#8217;t really want compressed data: you want the data extracted on the replication server, just as it is on the original host.</p>
+<p><em>mylvmbackup</em> supports backing up the files using <em>rsync</em>.</p>
+<p>To copy MySQL data to a remote host, configure the following in the mylvmbackup.conf file:</p>
+<blockquote>
+<pre>[fs]
+backupdir=shlomi@backuphost:/data/backup/mysql
+[misc]
+backuptype=rsync
+</pre>
+</blockquote>
+<p>You may be prompted to enter password, unless you have the user&#8217;s public key stored on the remote host.</p>
+<p>Normally, <em>rsync</em> is considered as <strong>r</strong>emote-<strong>sync</strong>, but it also works on local file systems. If you have a remote directory mounted on your file system (e.g. with <em>nfs</em>), you can use the fact that <em>rsync</em> works just as well with local file systems:</p>
+<blockquote>
+<pre>[fs]
+backupdir=/mnt/backup/mysql
+[misc]
+backuptype=rsync
+</pre>
+</blockquote>
+<p>Voila! Your backup is complete.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mylvmbackup-howto-minimal-privileges-filesystem-copy/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2839</post-id>	</item>
+		<item>
+		<title>Tips for taking MySQL backups using LVM</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/tips-for-taking-mysql-backups-using-lvm</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/tips-for-taking-mysql-backups-using-lvm#comments</comments>
+				<pubDate>Tue, 03 Aug 2010 06:45:29 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2717</guid>
+				<description><![CDATA[LVM uses copy-on-write to implement snapshots. Whenever you&#8217;re writing data to some page, LVM copies the original page (the way it looked like when the snapshot was taken) to the snapshot volume. The snapshot volume must be large enough to accommodate all pages written to for the duration of the snapshot&#8217;s lifetime. In other words, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>LVM uses copy-on-write to implement snapshots. Whenever you&#8217;re writing data to some page, LVM copies the original page (the way it looked like when the snapshot was taken) to the snapshot volume. The snapshot volume must be large enough to accommodate all pages written to for the duration of the snapshot&#8217;s lifetime. In other words, you must be able to copy the data somewhere outside (tape, NFS, rsync, etc.) in less time than it would take for the snapshot to fill up.</p>
+<p>While LVM allows for hot backups of MySQL, it still poses an impact on the disks. An LVM snapshot backup may not go unnoticed by the MySQL users.</p>
+<p>Some general guidelines for making life easier with LVM backups follow.</p>
+<h4>Lighter, longer snapshots</h4>
+<p>If you&#8217;re confident that you have enough space on your snapshot volume, you may take the opportunity to make for a <em>longer</em> backup time. Why? Because you would then be able to reduce the stress from the file system. Use <strong>ionice</strong> when copying your data from the snapshot volume:</p>
+<blockquote>
+<pre>ionice -c 2 cp -R /mnt/mysql_snapshot /mnt/backup/daily/20100719/
+</pre>
+</blockquote>
+<p><em>[Update: this is only on the cfq I/O scheduler; thanks, Vojtech]</em></p>
+<h4>Are you running out of space?</h4>
+<p>Monitor snapshot&#8217;s allocated size: if there&#8217;s just one snapshot, do it like this:<span id="more-2717"></span></p>
+<blockquote>
+<pre>lvdisplay | grep Allocated                                                                                                                  Mon Jul 19 09:51:29 2010
+
+ Allocated to snapshot  3.63%
+</pre>
+</blockquote>
+<p>Don&#8217;t let it reach 100%.</p>
+<h4>Avoid running out of space</h4>
+<p>To make sure you don&#8217;t run out of snapshot allocated size, stop all administrative scripts.</p>
+<ul>
+<li>Are you running your weekly purging of old data? You will be writing a lot of pages, and all will have to fit in the snapshot.</li>
+<li>Building your reports? You may be creating large temporary tables; make sure these are not on the snapshot volume.</li>
+<li>Rebuilding your Sphinx fulltext index? Make sure it is not on the snapshot volume, or postpone till after backup.</li>
+</ul>
+<p>You will gain not only snapshot space, but also faster backups.</p>
+<h4>Someone did the job before you</h4>
+<p>Use <a href="http://www.lenzg.net/mylvmbackup/">mylvmbackup</a>: the MySQL LVM backup script by Lenz Grimmer. Or do it manually: follow this old-yet-relevant <a href="http://www.mysqlperformanceblog.com/2006/08/21/using-lvm-for-mysql-backup-and-replication-setup/">post</a> by Peter Zaitsev.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/tips-for-taking-mysql-backups-using-lvm/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2717</post-id>	</item>
+		<item>
+		<title>mycheckpoint (rev. 170): improved custom queries; local charting; page/swap I/O monitoring; improved HTML reports</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports#comments</comments>
+				<pubDate>Fri, 16 Jul 2010 08:58:40 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[Open Source]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2650</guid>
+				<description><![CDATA[Revision 170 of mycheckpoint, a MySQL monitoring solution, has been released. New and updated in this revision: Improved custom queries: lifting of limitations from previous, introductory revision; better HTML presentation Local, inline charting: no rendering of Google Charts, unless explicitly requested. All charts are now rendered locally using JavaScript. No data is now sent over [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>170</strong> of <a href="../../forge/mycheckpoint">mycheckpoint</a>, a MySQL monitoring solution, has  been released. New and updated in this revision:</p>
+<ul>
+<li><strong>Improved custom queries</strong>: lifting of limitations from previous, introductory revision; better HTML presentation</li>
+<li><strong>Local, inline charting</strong>: no rendering of Google Charts, unless explicitly requested. All charts are now rendered locally using JavaScript. No data is now sent over the network.</li>
+<li><strong>Page/Swap I/O monitoring</strong>: now monitoring for page ins and outs, swap ins and outs (Linux only).</li>
+<li><strong>Improved HTML reports</strong>: several improvements on presentation (see <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-brief-169.html">sample</a>, more follow).</li>
+</ul>
+<h4>Improved custom queries</h4>
+<p>Some limitations, introduced in revision <strong>132</strong>, are now lifted. New features are introduced.</p>
+<ul>
+<li>There is now no limit to the number of custom queries (well, an INT limit).</li>
+<li>In fact, the data tables adjust themselves to the existing custom queries in the form of auto-deploy: once a new <a href="http://code.openark.org/forge/mycheckpoint/documentation/custom-monitoring">custom query is added</a> or an old one removed, mycheckpoint will add or remove the relevant columns from the data tables.</li>
+<li>The <strong>chart_order</strong> column is now utilized: HTML reports which include custom query charts now order those charts according to <strong>chart_order</strong> values. This makes for nicer reports.</li>
+<li>The standard <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-brief-169.html">HTML brief report</a> (<strong>SELECT html FROM sv_report_html_brief</strong>) now automatically includes all custom charts. The HTML brief report is the report one usually wants to look at: it provides with the latest 24 hours metrics for selected values. It now becomes a centralized place for all that is interesting in the past 24 hours.</li>
+<li>Custom queries are now allowed to return <strong>NULL</strong>, treated as a missing value. This is a bugfix from previous revisions.</li>
+</ul>
+<h4>Local charting</h4>
+<p>Motivation for local charting is clear: no one likes having their data being sent over the network. And no one likes Google to know about their DML values.</p>
+<p>I&#8217;ve been playing around with quite a few charting solutions, and have gone into depths with two of them, adding and rewriting quite a lot of code. Eventually, I settled on my very own rendering. Here&#8217;s what I&#8217;ve seen &amp; tested:<span id="more-2650"></span></p>
+<ul>
+<li><a href="http://danvk.org/dygraphs/">dygraphs</a>: a very nice time series charting library. I&#8217;ve presented a use case on <a href="https://shlomi-noach.github.io/blog/mysql/static-charts-vs-interactive-charts">a previous post</a>.
+<ul>
+<li>Pros: slick, easy to work with.</li>
+<li>Cons: uses HTML Canvas for rendering. This is fine on Firefox, Chrome, Safari, you name it. This isn&#8217;t fine on IE, which does not support Canvas. There&#8217;s <a href="http://excanvas.sourceforge.net/">ExplorerCanvas</a>, a hack tool which converts canvas to IE&#8217;s VML, but it is far from being satisfactory: it is <em>sloooow</em>. Very, very slow. It is slow with one chart; but loading of 21 charts, as I do in some of <em>mycheckpoint</em>&#8216;s reports can take <em>long minutes</em> on Internet explorer.</li>
+<li>Cons: Only provides with a time series chart. No scatter plots.</li>
+</ul>
+</li>
+<li>Because they&#8217;re using ExplorerCanvas for IE, <a href="http://code.google.com/p/flot/">flot</a>, <a href="http://www.jqplot.com/">jqPlot</a> etc., are all unacceptable.</li>
+<li><a href="http://g.raphaeljs.com/">gRaphael</a>: very slick charts based on Raphael. The original line charts are very basic, and I have invested a lot of time rewriting a great deal (you can find it all <a href="http://code.google.com/p/mycheckpoint/source/browse/#svn/trunk/graphael">here</a>). Raphael uses VML on IE, and SVG for all other browsers.
+<ul>
+<li>Pros: very slick. Supports various chart types, including line (though not time-series) and scatter.</li>
+<li>Cons: <em>slooooooooow</em> when instantiating multiple charts. Unbearably slow, both on Firefox and IE. Slow as in minutes of waiting.</li>
+</ul>
+</li>
+</ul>
+<p>In addition, all of the above solutions were quite heavyweight: at about 45KB to start with, then add ExplorerCanvas or jQuery, or Raphael as supporting libraries, these became a real burden.</p>
+<p>So, I had some time to spare (business is fine, thank you. I was a bit Ill. I&#8217;m feeling well now, thank you), and was upset what with all the time I invested in the above coding. And I decided to invest even more time, and build <em>my own</em> charts.</p>
+<p>Enter <em>openark-charts</em>.</p>
+<blockquote>
+<pre><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot.png"><img class="alignnone size-full wp-image-2662" title="mycheckpoint-report-html-screenshot" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot.png" alt="" width="808" height="307" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot.png 808w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot-300x113.png 300w" sizes="(max-width: 808px) 100vw, 808px" /></a>
+
+<a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot.png"><img class="alignnone size-full wp-image-2663" title="mycheckpoint-24-7-report-html-screenshot" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot.png" alt="" width="808" height="267" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot.png 808w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot-300x99.png 300w" sizes="(max-width: 808px) 100vw, 808px" /></a></pre>
+</blockquote>
+<p>Currently, these line charts and scatter charts know how to parse a Google Image chart URL (only some features supported &#8212; only those I&#8217;m actually using with <em>mycheckpoint</em>). These are not full blown solutions: they come to serve mycheckpoint. And they do so nicely, if I may say so. Using Canvas for most browsers, or VML for IE, these very small pieces of code (10K for line chart, 6K for scatter chart, minified) load fast, use very little memory, and do their work well.</p>
+<p>Granted, neither provides with interactive features: this is planned for the future.</p>
+<h4>Page/swap I/O monitoring</h4>
+<p>(Linux only) <em>mycheckpoint</em> now reads <strong>/proc/vmstat</strong> to get the <em>pageins</em>, <em>pageouts</em>, <em>swapins</em> and <em>swapouts</em> (since last reboot). I was actually looking at completely different places on the <strong>/proc</strong> file system to get swap info, and was frustrated with the complexity involved, till I bumped on <strong>/proc/vmstat</strong>&#8230; New tricks every day!</p>
+<h4>Improved HTML reports</h4>
+<p>This is mostly HTML make-up. Some minimal design, some more details thrown into the HTML pages (name of DB, MySQL version, <em>mycheckpoint</em> version). A little more verbosity; all sorts of stuff which was neglected so far.</p>
+<p>Here are some <span style="text-decoration: line-through;"><strong>show off</strong></span> examples of the new HTML views: <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-full-169.html">[full report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-brief-169.html">[brief report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-24-7-169.html">[24/7 report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-custom-full-169.html">[custom full report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-custom-brief-169.html">[custom brief report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-alert-pending-169.html">[alert pending report]</a>.</p>
+<p>All HTML views now utilize the new <em>openark-charts</em>, and none renders charts with Google charts. This means when you <a href="http://code.openark.org/forge/mycheckpoint/documentation/generating-html-reports">use your HTML view</a>, your data is safe. No data is sent over the net. All charts are rendered using Javascript, which is loaded and executed locally.</p>
+<p>But if you like, there&#8217;s a [url] link next to each chart, which leads to a (online) Google chart image. Why? Because neither HTML Canvas nor VML allow for a complete rendering of the charts to an image. So this is a way for one to retrieve &amp; store a chart&#8217;s image. Don&#8217;t use it if you see no reason for it; it&#8217;s just there.</p>
+<p>And I even threw in rounded corners (IE users: only as of Windows 7).</p>
+<h4>Future plans</h4>
+<p>Work is going on. These are the non-scheduled future tasks I see:</p>
+<ul>
+<li>Monitoring InnoDB Plugin &amp; XtraDB status.</li>
+<li>Interactive charts. See my <a href="../mysql/static-charts-vs-interactive-charts">earlier  post</a>.</li>
+<li>A proper <em>man</em> page.</li>
+<li>Anything else that interests me.</li>
+</ul>
+<h4>Try it out</h4>
+<p>Try out <em>mycheckpoint</em>. It’s a different kind of monitoring  solution. You will need basic SQL skills, and in return you’ll get a lot  of power under your hands.</p>
+<ul>
+<li>Download mycheckpoint <a href="https://code.google.com/p/mycheckpoint/">here</a></li>
+<li>Visit the project’s <a href="../../forge/mycheckpoint">homepage</a></li>
+<li>Browse the <a href="../../forge/mycheckpoint/documentation">documentation</a></li>
+<li>Report <a href="https://code.google.com/p/mycheckpoint/issues/list">bugs</a></li>
+</ul>
+<p><em>mycheckpoint</em> is released under the <a href="http://www.opensource.org/licenses/bsd-license.php">New BSD  License</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2650</post-id>	</item>
+		<item>
+		<title>To not yum or to not apt-get?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get#comments</comments>
+				<pubDate>Tue, 16 Feb 2010 11:44:25 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1776</guid>
+				<description><![CDATA[I&#8217;ve written shortly on this before. I like yum; I love apt-get; I prefer not to use them for MySQL installations. I consider a binary tarball to be the best MySQL installation format (source installations being a different case altogether). Why? I use yum and apt-get whenever I can and for almost all needs (sometimes [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;ve <a href="https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto">written</a> shortly on this before. I like <strong>yum</strong>; I love <strong>apt-get</strong>; I prefer <em>not</em> to use them for MySQL installations. I consider a binary tarball to be the best MySQL installation format (source installations being a different case altogether).</p>
+<h4>Why?</h4>
+<p>I use <strong>yum</strong> and <strong>apt-get</strong> whenever I can and for almost all needs (sometimes preferring CPAN for Perl installations). But on a MySQL machine, I avoid doing so. The reason is either dependency hell or dependency mismatch.</p>
+<p>Package managers are supposed to solve the dependency hell issue. But package managers will rarely have an up to date MySQL version.</p>
+<p>I&#8217;ve had several experiences where a simple <strong>yum</strong> installation re-installed the MySQL version. I&#8217;ve had customers calling me up when, having installed something with <strong>yum</strong>, MySQL would not work anymore.<span id="more-1776"></span></p>
+<p><strong>yum install package-which-depends-on-mysql-server</strong> will install MySQL server on your system if it hasn&#8217;t been installed with <strong>yum</strong>. Are you on CentOS <strong>5.0</strong>? You&#8217;ll get MySQL <strong>5.0.22</strong>. Oh, did you already have a <strong>RPM</strong> installation for MySQL <strong>5.0.81</strong>? Sorry &#8211; it&#8217;s just been <em>downgraded</em>, plus <em>it won&#8217;t work</em> anymore since the error messages file has been changed since then.</p>
+<p>Don&#8217;t press &#8216;<strong>Y</strong>&#8216; too soon!</p>
+<p>Things are slightly better with <strong>apt-get</strong>. I&#8217;ve encountered less situations where <strong>mysql-server</strong> was on the dependency list. Many times it&#8217;s just the <strong>libmysqlclient</strong> package or the <strong>mysql-common</strong> one.</p>
+<p>But wait! Did you install <strong>mysql-common</strong>? Bonus! You get the elusive <strong>/etc/mysql/my.cnf</strong> file created, and there goes your server configuration. Future spawns of the MySQL server / clients will read from the wrong configuration file, and will probably fail to load.</p>
+<p>Not to mention neither will help you out with multiple instances installation.</p>
+<h4>My argument</h4>
+<p>A sys admin recently argued with me that it was wrong of me to have the entire machine set up with <strong>yum</strong>, but have MySQL installed with binary tarball. He argued that it broke the entire setup. I expressed my opinion: <em>on a MySQL dedicated server, MySQL gets to be prioritized. It&#8217;s special</em>. It is the reason for the existence of the machine. I would imagine that same would hold for Apache on an Apache dedicated machine, for Sendmail on a Sendmail dedicated machine, etc. As a DBA, I want to have best control of the MySQL installation; I want to be able to upgrade minor versions quickly: I often find newer versions to solve bugs I was concerned with; I want to be able to install multiple instances; I want to be able to downgrade without having to remove and uninstall the previous version.</p>
+<p>I want to have control. World domination aside, that is.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get/feed</wfw:commentRss>
+		<slash:comments>26</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1776</post-id>	</item>
+		<item>
+		<title>mycheckpoint rev. 76: OS monitoring, auto deploy, brief HTML and 24/7 reports</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports#comments</comments>
+				<pubDate>Tue, 05 Jan 2010 08:55:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1784</guid>
+				<description><![CDATA[Revision 76 of mycheckpoint comes with quite a few improvements, including: OS monitoring (CPU, load average, memory) Auto-deploy Improved charting Brief HTML reports 24/7 charts OS Monitoring When monitoring the local machine, mycheckpoint now monitors CPU utilization, load average, memory and swap space. This only applies to the Linux operating system; there is currently no [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>76</strong> of <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> comes with quite a few improvements, including:</p>
+<ul>
+<li>OS monitoring (CPU, load average, memory)</li>
+<li>Auto-deploy</li>
+<li>Improved charting</li>
+<li>Brief HTML reports</li>
+<li>24/7 charts</li>
+</ul>
+<h4>OS Monitoring</h4>
+<p>When monitoring the local machine, <em>mycheckpoint</em> now monitors CPU utilization, load average, memory and swap space.</p>
+<p>This only applies to the Linux operating system; there is currently no plan to work this out for other operating systems.</p>
+<p>Examples:</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>os_cpu_utilization_percent</strong> FROM sv_report_chart_sample;
+
+<img class="size-full wp-image-1794 alignnone" title="mycheckpoint-chart-cpu-sample" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-cpu-sample.png" alt="mycheckpoint-chart-cpu-sample" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-cpu-sample.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-cpu-sample-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /></pre>
+</blockquote>
+<blockquote>
+<pre>mysql&gt; SELECT ts, <strong>os_loadavg</strong> FROM mycheckpoint.sv_report_sample;
++---------------------+------------+
+| 2009-12-27 11:45:01 |       1.78 |
+| 2009-12-27 11:50:01 |       2.48 |
+| 2009-12-27 11:55:01 |       2.35 |
+...
++---------------------+------------+</pre>
+</blockquote>
+<blockquote>
+<pre>mysql&gt; SELECT report FROM mycheckpoint.sv_report_human_sample ORDER BY id DESC LIMIT 1 \G
+*************************** 1. row ***************************
+report:
+Report period: 2009-12-27 13:20:01 to 2009-12-27 13:25:01. Period is 5 minutes (0.08 hours)
+Uptime: 100.0% (Up: 334 days, 06:37:28 hours)
+
+<strong>OS:
+ Load average: 1.67
+ CPU utilization: 25.2%
+ Memory: 7486.4MB used out of 7985.6484MB (Active: 6685.8906MB)
+ Swap: 3835.2MB used out of 8189.3750MB</strong>
+...</pre>
+</blockquote>
+<h4>Auto-deploy</h4>
+<p><em>mycheckpoint</em> now has a version recognition mechanism. There is no need to call <em>mycheckpoint</em> with the &#8220;<strong>deploy</strong>&#8221; argument on first install or after upgrade. <em>mycheckpoint</em> will recognize a change of version and will auto-deploy before moving on to monitoring your system.</p>
+<p><span id="more-1784"></span>It is still possible, though, to use &#8220;<strong>deploy</strong>&#8220;, in case you just want to make sure an upgrade takes place, without issuing a monitoring action.</p>
+<h4>Improved charting</h4>
+<p>Further improvements and bug fixes made to the Google charts, including the implementation of missing values charting.</p>
+<h4>Brief HTML report</h4>
+<p>In contrast with the full blown HTML report (see <a href="http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint_report-72.html">sample</a>), which presents hourly/daily/weekly reports for the many metrics, the new brief report only presents with a few hourly based charts. These include InnoDB performance, DML, OS metrics, and replication status.</p>
+<p>To get a brief HTML report, issue:</p>
+<blockquote>
+<pre>mysql&gt; SELECT html FROM sv_report_html_brief;
+
+<a href="http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint-brief-report.html"><img class="alignnone size-full wp-image-1839" title="mycehckpoint-report-html-brief-screenshot-small" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycehckpoint-report-html-brief-screenshot-small2.png" alt="" width="611" height="409" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycehckpoint-report-html-brief-screenshot-small2.png 611w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycehckpoint-report-html-brief-screenshot-small2-300x200.png 300w" sizes="(max-width: 611px) 100vw, 611px" /></a>
+</pre>
+</blockquote>
+<p>See <a href="http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint-brief-report.html">sample brief HTML report</a>.</p>
+<h4>24/7 charts</h4>
+<p>24/7 charts present the various metrics on a 24&#215;7 matrix, which allows for diagnostics of usage throughout the day and week. For example, it makes it easier to see how things slow down on Saturday/Sunday; how load increases on 10:00am every day, etc.</p>
+<p>24/7 charts are provided by the <strong>sv_report_chart_24_7</strong> view.</p>
+<blockquote>
+<pre>DESC sv_report_chart_24_7;
++---------------------------------------+----------+------+-----+---------+-------+
+| Field                                 | Type     | Null | Key | Default | Extra |
++---------------------------------------+----------+------+-----+---------+-------+
+| innodb_read_hit_percent               | longblob | YES  |     | NULL    |       |
+| innodb_buffer_pool_reads_psec         | longblob | YES  |     | NULL    |       |
+| innodb_buffer_pool_pages_flushed_psec | longblob | YES  |     | NULL    |       |
+| innodb_os_log_written_psec            | longblob | YES  |     | NULL    |       |
+| innodb_row_lock_waits_psec            | longblob | YES  |     | NULL    |       |
+| mega_bytes_sent_psec                  | longblob | YES  |     | NULL    |       |
+| mega_bytes_received_psec              | longblob | YES  |     | NULL    |       |
+| key_read_hit_percent                  | longblob | YES  |     | NULL    |       |
+| key_write_hit_percent                 | longblob | YES  |     | NULL    |       |
+| com_select_psec                       | longblob | YES  |     | NULL    |       |
+| com_insert_psec                       | longblob | YES  |     | NULL    |       |
+| com_delete_psec                       | longblob | YES  |     | NULL    |       |
+| com_update_psec                       | longblob | YES  |     | NULL    |       |
+| com_replace_psec                      | longblob | YES  |     | NULL    |       |
+| com_set_option_percent                | longblob | YES  |     | NULL    |       |
+| com_commit_percent                    | longblob | YES  |     | NULL    |       |
+| slow_queries_percent                  | longblob | YES  |     | NULL    |       |
+| select_scan_psec                      | longblob | YES  |     | NULL    |       |
+| select_full_join_psec                 | longblob | YES  |     | NULL    |       |
+| select_range_psec                     | longblob | YES  |     | NULL    |       |
+| table_locks_waited_psec               | longblob | YES  |     | NULL    |       |
+| opened_tables_psec                    | longblob | YES  |     | NULL    |       |
+| created_tmp_tables_psec               | longblob | YES  |     | NULL    |       |
+| created_tmp_disk_tables_psec          | longblob | YES  |     | NULL    |       |
+| connections_psec                      | longblob | YES  |     | NULL    |       |
+| aborted_connects_psec                 | longblob | YES  |     | NULL    |       |
+| threads_created_psec                  | longblob | YES  |     | NULL    |       |
+| seconds_behind_master                 | longblob | YES  |     | NULL    |       |
+| os_loadavg                            | longblob | YES  |     | NULL    |       |
+| os_cpu_utilization_percent            | longblob | YES  |     | NULL    |       |
+| os_mem_used_mb                        | longblob | YES  |     | NULL    |       |
+| os_mem_active_mb                      | longblob | YES  |     | NULL    |       |
+| os_swap_used_mb                       | longblob | YES  |     | NULL    |       |
++---------------------------------------+----------+------+-----+---------+-------</pre>
+</blockquote>
+<p>Example:</p>
+<blockquote>
+<pre>mysql&gt; SELECT com_select_psec, innodb_buffer_pool_pages_flushed_psec FROM mycheckpoint.<strong>sv_report_chart_24_7</strong> \G
+<img class="alignnone size-full wp-image-1798" title="mycheckpoint-chart-247-sample" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-247-sample1.png" alt="mycheckpoint-chart-247-sample" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-247-sample1.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-247-sample1-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" />
+<img class="alignnone size-full wp-image-1830" title="mycheckpoint-24-7-chart-sample2" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycheckpoint-24-7-chart-sample2.png" alt="" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycheckpoint-24-7-chart-sample2.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycheckpoint-24-7-chart-sample2-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" />
+</pre>
+</blockquote>
+<h4>Trying mycheckpoint</h4>
+<ul>
+<li>Get <em>mycheckpoint</em> from the <a href="https://code.google.com/p/mycheckpoint/">mycheckpoint Google Code project page</a>.</li>
+<li>Read the <a href="http://code.openark.org/forge/mycheckpoint/documentation">documentation</a>.</li>
+<li>Report <a href="https://code.google.com/p/mycheckpoint/issues/list">issues</a>!</li>
+</ul>
+<h4>Future plans</h4>
+<p>I haven&#8217;t got any major immediate issues; planning on user customization of charts and HTML reports. Considering thresholds and alerting for the future.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1784</post-id>	</item>
+		<item>
+		<title>Manually installing multiple MySQL instances on Linux: HOWTO</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto#comments</comments>
+				<pubDate>Thu, 19 Feb 2009 06:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=531</guid>
+				<description><![CDATA[Installing a single MySQL instance on a linux machine is a very simple operation. It may be as simple as: apt-get install mysql-server But you cannot use this method to install another MySQL instance. Moreover, if you try to manually install another instance, you may find that some collisions occur. For example, when trying to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Installing a single MySQL instance on a linux machine is a very simple operation. It may be as simple as:</p>
+<blockquote>
+<pre>apt-get install mysql-server</pre>
+</blockquote>
+<p>But you cannot use this method to install another MySQL instance. Moreover, if you try to manually install another instance, you may find that some collisions occur.</p>
+<p>For example, when trying to install two 5.0 servers, apt-get or yum will just tell me &#8220;package is already installed&#8221;.</p>
+<p>When trying to install a new 5.1 server along with 5.0, an implicit upgrade is performed.</p>
+<p>But even if we try forcing the installation, there are collisions:</p>
+<ul>
+<li>A dpkg or rpm will install my.cnf under <strong>/etc</strong>. Two installations will override one another. With RPM you may get a .rpmsave backup file, but that doesn&#8217;t help too much.</li>
+<li>The daemon file: <strong>/etc/init.d/mysql(d)</strong> is overwritten.</li>
+<li>The default data directory is used for both installations: <strong>/var/lib/mysql</strong></li>
+<li>The binaries are overwritten</li>
+<li>Both installations will use port 3306.</li>
+<li>In both installations, the same socket file (e.g. <strong>/var/run/mysql/mysql.sock</strong>) is used.</li>
+</ul>
+<p><span id="more-531"></span>Interestingly, on Windows, multiple MySQL installations are by far easier:</p>
+<ul>
+<li>Binaries are under <strong>Program Files\\MySQL\\MySQLX.X</strong>. With two installations, you specify different directories.</li>
+<li>Data files are by default directly under the installations paths (MySQL 5.0) or under &#8220;<strong>Documents And Settings&#8230;</strong>&#8221; (MySQL 5.1) with no collisions.</li>
+<li>The <strong>my.ini</strong> files are located directly under the installation paths.</li>
+<li>The installer asks you for a service name, and notifies you if that name is already in use.</li>
+<li>The installer let&#8217;s you know if port 3306 is already taken, and allows you to specify another one.</li>
+<li>Of course, there&#8217;s no unix socket file.</li>
+</ul>
+<p>I usually install MySQL on Linux using the binary tarball. When there&#8217;s only one instance expected, I go with the standards: my.cnf is in <strong>/etc</strong>, mysqld is under <strong>/etc/init.d</strong>, etc. (no pun intended)</p>
+<h4>Steps for multiple installation on Linux</h4>
+<p>When more than one installation is expected, here&#8217;s a safe way to ensure no collisions occur. We will assume a 5.0 and 5.1 installation (say we want to upgrade):</p>
+<h4>Install the MySQL binaries under /usr/local</h4>
+<p>Following the INSTALL document file, we make symbolic links to the full path in the names</p>
+<blockquote>
+<pre>ln -s /usr/local/your-mysql-5.0-full-installation-path /usr/local/mysql50
+ln -s /usr/local/your-mysql-5.1-full-installation-path /usr/local/mysql51</pre>
+</blockquote>
+<p><strong> </strong></p>
+<h4>Do not put my.cnf under /etc</h4>
+<p>Instead, put them directly in the installation path:</p>
+<blockquote>
+<pre>touch /usr/local/mysql50/my.cnf
+touch /usr/local/mysql51/my.cnf</pre>
+</blockquote>
+<h4>Setup different port numbers in the my.cnf files</h4>
+<p>For example, in /usr/local/mysql50/my.cnf, use port 3350:</p>
+<blockquote>
+<pre>[mysql]
+port=3350
+
+[mysqld]
+port=3350</pre>
+</blockquote>
+<p>Choose another port (e.g. 3351) for the 5.1 installation, then have it written as above in the 5.1 my.cnf file.</p>
+<h4>Choose distinct socket files</h4>
+<p>For example,  in /usr/local/mysql50/my.cnf, add:</p>
+<blockquote>
+<pre>[mysql]
+port=3350
+<strong>socket=/tmp/mysql50.sock</strong>
+
+[mysqld]
+port=3350
+<strong>socket=/tmp/mysql50.sock
+</strong></pre>
+</blockquote>
+<p>Choose another socket and set it up in the second my.cnf file. You may also choose to put the socket files under the data paths or installation paths.</p>
+<h4>Choose distinct data paths</h4>
+<p>Either do not specify them at all, in which case they will reside under the installation path, or, if you want to enjoy another partition, use:</p>
+<blockquote>
+<pre>[mysql]
+port=3350
+socket=/tmp/mysql50.sock
+
+[mysqld]
+port=3350
+socket=/tmp/mysql50.sock
+<strong>datadir=/my_raid_path/mysql50/</strong></pre>
+</blockquote>
+<h4>Create distinct daemons</h4>
+<p>Manually copy support_files/mysql.server to /etc/init.d under distinct names. For example:</p>
+<blockquote>
+<pre>cp /usr/local/mysql50/support_files/mysql.server /etc/init.d/mysqld50
+cp /usr/local/mysql51/support_files/mysql.server /etc/init.d/mysqld51</pre>
+</blockquote>
+<h4>Other settings</h4>
+<p>You may wish to set up a soft link for the client binaries, for example:</p>
+<blockquote>
+<pre>ln -s /usr/local/mysql50/bin/mysql /usr/bin/mysql50</pre>
+</blockquote>
+<p>chkconfig (RedHat and derived) can be used to start/stop daemon as service:</p>
+<blockquote>
+<pre>chkconfig --add mysqld50</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>I would prefer MySQL to come bundled in self-contained directory. The tarball is almost that, except it expects socket file to be on /tmp, and by default uses the 3306 port. I would further like to have a dpkg-reconfigure script to setup the above issues.</p>
+<p>Till then, it&#8217;s manual configuration.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto/feed</wfw:commentRss>
+		<slash:comments>28</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">531</post-id>	</item>
+	</channel>
+</rss>

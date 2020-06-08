@@ -1,0 +1,978 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Hack &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/hack/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 20 Oct 2014 06:40:04 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Making UUID() and RAND() replication safe</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/making-uuid-and-rand-replication-safe</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/making-uuid-and-rand-replication-safe#comments</comments>
+				<pubDate>Mon, 20 Oct 2014 06:40:04 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7034</guid>
+				<description><![CDATA[MySQL&#8217;s UUID() and RAND() functions both provide with (pseudo) indeterministic result. UUID()&#8216;s result is moreover bound to the host on which it executes. For this reason, both are unsafe to replicate with STATEMENT binlog format. As an example, consider: master&#62; create table test.uuid_test (id int, u varchar(64)); master&#62; insert into test.uuid_test values (1, UUID()); Query [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL&#8217;s <a href="http://dev.mysql.com/doc/refman/5.5/en/miscellaneous-functions.html#function_uuid"><strong>UUID()</strong></a> and <a href="http://dev.mysql.com/doc/refman/5.5/en/mathematical-functions.html#function_rand"><strong>RAND()</strong></a> functions both provide with (pseudo) indeterministic result. <strong>UUID()</strong>&#8216;s result is moreover bound to the host on which it executes. For this reason, both are unsafe to replicate with <strong>STATEMENT</strong> binlog format. As an example, consider:</p>
+<blockquote>
+<pre><strong>master&gt;</strong> create table test.uuid_test (id int, u varchar(64));
+
+<strong>master&gt;</strong> insert into test.uuid_test values (1, UUID());
+Query OK, 1 row affected, 1 warning (0.03 sec)
+
+<strong>master&gt;</strong> select * from test.uuid_test;
++------+--------------------------------------+
+| id   | u                                    |
++------+--------------------------------------+
+|    1 | 7e3596d8-56ac-11e4-b284-3c970ea31ea8 |
++------+--------------------------------------+</pre>
+</blockquote>
+<p>The warning we got on the insert directly relates to the following inconsistency on a slave:</p>
+<blockquote>
+<pre><strong>slave1&gt;</strong> select * from test.uuid_test;
++------+--------------------------------------+
+| id   | u                                    |
++------+--------------------------------------+
+|    1 | 7e379d63-56ac-11e4-8477-3c970ea31ea8 |
++------+--------------------------------------+</pre>
+</blockquote>
+<p>The data on the slave is clearly inconsistent with the master&#8217;s. The slave, replicating via <strong>STATEMENT</strong> binlog format, re-executes the <strong>INSERT</strong> command and gets a different UUID value.</p>
+<h4>External</h4>
+<p>One solution to the above is to generate the UUID value from your application. By the time MySQL gets the <strong>INSERT</strong> statement, the UUID value is a constant string, as far as MySQL is concerned.</p>
+<h4>Internal</h4>
+<p>However there&#8217;s a way to do it from within MySQL, by decoupling the <strong>UUID()</strong> function from the <strong>INSERT</strong> statement. It takes a session variable. Consider:<span id="more-7034"></span></p>
+<blockquote>
+<pre><strong>master&gt;</strong> set @safe_uuid := UUID();
+Query OK, 0 rows affected (0.00 sec)
+
+<strong>master&gt;</strong> insert into test.uuid_test values (2, @safe_uuid);
+Query OK, 1 row affected (0.02 sec)
+
+<strong>master&gt;</strong> select * from test.uuid_test;
++------+--------------------------------------+
+| id   | u                                    |
++------+--------------------------------------+
+|    1 | 7e3596d8-56ac-11e4-b284-3c970ea31ea8 |
+|    2 | <strong>29c51fb9-56ad-11e4-b284-3c970ea31ea8</strong> |
++------+--------------------------------------+</pre>
+</blockquote>
+<p>And on a slave:</p>
+<blockquote>
+<pre><strong>slave1&gt;</strong> select * from test.uuid_test;
++------+--------------------------------------+
+| id   | u                                    |
++------+--------------------------------------+
+|    1 | 7e379d63-56ac-11e4-8477-3c970ea31ea8 |
+|    2 | <strong>29c51fb9-56ad-11e4-b284-3c970ea31ea8</strong> |
++------+--------------------------------------+</pre>
+</blockquote>
+<p>The reason why this succeeds is that MySQL stores session variable values that are being used by DML queries in the binary log. It just so happened that <strong>@safe_uuid</strong> was assigned the <strong>UUID()</strong> value, but it could just as well have been assigned a constant or other computation. MySQL stored the resulting value into the binary log, where it is forces upon the slave to use. Check out this binary log snippet:</p>
+<blockquote>
+<pre># at 14251
+#141018 12:57:35 server id 1  end_log_pos 14319         Query   thread_id=2     exec_time=0     error_code=0
+SET TIMESTAMP=1413626255/*!*/;
+SET @@session.sql_auto_is_null=0/*!*/;
+BEGIN
+/*!*/;
+# at 14319
+#141018 12:57:35 server id 1  end_log_pos 14397         User_var
+<strong>SET @`safe_uuid`:=_utf8 0x32396335316662392D353661642D313165342D623238342D336339373065613331656138 COLLATE `utf8_general_ci`/*!*/;</strong>
+# at 14397
+#141018 12:57:35 server id 1  end_log_pos 14509         Query   thread_id=2     exec_time=0     error_code=0
+SET TIMESTAMP=1413626255/*!*/;
+<strong>insert into test.uuid_test values (2, @safe_uuid)</strong>
+/*!*/;
+# at 14509
+#141018 12:57:35 server id 1  end_log_pos 14536         Xid = 145
+COMMIT/*!*/;</pre>
+</blockquote>
+<p>The same can be applied for <strong>RAND()</strong>. Funny thing about <strong>RAND()</strong> is that it is already taken care of by the binary log via <strong>SET @@RAND_SEED1, SET @@RAND_SEED2</strong> statements (i.e. it <em>works</em>), though the documentation clearly states it is unsafe.</p>
+<p>With Row Based Replication (RBR) the problem never arises in the first place since the binlog contains the <em>values</em> of the new/updated rows.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/making-uuid-and-rand-replication-safe/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7034</post-id>	</item>
+		<item>
+		<title>Cheating mysqlsandbox to install MariaDB 10.0</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/cheating-mysqlsandbox-to-install-mariadb-10-0</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/cheating-mysqlsandbox-to-install-mariadb-10-0#comments</comments>
+				<pubDate>Sun, 17 Mar 2013 06:19:50 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[tools]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6139</guid>
+				<description><![CDATA[mysqlsandbox is version-aware. The new 5.6 version, for example, requires special care because of the system InnoDB tables or otherwise modified system tables. At this moment, it will refuse to install MariaDB 10.0 (alpha): bash$ make_sandbox /tmp/mariadb-10.0.1-linux-x86_64.tar.gz unpacking /tmp/mariadb-10.0.1-linux-x86_64.tar.gz unsupported version 10.0 This is perfectly legitimate, and I have no quarrel with this fact. However, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><em>mysqlsandbox</em> is version-aware. The new <strong>5.6</strong> version, for example, requires <a href="http://datacharmer.blogspot.co.il/2012/09/mysql-sandbox-updated-with-minimal.html">special</a> <a href="http://datacharmer.blogspot.co.il/2013/02/mysql-sandbox-3030-now-adapted-to-work.html">care</a> because of the system InnoDB tables or otherwise modified system tables.</p>
+<p>At this moment, it will refuse to install MariaDB <strong>10.0</strong> (alpha):</p>
+<blockquote>
+<pre><strong>bash$</strong> make_sandbox /tmp/mariadb-10.0.1-linux-x86_64.tar.gz 
+unpacking /tmp/mariadb-10.0.1-linux-x86_64.tar.gz
+<span style="color: #800000;">unsupported version 10.0</span></pre>
+</blockquote>
+<p>This is perfectly legitimate, and I have no quarrel with this fact. However, I did want to setup MariaDB <strong>10.0</strong> as a sandbox.</p>
+<p>As it turns out <em>mysqlsandbox</em> relies on MySQL package naming conventions to detect the version: the fact that a <strong>tgz</strong> file distribution is named <strong>mariadb-10.0.1-linux-x86_64.tar.gz</strong> and extracts onto <strong>mariadb-10.0.1-linux-x86_64</strong>, tells <em>mysqlsandbox</em> that this is version <strong>10.0.1</strong>. Easy enough to cheat, then: pick a version that <em>mysqlsandbox</em> will work with, and which is compatible sandbox-wise with your own, and do the renames. For that matter, I picked <strong>5.5</strong>, and, actually, made it <strong>5.5.100</strong>:<span id="more-6139"></span></p>
+<blockquote>
+<pre><strong>bash:/tmp$</strong> tar xzf <span style="color: #800000;">mariadb-10.0.1-linux-x86_64.tar.gz</span>
+<strong>bash:/tmp$</strong> mv <span style="color: #800000;">mariadb-10.0.1-linux-x86_64</span> <span style="color: #000080;">mariadb-5.5.100-linux-x86_64</span>
+<strong>bash:/tmp$</strong> tar czf <span style="color: #000080;">/tmp/mariadb-5.5.100-linux-x86_64.tar.gz</span> <span style="color: #000080;">./mariadb-5.5.100-linux-x86_64</span>
+<strong>bash:/tmp$</strong> make_sandbox <span style="color: #000080;">mariadb-5.5.100-linux-x86_64.tar.gz</span> 
+
+unpacking /tmp/mariadb-5.5.100-linux-x86_64.tar.gz
+Executing low_level_make_sandbox --basedir=/tmp/5.5.100 \
+        --sandbox_directory=msb_5_5_100 \
+        <span style="color: #339966;">--install_version=5.5</span> \
+        --sandbox_port=55100 \
+        --no_ver_after_name \
+        --my_clause=log-error=msandbox.err
+&gt;&gt;/tmp
+    The MySQL Sandbox,  version 3.0.29
+    (C) 2006-2013 Giuseppe Maxia
+installing with the following parameters:
+upper_directory                = /home/shlomi/sandboxes
+sandbox_directory              = msb_5_5_100
+sandbox_port                   = 55100
+check_port                     = 
+no_check_port                  = 
+datadir_from                   = script
+install_version                = 5.5
+basedir                        = /tmp/5.5.100
+tmpdir                         = 
+my_file                        = 
+operating_system_user          = shlomi
+db_user                        = msandbox
+remote_access                  = 127.%
+ro_user                        = msandbox_ro
+rw_user                        = msandbox_rw
+repl_user                      = rsandbox
+db_password                    = msandbox
+repl_password                  = rsandbox
+my_clause                      = log-error=msandbox.err
+master                         = 
+slaveof                        = 
+high_performance               = 
+prompt_prefix                  = mysql
+prompt_body                    =  [\h] {\u} (\d) &gt; 
+force                          = 
+no_ver_after_name              = 1
+verbose                        = 
+load_grants                    = 1
+no_load_grants                 = 
+no_run                         = 
+no_show                        = 
+do you agree? ([Y],n)</pre>
+</blockquote>
+<p>It worked well for me; perhaps I&#8217;m missing on something, so watch your own setup.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/cheating-mysqlsandbox-to-install-mariadb-10-0/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6139</post-id>	</item>
+		<item>
+		<title>Looking for a hack: share data between MySQL sessions</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/looking-for-a-hack-share-data-between-mysql-sessions</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/looking-for-a-hack-share-data-between-mysql-sessions#comments</comments>
+				<pubDate>Mon, 28 Jan 2013 13:27:58 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6034</guid>
+				<description><![CDATA[I&#8217;m looking for a way to share data between two MySQL connections/sessions. Obviously tables are the trivial answer, but for reasons of security (possibly insufficient privileges) I wish to avoid that. The type of data to be passed can vary. Ideally I would be able to pass multiple pieces of information (dates, texts, integers, etc.) [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m looking for a way to share data between two MySQL connections/sessions. Obviously tables are the trivial answer, but for reasons of security (possibly insufficient privileges) I wish to avoid that.</p>
+<p>The type of data to be passed can vary. Ideally I would be able to pass multiple pieces of information (dates, texts, integers, etc.) around. If impossible, I would do with texts only, and if impossible yet, I could do with a single text (but reasonably long).</p>
+<p>There is a way to do so: by writing to the file system (<strong>SELECT INTO OUTFILE</strong> + <strong>LOAD_FILE()</strong>). However I wish to avoid it, since writing to files from within MySQL requires creation of a new file each time; no overwrite and no purging; this litters the file system.</p>
+<p>So: any other tricks? Is there some way to pass data via <strong>GET_LOCK()</strong>/<strong>RELEASE_LOCK()</strong> (none that I can see other than Morse code)?</p>
+<p>Is there some global variable that is unused, can be changed dynamically, and has enough space? (I couldn&#8217;t find one)</p>
+<p>I appreciate any input.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/looking-for-a-hack-share-data-between-mysql-sessions/feed</wfw:commentRss>
+		<slash:comments>20</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6034</post-id>	</item>
+		<item>
+		<title>SQL: selecting top N records per group, another solution</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution#comments</comments>
+				<pubDate>Tue, 21 Aug 2012 04:49:43 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5249</guid>
+				<description><![CDATA[A while back I presented SQL: selecting top N records per group, a &#8220;give me the top 5 countries in each continent&#8221; type of query, and which used an external numbers table and a lot of tedious casting. Here&#8217;s another solution I came up with (*). Still using GROUP_CONCAT (how else?), but no external table [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A while back I presented <a title="Permanent Link to SQL: selecting top N records per group" href="https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group" rel="bookmark">SQL: selecting top N records per group</a>, a &#8220;give me the top <strong>5</strong> countries in each continent&#8221; type of query, and which used an external <em>numbers</em> table and a lot of tedious casting.</p>
+<p>Here&#8217;s another solution I came up with (<a href="#update">*</a>). Still using <strong>GROUP_CONCAT</strong> (how else?), but no external table and no casting. The query outputs the largest <strong>5</strong> countries (by surface area) per continent.</p>
+<blockquote>
+<pre>SELECT
+  Continent,
+  Name,
+  SurfaceArea,
+  Population
+FROM
+  world.Country,
+  (
+    SELECT 
+      GROUP_CONCAT(top_codes_per_group) AS top_codes
+    FROM
+      (
+        SELECT 
+          SUBSTRING_INDEX(GROUP_CONCAT(<strong>Code ORDER BY SurfaceArea DESC</strong>), ',', <strong>5</strong>) AS top_codes_per_group
+        FROM
+          world.Country
+        GROUP BY
+          Continent
+      ) s_top_codes_per_group
+  ) s_top_codes
+WHERE
+  FIND_IN_SET(Code, top_codes)
+ORDER BY
+  Continent,
+  SurfaceArea DESC
+;
+
++---------------+----------------------------------------------+-------------+------------+
+| Continent     | Name                                         | SurfaceArea | Population |
++---------------+----------------------------------------------+-------------+------------+
+| Asia          | China                                        |  9572900.00 | 1277558000 |
+| Asia          | India                                        |  3287263.00 | 1013662000 |
+| Asia          | Kazakstan                                    |  2724900.00 |   16223000 |
+| Asia          | Saudi Arabia                                 |  2149690.00 |   21607000 |
+| Asia          | Indonesia                                    |  1904569.00 |  212107000 |
+| Europe        | Russian Federation                           | 17075400.00 |  146934000 |
+| Europe        | Ukraine                                      |   603700.00 |   50456000 |
+| Europe        | France                                       |   551500.00 |   59225700 |
+| Europe        | Spain                                        |   505992.00 |   39441700 |
+| Europe        | Sweden                                       |   449964.00 |    8861400 |
+| North America | Canada                                       |  9970610.00 |   31147000 |
+| North America | United States                                |  9363520.00 |  278357000 |
+| North America | Greenland                                    |  2166090.00 |      56000 |
+| North America | Mexico                                       |  1958201.00 |   98881000 |
+| North America | Nicaragua                                    |   130000.00 |    5074000 |
+| Africa        | Sudan                                        |  2505813.00 |   29490000 |
+| Africa        | Algeria                                      |  2381741.00 |   31471000 |
+| Africa        | Congo, The Democratic Republic of the        |  2344858.00 |   51654000 |
+| Africa        | Libyan Arab Jamahiriya                       |  1759540.00 |    5605000 |
+| Africa        | Chad                                         |  1284000.00 |    7651000 |
+| Oceania       | Australia                                    |  7741220.00 |   18886000 |
+| Oceania       | Papua New Guinea                             |   462840.00 |    4807000 |
+| Oceania       | New Zealand                                  |   270534.00 |    3862000 |
+| Oceania       | Solomon Islands                              |    28896.00 |     444000 |
+| Oceania       | New Caledonia                                |    18575.00 |     214000 |
+| Antarctica    | Antarctica                                   | 13120000.00 |          0 |
+| Antarctica    | French Southern territories                  |     7780.00 |          0 |
+| Antarctica    | South Georgia and the South Sandwich Islands |     3903.00 |          0 |
+| Antarctica    | Heard Island and McDonald Islands            |      359.00 |          0 |
+| Antarctica    | Bouvet Island                                |       59.00 |          0 |
+| South America | Brazil                                       |  8547403.00 |  170115000 |
+| South America | Argentina                                    |  2780400.00 |   37032000 |
+| South America | Peru                                         |  1285216.00 |   25662000 |
+| South America | Colombia                                     |  1138914.00 |   42321000 |
+| South America | Bolivia                                      |  1098581.00 |    8329000 |
++---------------+----------------------------------------------+-------------+------------+
+</pre>
+</blockquote>
+<p>In bold are the conditions by which we nominate our selected rows (condition is <strong>SurfaceArea DESC</strong>, number of rows is <strong>5</strong>, so 5 largest countries).</p>
+<h4><span id="more-5249"></span>What&#8217;s going on here?</h4>
+<p>So the inner <strong>s_top_codes_per_group</strong> query produces the codes for largest countries per continent:</p>
+<blockquote>
+<pre>+---------------------+
+| top_codes_per_group |
++---------------------+
+| CHN,IND,KAZ,SAU,IDN |
+| RUS,UKR,FRA,ESP,SWE |
+| CAN,USA,GRL,MEX,NIC |
+| SDN,DZA,COD,LBY,TCD |
+| AUS,PNG,NZL,SLB,NCL |
+| ATA,ATF,SGS,HMD,BVT |
+| BRA,ARG,PER,COL,BOL |
++---------------------+</pre>
+</blockquote>
+<p>The wrapping <strong>s_top_codes</strong> query concatenates all the above to one long text:</p>
+<blockquote>
+<pre>+---------------------------------------------------------------------------------------------------------------------------------------------+
+| top_codes                                                                                                                                   |
++---------------------------------------------------------------------------------------------------------------------------------------------+
+| CHN,IND,KAZ,SAU,IDN,RUS,UKR,FRA,ESP,SWE,CAN,USA,GRL,MEX,NIC,SDN,DZA,COD,LBY,TCD,AUS,PNG,NZL,SLB,NCL,ATA,ATF,SGS,HMD,BVT,BRA,ARG,PER,COL,BOL |
++---------------------------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>And the final query simply demands that <strong>Code</strong> must be found within this string, by calling upon <strong>FIND_IN_SET(Code, top_codes)</strong>.</p>
+<h4>Notes</h4>
+<ul>
+<li>This solution works for <strong>PRIMARY KEY</strong>s or otherwise <strong>UNIQUE KEY</strong>s of all sorts (a <strong>CHAR(3)</strong> in our example, but same for integers etc.)</li>
+<li>And you still have to have a sufficient <strong>group_concat_max_len</strong> (see <a title="Those oversized, undersized variables defaults" href="https://shlomi-noach.github.io/blog/mysql/those-oversized-undersized-variables-defaults">this post</a>). You <em>must</em> have a large enough value to fit in the very long text you may be expecting in <strong>s_top_codes</strong>.</li>
+<li>Performance-wise there are full scans here, as well as string searching.</li>
+</ul>
+<p><a name="update"></a></p>
+<h4>* UPDATE</h4>
+<p>I should pay closer attention. <a href="http://www.xaprb.com/blog/2006/12/07/how-to-select-the-firstleastmax-row-per-group-in-sql/#comment-13284">This comment</a> had it <strong>5</strong> years ago.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql-selecting-top-n-records-per-group-another-solution/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5249</post-id>	</item>
+		<item>
+		<title>Getting rid of huge ibdata file, no dump required, part II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii#comments</comments>
+				<pubDate>Wed, 30 May 2012 07:03:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Refactoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4845</guid>
+				<description><![CDATA[This post continues Getting rid of huge ibdata file, no dump required, part I, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing everything at once. In previous part we put aside the issue of foreign keys. We address this issue now. What [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post continues <a href="https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required">Getting rid of huge ibdata file, no dump required, part I</a>, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing <em>everything at once</em>.</p>
+<p>In previous part we put aside the issue of foreign keys. We address this issue now.</p>
+<h4>What if my InnoDB tables have foreign keys?</h4>
+<p>MyISAM does not support them, so you can&#8217;t just <strong>ALTER</strong> an InnoDB table to MyISAM and back into InnoDB, and expect everything to work.</p>
+<p>Alas, this calls for additional steps (i.e. additional <strong>ALTER</strong> commands). However, these still fall well under the concept of <em>&#8220;do it one table at a time, then take time to recover your breath and replication lag&#8221;</em>.</p>
+<h4>Save , drop and restore your Foreign Keys setup</h4>
+<p>You can use <a href="http://code.google.com/p/common-schema/">common_schema</a>&#8216;s  <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">sql_foreign_keys</a> to get the full listing and create definition of your foreign keys. For example, assume we use the <strong>sakila</strong> database:<span id="more-4845"></span></p>
+<blockquote>
+<pre>SELECT create_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila' INTO OUTFILE '/somewhere/safe/create_foreign_keys.sql'</pre>
+</blockquote>
+<p>(replace <strong>TABLE_SCHEMA=&#8217;sakila&#8217;</strong> with whatever you want).</p>
+<p>A sample output would be something like this (<em>note: no semicolon on end of line</em>):</p>
+<blockquote>
+<pre>ALTER TABLE `sakila`.`address` ADD CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `sakila`.`city` (`city_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`city` ADD CONSTRAINT `fk_city_country` FOREIGN KEY (`country_id`) REFERENCES `sakila`.`country` (`country_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+...</pre>
+</blockquote>
+<p>Once the above is in a safe place, you will want to DROP all of your foreign keys. Again, using <em>common_schema</em>:</p>
+<blockquote>
+<pre>SELECT drop_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila';
++-----------------------------------------------------------------------------------+
+| drop_statement                                                                    |
++-----------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` DROP FOREIGN KEY `fk_address_city`                 |
+| ALTER TABLE `sakila`.`city` DROP FOREIGN KEY `fk_city_country`                    |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_address`            |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_store`              |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language`                   |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language_original`          |
+| ...                                                                               |
++-----------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>You don&#8217;t want to issue all these at once: do them one at a time, and wait for your slave to catch up.</p>
+<p>Once this is done, you can move on to the steps described in Part I of this post: converting tables to MyISAM, shutting down, removing InnoDB files, then converting back to InnoDB.</p>
+<p>And then, taking breath again, you must re-import the foreign keys. Use the <strong>ADD CONSTRAINT</strong> commands you have saved earlier on. Again, one at a time, wait for slave to catch up.</p>
+<p>To reiterate, for each table you would take the following steps:</p>
+<ol>
+<li>Make sure the FK definition is safely stored somewhere</li>
+<li>STOP SLAVE</li>
+<li>Drop all table&#8217;s foreign keys: ALTER TABLE &#8230; DROP FOREIGN KEY &#8230;, DROP FOREIGN KEY &#8230;</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ENGINE=MyISAM (*)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(*) Altering to MyISAM drops FK constraints, so the above could actually be done in one step. I&#8217;m cautious and illustrate in two.</p>
+<p>Once all tables are altered, and InnoDB tablespace is removed, restoration is as follows: for each table,</p>
+<ol>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ENGINE=InnoDB [create options]</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ADD CONSTRAINT &#8230;, ADD CONSTRAINT &#8230;(+)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(+) Alas, you can&#8217;t convert to InnoDB and add constraints at the same time&#8230;</p>
+<h4>This is not entirely safe</h4>
+<p>A MyISAM slave to an InnoDB master with foreign keys is a tricky business. It really depends on the type of foreign keys you have and the use you make of them. See <a title="Link to Impact of foreign keys absence on replicating slaves" href="https://shlomi-noach.github.io/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves" rel="bookmark">Impact of foreign keys absence on replicating slaves</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4845</post-id>	</item>
+		<item>
+		<title>Getting rid of huge ibdata file, no dump required</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required#comments</comments>
+				<pubDate>Tue, 22 May 2012 05:33:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Refactoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442</guid>
+				<description><![CDATA[You have been told (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named ibdata1), when moving to innodb_file_per_table, is to do a logical dump of your data, completely erase everything, then import the dump. To quickly reiterate, you can only delete the ibdata1 file when no [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>You <a href="https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file">have</a> been <a href="http://ronaldbradford.com/blog/leveraging-the-innodb-plugin-2011-02-11/">told</a> (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named <strong>ibdata1</strong>), when moving to <strong>innodb_file_per_table</strong>, is to do a logical dump of your data, completely erase everything, then import the dump.</p>
+<p>To quickly reiterate, you can only delete the <strong>ibdata1</strong> file when no InnoDB tables exist. Delete this file with an existing InnoDB table, even a table in its own tablespace, and nothing ever works anymore.</p>
+<h4>The problem with the dump-based solution</h4>
+<p>The impact of doing a logical dump is often overwhelming. Well, the dump may be tolerable, but the restore is much longer. The real pain is that you can&#8217;t do this one table at a time: you have to destroy everything before dropping the <strong>ibdata1</strong> file; you then have to import everything.</p>
+<p>Perhaps the most common scenario is that we do the changes on a slave, so as not to completely shut down our database. This is nice; no one is aware of the shutdown process. However, Huston, we have a problem: we need to make sure we can keep up the binary logs on the master for the duration of the <em>entire process</em>.<span id="more-3442"></span></p>
+<h4>A semi-solution for binary logs</h4>
+<p>You may get by by keeping the <strong>SQL_IO_THREAD</strong> running on the slave while dump is taken (SQL thread is better turned off). If you&#8217;re careful, you could do the same after restarting the database: you should still be able to acquire relay logs. With row based replication becoming more common, the problem of binary logs disk space returns: the logs (rather, log entries) are just so much larger!</p>
+<p>Either way, the process can takes long days, at the end of which your slave is up, but lags for long days behind.</p>
+<h4>Wishful thought: do it one table at a time</h4>
+<p>If we could do it one table at a time, and assuming our dataset is fairly split among several tables (i.e. not all of our <strong>500GB</strong> of data is in one huge table), life would be easier: we could work on a single table, resume replication, let the slave catch up, then do the same for the next table.</p>
+<p>How? Didn&#8217;t we just say one can only drop the <strong>ibdata1</strong> file when no InnoDB tables exist?</p>
+<h4>Solution: do it one table at a time</h4>
+<p>I&#8217;m going to illustrate what seems like a longer procedure. I will later show why it is not, in fact, longer.</p>
+<p>The idea is to first convert all your tables to MyISAM (Yay! A use for MyISAM!). That is, convert your tables one table at a time, using normal <strong>ALTER TABLE t ENGINE=MyISAM</strong>.</p>
+<p>Please let go of the foreign keys issue right now. I will address it later, there&#8217;s a lot to be addressed.</p>
+<p>So, on a slave:</p>
+<ol>
+<li><strong>STOP SLAVE</strong></li>
+<li>One <strong>ALTER TABLE &#8230; ENGINE=MyISAM<br />
+</strong></li>
+<li><strong>START SLAVE</strong> again</li>
+<li>Wait for slave catch up</li>
+<li>GOTO <strong>1</strong></li>
+</ol>
+<p>What do we end up with? A MyISAM only database. What do we do with it? Why, convert it back to InnoDB, of course!</p>
+<p>But, before that, we:</p>
+<ol>
+<li>Shut MySQL down</li>
+<li>Delete <strong>ibdata1</strong> file, <strong>ib_logfile[01]</strong> (i.e. delete all InnoDB files)</li>
+<li>Start MySQL</li>
+</ol>
+<p>A new <strong>ibdata1</strong> file, and new transaction log files will be created. Note: the new ibdata1 file is <em>small</em>. Mission almost accomplished.</p>
+<p>We then:</p>
+<ol>
+<li><strong>STOP SLAVE</strong></li>
+<li>Do one <strong>ALTER TABLE &#8230; ENGINE=InnoDB [ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8 &#8230;]<br />
+</strong></li>
+<li><strong>START SLAVE</strong> again</li>
+<li>Wait for slave catch up</li>
+<li>GOTO <strong>1</strong></li>
+</ol>
+<p>What do we end up with? An InnoDB only database, with true file per table, and a small <strong>ibdata1</strong> file. Space recovered!</p>
+<h4>The advantage of this method</h4>
+<p>The thing is, we resume replication after each table alteration. This means breaking the lag period into many smaller periods. While the <em>total</em> runtime does not reduce, we do reduce the maximum lag time. And this makes for easier recovery: no need to store multitudes of binary logs!</p>
+<h4>So what about the foreign keys?</h4>
+<p>Phew. Continued next post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3442</post-id>	</item>
+		<item>
+		<title>Auto caching INFORMATION_SCHEMA tables: seeking input</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/auto-caching-information_schema-tables-seeking-input</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/auto-caching-information_schema-tables-seeking-input#comments</comments>
+				<pubDate>Thu, 08 Mar 2012 18:31:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4761</guid>
+				<description><![CDATA[The short version I have it all working. It&#8217;s kind of magic. But there are issues, and I&#8217;m not sure it should even exist, and am looking for input. The long version In Auto caching tables I presented with a hack which allows getting cached or fresh results via a simple SELECT queries. The drive [&#8230;]]]></description>
+								<content:encoded><![CDATA[<h4>The short version</h4>
+<p>I have it all working. It&#8217;s kind of magic. But there are issues, and I&#8217;m not sure it should even exist, and am looking for input.</p>
+<h4>The long version</h4>
+<p>In <a title="Link to Auto caching tables" href="https://shlomi-noach.github.io/blog/mysql/auto-caching-tables" rel="bookmark">Auto caching tables</a> I presented with a hack which allows getting cached or fresh results via a simple SELECT queries.</p>
+<p>The drive for the above hack was <strong>INFORMATION_SCHEMA</strong> tables. There are two major problems with <strong>INFORMATION_SCHEMA</strong>:</p>
+<ol>
+<li>Queries on schema-oriented tables such as <strong>TABLES</strong>, <strong>COLUMNS</strong>, <strong>STATISTICS</strong>, etc. are heavyweight. How heavyweight? Enough to make a lockdown of your database. Enough to crash down your database in some cases.</li>
+<li>The data is always generated on-the-fly, as you request it. Query the <strong>COLUMNS</strong> table twice, and risk two lockdowns of your database.</li>
+</ol>
+<p>The auto-cache mechanism solves issue <strong>#2</strong>. I have it working, time based. I have an auto-cache table for each of the <strong>INFORMATION_SCHEMA</strong> heavyweight tables. Say, every <strong>30</strong> minutes the cache is invalidated. Throughout those <strong>30</strong> minutes, you get a free pass!</p>
+<p>The auto-cache mechanism also paves the road to solving issue <strong>#1</strong>: since it works by invoking a stored routine, I have better control of the way I read <strong>INFORMATION_SCHEMA</strong>. This, I can take advantage of <a href="http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html">INFORMATION_SCHEMA optimization</a>. It&#8217;s tedious, but not complicated.</p>
+<p>For example, if I wanted to cache the <strong>TABLES</strong> table, I don&#8217;t necessarily read the entire <strong>TABLES</strong> data in one read. Instead, I can iterate the schemata, get a list of table names per schema, then read full row data for these, table by table. The result? Many many more <strong>SELECT</strong>s, but more optimized, and no one-big-lock-it-all query.</p>
+<h4>And the problem is&#8230;</h4>
+<p><span id="more-4761"></span>I have two burning problems.</p>
+<ol>
+<li><strong>INFORMATION_SCHEMA</strong> optimization only works <em>that much</em>. It sometimes does not work. In particular, I&#8217;ve noticed that if you have a view which relies on another view (possibly relying on yet another view), things get out of hand. I author a monitoring tool for MySQL called <a href="http://code.openark.org/forge/mycheckpoint/">mycheckpoint</a>. It uses some fancy techniques for generating aggregated data, HTML and charts, by means of nested views. There are a few views there I can never query for in <strong>COLUMNS</strong>. It just crashes down my server. Repeatedly. And it&#8217;s a good machine with good configuration. Make that <strong>5</strong> machines. They all crash, repeatedly. I just can&#8217;t trust <strong>INFORMATION_SCHEMA</strong>!</li>
+<li>Replication: any caching table is bound to replicate. Does it make any sense to replicate cache for internal metadata? Does it make sense to query for the cached table on slave, to have it answer for <em>master&#8217;</em>s data? With plain old <strong>INFORMATION_SCHEMA</strong>, every server is on its own. Caching kinda works against this. Or is it fair enough, since we would usually expect master/slaves to reflect same schema structure?</li>
+</ol>
+<p>I would feel much better if I could read <strong>SHOW</strong> statements with a <strong>SELECT</strong> query. Though I&#8217;ve found this <a href="https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side">nice hack</a>, it can&#8217;t work from a stored function, only via stored procedure. So it can&#8217;t be used from within a <strong>SELECT</strong> query. I&#8217;ve been banging my head for months now, I think I gave up on this one.</p>
+<p>Any insights are welcome!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/auto-caching-information_schema-tables-seeking-input/feed</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4761</post-id>	</item>
+		<item>
+		<title>Auto caching tables</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/auto-caching-tables</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/auto-caching-tables#comments</comments>
+				<pubDate>Tue, 06 Mar 2012 13:18:36 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+		<category><![CDATA[Views]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4353</guid>
+				<description><![CDATA[Is there a way to create a caching table, some sort of a materialized view, such that upon selecting from that table, its data is validated/invalidated? Hint: yes. But to elaborate the point: say I have some table data_table. Can I rewrite all my queries which access data_table to read from some autocache_data_table, but have [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Is there a way to create a caching table, some sort of a materialized view, such that <em>upon selecting</em> from that table, its data is validated/invalidated?</p>
+<p><em>Hint</em>: yes.</p>
+<p>But to elaborate the point: say I have some table <strong>data_table</strong>. Can I rewrite all my queries which access <strong>data_table</strong> to read from some <strong>autocache_data_table</strong>, but have nothing changed in the query itself? No caveats, no additional <strong>WHERE</strong>s, and still have that <strong>autocache_data_table</strong> provide with the correct data, dynamically updated by some rule <em>of our choice</em>?</p>
+<p>And: no <em>crontab</em>, no <em>event scheduler</em>, and no funny triggers on <strong>data_table</strong>? In such way that invalidation/revalidation occurs <em>upon <strong>SELECT</strong></em>?</p>
+<p>Well, yes.</p>
+<p>This post is long, but I suggest you read it through to understand the mechanism, it will be worthwhile.</p>
+<h4>Background</h4>
+<p>The following derives from my long research on how to provide better, faster and <em>safer</em> access to <strong>INFORMATION_SCHEMA</strong> tables. It is however not limited to this exact scenario, and in this post I provide with a simple, general purpose example. I&#8217;ll have more to share about <strong>INFORMATION_SCHEMA</strong> specific solutions shortly.</p>
+<p>I was looking for a server side solution which would not require query changes, apart from directing the query to other tables. Solution has to be supported by all standard MySQL installs; so: no plugins, no special rebuilds.<span id="more-4353"></span></p>
+<h4>Sample data</h4>
+<p>I&#8217;ll explain by walking through the solution. Let&#8217;s begin with some sample table:</p>
+<blockquote>
+<pre>CREATE TABLE sample_data (
+  id INT UNSIGNED NOT NULL PRIMARY KEY,
+  dt DATETIME,
+  msg VARCHAR(128) CHARSET ascii
+);
+
+INSERT INTO sample_data VALUES (1, NOW(), 'sample txt');
+INSERT INTO sample_data VALUES (2, NOW(), 'sample txt');
+INSERT INTO sample_data VALUES (3, NOW(), 'sample txt');
+
+SELECT * FROM sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>In this simplistic example, I wish to create a construct which looks exactly like <strong>sample_data</strong>, but which caches data according to some heuristic. It will, in fact, cache the entire content of <strong>sample_data</strong>.</p>
+<p>That much is not a problem: just create another table to cache the data:</p>
+<blockquote>
+<pre>CREATE TABLE cache_sample_data LIKE sample_data;</pre>
+</blockquote>
+<p>The big question is: how do you make the table invalidate itself while <strong>SELECT</strong>ing from it?</p>
+<p>Here&#8217;s the deal. I&#8217;ll ask for your patience while I draw the outline, and start with failed solutions. By the end, everything will work.</p>
+<h4>Failed attempt: purge rows from the table even while reading it</h4>
+<p>My idea is to create a stored function which purges the <strong>cache_sample_data</strong> table, then fills in with fresh data, according to some heuristic. Something like this:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+CREATE FUNCTION `revalidate_cache_sample_data`() RETURNS tinyint unsigned
+    MODIFIES SQL DATA
+    DETERMINISTIC
+    SQL SECURITY INVOKER
+BEGIN
+  if(rand() &gt; 0.1) then
+    return 0; -- simplistic heuristic
+  end if;
+
+  DELETE FROM cache_sample_data;
+  INSERT INTO cache_sample_data SELECT * FROM sample_data;
+  RETURN 0;
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>So the function uses some heuristic. It&#8217;s a funny <strong>RAND()</strong> in our case; you will want to check up on time stamps, or some flags, what have you. But this is not the important part here, and I want to keep the focus on the main logic.</p>
+<p>Upon deciding the table needs refreshing, the function purges all rows, then copies everything from <strong>sample_data</strong>. Sounds fair enough?</p>
+<p>Let&#8217;s try and invoke it. Just write some query by hand:</p>
+<blockquote>
+<pre>mysql&gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              <strong>0</strong> |
++--------------------------------+
+
+mysql&gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              <strong>0</strong> |
++--------------------------------+
+
+mysql&gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              <strong>1</strong> |
++--------------------------------+</pre>
+</blockquote>
+<p>First two invocations &#8211; nothing. The third one indicated a revalidation of cache data. Let&#8217;s verify:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM cache_sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>OK, seems like the function works.</p>
+<p>We now gather some courage, and try combining calling to this function even while SELECTing from the cache table, like this:</p>
+<blockquote>
+<pre>SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>To explain what happens in the above query, consider its <a href="https://shlomi-noach.github.io/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql">programmatic nature</a>: we create a derived table, populated by the function&#8217;s result. That means the function is invoked in order to generate the derived table. The derived table itself must be materialized before the query begins execution, and so it is that we first invoke the function, then make the <strong>SELECT</strong>.</p>
+<p>Don&#8217;t open the champagne yet. While the above paragraph is correct, we are deceived: in this last invocation, the function did <strong>not</strong> attempt a revalidation. The <strong>RAND()</strong> function just didn&#8217;t provide with the right value.</p>
+<p>Let&#8217;s try again:</p>
+<blockquote>
+<pre>SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
+<strong>ERROR 1442 (HY000): Can't update table 'cache_sample_data' in stored function/trigger because it is already used by statement which invoked this stored function/trigger.</strong></pre>
+</blockquote>
+<p>Aha! Bad news. The MySQL manual says on <a href="http://dev.mysql.com/doc/refman/5.1/en/stored-program-restrictions.html">Restrictions on Stored Programs</a>:</p>
+<blockquote><p>A stored function or trigger cannot modify a table that is already being used (for reading or writing) by the statement that invoked the function or trigger.</p></blockquote>
+<h4>Anyone to the rescue?</h4>
+<p>I was quite upset. Can we not make this work? At sorrow times like these, one reflects back on words of wiser people. What would <a href="http://rpbouman.blogspot.com/">Roland Bouman</a> say on this?</p>
+<p>Oh, yes; he would say: <em>&#8220;we can use a <strong>FEDERATED</strong> table which connect onto itself, thus bypass the above restriction&#8221;</em>.</p>
+<p>Unfortunately, <strong>FEDERATED</strong> is by default disabled nowadays; I cannot rely on its existence. Besides, to use <strong>FEDERATED</strong> one has to fill in passwords and stuff. Definitely not an out-of-the-box solution in this case.</p>
+<p>Few more days gone by. Decided the problem cannot be solved. And then it hit me.</p>
+<h4>MyISAM to the rescue</h4>
+<p><em><strong>MyISAM</strong></em>? Really?</p>
+<p>Yes, and not only <strong>MyISAM</strong>, but also its cousin: it&#8217;s long abandoned cousin, forgotten once <strong>views</strong> and <strong>partitions</strong> came into MySQL. <strong><a href="http://dev.mysql.com/doc/refman/5.1/en/merge-storage-engine.html">MERGE</a></strong>.</p>
+<p><strong>MERGE</strong> reflects the data contained within <strong>MyISAM</strong> tables. Perhaps the most common use for <strong>MERGE</strong> is to work out partitioned-like table of records, with <strong>MyISAM</strong> table-per month, and an overlooking <strong>MERGE</strong> table dynamically adding and removing tables from its view.</p>
+<p>But I intend for <strong>MERGE</strong> a different use: just be an identical reflection of <strong>cache_sample_data</strong>.</p>
+<p>So we must work out the following:</p>
+<blockquote>
+<pre>ALTER TABLE <strong>cache_sample_data</strong> ENGINE=<strong>MyISAM</strong>;
+CREATE TABLE <strong>cache_sample_data_wrapper</strong> LIKE cache_sample_data;
+ALTER TABLE <strong>cache_sample_data_wrapper</strong> ENGINE=<strong>MERGE</strong> <strong>UNION=(cache_sample_data)</strong>;</pre>
+</blockquote>
+<p>I just want to verify the new table is setup correctly:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM cache_sample_data_wrapper;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>Seems fine.</p>
+<p>So the next step is what makes the difference: the two tables are <em>not the same</em>. One <em>relies on the other</em>, but they are distinct. Our function <strong>DELETE</strong>s from and <strong>INSERT</strong>s to <strong>cached_sample_data</strong>, but it does <em>not affect, nor lock</em>, <strong>cache_sample_data_wrapper</strong>.</p>
+<p>We now rewrite our query to read:</p>
+<blockquote>
+<pre>SELECT
+  cache_sample_data_wrapper.*
+FROM
+  <strong>cache_sample_data_wrapper</strong>,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;</pre>
+</blockquote>
+<p>This query is perfectly valid. It works. To illustrate, I do:</p>
+<blockquote>
+<pre>-- Try this a few times till RAND() is lucky:
+
+<strong>TRUNCATE</strong> cache_sample_data;
+
+SELECT
+  cache_sample_data_wrapper.*
+FROM
+  cache_sample_data_wrapper,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>Whoa! Where did all this data come from? Didn&#8217;t we just <strong>TRUNCATE</strong> the table?</p>
+<p>The query worked. The function re-populated <strong>cache_sample_data</strong>.</p>
+<h4>The final touch</h4>
+<p>Isn&#8217;t the above query just <em>beautiful</em>? I suppose not many will share my opinion. What happened to my declaration that <em>&#8220;the original query need not be changed, apart from querying a different table&#8221;</em>?</p>
+<p>Yes, indeed. It&#8217;s now time for the final touch. There&#8217;s nothing amazing in this step, but we all know the way it is packaged is what makes the sale. We will now use <em>views</em>. We use two of them since a view must not contain a <em>subquery</em> in the <strong>FROM</strong> clause. Here goes:</p>
+<blockquote>
+<pre>CREATE OR REPLACE VIEW <strong>revalidate_cache_sample_data_view</strong> AS
+  SELECT revalidate_cache_sample_data()
+;
+
+CREATE OR REPLACE VIEW <strong>autocache_sample_data</strong> AS
+  SELECT
+    cache_sample_data_wrapper.*
+  FROM
+    cache_sample_data_wrapper,
+    revalidate_cache_sample_data_view
+;</pre>
+</blockquote>
+<p>And finally, we can make a very simple query like this:</p>
+<blockquote>
+<pre>SELECT * FROM <strong>autocache_sample_data</strong>;
+--
+-- <strong><span style="color: #ff9900;">Magic in work now!</span></strong>
+--
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>Much as we would query the original <strong>sample_data</strong> table.</p>
+<h4>Summary</h4>
+<p>So what have we got? A stored routine, a <strong>MyISAM</strong> table, a <strong>MERGE</strong> table and two views. Quite a lot of constructs just to cache a table! But a beautiful cache access: <em>plain old SQL queries</em>. The flow looks like this:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow.png"><img class="alignnone size-full wp-image-4463" title="autocache flow chart" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow.png" alt="" width="835" height="625" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow.png 835w, https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow-300x224.png 300w" sizes="(max-width: 835px) 100vw, 835px" /></a></p></blockquote>
+<p>Our cache table is a <strong>MyISAM</strong> table. It can get corrupted, which is bad. But not completely bad: it&#8217;s nothing more than a cache; we can throw away its entire data, and revalidate. We can actually ask the function to revalidate (say, pass a parameter).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/auto-caching-tables/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4353</post-id>	</item>
+		<item>
+		<title>More MySQL foreach()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach#comments</comments>
+				<pubDate>Fri, 02 Dec 2011 13:55:32 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4171</guid>
+				<description><![CDATA[In my previous post I&#8217;ve shown several generic use cases for foreach(), a new scripting functionality introduced in common_schema. In this part I present DBA&#8217;s handy syntax for schema and table operations and maintenance. Confession: while I love INFORMATION_SCHEMA&#8216;s power, I just hate writing queries against it. It&#8217;s just so much typing! Just getting the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In my <a href="https://shlomi-noach.github.io/blog/mysql/mysql-foreach">previous post</a> I&#8217;ve shown several generic use cases for <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/foreach.html"><em>foreach()</em></a>, a new scripting functionality introduced in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>.</p>
+<p>In this part I present DBA&#8217;s handy syntax for schema and table operations and maintenance.</p>
+<p>Confession: while I love <strong>INFORMATION_SCHEMA</strong>&#8216;s power, I just <em>hate</em> writing queries against it. It&#8217;s just so much typing! Just getting the list of tables in a schema makes for this heavy duty query:</p>
+<blockquote>
+<pre>SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='sakila' AND TABLE_TYPE='BASE TABLE';</pre>
+</blockquote>
+<p>When a join is involved this really becomes a nightmare. I think it&#8217;s cumbersome, and as result, many do not remember the names and meaning of columns, making for <em>&#8220;oh, I need to read the manual all over again just to get that query right&#8221;</em>. Anyway, that&#8217;s my opinion.</p>
+<p>A <strong>SHOW TABLES</strong> statement is easier to type, but cannot be integrated into a <strong>SELECT</strong> query (though <a href="https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side">we have a partial solution</a> for that, too), and besides, when filtering out the views, the <strong>SHOW</strong> statement becomes almost as cumbersome as the one on <strong>INFORMATION_SCHEMA</strong>.</p>
+<p>Which is why <em>foreach()</em> offers handy shortcuts to common iterations on schemata and tables, as follows:</p>
+<h4>Use case: iterate all databases</h4>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema'</span>, <span style="color: #003366;">'CREATE TABLE ${schema}.event(event_id INT, msg VARCHAR(128))'</span>);</pre>
+</blockquote>
+<p>In the above we execute a query on each database. Hmmm, maybe not such a good idea to perform this operation on all databases? Let&#8217;s filter them:</p>
+<h4>Use case: iterate databases by name match</h4>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema like wordpress_%'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.wp_posts MODIFY COLUMN comment_author VARCHAR(96) NOT NULL'</span>);</pre>
+</blockquote>
+<p>The above will only iterate my WordPress databases (I have several of these), performing an <strong>ALTER</strong> on <strong>wp_posts</strong> for each of those databases.<span id="more-4171"></span></p>
+<p>I don&#8217;t have to quote the <em>like</em> expression, but I can, if I wish to.</p>
+<p>I can also use a regular expression match:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema ~ /^wordpress_[0-9]+$/'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.wp_posts MODIFY COLUMN comment_author VARCHAR(96) NOT NULL'</span>);</pre>
+</blockquote>
+<h4>Use case: iterate tables in a specific schema</h4>
+<p>Time to upgrade our <strong>sakila</strong> tables to InnoDB&#8217;s compressed format. We use <strong>$()</strong>, a synonym for <em>foreach()</em>.</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'table in sakila'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB ROW_FORMAT=COMPRESSED'</span>);</pre>
+</blockquote>
+<p>The above will iterate on tables in <strong>sakila</strong>. I say <em>tables</em>, since it will avoid iterating views (there is still no specific syntax for views iteration). This is done on purpose, as my experience shows there is very little in common between tables and views when it comes to maintenance and operations.</p>
+<h4>Use case: iterate tables by name match</h4>
+<p>Here&#8217;s a interesting scenario: you wish to work on all tables matching some name. The naive approach would be to:</p>
+<blockquote>
+<pre>SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'wp_posts' AND TABLE_TYPE = 'BASE TABLE'</pre>
+</blockquote>
+<p><em><strong>Wait!</strong></em> Are you aware this may bring your server down? This query will open all databases at once, opening all <strong>.frm</strong> files (though thankfully not data files, since we only check for name and type).</p>
+<p>Here&#8217;s a better approach:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'table like wp_posts'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB'</span>);</pre>
+</blockquote>
+<p>(There&#8217;s now FULLTEXT to InnoDB, so the above can make sense in the near future!)</p>
+<p>The good part is that <em>foreach()</em> will look for matching tables <em>one database at a time</em>. It will iterate the list of database, then look for matching tables per database, thereby optimizing the query on <strong>INFORMATION_SCHEMA</strong>.</p>
+<p>Here, too, I can use regular expressions:</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'table ~ /^wp_.*$/'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB'</span>);</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>This is work in the making, but, as someone who maintains a few productions servers, I&#8217;ve already put it to work.</p>
+<p>I&#8217;m hoping the syntax is easy to comprehend. I know that since I developed it it must be far more intuitive to myself than to others. I&#8217;ve tried to keep close on common syntax and concepts from various programming languages.</p>
+<p>I would like to get as much feedback as possible. I have further ideas and thoughts on the direction <a href="http://code.google.com/p/common-schema/">common_schema</a> is taking, but wish take it in small steps. Your feedback is appreciated!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4171</post-id>	</item>
+		<item>
+		<title>MySQL foreach()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-foreach</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-foreach#comments</comments>
+				<pubDate>Fri, 02 Dec 2011 04:59:03 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4002</guid>
+				<description><![CDATA[A new routine is now available in common_schema, which makes for an easier execution syntax for some operations: foreach(collection_to_iterate_over, queries_to_execute_per_iteration_step); To illustrate what it can do, consider: call foreach('table in sakila', 'ALTER TABLE ${schema}.${table} ENGINE=InnoDB ROW_FORMAT=COMPACT'); call $('schema like shard_%', 'CREATE TABLE ${schema}.messages (id INT)'); call $('2000:2009', 'INSERT IGNORE INTO report (report_year) VALUES (${1})'); $() [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A new routine is now available in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>, which makes for an easier execution syntax for some operations:</p>
+<blockquote>
+<pre>foreach(<span style="color: #808000;"><em>collection_to_iterate_over</em></span>, <span style="color: #003366;"><em>queries_to_execute_per_iteration_step</em></span>);</pre>
+</blockquote>
+<p>To illustrate what it can do, consider:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'table in sakila'</span>, <span style="color: #000080;">'ALTER TABLE <strong>${schema}</strong>.<strong>${table}</strong> ENGINE=InnoDB ROW_FORMAT=COMPACT'</span>);
+
+call $(<span style="color: #808000;">'schema like shard_%</span>', <span style="color: #000080;">'CREATE TABLE <strong>${schema}</strong>.messages (id INT)'</span>);
+
+call $(<span style="color: #808000;">'2000:2009'</span>, <span style="color: #000080;">'INSERT IGNORE INTO report (report_year) VALUES (<strong>${1}</strong>)'</span>);</pre>
+</blockquote>
+<p><strong>$()</strong> stands as a synonym to <em>foreach()</em>. I suspect it should look familiar to web programmers.</p>
+<p>The idea for <em>foreach()</em> was introduced by Giuseppe Maxia during a correspondence. At first I was skeptic: this isn&#8217;t <a href="http://api.jquery.com/jQuery.each/">jQuery</a>; this is SQL. Why would I want to use <em>foreach()</em>?</p>
+<p>Then Giuseppe provided some use cases, and as I started thinking about it, I found more and more cases where such a tool might considerably reduce scripting overhead and avoid requiring SQL-fu skills. In fact, I have been using it myself for the past few weeks</p>
+<p>I provide examples which I hope will convince the reader as for the simplicity of using such syntax. Showing off the types of input <em>foreach()</em> accepts (query, table search, schema search, set of constants, single or double numbers range), and the types of queries it can execute (single, multiple, using placeholders).</p>
+<p>I stress that this is not a replacement for common queries (i.e. does <em>not</em> come to replace your common <strong>SELECT</strong>, <strong>UPDATE</strong>, <strong>DELETE</strong>), but more for working out administrative tasks. Nevertheless, the last example in this post does provide with an interesting insight on possible &#8220;normal&#8221; use.<span id="more-4002"></span></p>
+<h4>Use case: using values from query</h4>
+<p>Let&#8217;s kill all queries running for over <strong>20</strong> seconds:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'SELECT id FROM INFORMATION_SCHEMA.PROCESSLIST WHERE time &gt; 20'</span>, <span style="color: #000080;">'KILL QUERY <strong>${1}</strong>'</span>);</pre>
+</blockquote>
+<p>The thing I like most about <em>foreach()</em> is that it&#8217;s self explanatory. Nevertheless, I note:</p>
+<ul>
+<li>The <strong>KILL</strong> command is executed for each process running for more than <strong>20</strong> seconds (I did round up corners, since I didn&#8217;t check for sleeping processes, for simplicity).</li>
+<li>I also use the <strong>${1}</strong> placeholder: much like in <em>awk</em>, this will get the first column in the result set. In our case, it is the single column, <strong>id</strong>.</li>
+<li>I chose to invoke a single query/command per iteration step.</li>
+</ul>
+<p>Compare the above with another solution to the same problem, using <a href="https://shlomi-noach.github.io/blog/mysql/mysql-eval">eval()</a>:</p>
+<blockquote>
+<pre>call eval('SELECT CONCAT(\'KILL QUERY \',id) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE TIME &gt; 20');</pre>
+</blockquote>
+<p>They both get the same thing done. But <em>foreach()</em> is just a bit more friendly to write (and read).</p>
+<p>Let&#8217;s move to a more complicated example.</p>
+<h4>Use case: using multiple values from a query, invoking multiple commands</h4>
+<p>Let&#8217;s kill some queries, as above, but also write down a log entry so that we know what happened:</p>
+<blockquote>
+<pre>call foreach(
+  <span style="color: #808000;">'SELECT id, user FROM INFORMATION_SCHEMA.PROCESSLIST WHERE time &gt; 20'</span>,
+  <span style="color: #000080;">'KILL QUERY <strong>${1}</strong>; INSERT INTO my_log VALUES (\'have just killed query <strong>${1}</strong>, executed by <strong>${2}</strong>\');'</span>)
+;</pre>
+</blockquote>
+<p>In the above, for each long running process, we:</p>
+<ul>
+<li>Kill the process&#8217; query. <strong>id</strong> being the first column, is referenced by <strong>${1}</strong>.</li>
+<li>INSERT to my_log that said process has been killed. We note both <strong>id</strong> and <strong>user</strong> using placeholders <strong>${1}</strong> and <strong>${2}</strong>, respectively.</li>
+</ul>
+<p>It&#8217;s possible to invoke as many queries/commands per iteration step. It is possible to use placeholders <strong>${1}</strong> through <strong>${9}</strong>, as well as <strong>${NR}</strong>, which works as in <em>awk</em>: it is a row-counter, <strong>1</strong>-based.</p>
+<p>This example can still be written with <em>eval()</em>, but in much uglier form. I can&#8217;t just first <strong>KILL</strong> the processes, then log about them, since by the time I want to log, the queries will not be running; the commands <em>must be coupled</em>. This is naturally done with <em>foreach()</em>.</p>
+<h4>Use case: iterating constant values, invoking DDL</h4>
+<p>The commands invoked by <em>foreach()</em> can take the form of DML (<strong>INSERT</strong>/<strong>UPDATE</strong>/&#8230;), DDL (<strong>CREATE</strong>/<strong>ALTER</strong>/&#8230;) or other (<strong>KILL</strong>/<strong>SET</strong>/&#8230;). The placeholders can be used anywhere within the text.</p>
+<p>Take an installation where different schemata have the same exact table structure. We want to refactor a table on all schemata:</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'<strong>{USA, UK, Japan, NZ}</strong>'</span>, <span style="color: #000080;">'ALTER TABLE db_region_<strong>${1}</strong>.customer ADD COLUMN personal_notes VARCHAR(4096) CHARSET utf8'</span>);</pre>
+</blockquote>
+<p>The above translates to the following commands:</p>
+<blockquote>
+<pre>ALTER TABLE <strong>db_region_USA</strong>.customer ADD COLUMN personal_notes VARCHAR(4096) CHARSET utf8;
+ALTER TABLE <strong>db_region_UK</strong>.customer ADD COLUMN personal_notes VARCHAR(4096) CHARSET utf8;
+ALTER TABLE <strong>db_region_Japan</strong>.customer ADD COLUMN personal_notes VARCHAR(4096) CHARSET utf8;
+ALTER TABLE <strong>db_region_NZ</strong>.customer ADD COLUMN personal_notes VARCHAR(4096) CHARSET utf8;</pre>
+</blockquote>
+<p>In the above, we:</p>
+<ul>
+<li>Provide a list of constant values. These can be strings, numbers, whatever. They are space delimited.</li>
+<li>Use the <strong>${1}</strong> place holder. We can also use <strong>${NR}</strong>.</li>
+</ul>
+<h4>Use case: loop through number sequence</h4>
+<p>We wish to populate a table with values:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'<strong>1970:2038</strong>'</span>, <span style="color: #003366;">'INSERT INTO test.test_dates (dt) VALUES (DATE(\'<strong>${1}</strong>-01-01\'))'</span>);</pre>
+</blockquote>
+<p>The above results with:</p>
+<blockquote>
+<pre>mysql&gt; SELECT dt FROM test_dates;
++------------+
+| dt         |
++------------+
+| 1970-01-01 |
+| 1971-01-01 |
+| 1972-01-01 |
+| 1973-01-01 |
+| 1974-01-01 |
+...
+| 2036-01-01 |
+| 2037-01-01 |
+| 2038-01-01 |
++------------+</pre>
+</blockquote>
+<p>With numbers range:</p>
+<ul>
+<li>Integers are assumed</li>
+<li>Range is indicated by low and high values, both inclusive</li>
+<li>Negatives allowed (e.g. <strong>&#8216;-5:5&#8217;</strong>, resulting with <strong>11</strong> steps)</li>
+<li>Placeholders <strong>${1}</strong> and <strong>${NR}</strong> are allowed.</li>
+</ul>
+<h4>Use case: iterating through two dimensional numbers range:</h4>
+<p>We use <strong>3</strong> template tables; we create <strong>15</strong> schemata; in each we create <strong>3</strong> tables based on the template tables:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;"><strong> '1:15,1:3'</strong></span>,
+  <span style="color: #003366;">'CREATE DATABASE IF NOT EXISTS db_test_${1}; CREATE TABLE db_test_${1}.tbl_${2} LIKE db_template.my_table_${2};'</span>
+);</pre>
+</blockquote>
+<p>Notes:</p>
+<ul>
+<li>Each of the number ranges has the same restrictions and properties as listed above (integers, inclusive, ascending)</li>
+<li>We can now use <strong>${1}</strong> and <strong>${2}</strong> placeholders, noting the first and second numbers range, respectively.</li>
+<li>We may also use <strong>${NR}</strong>, which, in this case, will run <strong>1</strong> through <strong>45</strong> (<strong>15</strong> times <strong>3</strong>).</li>
+<li>We use multiple queries per iteration step.</li>
+</ul>
+<h4>Use case: overcoming MySQL limitations</h4>
+<p>MySQL does not support <strong>ORDER BY</strong> &amp; <strong>LIMIT</strong> in multi-table <strong>UPDATE</strong> and <strong>DELETE</strong> statements (as noted <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year">last year</a>). So we <em>cannot</em>:</p>
+<blockquote>
+<pre>DELETE FROM t1 USING t1 JOIN t2 ON (...) JOIN t3 ON (..) WHERE x = 7 ORDER BY ts LIMIT 100;</pre>
+</blockquote>
+<p>However, we <em>can</em>:</p>
+<blockquote>
+<pre>call foreach(
+  <span style="color: #808000;">'SELECT t1.id FROM t1 JOIN t2 ON (...) JOIN t3 ON (..) WHERE x = 7 ORDER BY ts LIMIT 100'</span>,
+  <span style="color: #003366;">'DELETE FROM t1 WHERE id = ${1}'</span>
+);</pre>
+</blockquote>
+<p>Of course, it will do a lot of single row <strong>DELETE</strong>s. There are further MySQL limitations which complicate things if I want to overcome this. Perhaps at a later blog post.</p>
+<h4>Acknowledgements</h4>
+<p>I hit a weird <a href="http://bugs.mysql.com/bug.php?id=62406">bug</a> which prevented me from releasing this earlier on. Actually it&#8217;s a duplicate of <a href="http://bugs.mysql.com/bug.php?id=12257">this bug</a>, which makes it <strong>6</strong> years old. Hurray.</p>
+<p>To the rescue came <a href="http://rpbouman.blogspot.com/">Roland Bouman</a>, who suggested an idea so crazy even I was skeptic: to parse and modify the original query so as to rename column names according to my scheme. And of course he made it happen, along with some additional very useful stuff. It&#8217;s really a <em>super-ultra-meta-meta-sql-fu</em> magic he does there.</p>
+<p>So, thanks, Roland, for joining the ride, and thanks, Giuseppe, for testing and helping out to shape this functionality. It&#8217;s great fun working with other people on open-source &#8212; a new experience for me.</p>
+<h4>Continued</h4>
+<p>In this post I&#8217;ve covered the general-purpose iterations. There are also more specific types of iterations with <em>foreach()</em>. <a href="https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach">Continued next</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-foreach/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4002</post-id>	</item>
+	</channel>
+</rss>

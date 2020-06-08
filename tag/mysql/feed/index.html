@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>MySQL &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/mysql/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 18 Feb 2020 19:48:50 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>The state of Orchestrator, 2020 (spoiler: healthy)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy-2</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy-2#respond</comments>
+				<pubDate>Tue, 18 Feb 2020 19:14:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=8016</guid>
+				<description><![CDATA[This post serves as a pointer to my previous announcement about The state of Orchestrator, 2020. Thank you to Tom Krouper who applied his operational engineer expertise to content publishing problems.]]></description>
+								<content:encoded><![CDATA[<p>This post serves as a pointer to my previous announcement about <a href="https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy">The state of Orchestrator, 2020</a>.</p>
+<p>Thank you to <a href="https://github.com/tomkrouper">Tom Krouper</a> who applied his operational engineer expertise to content publishing problems.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy-2/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">8016</post-id>	</item>
+		<item>
+		<title>Observations on the hashicorp/raft library, and notes on RDBMS</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms#comments</comments>
+				<pubDate>Tue, 20 Jun 2017 04:05:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[freno]]></category>
+		<category><![CDATA[golang]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7717</guid>
+				<description><![CDATA[The hashicorp/raft library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s Consul. I&#8217;ve had the opportunity to work with this library a couple projects, namely freno and orchestrator. Here are a few observations on working with this library: TL;DR on Raft: a group communication protocol; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The <a href="https://github.com/hashicorp/raft">hashicorp/raft</a> library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s <a href="https://github.com/hashicorp/consul">Consul</a>.</p>
+<p>I&#8217;ve had the opportunity to work with this library a couple projects, namely <a href="https://github.com/github/freno">freno</a> and <a href="https://github.com/github/orchestrator/pull/183/">orchestrator</a>. Here are a few observations on working with this library:</p>
+<ul>
+<li>TL;DR on Raft: a group communication protocol; multiple nodes communicate, elect a leader. A leader leads a <em>consensus</em> (any subgroup of more than half the nodes of the original group, or hopefully all of them). Nodes may leave and rejoin, and will remain consistent with consensus.</li>
+<li>The hashicorp/raft library is an implementation of the Raft protocol. There are <a href="https://raft.github.io/#implementations">other implementations</a>, and different implementations support different features.</li>
+<li>The most basic premise is leader election. This is pretty straightforward to implement; you set up nodes to communicate to each other, and they elect a leader. You may query for the leader identity via <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Leader">Leader()</a>, <a href="https://godoc.org/github.com/hashicorp/raft#Raft.VerifyLeader">VerifyLeader()</a>, or observing <a href="https://godoc.org/github.com/hashicorp/raft#Raft.LeaderCh">LeaderCh</a>.</li>
+<li>You have no control over the identity of the leader. You cannot &#8220;prefer&#8221; one node to be the leader. You cannot <em>grab</em> leadership from an elected leader, and you cannot demote a leader unless by killing it.</li>
+<li>The next premise is gossip, sending messages between the raft nodes. With <code>hashicorp/raft</code>, only the leader may send messages to the group. This is done via the <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Apply">Apply()</a> function.</li>
+<li>Messages are nothing but blobs. Your app encodes the messages into <code>[]byte</code> and ships it via raft. Receiving ends need to decode the bytes into a meaningful message.</li>
+<li>You will check the result of Apply(), an <a href="https://godoc.org/github.com/hashicorp/raft#ApplyFuture">ApplyFuture</a>. The call to <a href="https://godoc.org/github.com/hashicorp/raft#Future">Error()</a> will wait for consensus.</li>
+<li>Just what is a message consensus? It&#8217;s a guarantee that the consensus of nodes has received and registered the message.</li>
+<li>Messages form the raft log.</li>
+<li>Messages are guaranteed to be handled in-order across all nodes.</li>
+<li>The leader is satisfied when the followers receive the messages/log, but it cares not for their interpretation of the log.</li>
+<li>The leader does not collect the output, or return value, of the followers applying of the log.</li>
+<li>Consequently, your followers may not abort the message. They may not cast an opinion. They must adhere to the instruction received from the leader.</li>
+<li><code>hashicorp/raft</code> uses either an <a href="http://github.com/hashicorp/raft-mdb">LMDB-based</a> store or <a href="https://github.com/boltdb/bolt">BoltDB</a> for persisting your messages. Both are transactional stores.</li>
+<li>Messages are expected to be idempotent: a node that, say, happens to restart, will request to join back the consensus (or to form a consensus with some other node). To do that, it will have to reapply historical messages that it may have applied in the past.</li>
+<li>Number of messages (log entries) will grow infinitely. Snapshots are taken so as to truncate the log history. You will implement the snapshot dump &amp; load.</li>
+<li>A snapshot includes the log index up to which it covers.</li>
+<li>Upon startup, your node will look for the most recent snapshot. It will read it, then resume replication from the aforementioned log index.</li>
+<li><code>hashicorp/raft</code> provides a file-system based snapshot implementation.</li>
+</ul>
+<p>One of my use cases is completely satisfied with the existing implementations of <code>BoltDB</code> and of the filesystem snapshot.</p>
+<p>However in another (<code>orchestrator</code>), my app stores its state in a relational backend. To that effect, I&#8217;ve modified the logstore and snapshot store. I&#8217;m using either MySQL or <code>sqlite</code> as backend stores for my app. How does that affect my <code>raft</code> use?<span id="more-7717"></span></p>
+<ul>
+<li>My backend RDBMS is the de-facto state of my <code>orchestrator</code> app. Anything written to this DB is persisted and durable.</li>
+<li>When <code>orchestrator</code> applies a raft log/message, it runs some app logic which ends with a write to the backend DB. At that time, the raft log is effectively not required anymore to persist. I care not for the history of logs.</li>
+<li>Moreover, I care not for snapshotting. To elaborate, I care not for snapshot data. My backend RDBMS <em>is the snapshot data</em>.</li>
+<li>Since I&#8217;m running a RDBMS, I find <code>BoltDB</code> to be wasteful, an additional transaction store on top a transaction store I already have.</li>
+<li>Likewise, the filesystem snapshots are yet another form of store.</li>
+<li>Log Store (including Stable Store) are <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_store.go">easily re-implemented</a> on top of RDBMS. The log is a classic relational entity.</li>
+<li>Snapshot is <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_snapshot.go">also implemented</a> on top of RDBMS,  however I only care for the snapshot metadata (what log entry is covered by a snapshot) and completely discard storing/loading snapshot <em>state</em> or <em>content</em>.</li>
+<li>With all these in place, I have a single entity that defines:
+<ul>
+<li>What my data looks like</li>
+<li>Where my node fares in the group gossip</li>
+</ul>
+</li>
+<li>A single RDBMS restore returns a dataset that will catch up with raft log correctly. However my restore window is limited by the number of snapshots I store and their frequency.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7717</post-id>	</item>
+	</channel>
+</rss>

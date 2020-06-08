@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Leader election using MySQL	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 25 Mar 2019 10:48:45 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: tbeerbower				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql/comment-page-1#comment-376690</link>
+		<dc:creator><![CDATA[tbeerbower]]></dc:creator>
+		<pubDate>Thu, 13 Oct 2016 14:11:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7384#comment-376690</guid>
+					<description><![CDATA[Nice, Thanks!
+
+I think it&#039;s worth mentioning that you can answer &#039;Am I the leader?&#039; by looking at the number of affected rows on the insert/update.  Only the leader will change the row values so you can update the row and check leadership in one statement.  In JDBC something like ...
+
+Properties connectionProperties = new Properties();
+connectionProperties.put(&quot;user&quot;, username);
+connectionProperties.put(&quot;password&quot;, password);
+connectionProperties.put(&quot;useAffectedRows&quot;, &quot;true&quot;);
+
+Connection connection = DriverManager.getConnection(url, connectionProperties);
+
+PreparedStatement statement = connection.prepareStatement(INSERT_ELECTION_STATEMENT);
+statement.setString(1, id);
+statement.setInt(2, timeout);
+
+boolean leader = statement.executeUpdate() &#062; 0;
+
+Note that you need to set the useAffectedRows (MySQL specific) property since JDBC specifies that the the number of selected rows should be returned.
+ 
+---
+
+Also, another benefit of your solution over GET_LOCK is that GET_LOCK doesn&#039;t work with MySQL Cluster since the lock is not visible outside of a single MySQL process.]]></description>
+		<content:encoded><![CDATA[<p>Nice, Thanks!</p>
+<p>I think it&#8217;s worth mentioning that you can answer &#8216;Am I the leader?&#8217; by looking at the number of affected rows on the insert/update.  Only the leader will change the row values so you can update the row and check leadership in one statement.  In JDBC something like &#8230;</p>
+<p>Properties connectionProperties = new Properties();<br />
+connectionProperties.put(&#8220;user&#8221;, username);<br />
+connectionProperties.put(&#8220;password&#8221;, password);<br />
+connectionProperties.put(&#8220;useAffectedRows&#8221;, &#8220;true&#8221;);</p>
+<p>Connection connection = DriverManager.getConnection(url, connectionProperties);</p>
+<p>PreparedStatement statement = connection.prepareStatement(INSERT_ELECTION_STATEMENT);<br />
+statement.setString(1, id);<br />
+statement.setInt(2, timeout);</p>
+<p>boolean leader = statement.executeUpdate() &gt; 0;</p>
+<p>Note that you need to set the useAffectedRows (MySQL specific) property since JDBC specifies that the the number of selected rows should be returned.</p>
+<p>&#8212;</p>
+<p>Also, another benefit of your solution over GET_LOCK is that GET_LOCK doesn&#8217;t work with MySQL Cluster since the lock is not visible outside of a single MySQL process.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql/comment-page-1#comment-363840</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Mon, 20 Jun 2016 12:39:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7384#comment-363840</guid>
+					<description><![CDATA[@xudifsd I&#039;m not sure I understand the question. 
+
+&gt; I don&#039;t want any server who is not leader to alter any data
+
+Which data is that? Any data?
+
+I wouldn&#039;t incorporate an SQL leader logic into every single query in your app. Instead, your app can have a flag, frequently updated, saying &quot;am I the leader&quot;.
+If you&#039;re OK that the app will cease writing for a second as the leader changes, you can further require that a new leader only begins writing at least one second after becoming leader, during which time previous leader completes its own writes.]]></description>
+		<content:encoded><![CDATA[<p>@xudifsd I&#8217;m not sure I understand the question. </p>
+<p>> I don&#8217;t want any server who is not leader to alter any data</p>
+<p>Which data is that? Any data?</p>
+<p>I wouldn&#8217;t incorporate an SQL leader logic into every single query in your app. Instead, your app can have a flag, frequently updated, saying &#8220;am I the leader&#8221;.<br />
+If you&#8217;re OK that the app will cease writing for a second as the leader changes, you can further require that a new leader only begins writing at least one second after becoming leader, during which time previous leader completes its own writes.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: xudifsd				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/leader-election-using-mysql/comment-page-1#comment-357588</link>
+		<dc:creator><![CDATA[xudifsd]]></dc:creator>
+		<pubDate>Fri, 06 May 2016 03:53:44 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7384#comment-357588</guid>
+					<description><![CDATA[Hi, I&#039;m wondering how would you implement fencing with this techniques?
+To be more precise, I don&#039;t want any server who is not leader to alter any data. Maybe expressed(not working) as:
+
+IF (SELECT count(*) as is_leader from service_election WHERE anchor=1 AND service_id=&#039;my_service_number_7&#039;) = 1 THEN
+  do update like insert or update or delete
+END IF
+
+In this way, we can prevent malfunctioning master polluting data. But I don&#039;t know if we can express it in SQL]]></description>
+		<content:encoded><![CDATA[<p>Hi, I&#8217;m wondering how would you implement fencing with this techniques?<br />
+To be more precise, I don&#8217;t want any server who is not leader to alter any data. Maybe expressed(not working) as:</p>
+<p>IF (SELECT count(*) as is_leader from service_election WHERE anchor=1 AND service_id=&#8217;my_service_number_7&#8242;) = 1 THEN<br />
+  do update like insert or update or delete<br />
+END IF</p>
+<p>In this way, we can prevent malfunctioning master polluting data. But I don&#8217;t know if we can express it in SQL</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

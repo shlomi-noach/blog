@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Easy SELECT COUNT(*) with split()	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/easy-select-count-with-split/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/easy-select-count-with-split</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 14 Jun 2013 10:55:23 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Jannes				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/easy-select-count-with-split/comment-page-1#comment-213579</link>
+		<dc:creator><![CDATA[Jannes]]></dc:creator>
+		<pubDate>Fri, 14 Jun 2013 10:55:23 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6379#comment-213579</guid>
+					<description><![CDATA[Thanks, I knew there would be a good reason.
+
+1 I knew, but didn&#039;t think of 2. Still find it amazing that they haven&#039;t fixed 3 after all these years.
+
+And now that I see how you actually find a minimum and maximum value such that the chunk size is 1000, I understand your remark about sparse too.]]></description>
+		<content:encoded><![CDATA[<p>Thanks, I knew there would be a good reason.</p>
+<p>1 I knew, but didn&#8217;t think of 2. Still find it amazing that they haven&#8217;t fixed 3 after all these years.</p>
+<p>And now that I see how you actually find a minimum and maximum value such that the chunk size is 1000, I understand your remark about sparse too.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/easy-select-count-with-split/comment-page-1#comment-213577</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 14 Jun 2013 10:20:12 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6379#comment-213577</guid>
+					<description><![CDATA[Hmmm, I should also note that getting the value 3999 makes for an extra effort, since I will need to also get hold of 4000. 
+
+This sounds silly, but only when the numbers are sequential. If the numbers are sparse, then the number before 4000 may well be 2975, for all we know.]]></description>
+		<content:encoded><![CDATA[<p>Hmmm, I should also note that getting the value 3999 makes for an extra effort, since I will need to also get hold of 4000. </p>
+<p>This sounds silly, but only when the numbers are sequential. If the numbers are sparse, then the number before 4000 may well be 2975, for all we know.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/easy-select-count-with-split/comment-page-1#comment-213576</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 14 Jun 2013 10:17:58 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6379#comment-213576</guid>
+					<description><![CDATA[@Jannes,
+
+Good question.
+There are a couple reasons:
+
+1. BETWEEN is inclusive on both edges (a &lt; = x AND x &lt;= b); except for the very first chunk, I want it only half-inclusive (a &lt; x AND x &lt;= b).
+
+2. More importantly, this is but the simple case of a more complex scenario where the key may be compound (see example in https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals )
+
+In such case you get something like this:
+
+&lt;code&gt;
+WHERE ((((`film_actor`.`actor_id` &gt; &#039;110&#039;)) OR ((`film_actor`.`actor_id` = &#039;110&#039;) AND (`film_actor`.`film_id` &gt; &#039;513&#039;))) AND (((`film_actor`.`actor_id` &lt; &#039;146&#039;)) OR ((`film_actor`.`actor_id` = &#039;146&#039;) AND (`film_actor`.`film_id` &lt; &#039;278&#039;)) OR ((`film_actor`.`actor_id` = &#039;146&#039;) AND (`film_actor`.`film_id` = &#039;278&#039;))));
+&lt;/code&gt;
+
+(3). It is worth mentioning that MySQL does not do a good job at doing a range comparison using a compound key:
+https://shlomi-noach.github.io/blog/mysql/mysql-not-being-able-to-utilize-a-compound-index
+Which is the reason I need to break the condition into so many clauses.]]></description>
+		<content:encoded><![CDATA[<p>@Jannes,</p>
+<p>Good question.<br />
+There are a couple reasons:</p>
+<p>1. BETWEEN is inclusive on both edges (a < = x AND x <= b); except for the very first chunk, I want it only half-inclusive (a < x AND x <= b).
+
+2. More importantly, this is but the simple case of a more complex scenario where the key may be compound (see example in <a href="https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals" rel="nofollow ugc">https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals</a> )</p>
+<p>In such case you get something like this:</p>
+<p><code><br />
+WHERE ((((`film_actor`.`actor_id` > '110')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` > '513'))) AND (((`film_actor`.`actor_id` < '146')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` < '278')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` = '278'))));
+</code></p>
+<p>(3). It is worth mentioning that MySQL does not do a good job at doing a range comparison using a compound key:<br />
+<a href="https://shlomi-noach.github.io/blog/mysql/mysql-not-being-able-to-utilize-a-compound-index" rel="nofollow ugc">https://shlomi-noach.github.io/blog/mysql/mysql-not-being-able-to-utilize-a-compound-index</a><br />
+Which is the reason I need to break the condition into so many clauses.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Jannes				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/easy-select-count-with-split/comment-page-1#comment-213571</link>
+		<dc:creator><![CDATA[Jannes]]></dc:creator>
+		<pubDate>Fri, 14 Jun 2013 08:18:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6379#comment-213571</guid>
+					<description><![CDATA[What&#039;s the reason for WHERE ((((`City`.`ID` &#062; &#039;3000&#039;))) AND (((`City`.`ID` &#060; &#039;4000&#039;)) OR ((`City`.`ID` = &#039;4000&#039;))))  ?
+
+Why not City.ID BETWEEN 3000 AND 3999    ?   (and then start the next chunk at 4000)
+
+Honest question]]></description>
+		<content:encoded><![CDATA[<p>What&#8217;s the reason for WHERE ((((`City`.`ID` &gt; &#8216;3000&#8217;))) AND (((`City`.`ID` &lt; &#039;4000&#039;)) OR ((`City`.`ID` = &#039;4000&#039;))))  ?</p>
+<p>Why not City.ID BETWEEN 3000 AND 3999    ?   (and then start the next chunk at 4000)</p>
+<p>Honest question</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

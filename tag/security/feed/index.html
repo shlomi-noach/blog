@@ -1,0 +1,918 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Security &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/security/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 19 Aug 2015 08:00:11 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path#comments</comments>
+				<pubDate>Fri, 07 Aug 2015 12:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[performance_schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7327</guid>
+				<description><![CDATA[MySQL 5.7 introduces a change in the way we query for global variables and status variables: the INFORMATION_SCHEMA.(GLOBAL&#124;SESSION)_(VARIABLES&#124;STATUS) tables are now deprecated and empty. Instead, we are to use the respective performance_schema.(global&#124;session)_(variables&#124;status) tables. But the change goes farther than that; there is also a security change. Oracle created a pitfall of 2 changes at the same time: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL <strong>5.7</strong> introduces a change in the way we query for global variables and status variables: the <strong>INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)</strong> tables are now deprecated and empty. Instead, we are to use the respective <strong>performance_schema.(global|session)_(variables|status)</strong> tables.</p>
+<p>But the change goes farther than that; there is also a security change. Oracle created a pitfall of <strong>2</strong> changes at the same time:</p>
+<ol>
+<li>Variables/status moved to a different table</li>
+<li>Privileges required on said table</li>
+</ol>
+<p>As an example, my non-root user gets:</p>
+<blockquote>
+<pre>mysql&gt; show session variables like 'tx_isolation';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'session_variables'</pre>
+</blockquote>
+<p>Who gets affected by this? Nearly <em>everyone and everything</em>.</p>
+<ul>
+<li>Your Nagios will not be able to read status variables</li>
+<li>Your ORM will not be able to determine session variables</li>
+<li>Your replication user will fail connecting (see <a href="http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html">this post by Giuseppe</a>)</li>
+<li>And most everyone else.</li>
+</ul>
+<p>The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:</p>
+<ol>
+<li>Change your app code to choose the correct schema (information_schema vs. performance_schema)</li>
+<li><strong>GRANT</strong> the permissions on your database</li>
+</ol>
+<p>Perhaps at this point you still do not consider this to be a problem. You may be thinking: <em>well, let&#8217;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code</em>.</p>
+<p>Not so fast. Can you really that simply create those GRANTs?<span id="more-7327"></span></p>
+<h3>Migration woes</h3>
+<p>How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.</p>
+<p>This should not be any different for <strong>5.7</strong>. We would like to provision a <strong>5.7</strong> slave in our topologies and just see that everything works. Well, we have, and things don&#8217;t just work. Our Nagios stops working for that <strong>5.7</strong> slave. <em>Orchestrator</em> started complaining (by this time I&#8217;ve <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.4.291">already fixed it</a> to be more tolerant for the <strong>5.7</strong> problems so no crashes here).</p>
+<p>I hope you see the problem by now.</p>
+<blockquote><p>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO &#8216;&#8230;&#8217;</strong> on your <strong>5.6</strong> master.</p></blockquote>
+<p>The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your <strong>5.7</strong> slave, which means you will not be able to <strong>SHOW GLOBAL VARIABLES</strong> on your slave, which means everything remains broken.</p>
+<p>Yes, you can issue this directly on your <strong>5.7</strong> slaves. It&#8217;s <em>doable</em>, but <em>undesired</em>. It&#8217;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#8217;s unfriendly to GTID (make sure to <strong>SET SQL_LOG_BIN=0</strong> before that).</p>
+<h3>WHY in the first place?</h3>
+<p>It seems like a security thing. I&#8217;m not sure whether this was intended. So you prevent a <strong>SHOW GLOBAL VARIABLES</strong> for a normal user. Makes sense. And yet:</p>
+<blockquote>
+<pre>mysql&gt; show global variables like 'hostname';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'global_variables'
+
+mysql&gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+</pre>
+</blockquote>
+<p>Seems like I&#8217;m allowed access to that info after all. So it&#8217;s not strictly a security design decision. For status variable, I admit, I don&#8217;t have a similar workaround.</p>
+<h3>Solutions?</h3>
+<p>The following are meant to be solutions, but do not really solve the problem:</p>
+<ul>
+<li><strong>SHOW</strong> commands. <strong>SHOW GLOBAL|SESSION VARIABLES|STATUS</strong> will work properly, and will implicitly know whether to provide the results via <strong>information_schema</strong> or <strong>performance_schema</strong> tables.
+<ul>
+<li>But, aren&#8217;t we meant to be happier with <strong>SELECT</strong> queries? So that I can really do stuff that is smarter than <strong>LIKE &#8216;variable_name%&#8217;</strong>?</li>
+<li>And of course you cannot use <strong>SHOW</strong> in server side cursors. Your stored routines are in a mess now.</li>
+<li>This does not solve the GRANTs problem.</li>
+</ul>
+</li>
+<li><strong><a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56">show_compatibility_56</a></strong>: an introduced variable in <strong>5.7</strong>, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+<ul>
+<li>Documentation introduces it, and says it is deprecated.
+<ul>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>But it actually works in <strong>5.7.8</strong> (latest)
+<ul>
+<li>time-travel-paradox plot thickens</li>
+</ul>
+</li>
+<li>Your automation scripts do not know in advance whether your MySQL has this variable
+<ul>
+<li>Hence <strong>SELECT @@global.show_compatibility_56</strong> will produce an error on <strong>5.6</strong></li>
+<li>But the &#8220;safe&#8221; way of <strong>SHOW GLOBAL VARIABLES LIKE &#8216;show_compatibility_56&#8217;</strong> will fail on a privilege error on <strong>5.7</strong></li>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>Actually advised by my colleague Simon J. Mudd, <strong>show_compatibility_56</strong> defaults to <strong>OFF</strong>. I <em>support</em> this line of thought. Or else it&#8217;s <strong>old_passwords=1</strong> all over again.</li>
+<li><strong>show_compatibility_56</strong> doesn&#8217;t solve the GRANTs problem.</li>
+<li>This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from <strong>&#8220;1&#8221;</strong> to <strong>&#8220;0&#8221;</strong>, I&#8217;m back at square one.</li>
+</ul>
+</li>
+</ul>
+<h3>Suggestion</h3>
+<p>I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in <strong>5.6</strong> if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:</p>
+<ol>
+<li><strong>Flow 1</strong>: keep <strong>information_schema</strong>, later migration into <strong>performance_schema</strong>
+<ul>
+<li>In <strong>5.7</strong>, <strong>information_schema</strong> tables should still produce the data.</li>
+<li>No security constraints on <strong>information_schema</strong></li>
+<li>Generate WARNINGs on reading from <strong>information_schema</strong> (&#8220;&#8230;this will be deprecated&#8230;&#8221;)</li>
+<li><strong>performance_schema </strong><em>also available</em>. With security constraints, whatever.</li>
+<li>In <strong>5.8</strong> remove <strong>information_schema</strong> tables; we are left with <strong>performance_schema</strong> only.</li>
+</ul>
+</li>
+<li><strong>Flow 2</strong>: easy migration into <strong>performance_schema</strong>:
+<ul>
+<li>In <strong>5.7</strong>, <strong>performance_schema</strong> tables should not require any special privileges. Any user can read from them.</li>
+<li>Keep <strong>show_compatibility_56 </strong>as it is.</li>
+<li><strong>SHOW</strong> commands choose between <strong>information_schema</strong> or <strong>performance_schema</strong> on their own &#8212; just as things are done now.</li>
+<li>In <strong>5.8</strong>, <strong>performance_schema</strong> tables will require <strong>SELECT</strong> privileges.</li>
+</ul>
+</li>
+</ol>
+<p>As always, I love the work done by the engineers; and I love how they listen to the community.</p>
+<p>Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?</p>
+<h3>[UPDATE 2015-08-19]</h3>
+<p>Please <a href="http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html">see this followup</a> by Morgan Tocker of Oracle.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7327</post-id>	</item>
+		<item>
+		<title>Get per-object grants via common_schema</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/get-per-object-grants-via-common_schema</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/get-per-object-grants-via-common_schema#respond</comments>
+				<pubDate>Mon, 29 Sep 2014 11:30:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7007</guid>
+				<description><![CDATA[Did you know common_schema supports a complete breakdown of all accounts on your database server? It can provide you with the GRANT statements required to set up an account, the REVOKE statements to undo the former, and this can be broken down on a per-object &#38; per-object-type basis. Consider the sql_grants view: Find who has [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Did you know <a href="http://code.google.com/p/common-schema">common_schema</a> supports a complete breakdown of all accounts on your database server? It can provide you with the <strong>GRANT</strong> statements required to set up an account, the <strong>REVOKE</strong> statements to undo the former, and this can be broken down on a per-object &amp; per-object-type basis. Consider the <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">sql_grants</a> view:</p>
+<p><em>Find who has privileges on a table called <strong>t</strong></em>:</p>
+<blockquote>
+<pre>select * from <strong>common_schema.sql_grants</strong> where <strong>priv_level_name</strong>='table' and <strong>object_name</strong>='t'\G
+
+           GRANTEE: 'power1'@'localhost'
+              user: power1
+              host: localhost
+        priv_level: `mytst`.`t`
+   priv_level_name: table
+     object_schema: mytst
+       object_name: t
+current_privileges: SELECT
+      IS_GRANTABLE: NO
+         sql_grant: GRANT SELECT ON `mytst`.`t` TO 'power1'@'localhost'
+        sql_revoke: REVOKE SELECT ON `mytst`.`t` FROM 'power1'@'localhost'
+     sql_drop_user: DROP USER 'power1'@'localhost'</pre>
+</blockquote>
+<p>or, <em>who has privileges on the <strong>test</strong> schema</em>:</p>
+<blockquote>
+<pre>select * from common_schema.sql_grants where priv_level_name='schema' and object_name='test' \G
+
+           GRANTEE: 'power1'@'localhost'
+              user: power1
+              host: localhost
+        priv_level: `test`.*
+   priv_level_name: schema
+     object_schema: NULL
+       object_name: test
+current_privileges: ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE
+      IS_GRANTABLE: NO
+         sql_grant: GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* TO 'power1'@'localhost'
+        sql_revoke: REVOKE ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* FROM 'power1'@'localhost'
+     sql_drop_user: DROP USER 'power1'@'localhost'
+
+           GRANTEE: 'test'@'localhost'
+              user: test
+              host: localhost
+        priv_level: `test`.*
+   priv_level_name: schema
+     object_schema: NULL
+       object_name: test
+current_privileges: ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE
+      IS_GRANTABLE: NO
+         sql_grant: GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* TO 'test'@'localhost'
+        sql_revoke: REVOKE ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* FROM 'test'@'localhost'
+     sql_drop_user: DROP USER 'test'@'localhost'
+
+</pre>
+</blockquote>
+<p>In the same manner, you can easily SELECT for all grants that are defined per-table, per-schema, &#8230; <strong>priv_level_name</strong>: is any one of <strong>&#8216;user&#8217;</strong>, <strong>&#8216;schema&#8217;</strong>, <strong>&#8216;table&#8217;</strong>, <strong>&#8216;column&#8217;</strong>, <strong>&#8216;routine&#8217;</strong>.</p>
+<p>The above is a view, which aggregates data from all relevant <strong>INFORMATION_SCHEMA</strong> tables, normalizing and de-normalizing as necessary.</p>
+<p>You might also want to look at <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">sql_show_grants</a> which provides with a no-breakdown GRANT for all accounts. It&#8217;s like a SHOW ALL GRANTS which doesn&#8217;t exist, plus it&#8217;s SELECTable.</p>
+<p>Also, thanks to <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html">eval()</a>, the above make for executable code. Consider:<span id="more-7007"></span></p>
+<p><em>Revoke any and all specific grants on private_schema.private_table:</em></p>
+<blockquote>
+<pre>call <strong>common_schema.eval</strong>("<strong><span style="color: #808000;">select sql_revoke from sql_grants where object_schema='private_schema' and object_name='private_table'</span></strong>")</pre>
+<p>&nbsp;</p></blockquote>
+<p>It&#8217;s been around for quite a while now. We&#8217;re using it in production extensively. Try it out!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/get-per-object-grants-via-common_schema/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7007</post-id>	</item>
+		<item>
+		<title>Some MySQL security tips</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/some-mysql-security-tips</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/some-mysql-security-tips#comments</comments>
+				<pubDate>Mon, 28 Jul 2014 09:13:36 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6482</guid>
+				<description><![CDATA[This is a brief list of security tips for MySQL. It is by no means complete. Follow the sudo example. Don&#8217;t let all you DBAs and Ops have the password for the root account. Have each and every one of them have their own personal super-duper account, with their own personal and private password. This [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is a brief list of security tips for MySQL. It is by no means complete.</p>
+<ul>
+<li>Follow the <strong>sudo</strong> example. Don&#8217;t let all you DBAs and Ops have the password for the <strong>root</strong> account. Have each and every one of them have their own personal super-duper account, with their own personal and private password. This makes it so easy when someone leaves the company. No need to change passwords, just to remove the employee&#8217;s account.</li>
+<li>Block <strong>root</strong>. Either remove it completely or forbid it from logging in. Yes, there&#8217;s a <del>way</del> hack in MySQL to have a valid account blocked from logging in. One way of making this happen is via <em>common_schema</em>&#8216;s <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_accounts.html">sql_accounts</a>. Here&#8217;s how to block root account using common_schema:</li>
+</ul>
+<blockquote>
+<pre>mysql&gt; CALL common_schema.eval("SELECT sql_block_account FROM sql_accounts WHERE USER = 'root'");</pre>
+</blockquote>
+<ul>
+<li>Make lots of small users. Give <em>nagios</em> its own user. Give <em>collectd</em> its own user. Give <em>orchestrator</em> its own user. Give <em>innotop</em> its own user. Give <em>whatever</em> its own user. Yes, it&#8217;s more users to create, but you get to have each user as limited in privileges as possible, and you don&#8217;t get to wonder why your heartbeat script has <strong>SUPER</strong>, <strong>LOCK</strong> and <strong>SHUTDOWN</strong> privileges.</li>
+<li>Verify: <strong>set @@old_passwords=0;</strong> before setting a new password. Make sure your configuration does not specify <strong>old_passwords = 1</strong>. There is no reason to use &#8220;<a href="https://shlomi-noach.github.io/blog/mysql/upgrading-passwords-from-old_passwords-to-new-passwords">old passwords</a>&#8220;. In fact, a <strong>5.6</strong> client will refuse connecting with an &#8220;old password&#8221;.</li>
+<li>Give no access to <strong>mysql.*</strong>. No one should be tampering directly with the <strong>mysql</strong> system tables.</li>
+<li>Run <a href="https://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-security-audit.html">oak-security-audit</a> or, if you have <em>common_schema</em> installed (you mean you don&#8217;t?), just <strong><a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/security_audit.html">CALL security_audit()</a>;</strong> I can (almost) guarantee you&#8217;d be surprised and thankful for the security breakdown. Users without passwords, users sharing same passwords, users with unreasonable privileges, and more&#8230; You&#8217;ll see them all.</li>
+<li>If you have web interfaces to your database or some of its aspects (e.g. Anemometer, Propagator, Orchestrator, monitoring, &#8230;), protect it via LDAP group or similar. Not everyone who has access to your network needs to see you database. Neither does every employee.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/some-mysql-security-tips/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6482</post-id>	</item>
+		<item>
+		<title>Introducing audit_login: simple MySQL login logfile based auditing</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/introducing-audit_login-simple-mysql-login-logfile-based-auditing</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/introducing-audit_login-simple-mysql-login-logfile-based-auditing#comments</comments>
+				<pubDate>Tue, 17 Sep 2013 07:24:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[plugin]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6523</guid>
+				<description><![CDATA[audit_login is a simple MySQL login auditing plugin, logging any login or login attempt to log file in JSON format. It seems that audit plugins are all the rage lately&#8230; We&#8217;ve developed out simple plugin a month ago as part of our database securing efforts; by auditing any login or login attempt we could either [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://github.com/outbrain/audit_login">audit_login</a> is a simple MySQL login auditing plugin, logging any login or login attempt to log file in JSON format.</p>
+<p>It seems that audit plugins are <a href="http://serge.frezefond.com/2013/09/news-mariadb-audit-plugin-beta-is-out/">all the rage</a> lately&#8230; We&#8217;ve developed out simple plugin a month ago as part of our database securing efforts; by auditing any login or login attempt we could either intercept or later investigate suspicious logins.</p>
+<p>However we quickly realized there is much more to be gathered by this info.</p>
+<p>In very short, you install this plugin onto your MySQL server, and your server starts writing into a text file called <strong>audit_login.log</strong> entries such as follows:</p>
+<blockquote>
+<pre>{"ts":"2013-09-11 09:11:47","type":"successful_login","myhost":"gromit03","thread":"74153868","user":"web_user","priv_user":"web_user","host":"web-87.localdomain","ip":"10.0.0.87"}
+{"ts":"2013-09-11 09:11:55","type":"failed_login","myhost":"gromit03","thread":"74153869","user":"backup_user","priv_user":"","host":"web-32","ip":"10.0.0.32"}
+{"ts":"2013-09-11 09:11:57","type":"failed_login","myhost":"gromit03","thread":"74153870","user":"backup_user","priv_user":"","host":"web-32","ip":"10.0.0.32"}
+{"ts":"2013-09-11 09:12:48","type":"successful_login","myhost":"gromit03","thread":"74153871","user":"root","priv_user":"root","host":"localhost","ip":"10.0.0.111"}
+{"ts":"2013-09-11 09:13:26","type":"successful_login","myhost":"gromit03","thread":"74153872","user":"web_user","priv_user":"web_user","host":"web-11.localdomain","ip":"10.0.0.11"}
+{"ts":"2013-09-11 09:13:44","type":"successful_login","myhost":"gromit03","thread":"74153873","user":"web_user","priv_user":"web_user","host":"web-40.localdomain","ip":"10.0.0.40"}
+{"ts":"2013-09-11 09:13:51","type":"successful_login","myhost":"gromit03","thread":"74153874","user":"web_user","priv_user":"web_user","host":"web-03.localdomain","ip":"10.0.0.03"}
+{"ts":"2013-09-11 09:14:09","type":"successful_login","myhost":"gromit03","thread":"74153875","user":"web_user","priv_user":"web_user","host":"web-40.localdomain","ip":"10.0.0.40"}
+{"ts":"2013-09-11 10:55:25","type":"successful_login","myhost":"gromit03","thread":"74153876","user":"web_user","priv_user":"web_user","host":"web-87.localdomain","ip":"10.0.0.87"}
+{"ts":"2013-09-11 10:55:59","type":"successful_login","myhost":"gromit03","thread":"74153877","user":"web_user","priv_user":"web_user","host":"web-12.localdomain","ip":"10.0.0.12"}
+{"ts":"2013-09-11 10:55:59","type":"failed_login","myhost":"gromit03","thread":"74153878","user":"(null)","priv_user":"(null)","host":"(null)","ip":"10.0.0.1"}</pre>
+</blockquote>
+<p>In the above your MySQL server is on <strong>gromit03</strong>, and is accepting connections from other hosts; some successful, some not. What kind of information can you gather from the above?</p>
+<ul>
+<li>You can tell how many connections are being created on your server</li>
+<li>Where they came from</li>
+<li>Where <strong>&#8216;root&#8217;</strong> connections come from</li>
+<li>Port scans (see last row) can be identified by no credentials. These don&#8217;t have to be port scans <em>per se</em>; any <strong>telnet localhost 3006</strong> followed by <strong>Ctrl+D</strong> will show the same. Typically these would be either load balancer or monitoring tools checks to see that the <strong>3306</strong> port is active.</li>
+<li>You can tell which accounts connect, and how many times</li>
+<li>And you can infer which accounts are stale and can be dropped &#8212; if an account does not connect within a week&#8217;s time, it&#8217;s probably stale (pick your own timeframe)</li>
+</ul>
+<p>The above is quite interesting on one host; but we have dozens. We&#8217;ve installed this plugin on all our MySQL servers, and we use <a href="http://logstash.net/"><strong>logstash</strong></a> to aggregate them. We aggregate to two destinations:<span id="more-6523"></span></p>
+<ul>
+<li>All logs are being sent over to <strong><a href="http://kibana.org/">kibana</a></strong>, where they are easily searchable via <a href="http://lucene.apache.org/core/">lucene</a> queries</li>
+<li>They are also all aggregated into one CSV formatted logfile, rotating daily; this format makes it easier for me to <strong>grep</strong> and <strong>uniq -c</strong> and generally produce very valuable data by scripting.</li>
+</ul>
+<p>By aggregating the logs from multiple hosts, we are able to gather such insight as:</p>
+<ul>
+<li>How well our load balancers are distributing connections</li>
+<li>How our various applications servers connect on our multiple data centres to our MySQL hosts</li>
+<li>Catching misbehaving apps with hardcoded server IPs</li>
+<li>Catching naughty developers logging into our masters directly (we have more mechanisms now to prevent and audit such cases)</li>
+<li>Identifying differences in behaviour of monitoring tools across our data centres</li>
+<li>etc.</li>
+</ul>
+<h4>Free to use</h4>
+<p>The <strong>audit_login</strong> plugin has been made free to use, open source, licensed under GNU GPL v2. It is <a href="https://github.com/outbrain/audit_login">publicly available in our github repository</a>, where more documentation on build and installation can be found.</p>
+<p>As MySQL plugins go, you must compile your plugin with your particular MySQL version. For you convenience, pre-compiled binaries are <a href="https://github.com/outbrain/audit_login/tree/master/lib">available in the repository</a> (at this time for <strong>5.5.32</strong> and <strong>5.5.21</strong> linux 64 bit; likely to add more)</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/introducing-audit_login-simple-mysql-login-logfile-based-auditing/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6523</post-id>	</item>
+		<item>
+		<title>MySQL security top wish list</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-security-top-wish-list</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-security-top-wish-list#comments</comments>
+				<pubDate>Thu, 29 Aug 2013 05:28:48 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6492</guid>
+				<description><![CDATA[Security seems to have no boundaries. I&#8217;ve been tightening our database security lately, and it seems like this could go on forever: from app to console to privileges to server, there are so many aspects to managing database security. Unfortunately, this is a field where MySQL is in particular weak, and with very little work [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Security seems to have no boundaries. I&#8217;ve been tightening our database security lately, and it seems like this could go on forever: from app to console to privileges to server, there are so many aspects to managing database security. Unfortunately, this is a field where MySQL is in particular weak, and with very little work done in the many years I&#8217;ve been working with MySQL.</p>
+<p>My very own top-wanted security features for MySQL follows. Surely this is but a small subset, your mileage may vary.</p>
+<h4>Autherntication-only SSL</h4>
+<p>By default, MySQL client API is unencrypted and <del>passwords are sent in cleartext</del>. MySQL supports SSL, but it an &#8220;all or nothing&#8221; deal: if you want to use SSL, then everything goes by SSL: any query, SELECT, DDL and whatnot.</p>
+<p><strong>[UPDATE]</strong>: Thanks to Davi &amp; Jan for correcting me on this: passwords are <em>not</em> sent via cleartext. I&#8217;m not sure by which constellation I saw cleartext passwords being sent &#8212; but obviously that was long time ago. Just verified via <em>tcpdump</em>, got <strong>&#8220;mysql_native_password&#8221;</strong> message and no cleartext password. Lesson learned!</p>
+<h4>Roles</h4>
+<p>Need I elaborate? This is a fundamental construct in a database grant system. The effort of maintaining multiple accounts with similar/identical privileges is overwhelming. (PS I haven&#8217;t used <a href="http://www.securich.com/">Securich</a> to date)</p>
+<h4>Host aggregation</h4>
+<p>In MySQL the combination of user+host makes for a distinct account. Thus, <strong>&#8216;gromit&#8217;@&#8217;192.168.%&#8217;</strong> is a completely different account than <strong>&#8216;gromit&#8217;@&#8217;10.10.%&#8217;</strong>. I get the idea: you can have more privileges to, say, <strong>gromit@localhost</strong> than for <strong>gromit@&#8217;192.%&#8217;</strong>. In practice, this only makes a headache. In all my years, I have <em>never</em> encountered nor designed a privilege set where two accounts of the same user had different set of privileges. Never ever ever. It is confusing and pointless: if an account has a different set of roles, just call it by another name!<span id="more-6492"></span></p>
+<p>Had we had roles, that would be less painful; but my opinion is that an account should be identified by user only, not by user+host. The &#8216;host&#8217; part should just indicate the whitelist of machines from which the user is allowed to connect.</p>
+<h4>Host blacklist</h4>
+<p>Speaking of whitelist, it would be great to have a host blacklist. If I wanted to grant access to &#8216;gromit&#8217;@&#8217;192.168.%&#8217; except for &#8216;192.168.10.%&#8217; &#8212; well, I would have to whitelist all the possible subnets. I can&#8217;t exclude a set of hosts.</p>
+<h4>Catalogues</h4>
+<p>Another common construct not available in MySQL: a level above &#8220;schema&#8221; and below &#8220;server&#8221;. The need for catalogues is in particular obvious when you want to grant some user SELECT access to all your schemas. Ahem, excluding, of course, the <strong>mysql</strong> schema&#8230; If I could create a &#8220;user catalogue&#8221;, as opposed to &#8220;system catalogue&#8221;, then I would have been able to <strong>GRANT SELECT ON CATALOGUE user.* TO my_user@localhost</strong>, and this would apply to all databases in that catalogue.</p>
+<h4>Privileges auditing</h4>
+<p>I&#8217;ve spent the last week or so restricting privileges to all accounts. This is hard work, because you want to make sure you&#8217;re not revoking privileges which are required by the system (in which case I would either choose not to revoke, or create a new dedicated account with requested set of privileges). It would be so much fun if I could turn a flag on, like <strong>&#8220;SET GLOBAL audit_privileges := 1&#8221;</strong>, and have a <strong>++counter</strong> for every time a privilege check is made per account.</p>
+<p>I guess we could go on&#8230; On a brighter note, I&#8217;ve been using the audit plugin interface by writing a login audit plugin with very good results (= good auditing &amp; important insights); the (simple) code will be released shortly as open source; I&#8217;ll write more on this at a later stage.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-security-top-wish-list/feed</wfw:commentRss>
+		<slash:comments>30</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6492</post-id>	</item>
+		<item>
+		<title>MySQL security tasks easily solved with common_schema</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-security-tasks-easily-solved-with-common_schema</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-security-tasks-easily-solved-with-common_schema#comments</comments>
+				<pubDate>Thu, 17 Jan 2013 08:09:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5792</guid>
+				<description><![CDATA[Here are three security tasks I handled, which I&#8217;m happy to say were easily solved with common_schema&#8216;s views and routines (with no prior planning). Two are so easy, that I actually now integrated them into common_schema 1.3: Duplicate a user (create new user with same privileges as another&#8217;s) Find users with identical set of grants [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here are three security tasks I handled, which I&#8217;m happy to say were easily solved with <em>common_schema</em>&#8216;s views and routines (with no prior planning). Two are so easy, that I actually now integrated them into <a href="http://code.google.com/p/common-schema">common_schema 1.3</a>:</p>
+<ul>
+<li>Duplicate a user (create new user with same privileges as another&#8217;s)</li>
+<li>Find users with identical set of grants (same roles)</li>
+<li>Finding redundant users (users who only have privileges on non-existing objects); I was approached on this by <a href="http://sheeri.com/">Sheeri K. Cabral</a> from Mozilla.</li>
+</ul>
+<h4>Duplicate user</h4>
+<p>How would you duplicate a grantee? That&#8217;s easy! Just get the SHOW GRANTS output, then do text search and replace: replace the existing account (e.g. <strong>&#8216;existing&#8217;@&#8217;localhost&#8217;</strong>) with the new account (e.g. <strong>&#8216;newcomer&#8217;@&#8217;localhost&#8217;</strong>).</p>
+<p>Ahem. And how would you get the output of <strong>SHOW GRANTS</strong>? That&#8217;s right: you can&#8217;t do this from within the server. You have to go outside the server, incoke mysql client, <em>sed</em> your way into it, then connect to MySQL again to invoke the GRANT query&#8230; Or you can do this by hand, of course, or you can use the new <a href="http://dev.mysql.com/doc/workbench/en/mysqluserclone.html">mysqluserclone</a> tool from MySQL utilities. Bottom line: you have to go outside the server. You can&#8217;t directly do this with your favorite GUI tool unless it has this function integrated.</p>
+<p>But to have a truly automated, scriptable, server-side user-duplication you don&#8217;t need to go far, since the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">sql_show_grants</a> view simulates a <strong>SHOW GRANTS</strong> output, but using plain old SQL. It produces the <strong>GRANT</strong> statement as SQL output. Which means you can <strong>REPLACE()</strong> the grantee. It&#8217;s actually a one liner, but is such a common operation that I created the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html">duplicate_grantee()</a> function for convenience. Just:<span id="more-5792"></span></p>
+<blockquote>
+<pre>call duplicate_grantee(<strong>'existing@localhost', </strong><strong>'newcomer@localhost'</strong>);</pre>
+</blockquote>
+<p>(and yes, using a more relaxed form of grantee, allowing dropping of all these gory quotes).</p>
+<h4>Finding similar grantees</h4>
+<p>If the grants of an account are available via SQL, I&#8217;m also able to compare it with the grants of another account. I just need to ignore the account&#8217;s name in itself. Since <em>sql_show_grants</em> normalizes the grants in expected order, this works well. Again, this is a simple query, but since it is of importance, I created a view for it: just <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html"><strong>SELECT * FROM similar_grants</strong></a> to find out about accounts sharing same set of privileges..</p>
+<h4>Drop redundant users</h4>
+<p>Sheeri approached me with the following problem (she authorized me to publicize): as she came to work for Mozilla, she inherited the databases to manage. When she reviewed them, she realized there were numerous accounts which were redundant. Redundant how? Well, obviously not being used, but moreover not having privileges on existing objects.</p>
+<p>She found out there were many accounts that only had privileges on non-existing schema, something like:</p>
+<blockquote>
+<pre>GRANT ALL PRIVILEGES ON <strong>penguin.*</strong> TO 'gromit'@'localhost'</pre>
+</blockquote>
+<p>Where the <strong>penguin</strong> schema does not exist anymore &#8211; it was some developer&#8217;s test database. The developer long since not working there, the database long since DROPped.</p>
+<p>How do you quickly find and drop such accounts? Should we do crazy parsing on <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-show-grants.html">pt-show-grants</a> output? Any other method?</p>
+<p>Well, <em>common_schema</em> to the rescue: the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">sql_grants</a> view breaks the <strong>GRANT</strong> statement into domains (in fact, this is not a true explanation; it actually <em>builds</em> the <strong>GRANT</strong> statements per domain; but it&#8217;s more convenient to view it as <em>breaking</em>). You actually get the different <strong>GRANT</strong> statement per account per domain: the <strong>GRANT</strong> the account has on <strong>*.*</strong>, the <strong>GRANT</strong> it has on <strong>world.*</strong>, the <strong>GRANT</strong> it has on <strong>sakila.*</strong>, the <strong>GRANT</strong> it has on &#8230;.</p>
+<p>Now this one is not entirely simple. Let me introduce the solution, then explain it. The way to find &amp; drop all such users is:</p>
+<blockquote>
+<pre>call <strong>eval</strong>(<span style="color: #000080;">"SELECT <strong>sql_revoke</strong> FROM <strong>sql_grants</strong> LEFT JOIN INFORMATION_SCHEMA.SCHEMATA ON(object_name = SCHEMA_NAME) WHERE priv_level_name='schema' AND DEFAULT_CHARACTER_SET_NAME IS NULL"</span>);
+call <strong>eval</strong>(<span style="color: #000080;">"SELECT <strong>sql_drop_user</strong> FROM <strong>sql_grants</strong> GROUP BY GRANTEE HAVING COUNT(*)=1 AND SUM(current_privileges='USAGE')=1"</span>);</pre>
+</blockquote>
+<p>Explanation:</p>
+<ol>
+<li>The <strong>LEFT JOIN</strong> query finds all <strong>GRANT</strong>s on non existing schemas.</li>
+<li>But we do more than that: we request the <strong>sql_revoke</strong> column which negates such <strong>GRANT</strong>s. <strong>sql_grants</strong> provides such info: the <strong>REVOKE</strong> statement for said <strong>GRANT</strong>s.</li>
+<li>We can actually evaluate the <strong>REVOKE</strong> statement via <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html"><strong>eval()</strong></a>. There! These privileges are now gone.</li>
+<li>Now that we have revoked privileges on non-existing domains, we should be left with accounts whose only privilege is <strong>USAGE</strong>. Any such account is redundant by definition, and should be dropped. The second query looks up such accounts.</li>
+<li>And, it asks for the <strong>sql_drop_user</strong> statement column for those accounts</li>
+<li>Finally, it evaluates the <strong>DROP USER</strong> statement via <em>eval()</em>.</li>
+</ol>
+<p>Here is the statements output without executing the <strong>eval()</strong>:</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SELECT <strong>sql_revoke</strong> FROM <strong>sql_grants</strong> LEFT JOIN INFORMATION_SCHEMA.SCHEMATA ON(object_name = SCHEMA_NAME) WHERE  priv_level_name='schema'  AND DEFAULT_CHARACTER_SET_NAME IS NULL;
++-----------------------------------------------------------------+
+| sql_revoke                                                      |
++-----------------------------------------------------------------+
+| REVOKE INSERT, SELECT ON `not_here`.* FROM 'gromit'@'localhost' |
++-----------------------------------------------------------------+
+
+root@mysql-5.1.51&gt; SELECT <strong>sql_drop_user</strong> FROM <strong>sql_grants</strong> GROUP BY GRANTEE HAVING COUNT(*)=1 AND SUM(current_privileges='USAGE')=1;
++--------------------------------+
+| sql_drop_user                  |
++--------------------------------+
+| DROP USER 'gromit'@'localhost' |
++--------------------------------+</pre>
+</blockquote>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-security-tasks-easily-solved-with-common_schema/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5792</post-id>	</item>
+		<item>
+		<title>common_schema: 1.3: security goodies, parameterized split(), json-to-xml, query checksum</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum#respond</comments>
+				<pubDate>Mon, 14 Jan 2013 06:25:07 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5941</guid>
+				<description><![CDATA[common_schema 1.3 is released and is available for download. New and noteworthy in this version: Parameterized split(): take further control over huge transactions by breaking them down into smaller chunks, now manually tunable if needed duplicate_grantee(): copy+paste existing accounts along with their full set of privileges similar_grants: find which accounts share the exact same set [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>common_schema <strong>1.3</strong> is released and is <a href="http://code.google.com/p/common-schema">available for download</a>. New and noteworthy in this version:</p>
+<ul>
+<li>Parameterized <strong><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">split()</a></strong>: take further control over huge transactions by breaking them down into smaller chunks, now manually tunable if needed</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html"><strong>duplicate_grantee()</strong></a>: copy+paste existing accounts along with their full set of privileges</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html"><strong>similar_grants</strong></a>: find which accounts share the exact same set of privileges (i.e. have the same <em>role</em>)</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/json_to_xml.html"><strong>json_to_xml()</strong></a>: translate any valid JSON object into its equivalent XML form</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/extract_json_value.html"><strong>extract_json_value()</strong></a>: use XPath notation to extract info from JSON data, just as you would from XML</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_checksum.html"><strong>query_checksum()</strong></a>: given a query, calculate a checksum on the result set</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/random_hash.html"><strong>random_hash()</strong></a>: get a 40 hexadecimal digits random hash, using a reasonably large changing input</li>
+</ul>
+<p>Let&#8217;s take a closer look at the above:</p>
+<h4>Parameterized split()</h4>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> takes your bulk query and automagically breaks it down into smaller pieces. So instead of one huge <strong>UPDATE</strong> or <strong>DELETE</strong> or <strong>INSERT..SELECT</strong> transaction, you get many smaller transactions, each with smaller impact on I/O, locks, CPU.</p>
+<p>As of <strong>1.3</strong>, <em>split()</em> gets more exposed: you can have some control on its execution, and you also get a lot of very interesting info during operation.</p>
+<p>Here&#8217;s an example of <em>split()</em> control:</p>
+<blockquote>
+<pre>set @script := "
+  <strong>split</strong>({<em>start</em>:7015, <em>step</em>:2000} : <span style="color: #3366ff;">UPDATE sakila.rental SET return_date = return_date + INTERVAL 1 DAY</span>) 
+    <strong>throttle</strong> 1;
+";
+call common_schema.run(@script);</pre>
+</blockquote>
+<p>In the above we choose a split size of 2,000 rows at a time; but we also choose to only start with <strong>7015</strong>, skipping all rows prior to that value. Just what is that value? It depends on the splitting key (and see next example for just that); but in this table we can safely assume this is the <strong>rental_id</strong> <strong>PRIMARY KEY</strong> of the table.</p>
+<p>You don&#8217;t <em>have to</em> use these control <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters">parameters</a>. But they can save you some time and effort.<span id="more-5941"></span></p>
+<p>And, look at some interesting info about the <em>splitting</em> process:</p>
+<blockquote>
+<pre>set @script := "
+  <strong>split</strong>(<span style="color: #339966;">sakila.film_actor</span>) 
+    <span style="color: #3366ff;"><strong>select</strong></span> $split_columns <span style="color: #3366ff;">as columns</span>, $split_range_start <span style="color: #3366ff;">as range_start</span>, $split_range_end <span style="color: #3366ff;">as range_end</span>
+";
+call common_schema.run(@script);
++----------------------+-------------+------------+
+| columns              | range_start | range_end  |
++----------------------+-------------+------------+
+| `actor_id`,`film_id` | '1','1'     | '39','293' |
++----------------------+-------------+------------+
+
++----------------------+-------------+------------+
+| columns              | range_start | range_end  |
++----------------------+-------------+------------+
+| `actor_id`,`film_id` | '39','293'  | '76','234' |
++----------------------+-------------+------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '76','234'  | '110','513' |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '110','513' | '146','278' |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '146','278' | '183','862' |
++----------------------+-------------+-------------+
+
++----------------------+-------------+-------------+
+| columns              | range_start | range_end   |
++----------------------+-------------+-------------+
+| `actor_id`,`film_id` | '183','862' | '200','993' |
++----------------------+-------------+-------------+</pre>
+</blockquote>
+<p>In the above you get to be told exactly how table splitting occurs: you are being told what columns are used to split the table, and what range of values is used in each step. There&#8217;s more to it: read the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">split() documentation</a>.</p>
+<h4>similar_grants</h4>
+<p>Out of your <strong>100</strong> different grants, which ones share the exact same set of privileges? MySQL has non notion of <em>roles</em>, but that doesn&#8217;t mean the notion does not exist. Multiple accounts share the same restrictions and privileges. Use <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/similar_grants.html"><strong>similar_grants</strong></a> to find out which. You might just realize there&#8217;s a few redundant accounts in your system.</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM similar_grants;
++-------------------------------+----------------+-------------------------------------------------------+
+| sample_grantee                | count_grantees | similar_grantees                                      |
++-------------------------------+----------------+-------------------------------------------------------+
+| 'root'@'127.0.0.1'            |              3 | <span style="color: #3366ff;">'root'@'127.0.0.1'</span>,<span style="color: #0000ff;">'root'@'myhost'</span>,<span style="color: #333399;">'root'@'localhost'</span> |
+| 'repl'@'10.%'                 |              2 | <span style="color: #008000;">'repl'@'10.%'</span>,<span style="color: #808000;">'replication'@'10.0.0.%'</span>                |
+| 'apps'@'%'                    |              1 | 'apps'@'%'                                            |
+| 'gromit'@'localhost'          |              1 | 'gromit'@'localhost'                                  |
+| 'monitoring_user'@'localhost' |              1 | 'monitoring_user'@'localhost'                         |
++-------------------------------+----------------+-------------------------------------------------------+</pre>
+</blockquote>
+<h4>duplicate_grantee()</h4>
+<p>Provide an existing account, and name your new, exact duplicate account. The complete set of privileges is copied, and so is the password. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/duplicate_grantee.html"><strong>duplicate_grantee()</strong></a> is your Copy+Paste of MySQL accounts.</p>
+<p>Let&#8217;s begin with some pre-existing account and see how it duplicates:</p>
+<blockquote>
+<pre>mysql&gt; show grants for <span style="color: #000080;">'world_user'@'localhost'</span>;
++------------------------------------------------------------------------------------------------------------------------+
+| Grants for world_user@localhost                                                                                        |
++------------------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO 'world_user'@'localhost' IDENTIFIED BY PASSWORD '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9'      |
+| GRANT ALL PRIVILEGES ON `world`.* TO 'world_user'@'localhost'                                                          |
+| GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `sakila`.`get_customer_balance` TO 'world_user'@'localhost' WITH GRANT OPTION |
++------------------------------------------------------------------------------------------------------------------------+
+
+mysql&gt; call <strong>duplicate_grantee</strong>(<span style="color: #000080;">'world_user@localhost'</span>, <span style="color: #000080;">'copied_user@10.0.0.%'</span>);
+Query OK, 0 rows affected (0.06 sec)
+
+mysql&gt; show grants for <span style="color: #000080;">'copied_user'@'10.0.0.%'</span>;
++------------------------------------------------------------------------------------------------------------------------+
+| Grants for copied_user@10.0.0.%                                                                                        |
++------------------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO 'copied_user'@'10.0.0.%' IDENTIFIED BY PASSWORD '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9'      |
+| GRANT ALL PRIVILEGES ON `world`.* TO 'copied_user'@'10.0.0.%'                                                          |
+| GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `sakila`.`get_customer_balance` TO 'copied_user'@'10.0.0.%' WITH GRANT OPTION |
++------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>The routine is quite relaxed in grantee format. <strong>copied_user@10.0.0.%</strong>, <strong>copied_user@&#8217;10.0.0.%&#8217;</strong> and <strong>&#8216;copied_user&#8217;@&#8217;10.0.0.%&#8217;</strong> are all just fine, and represent the same account. Saves trouble with all that quoting.</p>
+<h4>json_to_xml()</h4>
+<p>JSON is becoming increasingly popular in storing dynamically-structured data. XML&#8217;s tags overhead and its human unfriendliness make it less popular today. However, the two share similar concepts, and conversion between the two is possible. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/json_to_xml.html"><strong>json_to_xml()</strong></a> will translate your valid JSON data into its equivalent XML format. The rules are simple (all-nodes-and-data, no attributes, arrays as repeating nodes, objects as subnodes) and the results are valid XML objects.</p>
+<p>Sample data taken from <a href="http://json.org/example.html">json.org</a>:</p>
+<blockquote>
+<pre>mysql&gt; SET @json := '
+<span style="color: #000080;">{
+  "menu": {
+    "id": "file",
+    "value": "File",
+    "popup": {
+      "menuitem": [
+        {"value": "New", "onclick": "CreateNewDoc()"},
+        {"value": "Open", "onclick": "OpenDoc()"},
+        {"value": "Close", "onclick": "CloseDoc()"}
+      ]
+    }
+  }
+}</span>
+';
+
+mysql&gt; SELECT <strong>json_to_xml(@json)</strong> AS <strong>xml</strong> \G
+*************************** 1. row ***************************
+<strong>xml:</strong> &lt;menu&gt;&lt;id&gt;file&lt;/id&gt;&lt;value&gt;File&lt;/value&gt;&lt;popup&gt;&lt;menuitem&gt;&lt;value&gt;New&lt;/value&gt;&lt;onclick&gt;CreateNewDoc()&lt;/onclick&gt;&lt;/menuitem&gt;&lt;menuitem&gt;&lt;value&gt;Open&lt;/value&gt;&lt;onclick&gt;OpenDoc()&lt;/onclick&gt;&lt;/menuitem&gt;&lt;menuitem&gt;&lt;value&gt;Close&lt;/value&gt;&lt;onclick&gt;CloseDoc()&lt;/onclick&gt;&lt;/menuitem&gt;&lt;/popup&gt;&lt;/menu&gt;</pre>
+</blockquote>
+<p>Beautified form of the above result:</p>
+<blockquote>
+<pre>&lt;menu&gt;
+  &lt;id&gt;file&lt;/id&gt;
+  &lt;value&gt;File&lt;/value&gt;
+  &lt;popup&gt;
+    &lt;menuitem&gt;
+      &lt;value&gt;New&lt;/value&gt;
+      &lt;onclick&gt;CreateNewDoc()&lt;/onclick&gt;
+    &lt;/menuitem&gt;
+    &lt;menuitem&gt;
+      &lt;value&gt;Open&lt;/value&gt;
+      &lt;onclick&gt;OpenDoc()&lt;/onclick&gt;
+    &lt;/menuitem&gt;
+    &lt;menuitem&gt;
+      &lt;value&gt;Close&lt;/value&gt;
+      &lt;onclick&gt;CloseDoc()&lt;/onclick&gt;
+    &lt;/menuitem&gt;
+  &lt;/popup&gt;
+&lt;/menu&gt;</pre>
+</blockquote>
+<p>Note that linked examples page uses sporadically invented attributes; <em>common_schema</em> prefers using well-defined nodes.</p>
+<h4>extract_json_value()</h4>
+<p>Which means things you can do with XML can also be done with JSON. XPath is a popular extraction DSL, working not only for XML but also for Object Oriented structures (see Groovy&#8217;s nice integration of XPath into the language, or just commons-beans for conservative approach). JSON is a perfect data store for XPath expressions; by utilizing the translation between JSON and XML, one is now easily able to extract value from JSON (using same example as above):</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>extract_json_value</strong>(@json, <span style="color: #000080;">'//id'</span>) AS result;
++--------+
+| result |
++--------+
+| file   |
++--------+
+
+mysql&gt; SELECT <strong>extract_json_value</strong>(@json, <span style="color: #000080;">'count(/menu/popup/menuitem)'</span>) AS count_items;
++-------------+
+| count_items |
++-------------+
+| 3           |
++-------------+</pre>
+</blockquote>
+<p>Implementations of <strong>json_to_xml()</strong> and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/extract_json_value.html"><strong>extract_json_value()</strong></a> are CPU intensive. There is really just one justification for having these written in Stored Procedures: their lack in the standard MySQL function library. This is reason enough. Just be aware; test with <a href="http://dev.mysql.com/doc/refman/5.5/en/information-functions.html#function_benchmark">BENCHMARK()</a>.</p>
+<h4>query_checksum()</h4>
+<p>It looks like this:</p>
+<blockquote>
+<pre>mysql&gt; call <strong>query_checksum</strong>(<span style="color: #000080;">'select id from world.City where id in (select capital from world.Country) order by id'</span>);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 5f35070b90b0c079ba692048c51a89fe |
++----------------------------------+
+
+mysql&gt; call <strong>query_checksum</strong>(<span style="color: #000080;">'select capital from world.Country where capital is not null order by capital'</span>);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 5f35070b90b0c079ba692048c51a89fe |
++----------------------------------+</pre>
+</blockquote>
+<p>The two queries above yield with the same result set. As consequence, <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_checksum.html"><strong>query_checksum()</strong></a> produces the same checksum value for both. The next query produces a different result set, hence a different checksum:</p>
+<blockquote>
+<pre>mysql&gt; call <strong>query_checksum</strong>(<span style="color: #000080;">'select id from world.City where id in (select capital from world.Country) order by id limit 10'</span>);
++----------------------------------+
+| checksum                         |
++----------------------------------+
+| 997079c2dfca34ba87ae44ed8965276e |
++----------------------------------+</pre>
+</blockquote>
+<p>The routine actually invokes the given queries (modifying them a bit along the way) and uses a deterministic incremental checksum to get the final result.</p>
+<p>Its use? As a handy built-in mechanism for comparing your table data. This is meant for relatively small result sets &#8211; not for your <strong>20GB</strong> table. Inspired by Baron&#8217;s <a href="http://www.xaprb.com/blog/2009/03/25/mysql-command-line-tip-compare-result-sets/">old trick</a>, and works on server side (Windows/GUI/automated clients to benefit).</p>
+<h4>random_hash()</h4>
+<p>Random hashes come handy. The naive way to produce them is by executing something like <strong>SELECT SHA1(RAND())</strong>. However the <strong>RAND()</strong> function just doesn&#8217;t provide enough plaintext for the hash function. The <strong>SHA</strong>/<strong>MD5</strong> functions expect a textual input, and produce a <strong>160</strong>/<strong>128</strong> bit long hash. The maximum char length of a <strong>RAND()</strong> result is <strong>20</strong> characters or so, and these are limited to the <strong>0-9</strong> digits. So at about <strong>10^20</strong> options for input, which is about <strong>64</strong> bit. Hmmmm. a 64 bit input to generate a <strong>160</strong> bit output? I don&#8217;t think so! <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/random_hash.html"><strong>random_hash()</strong></a> provides additional input in the form of your current status (at about 830 characters) as well as <strong>RAND()</strong>, <strong>SYSDATE()</strong> and server ID.</p>
+<h4>Bugfixes</h4>
+<p>Any bugfix adds at least one test; typically more. Currently with over <strong>470</strong> tests, <em>common_schema</em> is built to work.</p>
+<h4>Get common_schema</h4>
+<p><em>common_schema</em> <strong>1.3</strong> is available under the permissive New BSD License. <a href="http://code.google.com/p/common-schema/">Find the latest download here</a>.</p>
+<p>If you like to support <em>common_schema</em>, I&#8217;m always open for ideas and contributions. Or you can just spread the word!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-1-3-security-goodies-parameterized-split-json-to-xml-query-checksum/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5941</post-id>	</item>
+		<item>
+		<title>common_schema 1.2: security, partition management, processes, QueryScript goodies</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-1-2-security-partition-management-processes-queryscript-goodies</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-1-2-security-partition-management-processes-queryscript-goodies#comments</comments>
+				<pubDate>Tue, 13 Nov 2012 12:25:38 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5539</guid>
+				<description><![CDATA[common_schema 1.2 is released! This version comes shortly after 1.1, yet contains quite a few interesting goodies: Account blocking Security audit RANGE partition management Slave status Better blocking and idle transaction management QueryScript goodies: echo, report while-otherwise statement; foreach-otherwise statement Better variable scope handling Complete support for variable expansion Transaction support within QueryScript More summary [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="http://code.google.com/p/common-schema">common_schema</a> <strong>1.2</strong> is released! This version comes shortly after <strong>1.1</strong>, yet contains quite a few interesting goodies:</p>
+<ul>
+<li>Account blocking</li>
+<li>Security audit</li>
+<li>RANGE partition management</li>
+<li>Slave status</li>
+<li>Better blocking and idle transaction management</li>
+<li><em>QueryScript </em>goodies:
+<ul>
+<li>echo, report</li>
+<li>while-otherwise statement; foreach-otherwise statement</li>
+<li>Better variable scope handling</li>
+<li>Complete support for variable expansion</li>
+<li>Transaction support within QueryScript</li>
+</ul>
+</li>
+<li>More summary info and SQL statements in processlist-related views</li>
+</ul>
+<p>A closer look at these follows:</p>
+<h4>Account blocking</h4>
+<p>A new view called <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_accounts.html"><strong>sql_accounts</strong></a>, inspired by <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-block-account.html">oak-block-account</a> (also see <a href="https://shlomi-noach.github.io/blog/mysql/blocking-user-accounts">here</a> and <a href="https://shlomi-noach.github.io/blog/mysql/pop-quiz-what-is-the-most-basic-privilege-an-account-can-be-assigned-with">here</a>) provides with the means of blocking use accounts (and releasing them, of course) without revoking their privileges. It offers the SQL statements to block an account (by modifying its password in a symmetric way) and to release an account (by modifying its password back to normal). It really works like a charm. Together with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/killall.html">killall()</a> and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">sql_accounts</a> this gives the administrator great control over accounts.</p>
+<h4>Security audit</h4>
+<p>Imported from <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-security-audit.html">openark kit</a>, and implemented via <em>QueryScript</em>, the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/security_audit.html"><strong>security_audit()</strong></a> procedure will audit your accounts, passwords and general settings to find problems, pitfalls and security hazards. I will write more on this later.</p>
+<h4>RANGE partition management</h4>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_range_partitions.html"><strong>sql_range_partitions</strong></a> view manages your <strong>RANGE</strong> and <strong>RANGE COLUMNS</strong> partitioned tables by providing with the SQL statements to drop oldest partitions and to create the next (in sequence) partitions. See my <a href="https://shlomi-noach.github.io/blog/mysql/your-magical-range-partitioning-maintenance-query">earlier post</a>.<span id="more-5539"></span></p>
+<h4>Slave status</h4>
+<p>This is a hack providing a minified version of <strong>SHOW SLAVE STATUS</strong>, but as a <em>view</em> (<a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/slave_status.html"><strong>slave_status</strong></a>). It only provides with <strong>5</strong> columns:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM slave_status \G
+*************************** 1. row ***************************
+ Slave_Connected_time: 82077
+     Slave_IO_Running: 1
+    Slave_SQL_Running: 1
+        Slave_Running: 1
+Seconds_Behind_Master: 5</pre>
+</blockquote>
+<p>For me, the <strong>Seconds_Behind_Master</strong> is one critical value I am interested in getting using a query. So here it is.</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>(Seconds_Behind_Master &lt; 10) IS TRUE</strong> AS slave_is_up_to_date FROM <strong>slave_status</strong>;
++---------------------+
+| slave_is_up_to_date |
++---------------------+
+|                   1 |
++---------------------+</pre>
+</blockquote>
+<h4>QueryScript goodies</h4>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_while.html"><strong>while-otherwise</strong></a> statement: <strong>while (some_condition) { &#8230; } otherwise { /* this gets executed if the while never performs a single iteration */ }</strong></li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_foreach.html"><strong>foreach-otherwise</strong></a> statement, likewise</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_echo.html"><strong>echo</strong></a>, <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_report.html"><strong>report</strong></a> statements: echo your statements before applying them, or just echo your comments along the code. Generate a (beautified) report at the end of script execution (which is how security_audit() works).</li>
+<li>Better variable scopes: now allowing variables of same name to be declared when their scopes do not overlap. This makes for the expected behavior a programmer would expect.</li>
+<li>Complete variable expansion handling: expanded variables are now recognized anywhere within the script, including inside a while or <strong>foreach</strong> expression.</li>
+<li>Transactions are now handled by QueryScript and immediately delegated to MySQL. This completes the transaction management in QueryScript. Just <strong>start transaction</strong>, <strong>commit</strong> or <strong>rollback</strong> at will.</li>
+</ul>
+<h4>InnoDB idle transactions, blocking transactions</h4>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_transactions.html"><strong>innodb_transactions</strong></a> view now lists idle transactions, as well as their idle time. It also provides with the SQL statements to kill the query or connection for each transaction. This allows for a quick track or track-and-kill of idle transactions.</p>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_locked_transactions.html"><strong>innodb_locked_transactions</strong></a> view now offers the wait time and SQL statements for killing the query or connection of a blocking  transaction. This allows for a quick track or track-and-kill long time blocking transactions.</p>
+<p>I will write more in depth on both in a future post.</p>
+<h4>Processlist-related views</h4>
+<p>The new <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_states.html"><strong>processlist_states</strong></a> view aggregates processlist by thread state. This view, and all other processlist views now provide with median or <strong>95%</strong> median runtime for processes, in addition to the less informative AVG provided earlier.</p>
+<h4>Get it!</h4>
+<p><em>common_schema</em> is free and licensed under the New BSD License. It is nothing but a SQL file, so you simply import it into your MySQL server. <em>common_schema</em> installs on any MySQL &gt;= <strong>5.1</strong> server, including Percona Server and MariaDB, tested on <strong>5.1</strong>, <strong>5.5</strong> and <strong>5.6 RC</strong>.</p>
+<p><a href="http://code.google.com/p/common-schema">Go to common_schema download page</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-1-2-security-partition-management-processes-queryscript-goodies/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5539</post-id>	</item>
+		<item>
+		<title>common_schema rev. 68: eval(), processlist_grantees, candidate_keys, easter_day()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-68-eval-processlist_grantees-candidate_keys-easter_day</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-68-eval-processlist_grantees-candidate_keys-easter_day#respond</comments>
+				<pubDate>Tue, 06 Sep 2011 07:05:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3952</guid>
+				<description><![CDATA[Revision 68 of common_schema is out, and includes some interesting features: eval(): Evaluates the queries generated by a given query match_grantee(): Match an existing account based on user+host processlist_grantees: Assigning of GRANTEEs for connected processes candidate_keys: Listing of prioritized candidate keys: keys which are UNIQUE, by order of best-use. easter_day(): Returns DATE of easter day [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>68</strong> of <a rel="nofollow" href="http://code.google.com/p/common-schema/">common_schema</a> is out, and includes some interesting features:</p>
+<ul>
+<li><strong>eval()</strong>: Evaluates the queries generated by a given query</li>
+<li><strong>match_grantee()</strong>: Match an existing account based on user+host</li>
+<li><strong>processlist_grantees</strong>: Assigning of GRANTEEs for connected processes</li>
+<li><strong>candidate_keys</strong>: Listing of prioritized candidate keys: keys which are UNIQUE, by order of best-use.</li>
+<li><strong>easter_day()</strong>: Returns DATE of easter day in given DATETIME&#8217;s year.</li>
+</ul>
+<p>Let&#8217;s take a slightly closer look at these:</p>
+<h4>eval()</h4>
+<p>I&#8217;ve dedicated this blog post on <a href="https://shlomi-noach.github.io/blog/mysql/mysql-eval">MySQL eval()</a> to describe it. In simple summary: <strong>eval()</strong> takes a query which generates queries (most common use queries on <strong>INFORMATION_SCHEMA</strong>) and auto-evaluates (executes) those queries. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/general_procedures.html#eval">Read more</a></p>
+<h4>match_grantee()</h4>
+<p>As presented in <a title="Link to Finding CURRENT_USER for any user" rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/finding-current_user-for-any-user">Finding CURRENT_USER for any user</a>, I&#8217;ve developed the algorithm to match a connected user+host details (as presented with <strong>PROCESSLIST</strong>) with the grantee tables (i.e. the <strong>mysql.user</strong> table), in a manner which simulates the MySQL server account matching algorithm.</p>
+<p>This is now available as a stored function: given a user+host, the function returns with the best matched grantee. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/privileges_functions.html#match_grantee">Read more</a></p>
+<h4>processlist_grantees</h4>
+<p>This view relies on the above, and maps the entire <strong>PROCESSLIST</strong> onto GRANTEEs. The view maps each process onto the GRANTEE (MySQL account) which is the owner of that process. Surprisingly, MySQL does not provide one with such information.<span id="more-3952"></span></p>
+<p>The view also provides with the following useful metadata:</p>
+<ul>
+<li>Is said process executes under a SUPER privilege?</li>
+<li>Is this a replication thread, or serving a replicating client?</li>
+<li>Is this process the current connection (myself)?</li>
+</ul>
+<p>In the spirit of <strong>common_schema</strong>, it provides with the SQL commands necessary to <strong>KILL</strong> and <strong>KILL QUERY</strong> for each process. A sample output:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM common_schema.processlist_grantees;
++--------+------------+---------------------+------------------------+--------------+--------------+----------+---------+-------------------+---------------------+
+| ID     | USER       | HOST                | GRANTEE                | grantee_user | grantee_host | is_super | is_repl | sql_kill_query    | sql_kill_connection |
++--------+------------+---------------------+------------------------+--------------+--------------+----------+---------+-------------------+---------------------+
+| 650472 | replica    | jboss00.myweb:34266 | 'replica'@'%.myweb'    | replica      | %.myweb      |        0 |       1 | KILL QUERY 650472 | KILL 650472         |
+| 692346 | openarkkit | jboss02.myweb:43740 | 'openarkkit'@'%.myweb' | openarkkit   | %.myweb      |        0 |       0 | KILL QUERY 692346 | KILL 692346         |
+| 842853 | root       | localhost           | 'root'@'localhost'     | root         | localhost    |        1 |       0 | KILL QUERY 842853 | KILL 842853         |
+| 843443 | jboss      | jboss03.myweb:40007 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 843443 | KILL 843443         |
+| 843444 | jboss      | jboss03.myweb:40012 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 843444 | KILL 843444         |
+| 843510 | jboss      | jboss00.myweb:49850 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 843510 | KILL 843510         |
+| 844559 | jboss      | jboss01.myweb:37031 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 844559 | KILL 844559         |
++--------+------------+---------------------+------------------------+--------------+--------------+----------+---------+-------------------+---------------------+</pre>
+</blockquote>
+<p>Finally, it is now possible to execute the following:  “Kill all slow queries which are not executed by users with the SUPER privilege or are replication threads”. To just generate the commands, execute:</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>sql_kill_connection</strong> FROM <strong>common_schema.processlist_grantees</strong> WHERE is_super = 0 AND is_repl = 0;</pre>
+</blockquote>
+<p>Sorry, did you only want to kill the queries? Those which are very slow? Do as follows:</p>
+<blockquote>
+<pre>mysql&gt; SELECT sql_kill_connection FROM common_schema.processlist_grantees JOIN INFORMATION_SCHEMA.PROCESSLIST <strong>USING(ID)</strong> WHERE <strong>TIME &gt; 10</strong> AND is_super = 0 AND is_repl = 0;</pre>
+</blockquote>
+<p>But, really, we don&#8217;t just want <em>commands</em>. We really want to execute this!</p>
+<p>Good! Step in <strong>eval()</strong>:</p>
+<blockquote>
+<pre>mysql&gt; CALL common_schema.<strong>eval</strong>('SELECT <strong>sql_kill_query</strong> FROM common_schema.processlist_grantees JOIN INFORMATION_SCHEMA.PROCESSLIST USING(id) WHERE TIME &gt; 10 AND is_super = 0 AND is_repl = 0');</pre>
+</blockquote>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_grantees.html">Read more</a></p>
+<h4>candidate_keys</h4>
+<p>A view which lists the candidate keys for tables and provides ranking for those keys, based on some simple heuristics.</p>
+<p>This view uses  the same algorithm as that used by <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> and <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a>, tools in the <a href="http://code.openark.org/forge/openark-kit">openark kit</a>. So it provides with a way to choose the best candidate key to walk through a table. At current, a table&#8217;s <strong>PRIMARY KEY</strong> is always considered to be best, because of InnoDB&#8217;s structure of clustered index. But I intend to change that as well and provide general recommendation about candidate keys (so for example, I would be able to recommend that the <strong>PRIMARY KEY</strong> is not optimal for some table).</p>
+<p>Actually, after a discussion initiated by Giuseppe and Roland, starting <a href="http://datacharmer.blogspot.com/2011/09/finding-tables-without-primary-keys.html">here</a> and continuing on mail, there are more checks to be made for candidate keys, and I suspect the next version of <em>candidate_keys</em> will be more informational.</p>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/candidate_keys.html">Read more</a></p>
+<h4>easter_day()</h4>
+<p>Many thanks to <a href="http://rpbouman.blogspot.com/">Roland Bouman</a> who suggested his code for calculating easter day for a given year. <em>Weehee!</em> This is the first contribution to <em>common_schema</em>! <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/time_functions.html#easter_day">Read more</a></p>
+<h4>Get it</h4>
+<p><em>common_schema</em> is an open source project. It is released under the BSD license.</p>
+<p><a href="http://code.google.com/p/common-schema/">Find it here</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-68-eval-processlist_grantees-candidate_keys-easter_day/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3952</post-id>	</item>
+		<item>
+		<title>Finding CURRENT_USER for any user</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/finding-current_user-for-any-user</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/finding-current_user-for-any-user#respond</comments>
+				<pubDate>Tue, 09 Aug 2011 11:19:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3871</guid>
+				<description><![CDATA[A MySQL account is a user/host combination. A MySQL connection is done by a user connecting from some host. However, the user/host from which the connection is made are not the same as the user/host as specified in the account. For example, the account may be created thus: CREATE USER 'temp'@'10.0.0.%' IDENTIFIED BY '123456'; The [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A MySQL account is a user/host combination. A MySQL connection is done by a user connecting from some host.</p>
+<p>However, the user/host from which the connection is made are not the same as the user/host as specified in the account. For example, the account may be created thus:</p>
+<blockquote>
+<pre>CREATE USER 'temp'@'10.0.0.%' IDENTIFIED BY '123456';</pre>
+</blockquote>
+<p>The host as specified in the above account is a wildcard host. A connection by the <strong>&#8216;temp&#8217;</strong> user from <strong>&#8216;10.0.0.3&#8217;</strong> can map into that account. It thus happens that the connected user is <strong>&#8216;temp&#8217;@&#8217;10.0.0.3&#8217;</strong>, yet the assigned account is <strong>&#8216;temp&#8217;@&#8217;10.0.0.%&#8217;</strong>.</p>
+<p>MySQL provides with the <strong>USER()</strong> and <strong>CURRENT_USER()</strong> which map to the connected user and the assigned account, respectively, and which lets the current session identify the relation between the two. Read more on this on the <a href="http://dev.mysql.com/doc/refman/5.1/en/account-activity-auditing.html">MySQL docs</a>.</p>
+<h4>The problem</h4>
+<p>And the trouble is: MySQL only provides this functionality for the <em>current session</em>. Surprisingly, given a user/host combination, I cannot get MySQL to tell me which account matches those details.</p>
+<h4>The inconsistency</h4>
+<p>And I care because there is an inconsistency. Namely, when I do <strong>SHOW PROCESSLIST</strong> MySQL tells me the user &amp; host from which the connection is made. It does <em>not</em> tell me the account for which the process is assigned.<span id="more-3871"></span></p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SHOW PROCESSLIST;
++----+------+----------------+---------------+---------+------+-------+------------------+
+| Id | User | Host           | db            | Command | Time | State | Info             |
++----+------+----------------+---------------+---------+------+-------+------------------+
+| 16 | temp | 10.0.0.3:54142 | common_schema | Query   |    0 | NULL  | SELECT id, ...   |
++----+------+----------------+---------------+---------+------+-------+------------------+</pre>
+</blockquote>
+<p>The absurdness is that a super user, the manager of a MySQL server, has the full listing of connections, yet is unable to map those connections to accounts.</p>
+<p>I got into this because of a suggestion by <a href="http://forge.mysql.com/people/person.php?id=340">Matthew Montgomery</a> to include a <a href="http://forge.mysql.com/tools/tool.php?id=106">tool</a> of his into <a href="http://code.openark.org/forge/common_schema">common_schema</a>.The tool says &#8220;Kill all slow queries which are not executed by users with the SUPER privilege&#8221;.</p>
+<p>Great idea! But then, how do you identify such users?</p>
+<p>The tool attempts to find an exact match between <strong>INFORMATION_SCHEMA.PROCESSLIST</strong>&#8216;s user/host and <strong>INFORMATION_SCHEMA.USER_PRIVILEGES</strong>&#8216;s user/host. This will do well when the account is <strong>&#8216;root&#8217;@&#8217;localhost&#8217;</strong>, but less so when it is <strong>&#8216;maatkit&#8217;@&#8217;%.mydomain&#8217;</strong>.</p>
+<p>Unfortunately, many things fall under <strong>SUPER</strong>&#8216;s attention, and such accounts as monitoring, backup, management may require that privilege.</p>
+<h4>Account matching</h4>
+<p>Matching is achievable, but not completely trivial. If you&#8217;re not aware of this, you should note that <strong>&#8216;temp&#8217;@&#8217;10.0.0.3&#8217;</strong> can match any of the following:</p>
+<blockquote>
+<pre>+------+----------+
+| temp | 10.0.%   |
+| %    | 10.0.0.3 |
+| temp | 10.0.0.3 |
+| temp | 10.0.0.% |
++------+----------+</pre>
+</blockquote>
+<p>And the rule is we must match by most specific host first, then by most specific user. The order of matching should be this:</p>
+<blockquote>
+<pre>+------+----------+
+| temp | 10.0.0.3 |
+| %    | 10.0.0.3 |
+| temp | 10.0.0.% |
+| temp | 10.0.%   |
++------+----------+</pre>
+</blockquote>
+<p>The first row to match our connection&#8217;s user/host is the matched account.</p>
+<h4>The good news</h4>
+<p>This means the problem is reduced to an ORDER BY and to regular expressions. Easy enough to do with SQL. We prefer hosts with no wildcard to those with; we prefer more subdomains, we prefer no wildcard for users.</p>
+<h4>The code</h4>
+<p>The following query assumes you have two session variables: <strong>@connection_user</strong> and <strong>@connection_host</strong>.</p>
+<blockquote>
+<pre>SELECT
+  user, host
+FROM
+  mysql.user
+WHERE
+  @connection_user RLIKE
+    CONCAT('^',
+      REPLACE(
+        user,
+        '%', '.*'),
+      '$')
+  AND SUBSTRING_INDEX(@connection_host, ':', 1) RLIKE
+    CONCAT('^',
+      REPLACE(
+      REPLACE(
+        host,
+        '.', '\\.'),
+        '%', '.*'),
+      '$')
+ORDER BY
+  CHAR_LENGTH(host) - CHAR_LENGTH(REPLACE(host, '%', '')) ASC,
+  CHAR_LENGTH(host) - CHAR_LENGTH(REPLACE(host, '.', '')) DESC,
+  host ASC,
+  CHAR_LENGTH(user) - CHAR_LENGTH(REPLACE(user, '%', '')) ASC,
+  user ASC
+LIMIT 1
+;</pre>
+</blockquote>
+<p>There is still a slight fine-tuning to do for the above, but it should work for the majority of security setups.</p>
+<p>The above (in rewritten form) and derivative work will, of course, be part of the next <a href="../../forge/common_schema">common_schema</a> release, expected early September.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/finding-current_user-for-any-user/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3871</post-id>	</item>
+	</channel>
+</rss>

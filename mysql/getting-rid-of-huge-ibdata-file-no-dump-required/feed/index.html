@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Getting rid of huge ibdata file, no dump required	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 09 Nov 2012 04:34:16 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/comment-page-1#comment-132292</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 09 Nov 2012 04:34:16 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442#comment-132292</guid>
+					<description><![CDATA[@Michael,
+Incorrect. The entire process runs on a slave; you loose none of InnoDB&#039;s transactional features (except durability in case of crash in the middle of the process - but then you can start again).
+
+The slave is single threaded (up to 5.5) and couldn&#039;t care less about transactions on master. A failed transaction never reaches it. A committed transaction is just another command to execute.
+
+I think you may be confusing with running this process on the master, which is entirely not something discussed here.]]></description>
+		<content:encoded><![CDATA[<p>@Michael,<br />
+Incorrect. The entire process runs on a slave; you loose none of InnoDB&#8217;s transactional features (except durability in case of crash in the middle of the process &#8211; but then you can start again).</p>
+<p>The slave is single threaded (up to 5.5) and couldn&#8217;t care less about transactions on master. A failed transaction never reaches it. A committed transaction is just another command to execute.</p>
+<p>I think you may be confusing with running this process on the master, which is entirely not something discussed here.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Michael Mior				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/comment-page-1#comment-132206</link>
+		<dc:creator><![CDATA[Michael Mior]]></dc:creator>
+		<pubDate>Thu, 08 Nov 2012 21:06:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442#comment-132206</guid>
+					<description><![CDATA[The bigger issue is that you lose all the transactional features of InnoDB while this process is taking place and your application is none the wiser. Not to mention the differing performance characteristics of the two storage engines.
+
+While this can certainly be useful in some scenarios, you need to think very carefully as to whether your application can tolerate this kind of change.]]></description>
+		<content:encoded><![CDATA[<p>The bigger issue is that you lose all the transactional features of InnoDB while this process is taking place and your application is none the wiser. Not to mention the differing performance characteristics of the two storage engines.</p>
+<p>While this can certainly be useful in some scenarios, you need to think very carefully as to whether your application can tolerate this kind of change.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/comment-page-1#comment-93214</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 22 May 2012 13:58:40 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442#comment-93214</guid>
+					<description><![CDATA[Holger,
+I&#039;ve seen some cases where it would simply take too much time  (two weeks or more) to dump and restore, and disk space would not be available to accommodate all binary logs. 
+Setting up a chain of slaves is another option, with longer pipes to accommodate all binary logs.]]></description>
+		<content:encoded><![CDATA[<p>Holger,<br />
+I&#8217;ve seen some cases where it would simply take too much time  (two weeks or more) to dump and restore, and disk space would not be available to accommodate all binary logs.<br />
+Setting up a chain of slaves is another option, with longer pipes to accommodate all binary logs.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Holger Thiel				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/comment-page-1#comment-93207</link>
+		<dc:creator><![CDATA[Holger Thiel]]></dc:creator>
+		<pubDate>Tue, 22 May 2012 13:36:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442#comment-93207</guid>
+					<description><![CDATA[Hello,
+
+This is a tricky and dangerous idea. The replication is in danger to break as the statement based replication is in need.
+
+Normally another slave on the same machine can be installed and used to be built up. 
+
+Regards, 
+Holger]]></description>
+		<content:encoded><![CDATA[<p>Hello,</p>
+<p>This is a tricky and dangerous idea. The replication is in danger to break as the statement based replication is in need.</p>
+<p>Normally another slave on the same machine can be installed and used to be built up. </p>
+<p>Regards,<br />
+Holger</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

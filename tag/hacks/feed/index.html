@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Hacks &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/hacks/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 25 Nov 2011 19:39:58 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Reading results of SHOW statements, on server side</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side#comments</comments>
+				<pubDate>Fri, 25 Nov 2011 19:39:58 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Hacks]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4138</guid>
+				<description><![CDATA[SHOW statements are show stoppers on server side. While clients can get a SHOW statement as a result set just as any normal SELECT, things are not as such on server side. On server side, that is, from within MySQL itself, one cannot: SELECT `Database` FROM (SHOW DATABASES); One cannot: DECLARE show_cursor CURSOR FOR SHOW [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>SHOW</strong> statements are show stoppers on server side. While clients can get a <a href="http://dev.mysql.com/doc/refman/5.1/en/show.html">SHOW statement</a> as a result set just as any normal <strong>SELECT</strong>, things are not as such on server side.</p>
+<p>On server side, that is, from within MySQL itself, one <em>cannot</em>:</p>
+<blockquote>
+<pre>SELECT `Database` FROM (SHOW DATABASES);</pre>
+</blockquote>
+<p>One <em>cannot</em>:</p>
+<blockquote>
+<pre>DECLARE show_cursor CURSOR FOR SHOW TABLES;</pre>
+</blockquote>
+<p>One <em>cannot</em>:</p>
+<blockquote>
+<pre>SHOW TABLES INTO OUTFILE '/tmp/my_file.txt';</pre>
+</blockquote>
+<p>So it is impossible to get the results with a query; impossible to get the results from a stored routine; impossible to get the results by file reading&#8230;</p>
+<h4>Bwahaha! A hack!</h4>
+<p>For some <strong>SHOW</strong> statements, there is a way around this. I&#8217;ve been banging my head against the wall for weeks now on this. Now I have a partial solution: I&#8217;m able to read <strong>SHOW</strong> output for several <strong>SHOW</strong> statements. Namely, those <strong>SHOW</strong> statements <a href="http://dev.mysql.com/doc/refman/5.1/en/extended-show.html">which allow a LIKE or a WHERE</a> clause.</p>
+<p>For example, most are familiar with the following syntax:</p>
+<blockquote>
+<pre>USE mysql;
+SHOW TABLE STATUS LIKE 'user';</pre>
+</blockquote>
+<p>However not so many know that any <strong>SHOW</strong> statement which accepts <strong>LIKE</strong>, can also accept <strong>WHERE</strong>:<span id="more-4138"></span></p>
+<blockquote>
+<pre>SHOW TABLE STATUS WHERE Name='user'\G
+*************************** 1. row ***************************
+           Name: user
+         Engine: MyISAM
+        Version: 10
+     Row_format: Dynamic
+           Rows: 17
+ Avg_row_length: 69
+    Data_length: 1184
+Max_data_length: 281474976710655
+   Index_length: 2048
+      Data_free: 0
+ Auto_increment: NULL
+    Create_time: 2010-10-03 08:23:48
+    Update_time: 2011-07-30 19:31:00
+     Check_time: NULL
+      Collation: utf8_bin
+       Checksum: NULL
+ Create_options:
+        Comment: Users and global privileges</pre>
+</blockquote>
+<p>It&#8217;s not just about &#8220;<strong>Name</strong>&#8220;. I can filter using any column I like:</p>
+<blockquote>
+<pre>SHOW TABLE STATUS WHERE Rows &gt; 1000;
+SHOW TABLE STATUS WHERE Rows &gt; 1000 AND Index_length &gt; 65536;</pre>
+</blockquote>
+<p>etc.</p>
+<p>If you&#8217;ve been to my talk on <a href="http://www.percona.com/live/london-2011/session/programmatic-queries-things-you-can-code-with-sql/">Programmatic Queries: things you can code with SQL</a>, you have a good guess as for where I&#8217;m taking this.</p>
+<h4>Where there&#8217;s WHERE, there&#8217;s code</h4>
+<p>I can write code within the <strong>WHERE</strong> clause. Specifically, I can work with user defined variables. Shall we cut to the point and provide with an example?</p>
+<blockquote>
+<pre>mysql&gt; SET @databases := '';
+
+mysql&gt; SHOW DATABASES WHERE (@databases := CONCAT(@databases, `Database`, ',')) IS NULL;
+
+mysql&gt; SELECT @databases;
++-------------------------------------------------------------------+
+| @databases                                                        |
++-------------------------------------------------------------------+
+| information_schema,common_schema,mycheckpoint,mysql,sakila,world, |
++-------------------------------------------------------------------+</pre>
+</blockquote>
+<p>Let&#8217;s discuss the above. We:</p>
+<ul>
+<li>Set a user variables called <strong>@databases</strong> to an empty text</li>
+<li>Iterate through the <strong>SHOW DATABASES</strong> rowset. The <strong>WHERE</strong> clause is always <em>false</em> (the expression is in fact <strong>NOT NULL</strong> for all rows), so rows are not printed out, and we get an empty result set (we&#8217;re not really interested in a result set here, since there&#8217;s no way to read it anyhow).</li>
+<li>However we do take care to &#8220;remember&#8221; the value we visit, by concatenating the <strong>`Database`</strong> column value.</li>
+<li>We end up with a delimited string of database names. You&#8217;ll forgive the ending <strong>&#8216;,&#8217;</strong>. This is just a simple example, it is of no importance.</li>
+</ul>
+<h4>Further notes</h4>
+<p>What can we do with the concatenated list of database names? Whatever we want to. We can parse it again, <strong>INSERT</strong> it <strong>INTO</strong> some table, save to file, iterate, what have you!</p>
+<p>We can wrap the above in a stored routine. Alas, not with a stored function, since the <strong>SHOW</strong> command, although returns with an empty result set, does return with a result set, not allowed withing functions.<strong></strong></p>
+<h4>Limitations</h4>
+<ul>
+<li>Sadly, <strong>SHOW SLAVE STATUS</strong>, <strong>SHOW MASTER LOGS</strong> etc., do not support <strong>LIKE</strong> or <strong>WHERE</strong> syntax. Bummer.</li>
+<li>Stored functions, as just mentioned, cannot utilize this hack. Hey, I&#8217;m still working on this!</li>
+</ul>
+<h4>To what use?</h4>
+<p>Originally I wanted to avoid the time &amp; locking it takes for <strong>INFORMATION_SCHEMA</strong> queries, such as on <strong>TABLES</strong>, <strong>COLUMNS</strong>, etc. Ironically, in a few days apart I&#8217;ve found <em>another</em> interesting solution (well, two, actually) to manage reads from <strong>INFORMATION_SCHEMA</strong> with less overhead than in normal use. I&#8217;ll talk about that another time; am about to use this in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>.</p>
+<h4>Further notes</h4>
+<p>I met <a href="http://rpbouman.blogspot.com/">Roland</a> in <a href="http://www.percona.com/live/london-2011/">London</a>, and he liked the solution. As <a href="http://www.mysqlperformanceblog.com/author/baron/">Baron</a> joined, Roland said: &#8220;Baron, do you know Shlomi devised a method to read the output of <strong>SHOW</strong> commands?&#8221;</p>
+<p>And Baron said: &#8220;Without using files? Then a <strong>SHOW</strong> statement can have a <strong>WHERE</strong> clause, in which case you can use a variable&#8221;, and went on looking for his wife.</p>
+<p>And we remained speechless.</p>
+<p>[UPDATE: I&#8217;ve manually changed timestamp of this post due to failure in its aggregation in planet.mysql, being a major source of incoming traffic to this site]</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4138</post-id>	</item>
+	</channel>
+</rss>

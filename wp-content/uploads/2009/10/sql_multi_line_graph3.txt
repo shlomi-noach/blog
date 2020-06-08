@@ -1,0 +1,153 @@
+
+
+-- multiline - horizontal -- complete -- filled area beneath graph -- with-real-colors
+
+SELECT
+  y_scale,
+  REPLACE(
+  REPLACE(
+  REPLACE(
+  REPLACE(
+  REPLACE(
+  REPLACE(
+  REPLACE(horizontal_bar, '-', CONCAT(0x1b, '[30m-', 0x1b, '[0m')), 
+    'a', CONCAT(0x1b, '[31m@', 0x1b, '[0m')),
+    'b', CONCAT(0x1b, '[32m#', 0x1b, '[0m')),
+    'c', CONCAT(0x1b, '[33m$', 0x1b, '[0m')),
+    'd', CONCAT(0x1b, '[34m8', 0x1b, '[0m')),
+    'e', CONCAT(0x1b, '[35m&', 0x1b, '[0m')),
+    'f', CONCAT(0x1b, '[36m8', 0x1b, '[0m')
+  )
+    AS chart
+  FROM
+  (
+  SELECT
+    @multi_line_chart_row_number := @multi_line_chart_row_number+1,
+    CASE @multi_line_chart_row_number
+      WHEN 1 THEN ROUND(@multi_line_chart_max_value, @multi_line_chart_value_precision)
+      WHEN @multi_line_chart_graph_rows THEN ROUND(@multi_line_chart_min_value, @multi_line_chart_value_precision)
+      ELSE ROUND(@multi_line_chart_max_value-(@multi_line_chart_max_value-@multi_line_chart_min_value)*(@multi_line_chart_row_number-1)/(@multi_line_chart_graph_rows-1), @multi_line_chart_value_precision)
+    END AS y_scale,
+    horizontal_bar,
+    @multi_line_chart_bar_length := IFNULL(@multi_line_chart_bar_length, CHAR_LENGTH(horizontal_bar))
+  FROM
+    (SELECT @multi_line_chart_row_number := 0) AS select_row
+    INNER JOIN
+    (
+    SELECT
+      GROUP_CONCAT(SUBSTRING(unwalked_bar, tinyint_asc.value, 1) ORDER BY ordering_column SEPARATOR '') AS horizontal_bar
+    FROM
+      tinyint_asc
+    INNER JOIN (
+      SELECT 
+        ordering_column,
+        GROUP_CONCAT(bar_string_token ORDER BY string_position ASC SEPARATOR '') AS unwalked_bar
+      FROM
+        (SELECT 
+          ordering_column, 
+          string_position,
+          scaled_string_position,
+          REPLACE(LEFT(CONCAT(TRIM(GROUP_CONCAT(bar_string_token ORDER BY row_value ASC SEPARATOR '')), ' '), 1), ' ', '-') AS bar_string_token
+        FROM
+          (SELECT
+            row_value,
+            ordering_column,
+            @multi_line_chart_scaled_string_position := CONVERT((row_value-@multi_line_chart_min_value)*(@multi_line_chart_graph_rows-1)/(@multi_line_chart_max_value-@multi_line_chart_min_value), UNSIGNED) AS scaled_string_position,
+            value AS string_position,
+            IF(tinyint_asc.value <= @multi_line_chart_scaled_string_position+1 and tinyint_asc.value > GREATEST(0, @multi_line_chart_scaled_string_position+1-IFNULL(@multi_line_chart_line_width,10000)), 
+               SUBSTRING(
+                    @multi_line_chart_graph_fallback_colors, 
+                 row_value_indicator, 1), 
+               ' ') AS bar_string_token
+          FROM
+            tinyint_asc, 
+            (SELECT
+              ordering_column,
+              value AS row_value_indicator, 
+              row_value
+            FROM (
+              SELECT 
+                *,
+                @multi_line_chart_min_value := LEAST(IFNULL(@multi_line_chart_min_value, row_value), row_value) AS min_value,
+                @multi_line_chart_max_value := GREATEST(IFNULL(@multi_line_chart_max_value, row_value), row_value) AS max_value,
+                @multi_line_chart_min_range := LEAST(IFNULL(@multi_line_chart_min_range, ordering_column), ordering_column) AS min_range,
+                @multi_line_chart_max_range := GREATEST(IFNULL(@multi_line_chart_max_range, ordering_column), ordering_column) AS max_range
+              FROM
+                (SELECT 
+                  *,
+                  SUBSTRING_INDEX(SUBSTRING_INDEX(row_values, ',', tinyint_asc.value), ',', -1)+0 AS row_value,
+                  @multi_line_chart_num_values := CHAR_LENGTH(row_values)-CHAR_LENGTH(REPLACE(row_values,',',''))+1 AS num_values
+                FROM 
+                  (SELECT @multi_line_chart_values_legend := NULL) AS select_nullify_values_legend,
+                  (SELECT @multi_line_chart_bar_length := NULL) AS select_nullify_bar_length,
+                  tinyint_asc, 
+                  (
+SELECT value/10 AS ordering_column, CONCAT(SIN(value/10)+6, ',', COS(value/10)*2+5, ',', LEAST(value/10,4)-1) AS row_values, @multi_line_chart_values_legend := 'sin(x),cos(x),sign(tan(x))/2' FROM tinyint_asc LIMIT 81
+                  ) AS sel_main_values,
+                  (SELECT @multi_line_chart_min_value := NULL) AS select_min,
+                  (SELECT @multi_line_chart_max_value := NULL) AS select_max,
+                  (SELECT @multi_line_chart_min_range := NULL) AS select_min_range,
+                  (SELECT @multi_line_chart_max_range := NULL) AS select_max_range,
+                  (SELECT @multi_line_chart_graph_colors := '#*o%@+x;m:') AS select_graph_colors,
+                  (SELECT @multi_line_chart_graph_fallback_colors := 'abcdefghij') AS select_graph_fallback_colors,
+                  (SELECT @multi_line_chart_graph_fallback_real_colors := CONCAT(
+                    0x1b, '[31m*', 0x1b, '[32m*', 0x1b, '[33m*', 0x1b, '[34m*', 0x1b, '[35m*', 0x1b, '[36m*') ) AS sel_real_colors,
+                  (SELECT @multi_line_chart_value_precision := 2) AS select_value_precision,
+                  (SELECT @multi_line_chart_line_width := 1000) AS select_line_width,
+                  (SELECT @multi_line_chart_graph_rows := 25) AS select_graph_rows
+                ) sel_counted_values_main_values
+              WHERE 
+                value BETWEEN 1 AND @multi_line_chart_num_values
+              ) sel_row_values
+            ) AS sel_row_values_indicators
+          WHERE
+            tinyint_asc.value BETWEEN 1 AND @multi_line_chart_graph_rows
+          ) AS sel_marked_row_values
+        GROUP BY
+          ordering_column, string_position
+        ) AS sel_walked_bar
+      GROUP BY
+        ordering_column
+    ) AS select_vertical
+    WHERE
+      tinyint_asc.value BETWEEN 1 AND CHAR_LENGTH(unwalked_bar)
+    GROUP BY
+      tinyint_asc.value
+    ORDER BY
+      tinyint_asc.value DESC
+    ) AS select_horizontal
+  ) AS select_horizontal_untitled
+UNION ALL
+SELECT '', CONCAT('v', REPEAT(':', @multi_line_chart_bar_length-2), 'v')
+UNION ALL
+SELECT '', CONCAT(@multi_line_chart_min_range, REPEAT(' ', @multi_line_chart_bar_length-CHAR_LENGTH(@multi_line_chart_min_range)-CHAR_LENGTH(@multi_line_chart_max_range)), @multi_line_chart_max_range)
+UNION ALL
+SELECT 
+  '', 
+  CONCAT(
+    '    ', 
+    REPLACE(
+    REPLACE(
+    REPLACE(
+    REPLACE(
+    REPLACE(
+    REPLACE(
+    REPLACE(REPEAT(SUBSTRING(@multi_line_chart_graph_fallback_colors, value, 1), 2), '-', CONCAT(0x1b, '[30m-', 0x1b, '[0m')), 
+      'a', CONCAT(0x1b, '[31m@', 0x1b, '[0m')),
+      'b', CONCAT(0x1b, '[32m#', 0x1b, '[0m')),
+      'c', CONCAT(0x1b, '[33m$', 0x1b, '[0m')),
+      'd', CONCAT(0x1b, '[34m8', 0x1b, '[0m')),
+      'e', CONCAT(0x1b, '[35m&', 0x1b, '[0m')),
+      'f', CONCAT(0x1b, '[36m8', 0x1b, '[0m')
+    ),
+    ' ', 
+    SUBSTRING_INDEX(SUBSTRING_INDEX(@multi_line_chart_values_legend, ',', value), ',', -1)
+  )
+FROM 
+  tinyint_asc
+WHERE 
+  value BETWEEN 1 AND @multi_line_chart_num_values
+  AND @multi_line_chart_values_legend IS NOT NULL
+;
+
+

@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>mysqldump &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/mysqldump/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 06 Jul 2011 06:41:00 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Useful sed / awk liners for MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/useful-sed-awk-liners-for-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/useful-sed-awk-liners-for-mysql#comments</comments>
+				<pubDate>Wed, 06 Jul 2011 06:41:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3685</guid>
+				<description><![CDATA[Listing some useful sed / awk liners to use with MySQL. I use these on occasion. sed, awk &#38; grep have many overlapping features. Some simple tasks can be performed by either. For example, stripping empty lines can be performed by either: grep '.' awk '/./' sed '/./!d' grep -v '^$' awk '!/^$/' sed '/^$/d' [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Listing some useful <strong>sed</strong> / <strong>awk</strong> liners to use with MySQL. I use these on occasion.</p>
+<p><strong>sed</strong>, <strong>awk</strong> &amp; <strong>grep</strong> have many overlapping features. Some simple tasks can be performed by either. For example, stripping empty lines can be performed by either:</p>
+<blockquote>
+<pre><strong>grep</strong> '.'
+<strong>awk</strong> '/./'
+<strong>sed</strong> '/./!d'
+<strong>grep</strong> -v '^$'
+<strong>awk</strong> '!/^$/'
+<strong>sed</strong> '/^$/d'</pre>
+</blockquote>
+<p>It&#8217;s a matter of taste &amp; convention which tool and variation to use. So for any script I suggest, there may be many variations, possibly cleaner, shorter; feel free to comment.</p>
+<h4>mysqldump</h4>
+<p>The output of <em>mysqldump</em> is in particular useful when one wishes to make transformation on data or metadata.<span id="more-3685"></span></p>
+<ul>
+<li>Convert MyISAM tables to InnoDB:</li>
+</ul>
+<blockquote>
+<pre>mysqldump | sed -e 's/^) ENGINE=MyISAM/) ENGINE=InnoDB/'</pre>
+</blockquote>
+<p>I&#8217;ve had several occasion when people said this type of conversion assumes no <strong>&#8216;ENGINE=MyISAM&#8217;</strong> snippet exists within row data. This is not so. The <strong>&#8216;^) ENGINE=MyISAM/&#8217;</strong> pattern strictly requires that this text is outside row data. No row data begins with a <strong>&#8216;)&#8217;</strong>. This is a safe conversion.</p>
+<ul>
+<li>Convert InnoDB to InnoDB plugin, compressed tables:</li>
+</ul>
+<blockquote>
+<pre>mysqldump | sed -e 's/^) ENGINE=InnoDB/) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8/'</pre>
+</blockquote>
+<ul>
+<li>Slice out a specific database (assumes existence of the <strong>USE</strong> statement):</li>
+</ul>
+<blockquote>
+<pre>sed -n "/^USE \`employees\`/,/^USE \`/p"</pre>
+</blockquote>
+<ul>
+<li>Slice out a specific table:</li>
+</ul>
+<blockquote>
+<pre>sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p"</pre>
+</blockquote>
+<ul>
+<li>Combine the above two statements to slice a specific table from a specific database:</li>
+</ul>
+<blockquote>
+<pre>sed -n "/^USE \`employees\`/,/^USE \`/p" | sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p"</pre>
+</blockquote>
+<p>See also <a rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/on-restoring-a-single-table-from-mysqldump">On restoring a single table from mysqldump</a>.</p>
+<h4>my.cnf</h4>
+<p>Some <em>my.cnf</em> files are just a mess to read. Here&#8217;s some normalizing scripts:</p>
+<ul>
+<li>Strip a <em>my.cnf</em> file from comments, remove blank lines, normalize spaces:</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | sed '/^#/d' | sed '/^$/d' | sed -e 's/[ \t]\+//g'</pre>
+</blockquote>
+<ul>
+<li>Same, but only present <strong>[mysqld]</strong> section parameters:</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | sed -n '/^\[mysqld\]/,/^\[/p' | sed '/^\[/d' | sed '/^#/d' | sed '/^$/d' | sed -e 's/[ \t]\+//g'</pre>
+</blockquote>
+<ul>
+<li>Only present <strong>[mysqld]</strong> section parameters, tab delimited (this is useful in exporting and comparing instance parameters):</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | sed -n '/^\[mysqld\]/,/^\[/p' | sed '/^\[/d' | sed '/^#/d' | sed '/^$/d' | sed -e 's/[ \t]\+//g' | sed -e 's/=/\t/'</pre>
+</blockquote>
+<ul>
+<li>Multi-word parameters in <em>my.cnf</em> can be written with either hyphens or underscores. <strong>innodb_file_per_</strong>table is the same as <strong>innodb-file-per-table</strong>, as well as <strong>innodb_file-per_table</strong>. The following normalizes the parameter names to using underscores only, keeping from changing values (e.g. <strong>&#8216;mysql-bin&#8217; </strong>parameter value should not change). It isn&#8217;t pretty!</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | awk -F "=" 'NF &lt; 2 {print} sub("=", "=~placeholder~=") {print}' | awk -F "=~placeholder~=" 'NF &lt; 2 {gsub("-", "_", $0); print} NF==2 {gsub("-", "_", $1); print $1 "=" $2}'</pre>
+</blockquote>
+<div id="_mcePaste" class="mcePaste" style="position: absolute; left: -10000px; top: 0px; width: 1px; height: 1px; overflow: hidden;">grep &#8220;.&#8221;<br />
+awk &#8216;/./&#8217;<br />
+sed &#8216;/./!d&#8217;<br />
+grep -v &#8216;^$&#8217;<br />
+awk &#8216;!/^$/&#8217;<br />
+sed &#8216;/^$/d&#8217;</div>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/useful-sed-awk-liners-for-mysql/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3685</post-id>	</item>
+		<item>
+		<title>Upgrading to Barracuda &#038; getting rid of huge ibdata1 file</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file#comments</comments>
+				<pubDate>Tue, 15 Feb 2011 08:01:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3304</guid>
+				<description><![CDATA[Some of this is old stuff, but more people are now converting to InnoDB plugin, so as to enjoy table compression, performance boosts. Same holds for people converting to Percona&#8217;s XtraDB. InnoDB plugin requires innodb_file_per_table. No more shared tablespace file. So your ibdata1 file is some 150GB, and it won&#8217;t reduce. Really, it won&#8217;t reduce. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Some of this is old stuff, but more people are now converting to InnoDB plugin, so as to enjoy table compression, performance boosts. Same holds for people converting to Percona&#8217;s XtraDB. InnoDB plugin requires <strong>innodb_file_per_table</strong>. No more shared tablespace file.</p>
+<p>So your <strong>ibdata1</strong> file is some <strong>150GB</strong>, and it won&#8217;t reduce. Really, it won&#8217;t reduce. You set <strong>innodb_file_per_table=1</strong>, do <strong>ALTER TABLE t ENGINE=InnoDB</strong> (optionally <strong>ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8</strong>), and you get all your tables in file-per-table <strong>.ibd</strong> files.</p>
+<p>But the original <strong>ibdata1</strong> file is still there. It has to be there, don&#8217;t delete it! It contains more than your old data.</p>
+<p>InnoDB tablespace files never reduce in size, it&#8217;s an old-time annoyance. The only way to go round it, if you need the space, is to completely drop them and start afresh. That&#8217;s one of the things so nice about file-per-table: an <strong>ALTER TABLE</strong> actually creates a new tablespace file and drops the original one.</p>
+<h4>The procedure</h4>
+<p>The procedure is somewhat painful:</p>
+<ul>
+<li>Dump everything logically (either use <em>mysqldump</em>, <a href="http://www.maatkit.org/doc/mk-parallel-dump.html">mk-parallel-dump</a>, or do it your own way)</li>
+<li>Erase your data (literally, delete everything under your <strong>datadir</strong>)</li>
+<li>Generate a new empty database</li>
+<li>Load your dumped data.<span id="more-3304"></span></li>
+</ul>
+<h4>Using replication</h4>
+<p>Replication makes this less painful. Set up a slave, have it follow up on the master.</p>
+<ul>
+<li>Stop your slave.</li>
+<li>Make sure to backup the replication position (e.g. write <strong>SHOW SLAVE STATUS</strong> on a safe location, or copy <strong>master.info</strong> file).</li>
+<li>Work out the dump-erase-generate-load steps on the slave.</li>
+<li>Reattach the slave to the master using saved data.</li>
+</ul>
+<p>For this to succeed you must keep enough binary logs on the master for the entire dump-load period, which could be lengthy.</p>
+<h4>Upgrading to barracuda</h4>
+<p>If you wish to upgrade your InnoDB tables to <em>Barracuda</em> format, my advice is this:</p>
+<ol>
+<li>Follow the steps above to generate a file-per-table working slave</li>
+<li>Stop the slave</li>
+<li>Configure <strong>skip_slave_start</strong></li>
+<li>Restart MySQL</li>
+<li>One by one do the <strong>ALTER TABLE</strong> into <em>Barracuda</em> format (<strong>ROW_FORMAT=COMPACT</strong> or <strong>ROW_FORMAT=COMPRESSED</strong>)</li>
+</ol>
+<p>Note that if you&#8217;re about to do table compression, the <strong>ALTER</strong> statements become <em>considerably</em> slower the better the compression is.</p>
+<p>If your dataset is very large, and you can&#8217;t keep so many binary logs, you may wish to break step <strong>5</strong> above into:</p>
+<ul>
+<li>ALTER a large table</li>
+<li>Restart MySQL</li>
+<li>Start slave, wait for it to catch up</li>
+<li>Restart MySQL again</li>
+</ul>
+<p>and do the same for all large tables.</p>
+<h4>Why all these restarts?</h4>
+<p>I&#8217;ve been upgrading to Barracuda for a long time now. I have clearly noticed that <strong>ALTER</strong> into a <strong>COMPRESSED</strong> format works considerably slower after the slave has done some &#8220;real work&#8221;. This in particular relates to the last &#8220;renaming table&#8221; stage. There was a bug with earlier InnoDB plugin versions which made this stage hang. It was solved. But it still takes some time for this last, weird stage, where the new replacement table is complete, and it&#8217;s actually been renamed in place of the old table, and the old table renamed into something like &#8220;#sql-12345.ibd&#8221;, and all that needs to be done is have it dropped, and&#8230; Well, it takes time.</p>
+<p>My observation is it works faster on a freshly started server. Which is why I take the bother to restart MySQL before each large table conversion.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file/feed</wfw:commentRss>
+		<slash:comments>16</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3304</post-id>	</item>
+		<item>
+		<title>An argument for using mysqldump</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/an-argument-for-using-mysqldump</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/an-argument-for-using-mysqldump#comments</comments>
+				<pubDate>Tue, 09 Nov 2010 04:29:54 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[mysqldump]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3080</guid>
+				<description><![CDATA[I fully agree with Morgan&#8217;s An argument for not using mysqldump. This post does not come to contradict it, but rather shed a positive light on mysqldump. I usually prefer an LVM snapshot based backup, or using XtraBackup. And, with databases as large as dozens of GB and above, I consider mysqldump to be a [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I fully agree with Morgan&#8217;s <a href="http://www.mysqlperformanceblog.com/2010/11/08/an-argument-for-not-using-mysqldump-in-production/">An argument for not using mysqldump</a>. This post does not come to contradict it, but rather shed a positive light on <em>mysqldump</em>.</p>
+<p>I usually prefer an LVM snapshot based backup, or using XtraBackup. And, with databases as large as dozens of GB and above, I consider <em>mysqldump</em> to be a poor alternative. Poor in runtime, poor in overhead while taking the backup.</p>
+<p>However once in a while I get to be reminded that <em>mysqldump just works</em>.</p>
+<p>As a recent example, I had a server which was killed after an ALTER TABLE statement hanged forever (table already ALTERed, but old scheme never dropped). The old table data still hanged around the file system, but was not recognized by InnoDB. Trying out DISCARD TABLESPACE did not do the job, and eventually file was dropped.</p>
+<p>So far, reasonable. InnoDB would complain about some table it never recognized in the first place, but all would work. That is, until backup was concerned. With <em>innobackup</em> or XtraBackup the restore would fail on some internal problem. LVM would work, but would only copy+paste the problem: <em>innobackup</em> would never again be able to be used on this database.<span id="more-3080"></span></p>
+<p>It turned out a <strong>120GB</strong> InnoDB compressed data (roughly <strong>250GB</strong> uncompressed) would dump in <strong>&#8211;single-transaction</strong> in a matter of <strong>4</strong> hours and would restore in a matter of some <strong>20</strong> hours. A whole lot more than the <strong>3</strong> hours total it would take for an LVM backup for that database. But the data would load well; no missing tablespaces.</p>
+<p>I&#8217;ve had similar incidents in the past. Not to mention the issue of compressing shared tablespace file.</p>
+<p>There&#8217;s something about being able to say &#8220;<em>I&#8217;m not sure how long this is going to take; maybe a day or two. But in the end, we will have problems P1, P2 &amp; P3 resolved</em>&#8220;.</p>
+<p>I like the <em>clean state</em> you get from a <em>mysqldump</em> restore.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/an-argument-for-using-mysqldump/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3080</post-id>	</item>
+		<item>
+		<title>On restoring a single table from mysqldump</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/on-restoring-a-single-table-from-mysqldump</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/on-restoring-a-single-table-from-mysqldump#comments</comments>
+				<pubDate>Tue, 01 Dec 2009 08:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[Books]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1630</guid>
+				<description><![CDATA[Following Restore one table from an ALL database dump and Restore a Single Table From mysqldump, I would like to add my own thoughts and comments on the subject. I also wish to note performance issues with the two suggested solutions, and offer improvements. Problem relevance While the problem is interesting, I just want to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Following <a href="http://everythingmysql.ning.com/profiles/blogs/restore-one-table-from-an-all">Restore one table from an ALL database dump</a> and <a href="http://gtowey.blogspot.com/2009/11/restore-single-table-from-mysqldump.html">Restore a Single Table From mysqldump</a>, I would like to add my own thoughts and comments on the subject.</p>
+<p>I also wish to note performance issues with the two suggested solutions, and offer improvements.</p>
+<h4>Problem relevance</h4>
+<p>While the problem is interesting, I just want to note that it is relevant in very specific database dimensions. Too small &#8211; and it doesn&#8217;t matter how you solve it (e.g. just open vi/emacs and copy+paste). Too big &#8211; and it would not be worthwhile to restore from <em>mysqldump</em> anyway. I would suggest that the problem is interesting in the whereabouts of a few dozen GB worth of data.</p>
+<h4>Problem recap</h4>
+<p>Given a dump file (generated by mysqldump), how do you restore a single table, without making any changes to other tables?</p>
+<p>Let&#8217;s review the two referenced solutions. I&#8217;ll be using the <a href="http://dev.mysql.com/doc/employee/en/employee.html">employees db</a> on <a href="https://launchpad.net/mysql-sandbox">mysql-sandbox</a> for testing. I&#8217;ll choose a very small table to restore: <strong>departments</strong> (only a few rows in this table).</p>
+<h4>Security based solution</h4>
+<p><a href="http://everythingmysql.ning.com/profiles/blogs/restore-one-table-from-an-all"><strong>Chris</strong></a> offers to create a special purpose account, which will only have write (CREATE, INSERT, etc.) privileges on the particular table to restore. Cool hack! But, I&#8217;m afraid, not too efficient, for two reasons:<span id="more-1630"></span></p>
+<ol>
+<li>MySQL needs to process all irrelevant queries (ALTER, INSERT, &#8230;) only to disallow them due to access violation errors.</li>
+<li>Assuming restore is from remote host, we overload the network with all said irrelevant queries.</li>
+</ol>
+<p>Just how inefficient? Let&#8217;s time it:</p>
+<blockquote>
+<pre>mysql&gt; grant usage on *.* to 'restoreuser'@'localhost';
+mysql&gt; grant select on *.* to 'restoreuser'@'localhost';
+mysql&gt; grant all on employees.departments to 'restoreuser'@'localhost';
+
+$ time mysql --user=restoreuser --socket=/tmp/mysql_sandbox21701.sock --force employees &lt; /tmp/employees.sql
+...
+ERROR 1142 (42000) at line 343: INSERT command denied to user 'restoreuser'@'localhost' for table 'titles'
+ERROR 1142 (42000) at line 344: ALTER command denied to user 'restoreuser'@'localhost' for table 'titles'
+...
+(lot's of these messages)
+...
+
+real    <strong>0m31.945s</strong>
+user    0m6.328s
+sys     0m0.508s</pre>
+</blockquote>
+<p>So, at about <strong>30</strong> seconds to restore a 9 rows table.</p>
+<h4>Text filtering based solution.</h4>
+<p><a href="http://gtowey.blogspot.com/2009/11/restore-single-table-from-mysqldump.html"><strong>gtowey</strong></a> offers parsing the dump file beforehand:</p>
+<ul>
+<li>First, parse with <em>grep</em>, to detect rows where tables are referenced within dump file</li>
+<li>Second, parse with <em>sed</em>, extracting relevant rows.</li>
+</ul>
+<p>Let&#8217;s time this one:</p>
+<blockquote>
+<pre>$ time grep -n 'Table structure' /tmp/employees.sql
+23:-- Table structure for table `departments`
+48:-- Table structure for table `dept_emp`
+89:-- Table structure for table `dept_manager`
+117:-- Table structure for table `employees`
+161:-- Table structure for table `salaries`
+301:-- Table structure for table `titles`
+
+real    <strong>0m0.397s</strong>
+user    0m0.232s
+sys     0m0.164s
+
+$ time sed -n 23,48p /tmp/employees.sql | ./use employees
+
+real    <strong>0m0.562s</strong>
+user    0m0.380s
+sys     0m0.176s</pre>
+</blockquote>
+<p>Much faster: about <strong>1</strong> second, compared to <strong>30</strong> seconds from above.</p>
+<p>Nevertheless, I find two issues here:</p>
+<ol>
+<li>A correctness problem: this solution somewhat assumes that there&#8217;s only a single table with desired name. I say &#8220;somewhat&#8221; since it leaves this for the user.</li>
+<li>An efficiency problem: it reads the dump file <em>twice</em>. First parsing it with <em>grep</em>, then with <em>sed</em>.</li>
+</ol>
+<h4>A third solution</h4>
+<p><em>sed</em> is much stronger than presented. In fact, the inquiry made by <em>grep</em> in gtowey&#8217;s solution can be easily handled by <em>sed</em>:</p>
+<blockquote>
+<pre>$ time sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p" /tmp/employees.sql | ./use employees
+
+real    <strong>0m0.573s</strong>
+user    0m0.416s
+sys     0m0.152s</pre>
+</blockquote>
+<p>So, the <strong>&#8220;/^&#8211; Table structure for table \`departments\`/,/^&#8211; Table structure for table/p&#8221;</strong> part tells <em>sed</em> to only print those rows starting from the <strong>departments</strong> table structure, and ending in the next table structure (this is for clarity: had department been the last table, there would not be a next table, but we could nevertheless solve this using other anchors).</p>
+<p>And, we only do it in <strong>0.57</strong> seconds: about half the time of previous attempt.</p>
+<p>Now, just to be more correct, we only wish to consider the <strong>employees.department</strong> table. So, <em>assuming</em> there&#8217;s more than one database dumped (and, by consequence, <strong>USE</strong> statements in the dump-file), we use:</p>
+<blockquote>
+<pre>cat /tmp/employees.sql | sed -n "/^USE \`employees\`/,/^USE \`/p" | sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p" | ./use employees</pre>
+</blockquote>
+<h4>Further notes</h4>
+<ul>
+<li>All tests used warmed-up caches.</li>
+<li>The sharp eyed readers would notice that <strong>departments</strong> is the first table in the dump file. Would that give an unfair advantage to the parsing-based restore methods? The answer is no. I&#8217;ve created an <strong>xdepartments</strong> table, to be located at the end of the dump. The difference in time is neglectful and inconclusive; we&#8217;re still at ~0.58-0.59 seconds. The effect will be more visible on really large dumps; but then, so would the security-based effects.</li>
+</ul>
+<p>[<strong>UPDATE</strong>: see also following similar post: <a href="http://blog.tsheets.com/2008/tips-tricks/extract-a-single-table-from-a-mysqldump-file.html">Extract a Single Table from a mysqldump File</a>]</p>
+<h4>Conclusion</h4>
+<p><a href="http://www.amazon.com/Classic-Shell-Scripting-Arnold-Robbins/dp/0596005954/ref=sr_1_1"><img class="alignright" title="classic-shell-scripting" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/classic-shell-scripting.png" alt="classic-shell-scripting" width="144" height="189" /></a>Its is always best to test on large datasets, to get a feel on performance.</p>
+<p>It&#8217;s best to save MySQL the trouble of parsing &amp; ignoring statements. Scripting utilities like <em>sed</em>, <em>awk</em> &amp; <em>grep</em> have been around for ages, and are well optimized. They excel at text processing.</p>
+<p>I&#8217;ve used <em>sed</em> many times in transforming dump outputs; for example, in converting MyISAM to InnoDB tables; to convert Antelope InnoDB tables to Barracuda format, etc. grep &amp; awk are also very useful.</p>
+<p>May I recommend, at this point, reading <a href="http://www.amazon.com/Classic-Shell-Scripting-Arnold-Robbins/dp/0596005954/ref=sr_1_1">Classic Shell Scripting</a>, a very easy to follow book, which lists the most popular command line utilities like <em>grep</em>, <em>sed</em>, <em>awk</em>, <em>sort</em>, (countless more) and shell scripting in general. While most of these utilities are well known, the book excels in providing suprisingly practical, simple solution to common tasks.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/on-restoring-a-single-table-from-mysqldump/feed</wfw:commentRss>
+		<slash:comments>14</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1630</post-id>	</item>
+		<item>
+		<title>Reasons to use innodb_file_per_table</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reasons-to-use-innodb_file_per_table</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reasons-to-use-innodb_file_per_table#comments</comments>
+				<pubDate>Thu, 21 May 2009 03:40:42 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[Performance]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=614</guid>
+				<description><![CDATA[When working with InnoDB, you have two ways for managing the tablespace storage: Throw everything in one big file (optionally split). Have one file per table. I will discuss the advantages and disadvantages of the two options, and will strive to convince that innodb_file_per_table is preferable. A single tablespace Having everything in one big file [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>When working with InnoDB, you have two ways for managing the tablespace storage:</p>
+<ol>
+<li>Throw everything in one big file (optionally split).</li>
+<li>Have one file per table.</li>
+</ol>
+<p>I will discuss the advantages and disadvantages of the two options, and will strive to convince that <strong>innodb_file_per_table</strong> is preferable.</p>
+<h4>A single tablespace</h4>
+<p>Having everything in one big file means all tables and indexes, from <em>all schemes</em>, are &#8216;mixed&#8217; together in that file.</p>
+<p>This allows for the following nice property: free space can be shared between different tables and different schemes. Thus, if I purge many rows from my <strong>log</strong> table, the now unused space can be occupied by new rows of any other table.</p>
+<p>This same nice property also translates to a not so nice one: data can be greatly fragmented across the tablespace.</p>
+<p>An annoying property of InnoDB&#8217;s tablespaces is that they never shrink. So after purging those rows from the <strong>log</strong> table, the tablespace file (usually <strong>ibdata1</strong>) still keeps the same storage. It does not release storage to the file system.</p>
+<p>I&#8217;ve seen more than once how certain tables are left unwatched, growing until disk space reaches 90% and SMS notifications start beeping all around.<span id="more-614"></span></p>
+<p>There&#8217;s little to do in this case. Well, one can always purge the rows. Sure, the space would be reused by InnoDB. But having a file which consumes some 80-90% of disk space is a performance catastrophe. It means the disk needle needs to move large distances. Overall disk performance runs very low.</p>
+<p>The best way to solve this is to setup a new slave (after purging of the rows), and dump the data into that slave.</p>
+<h4>InnoDB Hot Backup</h4>
+<p>The funny thing is, the <strong>ibbackup</strong> utility will copy the tablespace file as it is. If it was 120GB, of which only 30GB are used, you still get a 120GB backed up and restored.</p>
+<h4>mysqldump, mk-parallel-dump</h4>
+<p>mysqldump would be your best choice if you only had the original machine to work with. Assuming you&#8217;re only using InnoDB, a dump with <strong>&#8211;single-transaction</strong> will do the job. Or you can utilize <a title="Maatkit: mk-parallel-dump" href="http://www.maatkit.org/">mk-parallel-dump</a> to speed things up (depending on your dump method and accessibility needs, mind the locking).</p>
+<h4>innodb_file_per_table</h4>
+<p>With this parameter set, a <strong>.ibd</strong> file is created per table. What we get is this:</p>
+<ul>
+<li>Tablespace is not shared among different tables, and certainly not among different schemes.</li>
+<li>Each file is considered a tablespace of its own.</li>
+<li>Again, tablespace never reduces in size.</li>
+<li>It is possible to regain space per tablespace.</li>
+</ul>
+<p>Wait. The last two seem conflicting, don&#8217;t they? Let&#8217;s explain.</p>
+<p>In our <strong>log</strong> table example, we purge many rows (up to 90GB of data is removed). The <strong>.ibd</strong> file does not shrink. But we <em>can</em> do:</p>
+<blockquote><p>ALTER TABLE log ENGINE=InnoDB</p></blockquote>
+<p>What will happen is that a new, temporary file is created, into which the table is rebuilt. Only existing data is added to the new table. Once comlete, the original table is removed, and the new table renamed as the original table.</p>
+<p>Sure, this takes a long time, during which the table is completely locked: no writes and no reads allowed. But still &#8211; it allows us to regain disk space.</p>
+<p>With the new InnoDB plugin, disk space is also regained when execuing a <strong>TRUNCATE TABLE log</strong> statement.</p>
+<p>Fragmentation is not as bad as in a single tablespace: the data is limited within the boundaries of a smaller file.</p>
+<h4>Monitoring</h4>
+<p>One other nice thing about <strong>innodb_file_per_table</strong> is that it is possible to monitor table size on the file system level. You don&#8217;t need access to MySQL, to use SHOW TABLE STATUS or to query the INFORMATION_SCHEMA. You can just look up the top 10 largest files under your MySQL data directory (and subdirectories), and monitor their size. You can see which table grows fastest.</p>
+<h4>Backup</h4>
+<p>Last, it is not yet possible to backup single InnoDB tables by copying the <strong>.ibd</strong> files. But hopefully work will be done in this direction.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reasons-to-use-innodb_file_per_table/feed</wfw:commentRss>
+		<slash:comments>37</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">614</post-id>	</item>
+		<item>
+		<title>Parameters to use on mysqldump</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/parameters-to-use-on-mysqldump</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/parameters-to-use-on-mysqldump#comments</comments>
+				<pubDate>Mon, 13 Oct 2008 07:03:50 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4</guid>
+				<description><![CDATA[mysqldump is commonly used for making a MySQL database backup or for setting up a replication. As in all mysql binaries, there are quite a few parameters to mysqldump. Some are just niceties but some flags are a must. Of course, choosing the parameters to use greatly depends on your requirements, database setup, network capacity [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>mysqldump is commonly used for making a MySQL database backup or for setting up a replication.</p>
+<p>As in all mysql binaries, there are quite a few parameters to mysqldump. Some are just niceties but some flags are a must. Of course, choosing the parameters to use greatly depends on your requirements, database setup, network capacity etc.</p>
+<p>Here is my usual setup for mysqldump. The parameters below apply for an InnoDB based schema (no MyISAM, Memory tables). Parameters can be specified on the command line, or under the <code>[mysqld]</code> scope in the MySQL configuration file.</p>
+<blockquote>
+<p style="text-align: left;"><code>mysqldump -u dump_user -p -h db_host --routines --master-data --single-transaction  --skip-add-locks --skip-lock-tables --default-character-set=utf8 --compress my_db</code></p>
+</blockquote>
+<p>Let&#8217;s review these parameters and see their effect:<span id="more-4"></span></p>
+<ul>
+<li><code>-u</code> or <code>--user</code>: This is the user which initiates the dump. Depending on other parameters, the user may need to have quite a few privileges, such as <code>SELECT</code>, <code>RELOAD</code>, <code>FILE</code>, <code>REPLICATION CLIENT</code> etc. Since I do not usually allow for remote root access into mysql, I create a temporary user solely for the purpose of the dump (many times it&#8217;s a one-time action), for the specific machine from which the dump is run, and provide this user with all necessary permissions.</li>
+<li><code>-h</code> or <code>--host</code>: I try not to dump from the same machine on which MySQL is running. If I do, I prefer to dump into a different disk from that on which the data and log files reside. The dump itself may create a heavy load on the machine (setting locks, performing lots of non cached IO operations). Since the target of the dump is mostly to create a backup on another machine, or set up replication on another machine, the dump has better not run from the MySQL machine.</li>
+<li><code>--routines</code>: It is really an annoyance to have to remember this flag. In contrast to &#8211;triggers, which is by default TRUE, the <code>--routines</code> parameter is by default FALSE, which means if you forget it &#8211; you don&#8217;t get the stored functions and procedures in your schema.</li>
+<li><code>--master-data</code>: I always enable binary logs on the MySQL nodes I work on. While binary logs may lead to more IO operations (writing binary logs make for more disk writes, obviously, but also disable some InnoDB optimizations), may consume more disk space (once I&#8217;ve worked with a company which had such a burst of traffic, that the binary logs to completely filled their disk in less than one day). If binary logs are enabled, the <code>--master-data</code> parameter allows for easy replication setup: the dump includes the <code>CHANGE MASTER TO MASTER_LOG_FILE='...', MASTER_LOG_POS=...</code> statement, so no need to do stuff like <code>SHOW MASTER STATUS</code> on the dumped node. Optionally, you can set <code>--master-data=2</code> to have the statement commented.</li>
+<li><code>--single-transaction</code> <code>--skip-add-locks</code> <code>--skip-lock-tables</code>: When working with transactional-only storage engines (InnoDB is the most popular choice, but new engines are coming: Falcon, PBXT, Transactional-Maria, SolidDB and more), these parameters allow for a non-interruptive backup, which does not place read locks on all tables. It is possible to keep on reading and writing to the database while mysqldump is running with single transaction. Running in this mode does have its penalty: more IO operations (due to MVCC&#8217;s duplication of data while many transactions access the same data for Read/Write). The server is likely to perform more slowly during the dump time.</li>
+<li><code>--default-character-set=utf8</code>: I&#8217;ve seen so many MySQL installations in which world-wide textual data was stored in the Latin1 charset than I can remember. Many developers, who are testing using standard English data, are not even aware of the issues arrising from changing the data later on to utf8. But even those who are, are usually unaware of the necessity to configure the character set on a per connection basis, or for their specific clients (JDBC or PHP connectors, etc). mysqldump is no different, and if you have non-latin text in your tables, always remember to set this option.</li>
+<li><code>--compress</code>: when dumping to another machine, especially a remote one, using this option to GZIP the data between the MySQL server and the mysqldump client. This will make for more CPU operations, but CPU is usually cheap nowdays, and the compression may well save you hours of network transfer time.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/parameters-to-use-on-mysqldump/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4</post-id>	</item>
+	</channel>
+</rss>

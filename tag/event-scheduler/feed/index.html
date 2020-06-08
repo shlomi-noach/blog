@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Event Scheduler &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/event-scheduler/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 02 Feb 2009 11:26:55 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Triggers Use Case Compilation, Part III</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii#comments</comments>
+				<pubDate>Mon, 02 Feb 2009 11:23:38 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Event Scheduler]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=412</guid>
+				<description><![CDATA[The previous two parts have looked at some solutions offered by triggers. Let&#8217;s look now at some wishful triggers solutions, which are currently unavailable because of triggers limitations. Triggers Use Case Compilation, Part I Triggers Use Case Compilation, Part II Limitations and wishful features Triggers are slow The overhead of adding triggers is usually an [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The previous two parts have looked at some solutions offered by triggers. Let&#8217;s look now at some wishful triggers solutions, which are currently unavailable because of triggers limitations.</p>
+<p><a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-i">Triggers Use Case Compilation, Part I</a></p>
+<p><a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">Triggers Use Case Compilation, Part II</a></p>
+<h4>Limitations and wishful features</h4>
+<p>Triggers are slow</p>
+<p style="padding-left: 30px;">The overhead of adding triggers is usually an even breaker. But I would like to believe speed will improve in time!</p>
+<p>Triggers cannot act on the same table which activated them.</p>
+<p style="padding-left: 30px;">A thing I would like to do is have a rotating table. A log table is a perfect example: I only want to store logs up to 7 days back, or up to 1M rows. ON INSERT, (or once every 1000 inserts or so), I wish to remove oldest rows. This is not possible today since I can&#8217;t DELETE rows from the same table which caused the ON INSERT trigger to run. It can&#8217;t be hacked by calling on another table, then doing a circular trigger trick. MySQL will raise an error on run time, complaining about a loop.</p>
+<p><span id="more-412"></span>Triggers cannot act on system tables.</p>
+<p style="padding-left: 30px;">Now why would I want to do that? Well, one of the first things I look at when reviewing a database is the users grants. I <em>always</em> find a list of users which is just too permissive, with far too many users than required. I once came upon a database with 273 users, where only 5 of them were actually in use. &#8220;When were these added?&#8221;, I asked &#8211; but nobody knew.</p>
+<p style="padding-left: 30px;">I would love to have an ON INSERT and an ON UPDATE trigger on the mysql.user table, which lists down the time of user creation and the invoking user (who would usually be &#8216;root&#8217;) and host, so it&#8217;s easier to track down who did what.</p>
+<p>You cannot execute prepared statements from within a trigger.</p>
+<p style="padding-left: 30px;">Not much to add here. The possibilities are too many.</p>
+<p>You can&#8217;t spawn an ANALYZE TABLE from a trigger</p>
+<p style="padding-left: 30px;">What I want to do is to run an ANALYZE TABLE once every 10K inserts or deletes, so the table takes care of itself. I&#8217;ve tried hacking this with prepared statements (you can&#8217;t use them); with cursors (you can only run a cursor on SELECT queries) or otherwise SQL hacks (none worked). If anyone finds a hack around it &#8211; please let me know!</p>
+<p>You can&#8217;t have more than one trigger on the same event per table</p>
+<p style="padding-left: 30px;">This is more of a design issue. If I want to have two things BEFORE INSERT on City, I need to code both in the same trigger. This means adding functionality involves editing existing, tested, working code. It would be much nicer if two such triggers could play along.</p>
+<h4>A dirty workaround to problematic issues</h4>
+<p>There is a dirty workaround to some issues.</p>
+<p>Take, for example, the rotating tables problem. Instead of the trigger executing the following query:</p>
+<blockquote>
+<pre>DELETE FROM logs WHERE time &lt; DATE_ADD(NOW(), INTERVAL -7 DAY)</pre>
+</blockquote>
+<p>(as we&#8217;ve already noted was impossible), the triggers can write down the query as TEXT into some <strong>queries_to_run</strong> table. A cronjob can periodically check this table and execute whatever is in it, removing executed rows.</p>
+<p>MySQL 5.1&#8217;s event scheduler can also be used for such statements which are invokable (like said DELETE).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">412</post-id>	</item>
+	</channel>
+</rss>

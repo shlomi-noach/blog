@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+
+	<title>Self throttling MySQL queries – code.openark.org</title>
+<link rel="dns-prefetch" href="//secure.gravatar.com">
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="https://shlomi-noach.github.io/blog/wp-includes/css/dist/block-library/style.min.css" media="all">
+<style id="wp-block-library-inline-css">
+.has-text-align-justify{text-align:justify;}
+</style>
+<link rel="stylesheet" id="wp-polls-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-css.css" media="all">
+<style id="wp-polls-inline-css">
+.wp-polls .pollbar {
+	margin: 1px;
+	font-size: 6px;
+	line-height: 8px;
+	height: 8px;
+	background-image: url('https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/images/default/pollbg.gif');
+	border: 1px solid #c8c8c8;
+}
+
+</style>
+<link rel="stylesheet" id="wpdiscuz-font-awesome-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/font-awesome-5.0.6/css/fontawesome-all.min.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-frontend-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-user-content-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz-user-content.css" media="all">
+<link rel="stylesheet" id="openark-primer-style-css" href="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/style.css" media="all">
+<link rel="stylesheet" id="wp-markdown-prettify-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/css/prettify.css" media="all">
+<link rel="stylesheet" id="social-logos-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/social-logos/social-logos.min.css" media="all">
+<link rel="stylesheet" id="jetpack_css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/css/jetpack.css" media="all">
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery-migrate.min.js"></script>
+
+
+
+
+
+
+
+
+
+            <style>
+                #wpcomm .wc_new_comment{background:#00B38F;}
+                #wpcomm .wc_new_reply{background:#00B38F;}
+                #wpcomm .wc-form-wrapper{ background:none; } /* ->formBGColor */
+                #wpcomm .wpdiscuz-front-actions{background:#F9F9F9;}
+                #wpcomm .wpdiscuz-subscribe-bar{background:#F9F9F9;}
+                #wpcomm select,
+                #wpcomm input[type="text"],
+                #wpcomm input[type="email"],
+                #wpcomm input[type="url"],
+                #wpcomm input[type="date"],
+                #wpcomm input[type="color"]{border:#D9D9D9 1px solid;}
+                #wpcomm .wc-comment .wc-comment-right{background:#FEFEFE;}
+                #wpcomm .wc-reply .wc-comment-right{background:#F8F8F8;}
+                #wpcomm .wc-comment-right .wc-comment-text, 
+                #wpcomm .wc-comment-right .wc-comment-text *{
+                    font-size:14px;
+                }
+                #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-administrator > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-editor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-contributor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-subscriber > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_admin > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_check > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_helper > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-post_author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-guest > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }                #wpcomm .wc-comment .wc-comment-left .wc-comment-label{ background: #ffffff;}
+                #wpcomm .wc-comment-left .wc-follow-user{color:#00B38F;}
+                #wpcomm .wc-load-more-submit{border:1px solid #D9D9D9;}
+                #wpcomm .wc-new-loaded-comment > .wc-comment-right{background:#FFFAD6;}
+                #wpcomm .wpdiscuz-subscribe-bar{color:#777;}
+                #wpcomm .wpdiscuz-front-actions .wpdiscuz-sbs-wrap span{color: #777;}
+                #wpcomm .page-numbers{color:#555;border:#555 1px solid;}
+                #wpcomm span.current{background:#555;}
+                #wpcomm .wpdiscuz-readmore{cursor:pointer;color:#00B38F;}
+                #wpcomm .wpdiscuz-textarea-wrap{border:#D9D9D9 1px solid;} .wpd-custom-field .wcf-pasiv-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label {color: #DDDDDD;}
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating:not(:checked) > label:hover,.wpdiscuz-rating:not(:checked) > label:hover ~ label {   }#wpcomm .wpdiscuz-item .wpdiscuz-rating > input ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label{color: #FFED85;} 
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label:hover ~ input:checked ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked + label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover ~ label, .wpd-custom-field .wcf-active-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label{ color:#FFD700;}
+                #wpcomm .wc-comment-header{border-top: 1px solid #dedede;}
+                #wpcomm .wc-reply .wc-comment-header{border-top: 1px solid #dedede;}
+                /* Buttons */
+                #wpcomm button, 
+                #wpcomm input[type="button"], 
+                #wpcomm input[type="reset"], 
+                #wpcomm input[type="submit"]{ border: 1px solid #555555; color: #FFFFFF; background-color: #555555; }
+                #wpcomm button:hover, 
+                #wpcomm button:focus,
+                #wpcomm input[type="button"]:hover, 
+                #wpcomm input[type="button"]:focus, 
+                #wpcomm input[type="reset"]:hover, 
+                #wpcomm input[type="reset"]:focus, 
+                #wpcomm input[type="submit"]:hover, 
+                #wpcomm input[type="submit"]:focus{ border: 1px solid #333333; background-color: #333333;  }
+                #wpcomm .wpdiscuz-sort-buttons{color:#777777;}
+                #wpcomm .wpdiscuz-sort-button{color:#777777; cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button:hover{color:#00B38F!important;cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button-active{color:#00B38F!important;cursor:default!important;}
+                #wpcomm .wc-cta-button, 
+                #wpcomm .wc-cta-button-x{color:#777777; }
+                #wpcomm .wc-vote-link.wc-up{color:#999999;}
+                #wpcomm .wc-vote-link.wc-down{color:#999999;}
+                #wpcomm .wc-vote-result{color:#999999;}
+                #wpcomm .wpf-cta{color:#999999; }
+                #wpcomm .wc-comment-link .wc-share-link .wpf-cta{color:#eeeeee;}
+                #wpcomm .wc-footer-left .wc-reply-button{border:1px solid #00B38F!important; color: #00B38F;}
+                #wpcomm .wpf-cta:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-left .wc-reply-button.wc-cta-active, #wpcomm .wc-cta-active{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-cta-button:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-right .wc-toggle,
+                #wpcomm .wc-footer-right .wc-toggle a,
+                #wpcomm .wc-footer-right .wc-toggle i{color:#00B38F;}
+                /* STICKY COMMENT HEADER */
+                #wpcomm .wc-sticky-comment.wc-comment .wc-comment-header .wpd-sticky{background: #1ecea8; color: #ffffff; }
+                #wpcomm .wc-closed-comment.wc-comment .wc-comment-header .wpd-closed{background: #aaaaaa; color: #ffffff;}
+                /* PRIVATE COMMENT HEADER */
+                #wpcomm .wc-private-comment.wc-comment .wc-comment-header .wpd-private{background: #999999; color: #ffffff;}
+                /* FOLLOW LINK */
+
+                #wpcomm .wc-follow{color:#777777;}
+                #wpcomm .wc-follow-active{color:#ff7a00;}
+                #wpcomm .wc-follow:hover i,
+                #wpcomm .wc-unfollow:hover i,
+                #wpcomm .wc-follow-active:hover i{color:#00B38F;}
+                                .wpd-wrapper .wpd-list-item.wpd-active{border-top: 3px solid #00B38F;}
+                                .comments-area{width:auto;}
+            </style>
+            <style data-context="foundation-flickity-css">/*! Flickity v2.0.2
+http://flickity.metafizzy.co
+---------------------------------------------- */.flickity-enabled{position:relative}.flickity-enabled:focus{outline:0}.flickity-viewport{overflow:hidden;position:relative;height:100%}.flickity-slider{position:absolute;width:100%;height:100%}.flickity-enabled.is-draggable{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.flickity-enabled.is-draggable .flickity-viewport{cursor:move;cursor:-webkit-grab;cursor:grab}.flickity-enabled.is-draggable .flickity-viewport.is-pointer-down{cursor:-webkit-grabbing;cursor:grabbing}.flickity-prev-next-button{position:absolute;top:50%;width:44px;height:44px;border:none;border-radius:50%;background:#fff;background:hsla(0,0%,100%,.75);cursor:pointer;-webkit-transform:translateY(-50%);transform:translateY(-50%)}.flickity-prev-next-button:hover{background:#fff}.flickity-prev-next-button:focus{outline:0;box-shadow:0 0 0 5px #09f}.flickity-prev-next-button:active{opacity:.6}.flickity-prev-next-button.previous{left:10px}.flickity-prev-next-button.next{right:10px}.flickity-rtl .flickity-prev-next-button.previous{left:auto;right:10px}.flickity-rtl .flickity-prev-next-button.next{right:auto;left:10px}.flickity-prev-next-button:disabled{opacity:.3;cursor:auto}.flickity-prev-next-button svg{position:absolute;left:20%;top:20%;width:60%;height:60%}.flickity-prev-next-button .arrow{fill:#333}.flickity-page-dots{position:absolute;width:100%;bottom:-25px;padding:0;margin:0;list-style:none;text-align:center;line-height:1}.flickity-rtl .flickity-page-dots{direction:rtl}.flickity-page-dots .dot{display:inline-block;width:10px;height:10px;margin:0 8px;background:#333;border-radius:50%;opacity:.25;cursor:pointer}.flickity-page-dots .dot.is-selected{opacity:1}</style><style data-context="foundation-slideout-css">.slideout-menu{position:fixed;left:0;top:0;bottom:0;right:auto;z-index:0;width:256px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}.slideout-menu.pushit-right{left:auto;right:0}.slideout-panel{position:relative;z-index:1;will-change:transform}.slideout-open,.slideout-open .slideout-panel,.slideout-open body{overflow:hidden}.slideout-open .slideout-menu{display:block}.pushit{display:none}</style>
+<link rel="dns-prefetch" href="//v0.wordpress.com">
+
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Self throttling MySQL queries">
+<meta property="og:url" content="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries">
+<meta property="og:description" content="Recap on the problem: A query takes a long time to complete. During this time it makes for a lot of I/O. Query’s I/O overloads the db, making for other queries run slow. I introduce the notio…">
+<meta property="article:published_time" content="2011-11-01T07:55:47+00:00">
+<meta property="article:modified_time" content="2011-11-01T07:57:56+00:00">
+<meta property="og:site_name" content="code.openark.org">
+<meta property="og:image" content="https://s0.wp.com/i/blank.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:text:title" content="Self throttling MySQL queries">
+<meta name="twitter:card" content="summary">
+
+
+<style>.ios7.web-app-mode.has-fixed header{ background-color: rgba(242,101,34,.88);}</style></head>
+
+<body class="post-template-default single single-post postid-4294 single-format-standard no-sidebar">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#primary">Skip to content</a>
+
+	<header id="masthead" class="site-header">
+		<div class="site-branding">
+							<p class="site-title"><a href="https://shlomi-noach.github.io/blog/" rel="home">code.openark.org</a></p>
+								<p class="site-description">Blog by Shlomi Noach</p>
+			
+			<nav id="site-navigation" class="main-navigation">
+				<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false">primary-menu</button>
+				<div class="menu-primary-menu-container"><ul id="menu-primary-menu" class="menu"><li id="menu-item-8109" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8109"><a href="https://shlomi-noach.github.io/blog/archives">archives</a></li>
+<li id="menu-item-8050" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8050"><a href="https://shlomi-noach.github.io/blog/presentations">presentations</a></li>
+<li id="menu-item-8055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8055"><a href="https://shlomi-noach.github.io/blog/about">about</a></li>
+<li id="menu-item-8071" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8071"><a href="https://github.com/shlomi-noach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a></li>
+<li id="menu-item-8074" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8074"><a href="https://www.linkedin.com/in/shlominoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg></a></li>
+<li id="menu-item-8072" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8072"><a href="https://twitter.com/ShlomiNoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"></path></svg></a></li>
+<li id="menu-item-8073" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8073"><a href="https://shlomi-noach.github.io/blog/feed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-12.832 20c-1.197 0-2.168-.969-2.168-2.165s.971-2.165 2.168-2.165 2.167.969 2.167 2.165-.97 2.165-2.167 2.165zm5.18 0c-.041-4.029-3.314-7.298-7.348-7.339v-3.207c5.814.041 10.518 4.739 10.561 10.546h-3.213zm5.441 0c-.021-7.063-5.736-12.761-12.789-12.792v-3.208c8.83.031 15.98 7.179 16 16h-3.211z"></path></svg></a></li>
+</ul></div>			</nav>
+		</div>
+	</header>
+
+	<main id="primary" class="site-main">
+
+		
+<article id="post-4294" class="post-4294 post type-post status-publish format-standard hentry category-mysql tag-hack tag-myisam tag-performance tag-sql tag-stored-routines">
+	<header class="entry-header">
+		<h1 class="entry-title">Self throttling MySQL queries</h1>			<div class="entry-meta">
+				<span class="cat-links"><a href="https://shlomi-noach.github.io/blog/category/mysql" rel="category tag">MySQL</a></span><span class="tags-links"><a href="https://shlomi-noach.github.io/blog/tag/hack" rel="tag">Hack</a><a href="https://shlomi-noach.github.io/blog/tag/myisam" rel="tag">MyISAM</a><a href="https://shlomi-noach.github.io/blog/tag/performance" rel="tag">Performance</a><a href="https://shlomi-noach.github.io/blog/tag/sql" rel="tag">SQL</a><a href="https://shlomi-noach.github.io/blog/tag/stored-routines" rel="tag">Stored routines</a></span><span class="posted-on alignright"><a href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" rel="bookmark"><time class="entry-date published" datetime="2011-11-01T09:55:47+02:00">November 1, 2011</time><time class="updated" datetime="2011-11-01T09:57:56+02:00">November 1, 2011</time></a></span>			</div>
+			</header>
+
+	
+	<div class="entry-content">
+		<p>Recap on the problem:</p>
+<ul>
+<li>A query takes a long time to complete.</li>
+<li>During this time it makes for a lot of I/O.</li>
+<li>Query’s I/O overloads the db, making for other queries run slow.</li>
+</ul>
+<p>I introduce the notion of self-throttling queries: queries that go to sleep, by themselves, throughout the runtime. The sleep period means the query does not perform I/O at that time, which then means other queries can have their chance to execute.</p>
+<p>I present two approaches:</p>
+<ul>
+<li>The naive approach: for every <strong>1,000</strong> rows, the query sleep for <strong>1</strong> second</li>
+<li>The factor approach: for every <strong>1,000</strong> rows, the query sleeps for the amount of time it took to iterate those <strong>1,000</strong> rows (effectively doubling the total runtime of the query).<span id="more-4294"></span></li>
+</ul>
+<h4>Sample query</h4>
+<p>We use a simple, single-table scan. No aggregates (which complicate the solution considerably).</p>
+<blockquote>
+<pre>SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental
+;</pre>
+</blockquote>
+<h4>The naive solution</h4>
+<p>We need to know every <strong>1,000</strong> rows. So we need to count the rows. We do that by using a counter, as follows:</p>
+<blockquote>
+<pre>SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days,
+  @row_counter := @row_counter + 1
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>A thing that bothers me, is that I wasn’t asking for an additional column. I would like the result set to remain as it were; same result structure. We also want to sleep for <strong>1</strong> second for each <strong>1,000</strong> rows. So we merge the two together along with one of the existing columns, like this:</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    IF(
+      (@row_counter := @row_counter + 1) % 1000 = 0,
+      SLEEP(1), 0
+    ) AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>To remain faithful to <a href="https://shlomi-noach.github.io/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql">my slides</a>, I rewrite as follows, and this is <em>the naive solution</em>:</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN <strong>(@row_counter := @row_counter + 1) % 1000 = 0</strong> THEN <strong>SLEEP(1)</strong>
+      ELSE <strong>0</strong>
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>The <strong>WHEN</strong> clause always returns <strong>0</strong>, so it does not affect the value of <strong>rental_id</strong>.</p>
+<h4>The factor approach</h4>
+<p>In the factor approach we wish to keep record of query execution, every <strong>1,000</strong> rows. I introduce a nested <strong>WHEN</strong> statement which updates time records. I rely on <strong>SYSDATE()</strong> to return the true time, and on <strong>NOW()</strong> to return query execution start time.</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN <strong>@row_counter % 1000 = 0</strong> THEN
+        CASE
+          WHEN (@time_now := <strong>SYSDATE()</strong>) IS NULL THEN NULL
+          WHEN (@time_diff := (<strong>TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now)</strong>)) IS NULL THEN NULL
+          WHEN <strong>SLEEP(@time_diff)</strong> IS NULL THEN NULL
+          WHEN (@chunk_start_time := <strong>SYSDATE()</strong>) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;</pre>
+</blockquote>
+<h4>Proof</h4>
+<p>How can we prove that the queries do indeed work?</p>
+<p>We can see if the total runtime sums up to the number of sleep calls, in seconds; but how do we know that sleeps do occur at the correct times?</p>
+<p>A solution I offer is to use a stored routines which logs to a MyISAM table (a non transactional table) the exact time (using <strong>SYSDATE()</strong>) and value per row. The following constructs are introduced:</p>
+<blockquote>
+<pre><strong>CREATE TABLE</strong> test.proof(
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dt DATETIME NOT NULL,
+  msg VARCHAR(255)
+) <strong>ENGINE=MyISAM</strong>;
+
+DELIMITER $$
+<strong>CREATE FUNCTION</strong> test.prove_it(message VARCHAR(255)) RETURNS TINYINT
+DETERMINISTIC
+MODIFIES SQL DATA
+BEGIN
+  <strong>INSERT INTO test.proof (dt, msg) VALUES (SYSDATE(), message); RETURN 0;</strong>
+END $$
+DELIMITER ;</pre>
+</blockquote>
+<p>The <strong>prove_it()</strong> function records the immediate time and a message into the MyISAM table, which immediately accepts the write, being non-transactional. It returns with <strong>0</strong>, so we will now embed it within the query. Of course, the function itself incurs some overhead, but it will nevertheless convince you that <strong>SLEEP()</strong>s do occur at the right time!</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN @row_counter % 1000 = 0 THEN
+        CASE
+          WHEN (@time_now := SYSDATE()) IS NULL THEN NULL
+          WHEN (@time_diff := (TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now))) IS NULL THEN NULL
+          WHEN SLEEP(@time_diff)<strong> + test.prove_it(CONCAT('will sleep for ', @time_diff, ' seconds'))</strong> IS NULL THEN NULL
+          WHEN (@chunk_start_time := SYSDATE()) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;
+
+mysql> SELECT * FROM test.proof;
++----+---------------------+--------------------------+
+| id | dt                  | msg                      |
++----+---------------------+--------------------------+
+|  1 | 2011-11-01 09:22:36 | will sleep for 1 seconds |
+|  2 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  3 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  4 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  5 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  6 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  7 | 2011-11-01 09:22:38 | will sleep for 1 seconds |
+|  8 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+|  9 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 10 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 11 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 12 | 2011-11-01 09:22:40 | will sleep for 1 seconds |
+| 13 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 14 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 15 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
++----+---------------------+--------------------------+</pre>
+</blockquote>
+<p>The above query is actually very fast. Try adding <strong>BENCHMARK(1000,ENCODE(‘hello’,’goodbye’))</strong> to rental_id so as to make it slower, or just use it on a really large table, see what happens (this is what I actually used to make the query run for several seconds in the example above).</p>
+<p>Observant reads will note that the <strong>“will sleep…”</strong> message actually gets written <em>after</em> the <strong>SLEEP()</strong> call. I leave this as it is.</p>
+<p>Another very nice treat of the code is that you don’t need sub-second resolution for it to work. If you look at the above, we don’t actually go to sleep every <strong>1,000</strong> rows (<strong>1,000</strong> is just too quick in the query — perhaps I should have used <strong>10,000</strong> seconds). But we <em>do</em> make it once a second has <em>elapsed</em>. Which means it works correctly <em>on average</em>. Of course, the entire discussion is only of interest when a query executes for a <em>substantial</em> number of seconds, so this is just an anecdote.</p>
+<h4>And the winner is…</h4>
+<p>Wow, this <a href="https://shlomi-noach.github.io/blog/mysql/contest-for-glory-write-a-self-throttling-mysql-query">contest</a> was anything but popular. <strong><a href="http://marcalff.blogspot.com/">Marc Alff</a></strong> is the obvious winner: he is the <em>only</em> one to suggest a solution 🙂</p>
+<p>But Marc uses a very nice trick: he reads the <strong>PERFORMANCE_SCHEMA</strong>. Now, I’m not sure how the <strong>PERFORMANCE_SCHEMA</strong> gets updated. I know that the <strong>INFORMATION_SCHEMA.GLOBAL_STATUS</strong> table does not get updated by a query until the query completes (so you cannot expect a change in <strong>innodb_rows_read</strong> throughout the execution of the query). I just didn’t test it (homework, anyone?). If it does get updated, then we can throttle the query based on InnoDB page reads using a simple query. Otherwise, an access to <strong>/proc/diskstats</strong> is possible, assuming no <em>apparmor</em> or <em>SELinux</em> are blocking us.</p>
+<p>Marc also uses a stored function, which is the <em>clean</em> way of doing it; however I distrust the overhead incurred by s stored routine and prefer my solution (which is, admittedly, not a pretty SQL sight!).</p>
+<p>Happy throttling!</p>
+<div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><div class="sd-content"><ul><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-4294" class="share-twitter sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-4294" class="share-linkedin sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-jetpack-whatsapp"><a rel="nofollow noopener noreferrer" data-shared="" class="share-jetpack-whatsapp sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" target="_blank" title="Click to share on WhatsApp"><span>WhatsApp</span></a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-4294" class="share-facebook sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>	</div>
+
+	<footer class="entry-footer">
+			</footer>
+</article>
+
+	<nav class="navigation post-navigation" role="navigation" aria-label="Posts">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://shlomi-noach.github.io/blog/mysql/impressions-from-percona-live-london" rel="prev"><span class="nav-subtitle">Previous:</span> <span class="nav-title">Impressions from Percona Live, London</span></a></div><div class="nav-next"><a href="https://shlomi-noach.github.io/blog/mysql/oracle-ace" rel="next"><span class="nav-subtitle">Next:</span> <span class="nav-title">Oracle ACE</span></a></div></div>
+	</nav>    <div class="wpdiscuz_top_clearing"></div>
+    <div id="comments" class="comments-area"><div id="respond" style="width: 0;height: 0;clear: both;margin: 0;padding: 0;"></div>            <h3 id="wc-comment-header">
+                                    <div class="wpdiscuz-comment-count">
+                        <div class="wpd-cc-value">5</div>
+                        <div class="wpd-cc-arrow"></div>
+                    </div>
+                                Leave a Reply            </h3>
+                    <div id="wpcomm" class="wpdiscuz_unauth wpd-default">
+            <div class="wpdiscuz-form-top-bar">
+                <div class="wpdiscuz-ftb-left">
+                                                            <div id="wc_show_hide_loggedin_username">
+                                            </div>
+                </div>
+                                <div class="wpd-clear"></div>
+            </div>
+
+
+                        <div class="wc_social_plugin_wrapper">
+                            </div>
+                    <div class="wc-form-wrapper wc-main-form-wrapper" id="wc-main-form-wrapper-0_0">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                                        <form class="wc_comm_form wc_main_comm_form" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://2.gravatar.com/avatar/?s=40&d=mm&r=g" srcset="http://0.gravatar.com/avatar/?s=80&d=mm&r=g 2x" class="avatar avatar-40 photo avatar-default" height="40" width="40">                                    </div>
+                                
+                                <textarea id="wc-textarea-0_0" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="0_0" name="wpdiscuz_unique_id">
+                </form>
+                    <div class="wpdiscuz-form-bottom-bar">
+                    <div class="wpdiscuz-fbb-left">
+                                                                        <div class="wpdiscuz-stat wpd-stat-threads wpd-tooltip-left">
+                        <i class="fas fa-align-left fa-rotate-180" data-fa-transform="rotate-180"></i><span class="wpd-stat-threads-count">5</span>
+                        <wpdtip>Comment threads</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-replies wpd-tooltip-left">
+                        <i class="far fa-comments"></i><span class="wpd-stat-replies-count">0</span>
+                        <wpdtip>Thread replies</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-subscribers wpd-tooltip-left">
+                        <i class="fas fa-rss"></i><span>0</span>
+                        <wpdtip>Followers</wpdtip>
+                    </div> 
+                                                                    
+                    <div class="wpdiscuz-stat wpd-stat-reacted wpd-tooltip">
+                        <i class="fas fa-bolt"></i>
+                        <wpdtip>Most reacted comment</wpdtip>
+                    </div>
+                                                                    <div class="wpdiscuz-stat wpd-stat-hot wpd-tooltip">
+                        <i class="fab fa-hotjar"></i>
+                        <wpdtip>Hottest comment thread</wpdtip>
+                    </div>
+                            </div>
+                                        <div class="wpdiscuz-fbb-right">
+                                                        <div class="wpdiscuz-stat wpd-stat-users wpd-tooltip">
+                        <i class="fas fa-user-circle"></i> <span class="wpd-stat-authors-count">3</span>
+                        <wpdtip>Comment authors</wpdtip>
+                    </div>
+                                                                                                            <div class="wpdiscuz-users wpd-tooltip-right">
+                        <img alt="Rick James" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/94db865d443486da7d7f0b0356bc8827.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/94db865d443486da7d7f0b0356bc8827.gif 2x" class="avatar avatar-64 photo" height="64" width="64" title="Rick James"><img alt="shlomi" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="shlomi"><img alt="sbester" src="http://0.gravatar.com/avatar/00e4816642194db584389bb93ee8736b?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/00e4816642194db584389bb93ee8736b?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="sbester">                        <wpdtip>Recent comment authors</wpdtip>
+                    </div>
+                            </div>
+                <div class="wpd-clear"></div>
+    </div>
+            </div>
+                <div id="wpdiscuz_hidden_secondary_form" style="display: none;">
+                    <div class="wc-form-wrapper wc-secondary-form-wrapper" id="wc-secondary-form-wrapper-wpdiscuzuniqueid" style="display: none;">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                            <div class="wc-secondary-forms-social-content"></div><div class="clearfix"></div>
+                                        <form class="wc_comm_form wc-secondary-form-wrapper" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=48&d=mm&r=g" srcset="http://2.gravatar.com/avatar/?s=96&d=mm&r=g 2x" class="avatar avatar-48 photo avatar-default" height="48" width="48">                                    </div>
+                                
+                                <textarea id="wc-textarea-wpdiscuzuniqueid" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="wpdiscuzuniqueid" name="wpdiscuz_unique_id">
+                </form>
+                        </div>
+                </div>
+        <p class="akismet_comment_form_privacy_notice">This site uses Akismet to reduce spam. <a href="https://akismet.com/privacy/" target="_blank" rel="nofollow noopener">Learn how your comment data is processed</a>.</p>                                   
+
+                                    <div class="wpdiscuz-front-actions">
+                                                    <div class="wpdiscuz-sbs-wrap">
+                                <span><i class="far fa-envelope" aria-hidden="true"></i>  Subscribe  <i class="fas fa-caret-down" aria-hidden="true"></i></span>
+                            </div>
+                                                                        <div class="clearfix"></div>
+                    </div>
+                                                    <div class="wpdiscuz-subscribe-bar wpdiscuz-hidden">
+                                                    <form action="https://shlomi-noach.github.io/blog/wp-admin/admin-ajax.php?action=addSubscription" method="post" id="wpdiscuz-subscribe-form">
+                                <div class="wpdiscuz-subscribe-form-intro">Notify of </div>
+                                <div class="wpdiscuz-subscribe-form-option" style="width:40%;">
+                                    <select class="wpdiscuz_select" name="wpdiscuzSubscriptionType">
+                                                                                    <option value="post">new follow-up comments</option>
+                                                                                                                            <option value="all_comment" disabled>new replies to my comments</option>
+                                                                            </select>
+                                </div>
+                                                                    <div class="wpdiscuz-item wpdiscuz-subscribe-form-email">
+                                        <input class="email" type="email" name="wpdiscuzSubscriptionEmail" required="required" value="" placeholder="Email">
+                                    </div>
+                                                                <div class="wpdiscuz-subscribe-form-button">
+                                    <input id="wpdiscuz_subscription_button" type="submit" value="›" name="wpdiscuz_subscription_button">
+                                </div> 
+                                                                <input type="hidden" id="wpdiscuz_subscribe_form_nonce" name="wpdiscuz_subscribe_form_nonce" value="12fac97726"><input type="hidden" name="_wp_http_referer" value="/blog/mysql/self-throttling-mysql-queries/comment-page-1">                                                                <input type="hidden" value="4294" name="wpdiscuzSubscriptionPostId">
+                            </form>
+                                                <div class="wpdiscuz_clear"></div>
+                                            </div>
+                    
+                                <div id="wcThreadWrapper" class="wc-thread-wrapper">
+                    <div id="wc-comm-57295_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="sbester" src="http://0.gravatar.com/avatar/00e4816642194db584389bb93ee8736b?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/00e4816642194db584389bb93ee8736b?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-57295" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">sbester</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=i+got+stuck+on+the+potential+sub-second+re...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fself-throttling-mysql-queries%2Fcomment-page-1%23comment-57295" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/comment-page-1#comment-57295" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>i got stuck on the potential sub-second requirement quite a bit..  only way i thought it possible was getting it from the uuid() but it got too messy and i gave up 🙂</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-57295_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-57296_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-57296" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40sbester%2C%0ATechnically%2C+you+can+use%3A%0ATIMEST...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fself-throttling-mysql-queries%2Fcomment-page-1%23comment-57296" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/comment-page-1#comment-57296" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@sbester,</p>
+<p>Technically, you can use:<br>
+TIMESTAMPDIFF(MICROSECOND, start, end)/1000000.0<br>
+The syntax is accepted in MySQL.</p>
+<p>In MariaDB this should actually work (I never tried).</p>
+<p>You will get a letter of condolences for not winning the Glory award.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-57296_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-60257_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-60257" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="https://shlomi-noach.github.io/blog/mysql/contest-for-glory-write-a-self-throttling-mysql-query" rel="nofollow" target="_blank">Contest for Glory: write a self throttling MySQL query | code.openark.org</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+Self+throttling+MySQL+queries+%5B%26...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fself-throttling-mysql-queries%2Fcomment-page-1%23comment-60257" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/comment-page-1#comment-60257" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] Self throttling MySQL queries […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-60257_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-74137_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Rick James" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/94db865d443486da7d7f0b0356bc8827.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/94db865d443486da7d7f0b0356bc8827.gif 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-74137" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://mysql.rjweb.org/" rel="nofollow" target="_blank">Rick James</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hmmm%26%238230%3B+I+may+want+to+incorporate+you+...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fself-throttling-mysql-queries%2Fcomment-page-1%23comment-74137" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/comment-page-1#comment-74137" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hmmm… I may want to incorporate you technique in my web page on how to do big deletes:<br>
+<a href="http://mysql.rjweb.org/doc.php/deletebig" rel="nofollow ugc">http://mysql.rjweb.org/doc.php/deletebig</a></p>
+<p>You discussed SELECT, but in applying this to write operations, be aware issues with SYSDATE() in a replication situation:<br>
+<a href="http://bugs.mysql.com/bug.php?id=15101" rel="nofollow ugc">http://bugs.mysql.com/bug.php?id=15101</a><br>
+(I have not tested.)</p>
+<p>As for MICROSECONDs, most people have to wait for SYSDATE() (or whatever) to provide microseconds.  The manual (even for 5.0) claims that SYSDATE() “Returns … YYYYMMDDHHMMSS.uuuuuu format, depending on whether the function is used in a string or numeric context”, but it does not work on 5.1.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-74137_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-74244_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-74244" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Rick%2C%0Afor+DELETEs+I+provide+with+oak-chun...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fself-throttling-mysql-queries%2Fcomment-page-1%23comment-74244" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/comment-page-1#comment-74244" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Rick,<br>
+for DELETEs I provide with <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html" rel="nofollow">oak-chunk-update</a>, as part of the openark-kit.</p>
+<p>I’m also going to integrate this into <a href="http://www.queryscript.com/" rel="nofollow">QueryScript</a>.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-74244_0" class="wpdiscuz_clear"></div></div>                
+                    <div class="wpdiscuz-comment-pagination">
+                                            </div>
+                </div>
+                <div class="wpdiscuz_clear"></div>
+                                                                                </div>
+        </div>
+        <div id="wpdiscuz-loading-bar" class="wpdiscuz-loading-bar wpdiscuz-loading-bar-unauth"></div>
+        
+	</main>
+
+
+	<footer id="colophon" class="site-footer">
+		<div class="site-info">
+			<a href="https://wordpress.org/">
+				Powered by WordPress			</a>
+			<span class="sep"> | </span>
+				Theme: <a href="http://openark.org">openark-primer</a> by <a href="http://underscores.me/">Underscores.me</a>.		</div>
+	</footer>
+</div>
+
+<a id="wpdUserContentInfoAnchor" style="display:none;" rel="#wpdUserContentInfo" data-wpd-lity>wpDiscuz</a><div id="wpdUserContentInfo" style="overflow:auto;background:#FDFDF6;padding:20px;width:600px;max-width:100%;border-radius:6px;" class="lity-hide"></div>	<div style="display:none">
+	<div class="grofile-hash-map-94db865d443486da7d7f0b0356bc8827">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	<div class="grofile-hash-map-00e4816642194db584389bb93ee8736b">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/shlomi-noach.github.io\/blog\/mysql\/self-throttling-mysql-queries":4294};
+	</script>
+					<div id="sharing_email" style="display: none;">
+		<form action="/blog/mysql/self-throttling-mysql-queries/comment-page-1" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="">
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="">
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="">
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed">
+			
+			<img style="float: right; display: none" class="loading" src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/sharedaddy/images/loading.gif" alt="loading" width="16" height="16">
+			<input type="submit" value="Send Email" class="sharing_send">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<script>
+var pollsL10n = {"ajax_url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","text_wait":"Your last request is still being processed. Please wait a while ...","text_valid":"Please choose a valid poll answer.","text_multiple":"Maximum number of choices allowed: ","show_loading":"1","show_fading":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-js.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/wpdccjs/wpdcc.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/autogrow/jquery.autogrowtextarea.min.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.form.min.js"></script>
+<script>
+var wpdiscuzAjaxObj = {"url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","customAjaxUrl":"https:\/\/shlomi-noach.github.io\/blog\/wp-content\/plugins\/wpdiscuz\/utils\/ajax\/wpdiscuz-ajax.php","wpdiscuz_options":{"wc_hide_replies_text":"Hide Replies","wc_show_replies_text":"View Replies","wc_msg_required_fields":"Please fill out required fields","wc_invalid_field":"Some of field value is invalid","wc_error_empty_text":"please fill out this field to comment","wc_error_url_text":"url is invalid","wc_error_email_text":"email address is invalid","wc_invalid_captcha":"Invalid Captcha Code","wc_login_to_vote":"You Must Be Logged In To Vote","wc_deny_voting_from_same_ip":"You are not allowed to vote for this comment","wc_self_vote":"You cannot vote for your comment","wc_vote_only_one_time":"You've already voted for this comment","wc_voting_error":"Voting Error","wc_held_for_moderate":"Comment awaiting moderation","wc_comment_edit_not_possible":"Sorry, this comment no longer possible to edit","wc_comment_not_updated":"Sorry, the comment was not updated","wc_comment_not_edited":"You've not made any changes","wc_new_comment_button_text":"new comment","wc_new_comments_button_text":"new comments","wc_new_reply_button_text":"new reply on your comment","wc_new_replies_button_text":"new replies on your comments","wc_msg_input_min_length":"Input is too short","wc_msg_input_max_length":"Input is too long","wc_follow_user":"Follow this user","wc_unfollow_user":"Unfollow this user","wc_follow_success":"You started following this comment author","wc_follow_canceled":"You stopped following this comment author.","wc_follow_email_confirm":"Please check your email and confirm the user following request.","wc_follow_email_confirm_fail":"Sorry, we couldn't send confirmation email.","wc_follow_login_to_follow":"Please login to follow users.","wc_follow_impossible":"We are sorry, but you can't follow this user.","wc_follow_not_added":"Following failed. Please try again later.","is_user_logged_in":false,"commentListLoadType":"0","commentListUpdateType":"0","commentListUpdateTimer":"30","liveUpdateGuests":"1","wc_comment_bg_color":"#FEFEFE","wc_reply_bg_color":"#F8F8F8","wpdiscuzCommentsOrder":"asc","wpdiscuzCommentOrderBy":"comment_date_gmt","commentsVoteOrder":false,"wordpressThreadCommentsDepth":"5","wordpressIsPaginate":"1","commentTextMaxLength":null,"storeCommenterData":100000,"isCaptchaInSession":true,"isGoodbyeCaptchaActive":false,"socialLoginAgreementCheckbox":"1","enableFbLogin":"0","enableFbShare":"0","facebookAppID":"","facebookUseOAuth2":0,"enableGoogleLogin":"0","googleAppID":"","cookiehash":"c616fa5ebd4c9ddc6dc50cbf089ebb1d","isLoadOnlyParentComments":"0","ahk":"ef4t(c4n18s$wj!7(^b9x8#r5pax76x#","enableDropAnimation":1,"isNativeAjaxEnabled":1,"cookieCommentsSorting":"wpdiscuz_comments_sorting","enableLastVisitCookie":0,"version":"5.3.5","wc_post_id":4294,"loadLastCommentId":0,"lastVisitKey":"wpdiscuz_last_visit","isCookiesEnabled":true,"wc_captcha_show_for_guest":"0","wc_captcha_show_for_members":"0","is_email_field_required":"1"}};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz.js"></script>
+<script>
+var wpdiscuzUCObj = {"msgConfirmDeleteComment":"Are you sure you want to delete this comment?","msgConfirmCancelSubscription":"Are you sure you want to cancel this subscription?","msgConfirmCancelFollow":"Are you sure you want to cancel this follow?"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz-user-content.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/lity/lity.js"></script>
+<script src="https://secure.gravatar.com/js/gprofiles.js?ver=2020Junaa"></script>
+<script>
+var WPGroHo = {"my_hash":""};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/wpgroho.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/navigation.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/skip-link-focus-fix.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/js/prettify.min.js"></script>
+<script>
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/build/sharedaddy/sharing.min.js"></script>
+<script>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+</script>
+<script type="text/javascript" src="https://stats.wp.com/e-202024.js" async="async" defer></script>
+<script type="text/javascript">
+	_stq = window._stq || [];
+	_stq.push([ 'view', {v:'ext',j:'1:8.2.1',blog:'32412571',post:'4294',tz:'2',srv:'code.openark.org'} ]);
+	_stq.push([ 'clickTrackerInit', '32412571', '4294' ]);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>sql_mode &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/sql_mode/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 09 Jun 2010 11:00:04 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Those oversized, undersized variables defaults</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/those-oversized-undersized-variables-defaults</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/those-oversized-undersized-variables-defaults#comments</comments>
+				<pubDate>Wed, 09 Jun 2010 04:35:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[sql_mode]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1997</guid>
+				<description><![CDATA[Some mysqld parameters are far from having reasonable defaults. Most notable are the engine-specific values, and in particular the InnoDB parameters. Some of these variables have different defaults as of MySQL 5.4. innodb_buffer_pool_size, for example, is 128M on 5.4. innodb_log_file_size, however, has changed back and forth, as far as I understand, and is down to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Some <strong>mysqld</strong> parameters are far from having reasonable defaults. Most notable are the engine-specific values, and in particular the InnoDB parameters.</p>
+<p>Some of these variables have different defaults as of MySQL 5.4. <strong>innodb_buffer_pool_size</strong>, for example, is <strong>128M</strong> on 5.4. <strong>innodb_log_file_size</strong>, however, has changed back and forth, as far as I understand, and is down to <strong>5M</strong> again. These settings are still the same on 5.5.</p>
+<p>I wish to present some not-so-obvious parameters which, in my opinion, have poor defaults, for reasons I will explain.</p>
+<ul>
+<li><strong>group_concat_max_len</strong>: This parameter limits the maximum text length of a <strong>GROUP_CONCAT</strong> concatenation result. It defaults to <strong>1024</strong>. I think this is a very low value. I have been using <strong>GROUP_CONCAT</strong> more and more, recently, to solve otherwise difficult problems. And in most cases, <strong>1024</strong> was just too low, resulting in <a href="https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error">silent</a> (<em>Argh!</em>) truncating of the result, thus returning incorrect results. It is interesting to learn that the maximum value for this parameter is limited by <strong>max_packet_size</strong>. I would suggest, then, that this parameter should be altogether removed, and have the <strong>max_packet_size</strong> limitation as the only limitation. Otherwise, I&#8217;d like it to have a very large default value, in the order of a few MB.</li>
+<li><strong>wait_timeout</strong>: Here&#8217;s a parameter whose default value is over permissive. <strong>wait_timeout</strong> enjoys an <strong>8 hour</strong> default. I usually go for <strong>5-10 minutes</strong>. I don&#8217;t see a point in letting idle connections waste resources for 8 hours. Applications which hold up such connections should be aware that they&#8217;re doing something wrong, in the form of a forced disconnection. Connection pools work beautifully with low settings, and can themselves do keepalives, if they choose to.</li>
+<li><strong>sql_mode</strong>: I&#8217;ve <a href="https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode">discussed this</a> in length before. My opinion unchanged.</li>
+<li><strong>open_files_limit</strong>: What with the fact connections, threads, table descriptors, table file descriptors (depending on how you use InnoDB), temporary file tables &#8212; all are files on unix-like systems, and considering this is an inexpensive payment, I think <strong>open_files_limit</strong> should default to a few thousands. Why risk the crash of &#8220;too many open files&#8221;?</li>
+</ul>
+<p><span id="more-1997"></span>No setting will ever be perfect for everyone, I know. But there are those parameters which you automatically set values for when you do a new install. These should be at focus and their defaults change.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/those-oversized-undersized-variables-defaults/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1997</post-id>	</item>
+		<item>
+		<title>But I DO want MySQL to say &#8220;ERROR&#8221;!</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error#comments</comments>
+				<pubDate>Fri, 12 Mar 2010 04:53:28 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[sql_mode]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2005</guid>
+				<description><![CDATA[MySQL is known for its willingness to accept invalid queries, data values. It can silently commit your transaction, truncate your data. Using GROUP_CONCAT with a small group_concat_max_len setting? Your result will be silently truncated (make sure to check the warnings though). Calling CREATE TEMPORARY TABLE? You get silent commit. Issuing a ROLLBACK on non-transactional involved [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL is known for its willingness to accept invalid queries, data values. It can silently commit your transaction, truncate your data.</p>
+<ul>
+<li>Using <strong>GROUP_CONCAT</strong> with a small <strong>group_concat_max_len</strong> setting? Your result will be silently truncated (make sure to check the warnings though).</li>
+<li>Calling <strong>CREATE <span style="text-decoration: line-through;">TEMPORARY</span> TABLE</strong>? You get <a href="http://www.joinfu.com/2010/03/a-follow-up-on-the-sql-puzzle/">silent commit</a>.</li>
+<li>Issuing a <strong>ROLLBACK</strong> on non-transactional involved engines? Have a warning; no error.</li>
+<li>Using <strong>LOCK IN SHARE MODE</strong> on non transactional tables? Not a problem. Nothing reported.</li>
+<li>Adding a <strong>FOREIGN KEY</strong> on a MyISAM table? Good for you; no action actually taken.</li>
+<li>Inserting <strong>300</strong> to a <strong>TINYINT</strong> column in a relaxed <strong>sql_mode</strong>? Give me <strong>255</strong>, I&#8217;ll silently drop the remaining <strong>45</strong>. I owe you.</li>
+</ul>
+<h4>Warnings and errors</h4>
+<p>It would be nice to:<span id="more-2005"></span></p>
+<ul>
+<li>Have an <strong>auto_propagate_warning_to_error</strong> server variable (global/session/both) which, well, does what it says.</li>
+<li>Have an <strong>i_am_really_not_a_dummy</strong> server variable which implies stricter checks for all the above and prevents you from doing with <em>anything</em> that may be problematic (or rolls back your transactions on your invalid actions).</li>
+</ul>
+<p>Connectors may be nice enough to propagate warnings to errors &#8211; that&#8217;s good. But not enough: since data is already committed in MySQL.</p>
+<p>If I understand correctly, and maybe it&#8217;s just a myth, it all relates to the times where MySQL had interest in a widespread adoption across the internet, in such way that it does not interfere too much with the users (hence leading to the common myth that &#8220;MySQL just works out of the box and does not require me to configure or understand anything&#8221;).</p>
+<p>MySQL is a database system, and is now widespread, and is used by serious companies and products. It is time to stop play nice to everyone and provide with strict integrity &#8212; or, be nice to everyone, just allow me to specify what &#8220;nice&#8221; means for me.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error/feed</wfw:commentRss>
+		<slash:comments>18</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2005</post-id>	</item>
+		<item>
+		<title>MySQL security: data integrity issues</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-security-data-integrity-issues</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-security-data-integrity-issues#comments</comments>
+				<pubDate>Wed, 21 Jan 2009 10:32:49 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[sql_mode]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=472</guid>
+				<description><![CDATA[MySQL&#8217;s security model is not as elaborate as other popular databases. It&#8217;s missing quite a lot. I wish to point out what I think are some very disturbing security holes, which may affect the database integrity. This post is not about Roles, Kerberos, IPs and such. It&#8217;s about simple MySQL features, which allow common, unprivileged [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL&#8217;s security model is not as elaborate as other popular databases. It&#8217;s missing quite a lot.</p>
+<p>I wish to point out what I think are some very disturbing security holes, which may affect the database integrity.</p>
+<p>This post is not about Roles, Kerberos, IPs and such. It&#8217;s about simple MySQL features, which allow common, unprivileged users, to break data integrity by using unprotected session variables.</p>
+<p>I will consider three such issues.</p>
+<p><span id="more-472"></span>We will assume a database with two tables, and two users.</p>
+<blockquote>
+<pre>GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+GRANT SELECT, INSERT, UPDATE, DELETE ON `w2`.* TO 'w2user'@'%';</pre>
+</blockquote>
+<p>We have one &#8216;root&#8217; user, and one very simple &#8216;w2user&#8217;, which can&#8217;t be accused of having too many privileges. The schema, with some sample data, follows.</p>
+<blockquote>
+<pre>DROP DATABASE IF EXISTS w2;
+CREATE DATABASE w2;
+USE w2;
+
+DROP TABLE IF EXISTS city;
+DROP TABLE IF EXISTS country;
+
+CREATE TABLE country (
+  country_id int(11) not null auto_increment,
+  name varchar(32) NOT NULL,
+  PRIMARY KEY  (country_id)
+)ENGINE=INNODB;
+
+CREATE TABLE city (
+  city_id int(11) NOT NULL auto_increment,
+  name varchar(32) NOT NULL,
+  country_id int(11) not null ,
+  PRIMARY KEY  (city_id),
+  INDEX country_id (country_id),
+  FOREIGN KEY (country_id) REFERENCES country(country_id)
+                      ON DELETE CASCADE
+
+)ENGINE=INNODB;
+
+INSERT INTO country (country_id, name) values (1, 'gbr');
+INSERT INTO country (country_id, name) values (2, 'usa');
+
+INSERT INTO city (name, country_id) values ('london',1);
+INSERT INTO city (name, country_id) values ('liverpool',1);
+INSERT INTO city (name, country_id) values ('birmingham',1);
+INSERT INTO city (name, country_id) values ('ny',2);
+INSERT INTO city (name, country_id) values ('boston',2);</pre>
+</blockquote>
+<p>Both tables are InnoDB, to support transactions and foreign keys.</p>
+<p>Obviously, &#8216;root&#8217; is allowed to do anything. But what harm can our unprivileged &#8216;w2user&#8217; do?</p>
+<h4>FOREIGN_KEY_CHECKS</h4>
+<p>The following <strong>INSERT</strong> should fail:</p>
+<blockquote>
+<pre>INSERT INTO city (name, country_id) values ('no_city',1234567);</pre>
+</blockquote>
+<p>But look at the following:</p>
+<blockquote>
+<pre>mysql&gt; SELECT CURRENT_USER();
++----------------+
+| CURRENT_USER() |
++----------------+
+| w2user@%       |
++----------------+
+1 row in set (0.00 sec)
+
+mysql&gt; SET FOREIGN_KEY_CHECKS=0;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; INSERT INTO city (name, country_id) values ('no_city',1234567);
+<span style="color: #993300;">Query OK, 1 row affected (0.01 sec)
+</span>
+mysql&gt; SET FOREIGN_KEY_CHECKS=1;
+Query OK, 0 rows affected (0.00 sec)</pre>
+</blockquote>
+<p>What was that? w2user was allowed to temporarily disable foreign key checks, insert an otherwise invalid row, then re-enable checks, and no error was thrown? Wait, did the row really get inserted?</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM city;
++---------+------------+------------+
+| city_id | name       | country_id |
++---------+------------+------------+
+|       1 | london     |          1 |
+|       2 | liverpool  |          1 |
+|       3 | birmingham |          1 |
+|       4 | ny         |          2 |
+|       5 | boston     |          2 |
+|       6 | no_city    |    <span style="color: #993300;">1234567</span> |
++---------+------------+------------+
+6 rows in set (0.01 sec)</pre>
+</blockquote>
+<p>Yes, it did.</p>
+<p>Disabling FK checks is handy when importing large data from dump, or from CSV, when it is <em>known</em> to be valid. For example, when restoring a backup created with mysqldump, FK checks can be safely disabled since dumped data must have been valid. Disabling checks helps in reducing import time.</p>
+<p>But I don&#8217;t think normal users should be allowed to set the FOREIGN_KEY_CHECKS variable. This should be restricted to users with the SUPER privilege.</p>
+<h4>tx_isolation</h4>
+<p>When using InnoDB, we can choose one of four isolation levels:</p>
+<ul>
+<li>READ-UNCOMMITTED</li>
+<li>READ COMMITTED</li>
+<li>REPEATABLE-READ (default):</li>
+<li>SERIALIZABLE</li>
+</ul>
+<p>In <strong>READ-UNCOMMITTED</strong>, a transaction can read other open transactions uncommitted data. It&#8217;s usually not a good idea to use this isolation level when working with transactional engines, since it undermines the very foundation of using transactions.</p>
+<p>But MySQL, and through it, InnoDB, allow a strange thing: the transaction isolation level can be modified on the run. I consider this to be peculiar and undesired. An isolation level imposes an application logic, which should not be changed. But MySQL also allows different isolation level on a per-connection basis.</p>
+<p>Every session can work on a different isolation level. This may be a good idea, when a session wishes to be stricter than the rest of the code, by using the <strong>SERIALIZABLE</strong> isolation, for example.</p>
+<p>But our w2user may decide to <em>lower</em> her session&#8217;s isolation level below the global one. That is, MySQL may be configured to work at <strong>REPEATABLE-READ</strong>, but w2user is allowed to:</p>
+<blockquote>
+<pre>mysql&gt; SELECT CURRENT_USER();
++----------------+
+| CURRENT_USER() |
++----------------+
+| w2user@%       |
++----------------+
+1 row in set (0.00 sec)
+
+mysql&gt; SET tx_isolation='READ-UNCOMMITTED';
+Query OK, 0 rows affected (0.00 sec)</pre>
+</blockquote>
+<p>Our &#8216;root&#8217; user does the following:</p>
+<blockquote>
+<pre>mysql&gt; SELECT CURRENT_USER();
++----------------+
+| CURRENT_USER() |
++----------------+
+| root@localhost |
++----------------+
+1 row in set (0.00 sec)
+
+mysql&gt; START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; INSERT INTO country (name) VALUES ('nowhere');
+Query OK, 1 row affected (0.00 sec)</pre>
+</blockquote>
+<p>While the transaction is still open, w2user can:</p>
+<blockquote>
+<pre>mysql&gt; SELECT CURRENT_USER();
++----------------+
+| CURRENT_USER() |
++----------------+
+| w2user@%       |
++----------------+
+1 row in set (0.00 sec)
+
+mysql&gt; SELECT * FROM country;
++------------+---------+
+| country_id | name    |
++------------+---------+
+|          1 | gbr     |
+|          2 | usa     |
+|          3 | <span style="color: #993300;">nowhere </span>|
++------------+---------+
+3 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>w2user used the <strong>READ-UNCOMMITED</strong>, hence was allowed to see the (soon to be rolled back?) &#8216;nowhere&#8217; country. But that country was inserted by a session using the <strong>REPEATABLE-READ</strong> level.</p>
+<p>Each session confirms to its isolation level rules, and the complaint is not about that. The complaint is with the fact that there&#8217;s a mess in our database.</p>
+<p>Working with the <strong>REPEATABLE-READ</strong> isolation level should guarantee me some <em>privacy</em> in my transaction. My transaction may choose to delete all rows from a table, only to fill them back again, and none (a small white lie here, since locking is also involved) is the wiser. The privacy notion is so inherent, that it&#8217;s shocking to learn that any other connection can knowingly choose to ignore my privacy and see any changes I make. This is why I consider this as a security breach, and not just some isolation nuance.</p>
+<p>In my opinion, the isolation level should not be dynamic at all. It must not be changed while the database is running. Perhaps I&#8217;m missing some interesting scenario where it would be desired, but the majority of applications would not find this feature beneficial.</p>
+<h4>sql_mode</h4>
+<p>I&#8217;ve written about <strong>sql_mode</strong> before, and here&#8217;s an example for a data integrity issue caused by weak security:</p>
+<p>In our example, <strong>sql_mode</strong> is set to &#8216;<strong>TRADITONAL</strong>&#8216;, which maps to:</p>
+<blockquote>
+<pre>STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_AUTO_CREATE_USER</pre>
+</blockquote>
+<p>Let&#8217;s add a <strong>TIMESTAMP</strong> column to the country table:</p>
+<blockquote>
+<pre>ALTER TABLE country ADD COLUMN ts TIMESTAMP NOT NULL;</pre>
+</blockquote>
+<p>We now try to set a &#8216;0&#8217; value for the time stamps (as user root):</p>
+<blockquote>
+<pre>mysql&gt; UPDATE country SET ts=NOW();
+Query OK, 2 rows affected (0.42 sec)
+Rows matched: 2  Changed: 2  Warnings: 0
+
+mysql&gt; UPDATE country SET ts=0;
+ERROR 1292 (22007): Incorrect datetime value: '0' for column 'ts' at row 1</pre>
+</blockquote>
+<p>We got the error becuase of the <strong>NO_ZERO_DATE</strong> part of our <strong>sql_mode</strong>.</p>
+<p>But, again, look at what w2user can do:</p>
+<blockquote>
+<pre>mysql&gt; SELECT @@sql_mode;
++-------------------------------------------------------------------------------------------------------------------------------+
+| @@sql_mode                                                                                                                    |
++-------------------------------------------------------------------------------------------------------------------------------+
+| STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_AUTO_CREATE_USER |
++-------------------------------------------------------------------------------------------------------------------------------+
+1 row in set (0.00 sec)
+
+mysql&gt; SET sql_mode='';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; UPDATE country SET ts=0;
+<span style="color: #993300;">Query OK, 2 rows affected (0.01 sec)
+Rows matched: 2  Changed: 2  Warnings: 0
+</span>
+mysql&gt; SELECT * FROM country;
++------------+------+---------------------+
+| country_id | name | ts                  |
++------------+------+---------------------+
+|          1 | gbr  | <span style="color: #993300;">0000-00-00 00:00:00</span> |
+|          2 | usa  | <span style="color: #993300;">0000-00-00 00:00:00</span> |
++------------+------+---------------------+
+2 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>So, are &#8216;0&#8217; values allowed for timestamps in our database or not? Turns out any simple user may decide differently.</p>
+<p>See my earlier posts <a title="Do we need sql_mode?" href="https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode">here</a> and <a title="sql_mode: a suggestion" href="https://shlomi-noach.github.io/blog/mysql/sql_mode-a-suggestion">here</a>. <a title="Roland Bouman's Blog" href="http://rpbouman.blogspot.com/">Roland Bouman</a> also offers <a title="MySQL's sql_mode: My Suggestions" href="http://rpbouman.blogspot.com/2009/01/mysqls-sqlmode-my-suggestions.html">suggestions</a> for fixing this issue.</p>
+<h4>Conclusion</h4>
+<p>The above three examples show how simple users can break data integrity due to very permissive MySQL logic. Even when the database is carfully tuned and secured, there&#8217;s no way to prevent non privileged users from damaging its integrity.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-security-data-integrity-issues/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">472</post-id>	</item>
+		<item>
+		<title>sql_mode: a suggestion</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql_mode-a-suggestion</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql_mode-a-suggestion#comments</comments>
+				<pubDate>Sun, 11 Jan 2009 16:09:17 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[sql_mode]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=505</guid>
+				<description><![CDATA[I thought this deserves more than a comment on my previous post on the subject, in which I expressed the opinion that sql_mode is undesired. Back to reality: sql_mode is here right now. What else can be done? Suggestion Is there anything to do about sql_mode? I believe so: make it strict by default. I [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I thought this deserves more than a comment on my <a title="Do we need sql_mode?" href="https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode">previous post</a> on the subject, in which I expressed the opinion that sql_mode is undesired.</p>
+<p>Back to reality: sql_mode is here right now. What else can be done?</p>
+<h4>Suggestion</h4>
+<p>Is there anything to do about sql_mode? I believe so: make it <em>strict</em> by default.</p>
+<p><span id="more-505"></span>I wish to stress the following:</p>
+<ul>
+<li>sql_mode is empty by default (which means it is very permissive).</li>
+<li>It is not documented enough. Many DBAs don&#8217;t really know anything about it.</li>
+<li>As a MySQL instructor, I have repeatedly witnessed the look of surprise on a student&#8217;s face when he learns that in the default configuration, an overflowed value is silently truncated to match the data type. My personal observation: people don&#8217;t like the default configuration.</li>
+<li>Stricter is better, if you code your application this way right from the start (naturally, trying to make changes after 3 years of development invites trouble).</li>
+</ul>
+<p>The fact that sql_mode is empty by default, and has been like that for the past years, means that many applications have been built which are not strict. The developers and DBAs never changed the sql_mode (remember they didn&#8217;t know about sql_mode). Many of the applications would not work under stricter sql_mode.</p>
+<p>Please imagine the following: assume we keep the sql_mode feature as it is, but make it &#8216;TRADITIONAL&#8217; by default. Now imagine we did that 5 years ago.</p>
+<p>Most, if not all of today&#8217;s applications were strict. Those who would disable STRICT_TRANS_TABLES or ERROR_FOR_DIVISION_BY_ZERO would be the exception, and they would have to do it knowingly, understanding the impact of their actions.</p>
+<p>May I offer my suggestion, then, that future MySQL installations come with a strict sql_mode. At the very least allow the user (in the Windows installer, for example, or via ncurses, dpkg-reconfigure, other) to choose her level of strictess. The windows installer already asks about encodings and engines.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql_mode-a-suggestion/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">505</post-id>	</item>
+		<item>
+		<title>Do we need sql_mode?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode#comments</comments>
+				<pubDate>Thu, 08 Jan 2009 06:14:38 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[sql_mode]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=462</guid>
+				<description><![CDATA[sql_mode must be one of the most elusive issues in setting up a MySQL database. It is also responsible for difficulties in migration, upgrading and securing of databases. MySQL usually has little issues with migrating database from one machine to another, one version to another, one OS to another, one architecture to another. If we&#8217;re [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>sql_mode must be one of the most elusive issues in setting up a MySQL database. It is also responsible for difficulties in migration, upgrading and securing of databases.</p>
+<p>MySQL usually has little issues with migrating database from one machine to another, one version to another, one OS to another, one architecture to another. If we&#8217;re not sure, we can always migrate using mysqldump&#8217;s logical dump, right?</p>
+<p>Not entirely right. The elusive sql_mode (empty by default) may affect out backup+restore, may affect our application behavior, may affect our data integrity.<span id="more-462"></span></p>
+<ul>
+<li>Did we remember to set NO_AUTO_CREATE_USER? Oh dear, we have some users without passwords.</li>
+<li>Did we remember to set NO_AUTO_VALUE_ON_ZERO? Oh dear, we&#8217;ve dumped our database for backup, restored, but AUTO_INCREMENT values <a title="Mind the SQL_MODE when running ALTER TABLE" href="http://www.pythian.com/blogs/1422/draft-mind-the-sql_mode-when-running-alter-table">have changed</a>!</li>
+<li>Did we set STRICT_ALL_TABLES? How do we know if the 255 value in our TINYINT really stands for 255 or if it was a truncated 299?</li>
+<li>Do we allow selecting non aggregated columns in GROUP BY? Did we set ONLY_FULL_GROUP_BY? Will our application crash now?</li>
+<li>Our old database has zero for empty date values (columns are NOT NULL). But what settings do we have for NO_ZERO_IN_DATE on our new installation? Will import fail?</li>
+<li>And how did the NULL get in? Was it because we divided by zero, and forgot to set ERROR_FOR_DIVISION_BY_ZERO? How can we tell?</li>
+</ul>
+<p>The fact is: two mysql instances, same version, same OS and architecture, with different sql modes &#8211; can be incompatible!</p>
+<p>As said, the sql_mode is empty by default. This is very non-strict. But more than that: it can be changed even while the database is running; even on a per connection basis.</p>
+<p>Setting sql_mode should be one of the first things to do after installation. The usual manuals talk about setting the innodb_buffer_pool_size and the query_cache_size, when sql_mode will dictate the nature of your database and application on an entirely grander scale.</p>
+<p>I think it would be best if MySQL chooses a desired set of sql modes (like &#8216;TRADITIONAL&#8217;), then make it the default. I further believe it would be best if MySQL would not allow changes to sql_mode. Not globally and certainly not per session. Choosing the stricter mode is better, I believe: errors such as overflow values should be reported to the application, not just swiped under the carpet.</p>
+<p>Backward compatibility? Indeed a problem (inherent to the very existence of sql_mode). Perhaps allow one setting per installation. Perhaps just <a title="My advice to MySQL" href="http://jpipes.com/index.php?/archives/276-My-advice-to-MySQL.html">go for it</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode/feed</wfw:commentRss>
+		<slash:comments>17</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">462</post-id>	</item>
+	</channel>
+</rss>

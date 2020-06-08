@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Reducing locks by narrowing primary key	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 20 May 2010 04:33:10 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13852</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 20 May 2010 04:33:10 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13852</guid>
+					<description><![CDATA[@Seun,
+
+You are right that without a secondary index there wouldn&#039;t be a bloat. The two issues I tackled did have secondary keys. Thanks for pointing this out.
+I&#039;m not an expert on the InnoDB internals, so let me explain this only in general: the reason is that InnoDB manager locks on the PK level, locking branches in the BTree. If you happen to attempt using the same branch (this does not necessarily mean you are now INSERTing two very close rows), then you are susceptible to locking.
+
+I should look more closely into this myself.]]></description>
+		<content:encoded><![CDATA[<p>@Seun,</p>
+<p>You are right that without a secondary index there wouldn&#8217;t be a bloat. The two issues I tackled did have secondary keys. Thanks for pointing this out.<br />
+I&#8217;m not an expert on the InnoDB internals, so let me explain this only in general: the reason is that InnoDB manager locks on the PK level, locking branches in the BTree. If you happen to attempt using the same branch (this does not necessarily mean you are now INSERTing two very close rows), then you are susceptible to locking.</p>
+<p>I should look more closely into this myself.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Seun Osewa				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13851</link>
+		<dc:creator><![CDATA[Seun Osewa]]></dc:creator>
+		<pubDate>Thu, 20 May 2010 04:18:39 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13851</guid>
+					<description><![CDATA[It doesn&#039;t appear that we fully understand this problem even though we have a solution that seems to work.  I don&#039;t see why a clustered index on the entire column should lead to more locking.  also, without secondary indexes, a hug primary index won&#039;t lead to more bloat.]]></description>
+		<content:encoded><![CDATA[<p>It doesn&#8217;t appear that we fully understand this problem even though we have a solution that seems to work.  I don&#8217;t see why a clustered index on the entire column should lead to more locking.  also, without secondary indexes, a hug primary index won&#8217;t lead to more bloat.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13733</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 18 May 2010 07:16:11 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13733</guid>
+					<description><![CDATA[@wdk
+thank you. Another issue with UUID is its length, which leads to a bloated PK.]]></description>
+		<content:encoded><![CDATA[<p>@wdk<br />
+thank you. Another issue with UUID is its length, which leads to a bloated PK.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: wdk				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13732</link>
+		<dc:creator><![CDATA[wdk]]></dc:creator>
+		<pubDate>Tue, 18 May 2010 06:47:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13732</guid>
+					<description><![CDATA[You can make a timebased uuid (see http://www.ietf.org/rfc/rfc4122.txt) ordered by changing the order of bytes.
+
+So:
+    TLTLTLTL-TMTM-VTHT-RCSC-NODENODENODE
+Becomes:
+    NODENODE-NODE-VTHT-RCSC-TMTMTLTLTLTL]]></description>
+		<content:encoded><![CDATA[<p>You can make a timebased uuid (see <a href="http://www.ietf.org/rfc/rfc4122.txt" rel="nofollow ugc">http://www.ietf.org/rfc/rfc4122.txt</a>) ordered by changing the order of bytes.</p>
+<p>So:<br />
+    TLTLTLTL-TMTM-VTHT-RCSC-NODENODENODE<br />
+Becomes:<br />
+    NODENODE-NODE-VTHT-RCSC-TMTMTLTLTLTL</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13151</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Wed, 05 May 2010 02:43:35 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13151</guid>
+					<description><![CDATA[@Gerry  -
+You are right that AUTO_INCREMENT imposes a serializing lok. However, I&#039;ve clearly seen how inserting unordered rows, as with UUID, significantly reduces insert time due to index fragmentation.
+With AUTO_INCREMENT, innodb makes some optimistic assumptions and builds the B+Tree in a far more condensed form.
+
+@hadov -
+No, there wansn&#039;t...]]></description>
+		<content:encoded><![CDATA[<p>@Gerry  &#8211;<br />
+You are right that AUTO_INCREMENT imposes a serializing lok. However, I&#8217;ve clearly seen how inserting unordered rows, as with UUID, significantly reduces insert time due to index fragmentation.<br />
+With AUTO_INCREMENT, innodb makes some optimistic assumptions and builds the B+Tree in a far more condensed form.</p>
+<p>@hadov &#8211;<br />
+No, there wansn&#8217;t&#8230;</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: hadov				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13124</link>
+		<dc:creator><![CDATA[hadov]]></dc:creator>
+		<pubDate>Tue, 04 May 2010 19:05:14 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13124</guid>
+					<description><![CDATA[wasn&#039;t there any subset of the 5 colomns that was unique by itself?
+(any superset of a unique key is unique as well)]]></description>
+		<content:encoded><![CDATA[<p>wasn&#8217;t there any subset of the 5 colomns that was unique by itself?<br />
+(any superset of a unique key is unique as well)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Gerry				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/comment-page-1#comment-13117</link>
+		<dc:creator><![CDATA[Gerry]]></dc:creator>
+		<pubDate>Tue, 04 May 2010 17:14:40 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269#comment-13117</guid>
+					<description><![CDATA[Keep in mind that an AUTO_INCREMENT key locks the whole index on INSERTs. When you have a high concurrent traffic situations, these locks could create waits damaging performance. In those cases you&#039;ll need to look for other alternatives, example: UUIDs.
+
+My $.02
+G]]></description>
+		<content:encoded><![CDATA[<p>Keep in mind that an AUTO_INCREMENT key locks the whole index on INSERTs. When you have a high concurrent traffic situations, these locks could create waits damaging performance. In those cases you&#8217;ll need to look for other alternatives, example: UUIDs.</p>
+<p>My $.02<br />
+G</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

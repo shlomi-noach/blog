@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: 7 ways to convince MySQL to use the right index	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 06 Dec 2018 03:28:00 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Chun Yin Lo				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-545268</link>
+		<dc:creator><![CDATA[Chun Yin Lo]]></dc:creator>
+		<pubDate>Thu, 06 Dec 2018 03:28:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-545268</guid>
+					<description><![CDATA[Please rename `t` to `data`. It is confusing at the first place]]></description>
+		<content:encoded><![CDATA[<p>Please rename `t` to `data`. It is confusing at the first place</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Vinay Jaiswal				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-415818</link>
+		<dc:creator><![CDATA[Vinay Jaiswal]]></dc:creator>
+		<pubDate>Fri, 26 Jan 2018 07:28:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-415818</guid>
+					<description><![CDATA[Facing issue Facing slow query on master even same query is running more faster on slave . need your inputs to resolve this issue . 
+
+Key Points : 
+Mysql version 5.6.33 on the both ( master &#038; slave ) version are same . 
+cross validated show status o/p is same on both server . 
+But getting different execution plan on master &#038; slave . 
+Slave is not using sorting &#038; temporary while master is using for same query . 
+schema &#038; index are same on both servers even also validated ordered . 
+Already run on three table analyse &#038; optimise on master server but still planner is different than slave .   
+
+Query :  explain extended  select this_.solution_type as y0_, this_.lead_id as y1_, this_.created_at as y2_, this_.cust_id as y3_, this_.mobile_number as y4_, node2_.sub_stage as y5_, node2_.stage as y6_ from user_business_mapping this_ inner join workflow_status wfstatus1_ on this_.id=wfstatus1_.user_business_mapping_id inner join workflow_node node2_ on wfstatus1_.workflow_node_id=node2_.id where this_.created_at&#062;=&#039;2018-01-19&#039; and this_.created_at&#060;=&#039;2018-01-25&#039; and this_.solution_type=&#039;bc_merchant&#039; and wfstatus1_.is_active=1 order by this_.id asc limit 5 
+
+Master server Execution Plan : 
+
+*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: node2_
+         type: index
+possible_keys: PRIMARY
+          key: idx_wfn_stage_substage_is_active
+      key_len: 305
+          ref: NULL
+         rows: 43
+     filtered: 100.00
+        Extra: Using index; Using temporary; Using filesort
+*************************** 2. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: wfstatus1_
+         type: ref
+possible_keys: FK_ws_rbsm,FK_wfs_wf_nodeId_idx
+          key: FK_wfs_wf_nodeId_idx
+      key_len: 9
+          ref: onboarding_engine.node2_.id
+         rows: 927
+     filtered: 100.00
+        Extra: Using where
+*************************** 3. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: this_
+         type: eq_ref
+possible_keys: PRIMARY,created_at_idx
+          key: PRIMARY
+      key_len: 8
+          ref: onboarding_engine.wfstatus1_.user_business_mapping_id
+         rows: 1
+     filtered: 100.00
+        Extra: Using where
+3 rows in set, 1 warning (0.00 sec)
+
+Slave Server Execution plan :
+
+*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: this_
+         type: index
+possible_keys: PRIMARY,created_at_idx
+          key: PRIMARY
+      key_len: 8
+          ref: NULL
+         rows: 5
+     filtered: 4705840.00
+        Extra: Using where
+*************************** 2. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: wfstatus1_
+         type: ref
+possible_keys: FK_ws_rbsm,FK_wfs_wf_nodeId_idx
+          key: FK_ws_rbsm
+      key_len: 8
+          ref: onboarding_engine.this_.id
+         rows: 4
+     filtered: 100.00
+        Extra: Using where
+*************************** 3. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: node2_
+         type: eq_ref
+possible_keys: PRIMARY
+          key: PRIMARY
+      key_len: 8
+          ref: onboarding_engine.wfstatus1_.workflow_node_id
+         rows: 1
+     filtered: 100.00
+        Extra: NULL
+3 rows in set, 1 warning (0.00 sec)]]></description>
+		<content:encoded><![CDATA[<p>Facing issue Facing slow query on master even same query is running more faster on slave . need your inputs to resolve this issue . </p>
+<p>Key Points :<br />
+Mysql version 5.6.33 on the both ( master &amp; slave ) version are same .<br />
+cross validated show status o/p is same on both server .<br />
+But getting different execution plan on master &amp; slave .<br />
+Slave is not using sorting &amp; temporary while master is using for same query .<br />
+schema &amp; index are same on both servers even also validated ordered .<br />
+Already run on three table analyse &amp; optimise on master server but still planner is different than slave .   </p>
+<p>Query :  explain extended  select this_.solution_type as y0_, this_.lead_id as y1_, this_.created_at as y2_, this_.cust_id as y3_, this_.mobile_number as y4_, node2_.sub_stage as y5_, node2_.stage as y6_ from user_business_mapping this_ inner join workflow_status wfstatus1_ on this_.id=wfstatus1_.user_business_mapping_id inner join workflow_node node2_ on wfstatus1_.workflow_node_id=node2_.id where this_.created_at&gt;=&#8217;2018-01-19&#8242; and this_.created_at&lt;=&#039;2018-01-25&#039; and this_.solution_type=&#039;bc_merchant&#039; and wfstatus1_.is_active=1 order by this_.id asc limit 5 </p>
+<p>Master server Execution Plan : </p>
+<p>*************************** 1. row ***************************<br />
+           id: 1<br />
+  select_type: SIMPLE<br />
+        table: node2_<br />
+         type: index<br />
+possible_keys: PRIMARY<br />
+          key: idx_wfn_stage_substage_is_active<br />
+      key_len: 305<br />
+          ref: NULL<br />
+         rows: 43<br />
+     filtered: 100.00<br />
+        Extra: Using index; Using temporary; Using filesort<br />
+*************************** 2. row ***************************<br />
+           id: 1<br />
+  select_type: SIMPLE<br />
+        table: wfstatus1_<br />
+         type: ref<br />
+possible_keys: FK_ws_rbsm,FK_wfs_wf_nodeId_idx<br />
+          key: FK_wfs_wf_nodeId_idx<br />
+      key_len: 9<br />
+          ref: onboarding_engine.node2_.id<br />
+         rows: 927<br />
+     filtered: 100.00<br />
+        Extra: Using where<br />
+*************************** 3. row ***************************<br />
+           id: 1<br />
+  select_type: SIMPLE<br />
+        table: this_<br />
+         type: eq_ref<br />
+possible_keys: PRIMARY,created_at_idx<br />
+          key: PRIMARY<br />
+      key_len: 8<br />
+          ref: onboarding_engine.wfstatus1_.user_business_mapping_id<br />
+         rows: 1<br />
+     filtered: 100.00<br />
+        Extra: Using where<br />
+3 rows in set, 1 warning (0.00 sec)</p>
+<p>Slave Server Execution plan :</p>
+<p>*************************** 1. row ***************************<br />
+           id: 1<br />
+  select_type: SIMPLE<br />
+        table: this_<br />
+         type: index<br />
+possible_keys: PRIMARY,created_at_idx<br />
+          key: PRIMARY<br />
+      key_len: 8<br />
+          ref: NULL<br />
+         rows: 5<br />
+     filtered: 4705840.00<br />
+        Extra: Using where<br />
+*************************** 2. row ***************************<br />
+           id: 1<br />
+  select_type: SIMPLE<br />
+        table: wfstatus1_<br />
+         type: ref<br />
+possible_keys: FK_ws_rbsm,FK_wfs_wf_nodeId_idx<br />
+          key: FK_ws_rbsm<br />
+      key_len: 8<br />
+          ref: onboarding_engine.this_.id<br />
+         rows: 4<br />
+     filtered: 100.00<br />
+        Extra: Using where<br />
+*************************** 3. row ***************************<br />
+           id: 1<br />
+  select_type: SIMPLE<br />
+        table: node2_<br />
+         type: eq_ref<br />
+possible_keys: PRIMARY<br />
+          key: PRIMARY<br />
+      key_len: 8<br />
+          ref: onboarding_engine.wfstatus1_.workflow_node_id<br />
+         rows: 1<br />
+     filtered: 100.00<br />
+        Extra: NULL<br />
+3 rows in set, 1 warning (0.00 sec)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: İlter Öcal				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-388909</link>
+		<dc:creator><![CDATA[İlter Öcal]]></dc:creator>
+		<pubDate>Wed, 26 Apr 2017 07:40:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-388909</guid>
+					<description><![CDATA[Faced this issue where mysql uses the wrong index and resulting with a simple query executed in 5 seconds. 
+
+I am using php laravel5 framework whose database library (Eloquent ORM) and query builder does not allow to specify use index/force index in the queries. But it allows to write raw order by clauses so i just added order by id + 0  as in SOLUTION #6 to prevent it using the wrong index. Now my query executes in 0.002 seconds. 
+
+Thanks for this great analysis and clever solution coming from 2009!]]></description>
+		<content:encoded><![CDATA[<p>Faced this issue where mysql uses the wrong index and resulting with a simple query executed in 5 seconds. </p>
+<p>I am using php laravel5 framework whose database library (Eloquent ORM) and query builder does not allow to specify use index/force index in the queries. But it allows to write raw order by clauses so i just added order by id + 0  as in SOLUTION #6 to prevent it using the wrong index. Now my query executes in 0.002 seconds. </p>
+<p>Thanks for this great analysis and clever solution coming from 2009!</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Jonathon				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-378127</link>
+		<dc:creator><![CDATA[Jonathon]]></dc:creator>
+		<pubDate>Wed, 09 Nov 2016 23:36:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-378127</guid>
+					<description><![CDATA[Excellent analysis and still relevant with latest stable version of MySQL. Had similar issue with a new client. Sure enough, ordering by the primary key only was resulting in perfectly good indices not being used where they should be. Came across this following a similar process to the above.]]></description>
+		<content:encoded><![CDATA[<p>Excellent analysis and still relevant with latest stable version of MySQL. Had similar issue with a new client. Sure enough, ordering by the primary key only was resulting in perfectly good indices not being used where they should be. Came across this following a similar process to the above.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Luke				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-339382</link>
+		<dc:creator><![CDATA[Luke]]></dc:creator>
+		<pubDate>Wed, 16 Dec 2015 23:08:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-339382</guid>
+					<description><![CDATA[Great read. Ran into same thought process with DOCTRINE and found you searching for ways NOT to USE or IGNORE indices.
+
+Our solution in the end was to run one query to simply get the queries from the ordered query without any of the other fields in the select. Then run a WHERE IN query using those IDs.]]></description>
+		<content:encoded><![CDATA[<p>Great read. Ran into same thought process with DOCTRINE and found you searching for ways NOT to USE or IGNORE indices.</p>
+<p>Our solution in the end was to run one query to simply get the queries from the ordered query without any of the other fields in the select. Then run a WHERE IN query using those IDs.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-309410</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Sat, 14 Feb 2015 05:14:23 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-309410</guid>
+					<description><![CDATA[I would start by recommending INDEX(type, level) or INDEX(type, level, id).  (With InnoDB, those are essentially identical.)  That would also get you &quot;Using index&quot;, which is an additional performance boost.]]></description>
+		<content:encoded><![CDATA[<p>I would start by recommending INDEX(type, level) or INDEX(type, level, id).  (With InnoDB, those are essentially identical.)  That would also get you &#8220;Using index&#8221;, which is an additional performance boost.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: SacTiw				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-243889</link>
+		<dc:creator><![CDATA[SacTiw]]></dc:creator>
+		<pubDate>Fri, 06 Jun 2014 13:25:21 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-243889</guid>
+					<description><![CDATA[Regarding solution:
+
+SELECT id from (SELECT id FROM data
+WHERE type=12345 AND level &#062; 3)
+ORDER BY id
+
+This would work fast only if for type=12345 you just have few hundred row (say  3
+
+I am not sure what would be the best solution for that but as of now these two comes to my mind:
+
+SELECT id from data IGNORE INDEX (index_on_type_column)
+WHERE type = 12345 AND level &#062; 3
+ORDER BY id LIMIT 1000;
+
+
+SELECT id from data
+WHERE id NOT IN (SELECT id FROM data
+WHERE type != 12345) AND level &#062; 3
+ORDER BY id LIMIT 1000;]]></description>
+		<content:encoded><![CDATA[<p>Regarding solution:</p>
+<p>SELECT id from (SELECT id FROM data<br />
+WHERE type=12345 AND level &gt; 3)<br />
+ORDER BY id</p>
+<p>This would work fast only if for type=12345 you just have few hundred row (say  3</p>
+<p>I am not sure what would be the best solution for that but as of now these two comes to my mind:</p>
+<p>SELECT id from data IGNORE INDEX (index_on_type_column)<br />
+WHERE type = 12345 AND level &gt; 3<br />
+ORDER BY id LIMIT 1000;</p>
+<p>SELECT id from data<br />
+WHERE id NOT IN (SELECT id FROM data<br />
+WHERE type != 12345) AND level &gt; 3<br />
+ORDER BY id LIMIT 1000;</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-241674</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 23 May 2014 05:35:56 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-241674</guid>
+					<description><![CDATA[@Lokesh,
+
+thanks - first time I encounter this variable. Interesting.]]></description>
+		<content:encoded><![CDATA[<p>@Lokesh,</p>
+<p>thanks &#8211; first time I encounter this variable. Interesting.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Lokesh				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-241521</link>
+		<dc:creator><![CDATA[Lokesh]]></dc:creator>
+		<pubDate>Thu, 22 May 2014 06:17:54 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-241521</guid>
+					<description><![CDATA[May be you can also try setting the MySQL variable &#039;SET max_seeks_for_key=100&#039; if you are sure your index will bring it down to 100 examinations...]]></description>
+		<content:encoded><![CDATA[<p>May be you can also try setting the MySQL variable &#8216;SET max_seeks_for_key=100&#8217; if you are sure your index will bring it down to 100 examinations&#8230;</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Jayadev Swain				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/7-ways-to-convince-mysql-to-use-the-right-index/comment-page-1#comment-222300</link>
+		<dc:creator><![CDATA[Jayadev Swain]]></dc:creator>
+		<pubDate>Thu, 31 Oct 2013 13:39:12 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=695#comment-222300</guid>
+					<description><![CDATA[Well documented article Shlomi!
+
+What could have also helped is if you had mentioned the Exec Time for each of the Solutions#.
+
+It would have helped with the comparisons. But nevertheless, this gives us techniques which can put to practice.]]></description>
+		<content:encoded><![CDATA[<p>Well documented article Shlomi!</p>
+<p>What could have also helped is if you had mentioned the Exec Time for each of the Solutions#.</p>
+<p>It would have helped with the comparisons. But nevertheless, this gives us techniques which can put to practice.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

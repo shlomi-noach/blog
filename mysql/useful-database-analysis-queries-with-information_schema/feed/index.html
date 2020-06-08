@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Useful database analysis queries with INFORMATION_SCHEMA	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/useful-database-analysis-queries-with-information_schema/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/useful-database-analysis-queries-with-information_schema</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 26 Aug 2009 07:33:06 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: code.openark.org &#187; Blog Archive &#187; MySQL&#8217;s character sets and collations demystified				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/useful-database-analysis-queries-with-information_schema/comment-page-1#comment-113</link>
+		<dc:creator><![CDATA[code.openark.org &#187; Blog Archive &#187; MySQL&#8217;s character sets and collations demystified]]></dc:creator>
+		<pubDate>Tue, 16 Dec 2008 07:58:18 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=188#comment-113</guid>
+					<description><![CDATA[[...] the following post: Useful database analysis queries with INFORMATION_SCHEMA for queries which diagnose your databases character sets.  tags: Data Types, SQL, Syntax MySQL &#124; by [...]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] the following post: Useful database analysis queries with INFORMATION_SCHEMA for queries which diagnose your databases character sets.  tags: Data Types, SQL, Syntax MySQL | by [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/useful-database-analysis-queries-with-information_schema/comment-page-1#comment-49</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Wed, 26 Nov 2008 17:33:11 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=188#comment-49</guid>
+					<description><![CDATA[Roland,
+Thanks for your comments,
+
+1. Indeed you are right, I used the &quot;ENGINE IS NOT NULL&quot; to get rid of the views. I was considering reading the TABLE_TYPE, but decided to go for the NOT NULL. There are many column in the INFORMATION_SCHEMA whose values I don&#039;t feel comfortable with (values like &#039;YES&#039; and &#039;NO&#039;, instead of 1, 0 etc.)
+
+2. Again, you are right. In this post I did not consider FULLTEXT and HASH keys at all. I don&#039;t get to cross them much; I&#039;ll review the queries.
+
+Thanks for the reference to your Redundant Index Finder. I&#039;ll take a closer look later on. Meanwhile it looks very interesting.
+
+Regards,
+Shlomi]]></description>
+		<content:encoded><![CDATA[<p>Roland,<br />
+Thanks for your comments,</p>
+<p>1. Indeed you are right, I used the &#8220;ENGINE IS NOT NULL&#8221; to get rid of the views. I was considering reading the TABLE_TYPE, but decided to go for the NOT NULL. There are many column in the INFORMATION_SCHEMA whose values I don&#8217;t feel comfortable with (values like &#8216;YES&#8217; and &#8216;NO&#8217;, instead of 1, 0 etc.)</p>
+<p>2. Again, you are right. In this post I did not consider FULLTEXT and HASH keys at all. I don&#8217;t get to cross them much; I&#8217;ll review the queries.</p>
+<p>Thanks for the reference to your Redundant Index Finder. I&#8217;ll take a closer look later on. Meanwhile it looks very interesting.</p>
+<p>Regards,<br />
+Shlomi</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Roland Bouman				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/useful-database-analysis-queries-with-information_schema/comment-page-1#comment-48</link>
+		<dc:creator><![CDATA[Roland Bouman]]></dc:creator>
+		<pubDate>Wed, 26 Nov 2008 10:44:38 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=188#comment-48</guid>
+					<description><![CDATA[Hi! Nice post!
+
+Few comments though....
+
+In the table size query you do:
+
+WHERE TABLE_SCHEMA NOT IN (&#039;mysql&#039;, &#039;INFORMATION_SCHEMA&#039;)
+  AND ENGINE IS NOT NULL
+
+I am assuming you added ENGINE IS NOT NULL to get rid of views. Personally, I feel the WHERE clause would be better if written like so:
+
+WHERE TABLE_TYPE = &#039;BASE TABLE&#039;
+
+This gets rid of all information schema tables (since those are all &#039;SYSTEM VIEW&#039;s). It does leave the tables in the mysql database in the result, but I consider that an advantage. 
+
+Second, about your redundant indexes query: 
+
+&quot;See if some index is a prefix of another (in which case it is redundant):&quot;
+
+This is not completely true. That is, you need to take the indexing algorithm in account too. If I have 
+
+create table books (
+    title       varchar(50)
+,   description varchar(255)
+,   index(title)
+,   fulltext index(title, description)
+)
+engine = MyISAM
+
+then the index on title will be a BTREE index which has radicaly different properties than the FULLTEXT index. So I would certainly not claim the index on title is redundant in this case. 
+
+Another, interesting, example is when working with MEMORY tables. For MEMORY tables we can have BTREE and HASH indexes. Again, like we saw with FULLTEXT we should take the algorithm into account when comparing indexes. But another, more subtle thing, comes into play in this case too. 
+
+If I have a HASH index on columns (A,B) and another HASH index on columns (B,A) then, according to your arguments, we should not consider either of these indexes redundant as they are not a prefix of each another. However, for HASH indexes, the order of the columns does not matter at all - HASH index can be used only if a value is known for all columns in the HASH index - the HASH function is applied to all column positions to compute a HASH code that is used to do the lookup. 
+
+So a HASH index is redundant if there is another HASH index that has the same set of columns *in any order*.
+
+Here on mysqlforge you can find some queries on the information schema that i feel do a better job:
+
+http://forge.mysql.com/tools/tool.php?id=45
+
+kind regards,
+
+Roland Bouman]]></description>
+		<content:encoded><![CDATA[<p>Hi! Nice post!</p>
+<p>Few comments though&#8230;.</p>
+<p>In the table size query you do:</p>
+<p>WHERE TABLE_SCHEMA NOT IN (&#8216;mysql&#8217;, &#8216;INFORMATION_SCHEMA&#8217;)<br />
+  AND ENGINE IS NOT NULL</p>
+<p>I am assuming you added ENGINE IS NOT NULL to get rid of views. Personally, I feel the WHERE clause would be better if written like so:</p>
+<p>WHERE TABLE_TYPE = &#8216;BASE TABLE&#8217;</p>
+<p>This gets rid of all information schema tables (since those are all &#8216;SYSTEM VIEW&#8217;s). It does leave the tables in the mysql database in the result, but I consider that an advantage. </p>
+<p>Second, about your redundant indexes query: </p>
+<p>&#8220;See if some index is a prefix of another (in which case it is redundant):&#8221;</p>
+<p>This is not completely true. That is, you need to take the indexing algorithm in account too. If I have </p>
+<p>create table books (<br />
+    title       varchar(50)<br />
+,   description varchar(255)<br />
+,   index(title)<br />
+,   fulltext index(title, description)<br />
+)<br />
+engine = MyISAM</p>
+<p>then the index on title will be a BTREE index which has radicaly different properties than the FULLTEXT index. So I would certainly not claim the index on title is redundant in this case. </p>
+<p>Another, interesting, example is when working with MEMORY tables. For MEMORY tables we can have BTREE and HASH indexes. Again, like we saw with FULLTEXT we should take the algorithm into account when comparing indexes. But another, more subtle thing, comes into play in this case too. </p>
+<p>If I have a HASH index on columns (A,B) and another HASH index on columns (B,A) then, according to your arguments, we should not consider either of these indexes redundant as they are not a prefix of each another. However, for HASH indexes, the order of the columns does not matter at all &#8211; HASH index can be used only if a value is known for all columns in the HASH index &#8211; the HASH function is applied to all column positions to compute a HASH code that is used to do the lookup. </p>
+<p>So a HASH index is redundant if there is another HASH index that has the same set of columns *in any order*.</p>
+<p>Here on mysqlforge you can find some queries on the information schema that i feel do a better job:</p>
+<p><a href="http://forge.mysql.com/tools/tool.php?id=45" rel="nofollow ugc">http://forge.mysql.com/tools/tool.php?id=45</a></p>
+<p>kind regards,</p>
+<p>Roland Bouman</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

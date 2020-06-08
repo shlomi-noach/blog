@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>operations &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/operations/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 23 Nov 2016 13:23:18 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Discussing online schema migrations with Oracle&#8217;s MySQL engineering managers</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/discussing-online-schema-migrations-with-oracles-mysql-engineering-managers</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/discussing-online-schema-migrations-with-oracles-mysql-engineering-managers#comments</comments>
+				<pubDate>Wed, 23 Nov 2016 13:23:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[community]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7646</guid>
+				<description><![CDATA[Last week I had the pleasant opportunity of introducing and discussing the operation of online schema migrations to MySQL&#8217;s engineering managers, as part of their annual meeting, in London. Together with Simon J. Mudd of Booking.com, we discussed our perception of what it takes to run online schema migrations on a live, busy system. While [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Last week I had the pleasant opportunity of introducing and discussing the operation of online schema migrations to MySQL&#8217;s engineering managers, as part of their annual meeting, in London.</p>
+<p>Together with Simon J. Mudd of Booking.com, we discussed our perception of what it takes to run online schema migrations on a live, busy system.</p>
+<p>While the Oracle/MySQL engineers develop new features or optimize behavior in the MySQL, we of the industry have the operational expertise and understanding of the flow of working with MySQL. In all topics, and in schema migration in particular, there is a gap between what&#8217;s perceived to be the use case and what the use case actually is. It is the community&#8217;s task to provide feedback back to Oracle so as to align development to match operations need where possible.</p>
+<p>Our meeting included the following:</p>
+<h3>Need for schema migrations</h3>
+<p>We presented, based on our experience in current and past companies, and based on our friends of the community&#8217;s experience, the case for online schema migrations. At GitHub, at Booking.com and in many other companies I&#8217;m familiar with, we continuously deploy to production, and this implies continuous schema migrations to our production databases. We have migrations running daily; sometimes multiple per day, some time none.<span id="more-7646"></span></p>
+<p>With continuous deployment, we as Guardians of the Database do not wish to be blockers for the development cycle. On the contrary, we want to be out of the way as soon as possible, other than verifying a requested migration is safe. We wish to be able to deliver a migration at any given time.</p>
+<p>Not all companies behave this way; some run a weekly aggregation of migrations. Others yet still use the Though Shall Not Pass DBA model. We tried to depict the various approaches with strong emphasis on our own approach, which is the most demanding of schema migration solutions.</p>
+<h3>The MySQL ALTER</h3>
+<p>We proceeded to discuss the in-house ALTER statement &amp; InnoDB online DDL, and pointed out the limitations those impose on &#8220;online&#8221; operations to the effect of rendering these solutions unused by many. The serialization in replication stream means losing serving capacity, getting lagging replicas. The lack of escape path means a commitment into an hours worth of uninterruptible operation. The lack of resource control implies getting performance degraded throughout the operation.</p>
+<p>We briefly touched on the TokuDB&#8217;s ALTER and how it worked.</p>
+<h3>Replication solutions</h3>
+<p>We discussed migrating via replication: running migrations on one or more replicas at a time, finally failing over onto a promoted replica once all replicas are updated.</p>
+<p>We know this solution to be in use in companies such as DropBox, Etsy and others. We illustrated our own reasoning for not using this solution:</p>
+<ul>
+<li>Increased clock-time for running a migration: running a one-replica-at-a-time or few-replicas-at-a-time can double, triple, quadruple and so forth the overall migration time.</li>
+<li>Concurrent migration complexity: and since runtime increases, so does the likelihood of needing to run additional migration at the same time, which highly complicates the flow in a one-at-a-time or few-at-a-time model.</li>
+<li>Serving capacity: in this model some, or up to half the number of servers, are non operational. Serving capacity is reduced and we need to have more hardware to support that</li>
+<li>Failover: the failover is not smooth; it either includes some outage or some block time, and at any case noticeable in production. Having a planned failover once in a while is OK, but having a failover multiple times a day is too much of a hustle, in our current setup.</li>
+<li>Topology complexity: how our topologies always have some special cases, such as cross-DC replication with reduced cross-DC network traffic via intermediate masters, testing replicas with newer versions, developer-dedicated servers and others, that make shuffling of replicas around difficult to automate.</li>
+</ul>
+<p>We have not discussed Galera&#8217;s Rolling Schema Upgrades as we personally do not have the experience of working with it. It solves the failover issue above, but given a &#8220;normal&#8221; replication tree under the cluster, same problems as above apply.</p>
+<p>We concluded with our personal take, that like everything else, we just like to write stuff directly onto our masters, and let the natural replication flow deal with it and get our entire topology to be consistent.</p>
+<h3>Existing trigger based migrations</h3>
+<p>We drilled down into the algorithms behind <strong>pt-online-schema-change</strong> and Facebook&#8217;s <strong>OSC</strong> (the latter being rewritten today, not yet released as open source). We elaborated on the pains we saw in trigger based migrations: being unsuspendible, causing lock spaghetti, impacting write latency on the master to the point of a standstill on busy servers, being untestable.</p>
+<h3>gh-ost</h3>
+<p>I presented  <a href="https://github.com/github/gh-ost"><strong>gh-ost</strong></a>, our own, triggerless take on schema migrations. I discussed the logic behind <strong>gh-ost</strong> and how it decouples migration load from production load; the low impact the triggerless migration has on the master and on the entire replication chain, leading to low, subsecond replication lags throughout the migration and eliminating locking contention on the master. Basically the <a href="https://speakerdeck.com/shlominoach/githubs-online-schema-migrations-for-mysql">presentation</a> Tom Krouper and I gave at Percona Live Amsterdam.</p>
+<h3>Want to Have</h3>
+<p>We followed up by a list of feature requests we could enjoy. These were largely technical issues <strong>gh-ost</strong> would benefit from, simplifying its behavior or ensuring its correctness in complex cases. We discussed dropping tables at end of migration, getting more info in the binary logs, GTID issues and more.</p>
+<h3>Acknowledgements</h3>
+<p>Thank you to Morgan Tocker for officially inviting us to this gathering. There were quite a few familiar faces in the room, and it was a friendly gathering. Thank you to all the engineering managers with whom we met!</p>
+<p>The discussion was lively, friendly and receptive. The Oracle engineers laid out the internals of the online DDL; some of their thoughts on the potential of the JSON format; gave advice on technical issues presented. I&#8217;d like to thank them for listening to our take on the subject. There was a discussion on the possible paths Oracle can take to improve online schema operations, and I&#8217;d like to thank Oracle for sharing their own thoughts and advice!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/discussing-online-schema-migrations-with-oracles-mysql-engineering-managers/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7646</post-id>	</item>
+		<item>
+		<title>Three wishes for a new year</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4#comments</comments>
+				<pubDate>Wed, 28 Sep 2016 14:20:54 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[GTID]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7643</guid>
+				<description><![CDATA[(Almost) another new year by Jewish calendar. What do I wish for the following year? World peace Good health to all Relaxed GTID constraints I&#8217;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>(Almost) another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Relaxed GTID constraints</li>
+</ol>
+<p>I&#8217;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? <code>gh-ost</code> has to write something to the binary log. Thus, it &#8220;corrupts&#8221; the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but&#8230;</p>
+<p>I understand the idea and need for the <code>Executed GTID Set</code>. It will certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a <code>flush tables with read lock</code> without disabling <code>sql_log_bin</code>. Things just happen.</p>
+<p>For that, I would like to suggest GTID control levels, such as:</p>
+<ol>
+<li><em>Strict</em>: same as Oracle&#8217;s existing implementation. Executed sets, purged sets, whatnot.</li>
+<li><em>Last executed</em>: a mode where the only thing that counts is the last executed GTID value. If I repoint replica, all it needs to check is &#8220;hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don&#8217;t care about comparing executed and purged sets, I will trust you and keep running from that point on&#8221;</li>
+<li><em>Declarative</em>: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.</li>
+</ol>
+<p>I realize Oracle MySQL GTID is out for some over 3 years now, but I&#8217;m sorry &#8211; I still have reservations and see use cases where I fear it will not serve me right.</p>
+<p>How about my previous years wishes? World peace and good health never came through, however:</p>
+<ul>
+<li>My <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-2015">2015 wish</a> for &#8220;decent, operations friendly built in online table refactoring&#8221; was unmet, however <code>gh-ost</code> is a thing now and exceeds my expectations. No, really. Please come see <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">Tom &amp; myself present gh-ost</a> and how it changed our migration paradigm.</li>
+<li>My <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201">2012 wish</a> for &#8220;decent, long waited for, implementation of <a href="http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function">Window Functions</a> (aka Analytic Functions) for MySQL&#8221; was met by MariaDB&#8217;s <a href="https://mariadb.com/kb/en/mariadb/window-functions/">window functions</a>.<br />
+Not strictly Window Functions, but Oracle MySQL 8.0 will <a href="http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/">support CTE</a> (hierarchial/recursive), worth a mention.</li>
+</ul>
+<p>See you in Amsterdam!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7643</post-id>	</item>
+		<item>
+		<title>Introducing gh-ost: triggerless online schema migrations</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations#comments</comments>
+				<pubDate>Mon, 01 Aug 2016 17:19:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[tools]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7596</guid>
+				<description><![CDATA[I&#8217;m thoroughly happy to introduce gh-ost: triggerless, controllable, auditable, testable, trusted online schema change tool released today by GitHub. gh-ost now powers our production schema migrations. We hit some serious limitations using pt-online-schema-change on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m thoroughly happy to introduce <a href="https://github.com/github/gh-ost"><strong>gh-ost</strong></a>: triggerless, controllable, auditable, testable, trusted online schema change tool <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">released today by GitHub</a>.</p>
+<p><em>gh-ost</em> now powers our production schema migrations. We hit some serious limitations using <a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html">pt-online-schema-change</a> on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent of causing outages. With <em>gh-ost</em>, we are now able to migrate our busiest tables at any time, peak hours and heavy workloads included, without causing impact to our service.</p>
+<p>gh-ost supports testing in production. It goes a long way to build trust, both in integrity and in control. Are your databases just too busy and you cannot run existing online-schema-change tools? Have you suffered outages due to migrations? Are you tired of babysitting migrations that run up to 3:00am? Tired of being the only one tailing logs? Please, take a look at <em>gh-ost</em>. I believe it changes online migration paradigm.</p>
+<p>For a more thorough overview, please read the <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">announcement</a> on the GitHub Engineering Blog, and proceed to the <a href="https://github.com/github/gh-ost/blob/master/README.md">documentation</a>.</p>
+<p><em>gh-ost</em> is open sourced under the MIT license.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7596</post-id>	</item>
+		<item>
+		<title>Solving the non-atomic table swap, Take III: making it atomic</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-iii-making-it-atomic</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-iii-making-it-atomic#comments</comments>
+				<pubDate>Thu, 07 Jul 2016 12:54:25 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[operations]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7577</guid>
+				<description><![CDATA[With the unintended impression of becoming live blogging, we now follow up on Solving the non-atomic table swap, Take II and Solving the Facebook-OSC non-atomic table swap problem with a safe, blocking, atomic solution Why yet another iteration? The solution presented in Solving the non-atomic table swap, Take II was good, in that it was [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>With the unintended impression of becoming live blogging, we now follow up on <a title="Link to Solving the non-atomic table swap, Take II" href="https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-ii" rel="bookmark">Solving the non-atomic table swap, Take II</a> and <a title="Link to Solving the Facebook-OSC non-atomic table swap problem" href="https://shlomi-noach.github.io/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem" rel="bookmark">Solving the Facebook-OSC non-atomic table swap problem</a> with a safe, blocking, <em>atomic</em> solution</p>
+<h3>Why yet another iteration?</h3>
+<p>The solution presented in <a title="Link to Solving the non-atomic table swap, Take II" href="https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-ii" rel="bookmark">Solving the non-atomic table swap, Take II</a> was good, in that it was safe. No data corruption. Optimistic: if no connection is killed throughout the process, then completely blocking.</p>
+<p>Two outstanding issues remained:</p>
+<ul>
+<li>If something did go wrong, the solution reverted to a table-outage</li>
+<li>On replicas, the table swap is non atomic, non blocking. There&#8217;s table-outage scenario on replica.</li>
+</ul>
+<p>As it turns out, there&#8217;s a simpler solution which overcomes both the above. As with math and physics, the simpler solution is often the preferred one. But it took those previous iterations to gather a few ideas together. So, anyway:</p>
+<h3>Safe, locking, atomic, asynchronous table swap</h3>
+<p>Do read the aforementioned previous posts; the quick-quick recap is: we want to be able to <strong>LOCK</strong> a table <strong>tbl</strong>, then do some stuff, then swap it out and put some <strong>ghost</strong> table in its place. MySQL does not allow us to <strong>rename tbl to tbl_old, ghost to tbl</strong> if we have locks on <strong>tbl</strong> in that session.</p>
+<p>The solution we offer is now based on two connections only (as opposed to three, in the <em>optimistic</em> approach). &#8220;Our&#8221; connections will be C10, C20. The &#8220;normal&#8221; app connections are C1..C9, C11..C19, C21..C29.</p>
+<ul>
+<li>Connections C1..C9 operate on <strong>tbl</strong> with normal DML: <strong>INSERT, UPDATE, DELETE</strong></li>
+<li>Connection C10: <strong>CREATE TABLE tbl_old (id int primary key) COMMENT=&#8217;magic-be-here&#8217;</strong></li>
+<li>Connection C10: <strong>LOCK TABLES tbl WRITE, tbl_old WRITE</strong></li>
+<li>Connections C11..C19, newly incoming, issue queries on <strong>tbl</strong> but are blocked due to the <strong>LOCK</strong></li>
+<li>Connection C20: <strong>RENAME TABLE tbl TO tbl_old, ghost TO tbl</strong><br />
+This is blocked due to the <strong>LOCK</strong>, <em>but</em> gets prioritized on top connections C11..C19 and on top C1..C9 or any other connection that attempts DML on <strong>tbl</strong></li>
+<li>Connections C21..C29, newly incoming, issue queries on <strong>tbl</strong> but are blocked due to the <strong>LOCK</strong> and due to the <strong>RENAME</strong>, waiting in queue</li>
+<li>Connection C10: checks that C20&#8217;s <strong>RENAME</strong> is applied (looks for the blocked <strong>RENAME</strong> in processlist)</li>
+<li>Connection 10: <strong>DROP TABLE tbl_old</strong><br />
+Nothing happens yet; <strong>tbl</strong> is still locked. All other connections still blocked.</li>
+<li>Connection 10: <strong>UNLOCK TABLES<br />
+BAM!</strong> The <strong>RENAME</strong> is first to execute, <strong>ghost</strong> table is swapped in place of <strong>tbl</strong>, then C1..C9, C11..C19, C21..C29 all get to operate on the new and shiny <strong>tbl</strong></li>
+</ul>
+<p>Some notes<span id="more-7577"></span></p>
+<ul>
+<li>We create <strong>tbl_old</strong> as a blocker for a premature swap</li>
+<li>It is allowed for a connection to <strong>DROP</strong> a table it has under a <strong>WRITE LOCK</strong></li>
+<li>A blocked <strong>RENAME</strong> is always prioritized over a blocked <strong>INSERT/UPDATE/DELETE</strong>, no matter who came first</li>
+</ul>
+<h3>What happens on failures?</h3>
+<p>Much fun. Just works; no rollback required.</p>
+<ul>
+<li>If C10 errors on the <strong>CREATE</strong> we do not proceed.</li>
+<li>If C10 errors on the <strong>LOCK</strong> statement, we do not proceed. The table is not locked. App continues to operate as normal.</li>
+<li>If C10 dies just as C20 is about to issue the <strong>RENAME</strong>:
+<ul>
+<li>The lock is released, the queries C1..C9, C11..C19 immediately operate on <strong>tbl</strong>.</li>
+<li>C20&#8217;s <strong>RENAME</strong> immediately fails because <strong>tbl_old</strong> exists.<br />
+The entire operation is failed, but nothing terrible happens; some queries were blocked for some time is all. We will need to retry everything</li>
+</ul>
+</li>
+<li>If C10 dies while C20 is blocked on <strong>RENAME</strong>: Mostly similar to the above. Lock released, then C20 fails the <strong>RENAME</strong> (because <strong>tbl_old</strong> exists), then all queries resume normal operation</li>
+<li>If C20 dies before C10 drops the table, we catch the error and let C10 proceed as planned: <strong>DROP, UNLOCK</strong>. Nothing terrible happens, some queries were blocked for some time. We will need to retry</li>
+<li>If C20 dies just after C10 <strong>DROP</strong>s the table but before the unlock, same as above.</li>
+<li>If both C10 and C20 die, no problem: <strong>LOCK</strong> is cleared; <strong>RENAME</strong> lock is cleared. C1..C9, C11..C19, C21..C29 are free to operate on <strong>tbl</strong>.</li>
+</ul>
+<p>No matter what happens, at the end of operation we look for the <strong>ghost</strong> table. Is it still there? Then we know the operation failed, &#8220;atomically&#8221;. Is it not there? Then it has been renamed to <strong>tbl</strong>, and the operation worked atomically.</p>
+<p>A side note on failure is the matter of cleaning up the magic <strong>tbl_old</strong>. Here this is a matter of taste. Maybe just let it live and avoid recreating it, or you can drop it if you like.</p>
+<h3>Impact on app</h3>
+<p>App connections are guaranteed to be blocked, either until <strong>ghost</strong> is swapped in, or until operation fails. In the former, they proceed to operate on the new table. In the latter, they proceed to operate on the original table.</p>
+<h3>Impact on replication</h3>
+<p>Replication only sees the <strong>RENAME</strong>. There is no <strong>LOCK</strong> in the binary logs. Thus, replication sees an atomic two-table swap. There is no table-outage.</p>
+<h3>Conclusion</h3>
+<p>This solution satisfies all we wanted to achieve. We&#8217;re unlikely to give this another iteration. Well, if some yet-more-elegant solution comes along I&#8217;ll be tempted, for the beauty of it, but the solution offered in this post is simple-enough, safe, atomic, replication friendly, and should make everyone happy.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-iii-making-it-atomic/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7577</post-id>	</item>
+		<item>
+		<title>Solving the non-atomic table swap, Take II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-ii#comments</comments>
+				<pubDate>Mon, 20 Jun 2016 09:26:47 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[operations]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7567</guid>
+				<description><![CDATA[Following up and improving on Solving the Facebook-OSC non-atomic table swap problem, we present a better, safe solution. Quick, quickest recap: We are working on a triggerless online schema migration solution. It is based on an asynchronous approach, similarly to the FB osc and as opposed to the synchronous solution as used by pt-online-schema-change. We asynchronously synchronize [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Following up and improving on <a title="Link to Solving the Facebook-OSC non-atomic table swap problem" href="https://shlomi-noach.github.io/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem" rel="bookmark">Solving the Facebook-OSC non-atomic table swap problem</a>, we present a better, safe solution.</p>
+<h3>Quick, quickest recap:</h3>
+<p>We are working on a triggerless online schema migration solution. It is based on an asynchronous approach, similarly to the <a href="https://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932/">FB osc</a> and as opposed to the synchronous solution as used by <a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html">pt-online-schema-change</a>.</p>
+<p>We asynchronously synchronize (is that even a valid statement?) between some table <strong>tbl</strong> and a ghost table <strong>ghost</strong>, and at some time we want to cut-over: swap the two; kick out <strong>tbl</strong> and put <strong>ghost</strong> in its place and under its name.</p>
+<p>However, we cannot use the single statement <strong>rename tbl to tbl_old, ghost to tbl</strong>, because we use the asynchronous approach, where at the time we lock <strong>tbl</strong> for writes, we still have some events we need to process and apply onto <strong>ghost</strong> before swapping the two.</p>
+<p>And MySQL does not allow a <strong>lock tables tbl write; &#8230; ; </strong><strong>rename tbl to tbl_old, ghost to tbl</strong>.</p>
+<p>In <a title="Link to Solving the Facebook-OSC non-atomic table swap problem" href="https://shlomi-noach.github.io/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem" rel="bookmark">Solving the Facebook-OSC non-atomic table swap problem</a> we suggested a way that works, unless when it doesn&#8217;t work. Read the caveat at the end of the post. Premature death of a connection that participates in the algorithm causes a chain reaction that leads to the premature execution of the <strong>rename</strong> statement, potentially before we&#8217;ve applied those remaining events. This leads to data inconsistency between the old table and the new table, and is unacceptable.</p>
+<p>To that effect, we were more inclined to go with the Facebook solution, which makes a two-step: <strong>lock tables tbl write; alter table tbl rename to tbl_old; &#8230; ; alter table ghost rename to tbl;</strong></p>
+<p>This two-step solution is guaranteed not to have data inconsistency. Alas, it also implies an outage. There&#8217;s a brief moment, in between the two <strong>rename</strong>s, and during that time where we apply those last changes, where the table <strong>tbl</strong> is simply not there.</p>
+<p>Not all applications will fail gracefully on such a scenario.<span id="more-7567"></span></p>
+<h3>UDF</h3>
+<p>We looked at a solution based on UDFs, where we would create global wait conditions, that are not connection based.</p>
+<p>We don&#8217;t like UDFs. You need to compile them for every new version. Puppetizing their setup is not fun. We wouldn&#8217;t like maintaining this. We wouldn&#8217;t like doing the operations for this. Neither would the community.</p>
+<p>We want to make this a community solution. Can we do without UDF?</p>
+<h3>Rewriting MySQL</h3>
+<p>We wish to avoid forking our own version of MySQL. It&#8217;s not what we do and it&#8217;s a pain.</p>
+<h3>A pure MySQL solution?</h3>
+<p>We found a solution to embrace; it is <em>optimistic</em>, and <em>safe</em>. hat <em>optimistic</em> means is explained further on, but let&#8217;s discuss <em>safe</em>:</p>
+<p>The previous solution we came up with as <em>unsafe</em> because breakage of a single component in the algorithm would lead to inconsistent data. The algorithm itself was fine, as long as no one would break it from the outside. This is the concern: what if some crazy cronjob that cleans up connections (kills idle connections, kills long running transactions) or some unfortunate user command kills one of the connections involved in the cut-over phase? This is not something that would happen every day, but can we protect against it? Our priority is to keep our data intact.</p>
+<p>The solution allows breakage. Even in the face of death of connections, data is not lost/corrupted, and at worst &#8212; causes a FB-like, recoverable outage scenario.</p>
+<h3>A step towards the solution, a flawed one</h3>
+<p>I wish to illustrate something that looks like it would work, but in fact has a hidden flaw. We will later improve on that solution.</p>
+<p>Let&#8217;s assume we have <strong>tbl</strong>, <strong>ghost</strong> tables. We execute the following by multiple connections; we call them C1, C2, C3, &#8230;:</p>
+<ul>
+<li>C1: <strong>lock tables tbl write;</strong></li>
+<li>C2, C3, &#8230;, C17: normal app connections, issuing <strong>insert, delete, update</strong> on <strong>tbl</strong>. Because of the lock, they are naturally blocked.</li>
+<li>We apply those last event we need to apply onto <strong>ghost</strong>. No new events are coming our way because <strong>tbl</strong> is blocked.</li>
+<li>C18: <strong>rename table tbl to tbl_old, ghost to tbl; </strong>(blocked as well)</li>
+<li>C1: <strong>unlock tables</strong><strong>; </strong>(everything gets released)</li>
+</ul>
+<p>Let&#8217;s consider the above, and see why it is flawed. But first, why it would typically work in the first place.</p>
+<ul>
+<li>Connections C2, &#8230;, C17 came first, and C18 came later. Nevertheless MySQL prioritizes C18 and moves it up the queue of waiting queries on <strong>tbl</strong>. When we <strong>unlock</strong>, C18 is the first to execute.</li>
+<li>We only issue the <strong>rename</strong> once we&#8217;re satisfied we&#8217;ve applied those changes. We only <strong>unlock</strong> once we&#8217;re satisfied that the <strong>rename</strong> has been executed.</li>
+<li>If for some reason C1 disconnects before we issue the <strong>rename</strong> &#8211; no problem, we just retry from scratch.</li>
+</ul>
+<h4>What&#8217;s the flaw?</h4>
+<p>We <strong>rename</strong> when C1 holds the <strong>lock</strong>. We check with C1 that it is alive and kicking. Yep, it&#8217;s connected and holding the lock. Are you sure? Yep, I&#8217;m good! Really really sure? Yep! OK then, let&#8217;s <strong>rename!</strong></p>
+<p>&#8220;Oh darn&#8221;, says C1, &#8220;now that you went ahead to <strong>rename</strong>, but just before you actually sent the request, I decided to take time off and terminate&#8221;. Or, more realistically, some job would kill C1.</p>
+<p>What happens now? The <strong>rename</strong> is not there yet. All those queries get released, and are immediately applied onto <strong>tbl</strong>, and <em>then</em> the <strong>rename</strong> applies, kicks all those changes into oblivion, and puts <strong>ghost</strong> in place, where it immediately receives further writes.</p>
+<p>Those blocking queries were committed but never to be seen again.</p>
+<p>So here&#8217;s another way to look at the problem: the <strong>rename</strong> made it through even though the connection C1 died just prior to that, whereas we would have loved the <strong>rename</strong> to abort upon such case.</p>
+<p>Is there a way in MySQL to cause an operation to <strong>fail or block</strong> when another connection dies? It&#8217;s the other way around! Connections hold locks, and those get released when they die!</p>
+<p>But there&#8217;s a way&#8230;</p>
+<h3>Three step, safe, optimistic solution</h3>
+<p>Here are the steps to a safe solution:</p>
+<ul>
+<li>C1: <strong>lock tables tbl write;</strong></li>
+<li>C2, C3, &#8230;, C17: normal app connections, issuing <strong>insert, delete, update</strong> on <strong>tbl</strong>. Because of the lock, they are naturally blocked.</li>
+<li>We apply those last event we need to apply onto <strong>ghost</strong>. No new events are coming our way because <strong>tbl</strong> is blocked.</li>
+<li>C18: checking that C1 is still alive, then <strong>rename table tbl to tbl_old</strong></li>
+<li>C19: checking to see that C18&#8217;s <strong>rename</strong> is in place (via <strong>show processlist</strong>), <strong>and</strong> that C1 is still alive; then issues: <strong>rename table ghost to tbl</strong></li>
+<li>(meanwhile more queries approach <strong>tbl</strong>, it doesn&#8217;t matter, they all get deprioritized, same as C2&#8230;C17)</li>
+<li>C1: <strong>unlock tables</strong></li>
+</ul>
+<p>What just happened? Let&#8217;s first explain some stuff:</p>
+<ul>
+<li>C18&#8217;s <strong>rename</strong> gets prioritized over the DMLs, even though it came later. That is how MySQL prioritizes queries on metadata-locked tables.</li>
+<li>C18 checks C1 is still alive, but as before, there&#8217;s always the chance C1 will die just at the wrong time &#8212; we&#8217;re going to address that.</li>
+<li>C19 is interested to see that C18 began execution, but potentially C18 will crash by the time C19 actually issues its own <strong>rename</strong> &#8212; we&#8217;re going to address that</li>
+<li>C19&#8217;s query sounds weird. At that time <strong>tbl</strong> still exists. You&#8217;d expect it to fail immediately &#8212; but it does not. It&#8217;s valid. This is because <strong>tbl</strong>&#8216;s metadata lock is in use.</li>
+<li>C19 gets prioritized over all the DMLs, but is known to be behind C18. The two stay in same order of arrival. So, C18 is known to execute before C19.</li>
+<li>When C1 unlocks, C18 executes first.</li>
+<li>Metadata lock is still in place on <strong>tbl</strong> even though it doesn&#8217;t actually exist, because of C19.</li>
+<li>C19 operates next.</li>
+<li>Finally all the DMLs execute.</li>
+</ul>
+<p>What happens on failures?</p>
+<ul>
+<li>If C1 dies just as C18 is about to issue the <strong>rename</strong>, we get an outage: <strong>tbl</strong> is renamed to <strong>tbl_old</strong>, and the queries get released and complain the table is just not there.
+<ul>
+<li>C19 will not initiate because it is executed <strong>after</strong> C18 and checks that C1 is alive &#8212; which turns to be untrue.</li>
+<li>So we <strong>know</strong> we have outage, and we quickly <strong>rename tbl_old to tbl;</strong> and go drink coffee, then begin it all again.</li>
+<li>The outage is unfortunate, but does not put our data in danger.</li>
+</ul>
+</li>
+<li>If C1 happens to die just as C19 is about to issue its <strong>rename</strong>, there&#8217;s no data integrity: at this point we&#8217;ve already asserted the tables are in sync. As C1 dies, C18 will immediately rename <strong>tbl</strong> to <strong>tbl_old</strong>. An outage will occur, but not for long, because C19 will next issue <strong>rename ghost to tbl</strong>, and close the gap. We suffered a minor outage, but no rollback. We roll forward.</li>
+<li>If C18 happens to die just as C19 is about to issue its <strong>rename</strong>, nothing bad happens: C19 is still blocking for as long as C1 is running. We find out C18 died, and release C1. C19 attempts to rename <strong>ghost</strong> onto <strong>tbl</strong>, but <strong>tbl</strong> exists and the query fails. The metadata lock is released and all the queries resume operation on the original <strong>tbl</strong>. The operation failed but without error. We will need to try the entire cycle again.</li>
+<li>If both C1 and C18 fail at the time C19 is about to begin its <strong>rename</strong>, same as above.</li>
+<li>If C18 fails as C19 is already in place, same as above.</li>
+<li>If C1 fails as C19 is already in place, it&#8217;s as good as having it issue the <strong>unlock tables</strong>. We&#8217;re happy.</li>
+<li>If C19 fails at any given point, we suffer outage. We revert by <code>rename tbl_old to tbl</code></li>
+</ul>
+<p>This solution relies on the notion that if a previous connection failed, we would not be able to <strong>rename ghost to tbl</strong> because the table would still be there. That&#8217;s what we were looking for; but instead of looking at locks, which get released when a connection terminates, we used a persistent entity: a table.</p>
+<h3>Conclusion</h3>
+<p>The algorithm above is <strong>optimistic</strong>: if no connections get weirdly killed, it&#8217;s a valid locking solution, and queries &amp; app are unaware that anything happened (granted, app will notice write latency). If connections do get weirdly killed, we get table-outage at worst case &#8212; an outage that is already considered to be a valid solution anyhow. The algorithm will not allow data corruption.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/solving-the-non-atomic-table-swap-take-ii/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7567</post-id>	</item>
+		<item>
+		<title>New features I&#8217;d like to see in MySQL 5.8</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8#comments</comments>
+				<pubDate>Wed, 07 Oct 2015 08:02:16 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7417</guid>
+				<description><![CDATA[Following up on Morgan Tocker&#8217;s What would you like to see in MySQL 5.8?, having attended and participated at the brainstorming at Percona Live Amsterdam, and publishing this post while failing to comply with any of Morgan&#8217;s suggested media, these are the features I would like to see in MySQL 5.8: Dynamicly enable/disable log-bin and log-slave-updates Today, when [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Following up on Morgan Tocker&#8217;s <a href="http://www.tocker.ca/2015/09/14/what-would-you-like-to-see-in-mysql-5-8.html">What would you like to see in MySQL 5.8?</a>, having attended and participated at the <a href="https://www.percona.com/live/europe-amsterdam-2015/sessions/mysql-58-dreaming-and-brainstorming">brainstorming at Percona Live Amsterdam</a>, and publishing this post while failing to comply with any of Morgan&#8217;s suggested media, these are the features I would like to see in MySQL <strong>5.8</strong>:</p>
+<ul>
+<li>Dynamicly enable/disable <strong>log-bin</strong> and <strong>log-slave-updates</strong><br />
+Today, when changing chef/puppet role of a server from a simple slave to an intermediate master and vice versa, a MySQL restart is required. This is a very big pain which makes replication automation complex, not to mention warmup times.</li>
+<li>&#8220;<strong><a href="http://man7.org/linux/man-pages/man1/nice.1.html">nice</a></strong>&#8220;.<br />
+I want to be able to execute a query that is <em>nice, i.e</em> has lower priority; will not consume all resources; will stall/throttle so as to allow other queries to complete. Luis asked and I said this could be on a per statement basis, e.g. add a <strong>SQL_NICE</strong> query hint. But I&#8217;m unsure that would be the correct behavior. It also makes sense to do so on a per connection basis (perhaps provide connection attributed to hint <em>niceness</em>?).</li>
+<li>Online-<em>ier</em> <strong>ALTER TABLE</strong>. I would in particular want it to apply the <em>nice</em> feature, above. Otherwise throttle by user defined metrics.</li>
+<li>Online-<em>ier</em> <strong>ALTER TABLE</strong> in replication stream.  Can the slaves run the <strong>ALTER</strong> statement in parallel?</li>
+<li><strong>Re-Group Commit</strong>: in MTS, and when intermediate masters involved, copy+paste the group commit as applied on master as working downstream. I suspect this is easily achievable. The result: same parallelism for replicating slaves in all levels, whether they replicate directly from master or from 2nd, 3rd tier intermediate masters. Today parallelism decreases as we go downstream.</li>
+<li>Global user-defined-variables. I want to be able to define arbitrary (global) variables that I can later query via <strong>SELECT @@global.arbitrary</strong>. This would be similar to HTML <strong>5</strong>&#8216;s <strong>&#8220;data-*&#8221;</strong> attributes. I often wish I could tell &amp; ask MySQL my puppet role; or the server status (is it live? Is it offline? Does it belong to a specific pool? etc.). Similar to <strong>&#8220;loose-*&#8221;</strong> syntax, this could be a <strong>&#8220;data-*&#8221;</strong> or <strong>&#8220;user-*&#8221;</strong> name prefix system.</li>
+</ul>
+<p>I will follow up on new <em>statements</em> I would like to see in MySQL <strong>5.8</strong>.</p>
+<p>The brainstorming session at PerconaLive, I should note, was pure joy, and apart from getting two nice furry dolphins I enjoyed the engagement, the diversity of ideas, and the fact Oracle engineers (Mark in particular) were very busy taking notes or otherwise openly discussing the viability of some requested features.</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7417</post-id>	</item>
+	</channel>
+</rss>

@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+
+	<title>SQL pie chart – code.openark.org</title>
+<link rel="dns-prefetch" href="//secure.gravatar.com">
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="https://shlomi-noach.github.io/blog/wp-includes/css/dist/block-library/style.min.css" media="all">
+<style id="wp-block-library-inline-css">
+.has-text-align-justify{text-align:justify;}
+</style>
+<link rel="stylesheet" id="wp-polls-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-css.css" media="all">
+<style id="wp-polls-inline-css">
+.wp-polls .pollbar {
+	margin: 1px;
+	font-size: 6px;
+	line-height: 8px;
+	height: 8px;
+	background-image: url('https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/images/default/pollbg.gif');
+	border: 1px solid #c8c8c8;
+}
+
+</style>
+<link rel="stylesheet" id="wpdiscuz-font-awesome-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/font-awesome-5.0.6/css/fontawesome-all.min.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-frontend-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-user-content-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz-user-content.css" media="all">
+<link rel="stylesheet" id="openark-primer-style-css" href="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/style.css" media="all">
+<link rel="stylesheet" id="wp-markdown-prettify-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/css/prettify.css" media="all">
+<link rel="stylesheet" id="social-logos-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/social-logos/social-logos.min.css" media="all">
+<link rel="stylesheet" id="jetpack_css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/css/jetpack.css" media="all">
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery-migrate.min.js"></script>
+
+
+
+
+
+
+
+
+
+            <style>
+                #wpcomm .wc_new_comment{background:#00B38F;}
+                #wpcomm .wc_new_reply{background:#00B38F;}
+                #wpcomm .wc-form-wrapper{ background:none; } /* ->formBGColor */
+                #wpcomm .wpdiscuz-front-actions{background:#F9F9F9;}
+                #wpcomm .wpdiscuz-subscribe-bar{background:#F9F9F9;}
+                #wpcomm select,
+                #wpcomm input[type="text"],
+                #wpcomm input[type="email"],
+                #wpcomm input[type="url"],
+                #wpcomm input[type="date"],
+                #wpcomm input[type="color"]{border:#D9D9D9 1px solid;}
+                #wpcomm .wc-comment .wc-comment-right{background:#FEFEFE;}
+                #wpcomm .wc-reply .wc-comment-right{background:#F8F8F8;}
+                #wpcomm .wc-comment-right .wc-comment-text, 
+                #wpcomm .wc-comment-right .wc-comment-text *{
+                    font-size:14px;
+                }
+                #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-administrator > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-editor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-contributor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-subscriber > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_admin > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_check > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_helper > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-post_author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-guest > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }                #wpcomm .wc-comment .wc-comment-left .wc-comment-label{ background: #ffffff;}
+                #wpcomm .wc-comment-left .wc-follow-user{color:#00B38F;}
+                #wpcomm .wc-load-more-submit{border:1px solid #D9D9D9;}
+                #wpcomm .wc-new-loaded-comment > .wc-comment-right{background:#FFFAD6;}
+                #wpcomm .wpdiscuz-subscribe-bar{color:#777;}
+                #wpcomm .wpdiscuz-front-actions .wpdiscuz-sbs-wrap span{color: #777;}
+                #wpcomm .page-numbers{color:#555;border:#555 1px solid;}
+                #wpcomm span.current{background:#555;}
+                #wpcomm .wpdiscuz-readmore{cursor:pointer;color:#00B38F;}
+                #wpcomm .wpdiscuz-textarea-wrap{border:#D9D9D9 1px solid;} .wpd-custom-field .wcf-pasiv-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label {color: #DDDDDD;}
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating:not(:checked) > label:hover,.wpdiscuz-rating:not(:checked) > label:hover ~ label {   }#wpcomm .wpdiscuz-item .wpdiscuz-rating > input ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label{color: #FFED85;} 
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label:hover ~ input:checked ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked + label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover ~ label, .wpd-custom-field .wcf-active-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label{ color:#FFD700;}
+                #wpcomm .wc-comment-header{border-top: 1px solid #dedede;}
+                #wpcomm .wc-reply .wc-comment-header{border-top: 1px solid #dedede;}
+                /* Buttons */
+                #wpcomm button, 
+                #wpcomm input[type="button"], 
+                #wpcomm input[type="reset"], 
+                #wpcomm input[type="submit"]{ border: 1px solid #555555; color: #FFFFFF; background-color: #555555; }
+                #wpcomm button:hover, 
+                #wpcomm button:focus,
+                #wpcomm input[type="button"]:hover, 
+                #wpcomm input[type="button"]:focus, 
+                #wpcomm input[type="reset"]:hover, 
+                #wpcomm input[type="reset"]:focus, 
+                #wpcomm input[type="submit"]:hover, 
+                #wpcomm input[type="submit"]:focus{ border: 1px solid #333333; background-color: #333333;  }
+                #wpcomm .wpdiscuz-sort-buttons{color:#777777;}
+                #wpcomm .wpdiscuz-sort-button{color:#777777; cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button:hover{color:#00B38F!important;cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button-active{color:#00B38F!important;cursor:default!important;}
+                #wpcomm .wc-cta-button, 
+                #wpcomm .wc-cta-button-x{color:#777777; }
+                #wpcomm .wc-vote-link.wc-up{color:#999999;}
+                #wpcomm .wc-vote-link.wc-down{color:#999999;}
+                #wpcomm .wc-vote-result{color:#999999;}
+                #wpcomm .wpf-cta{color:#999999; }
+                #wpcomm .wc-comment-link .wc-share-link .wpf-cta{color:#eeeeee;}
+                #wpcomm .wc-footer-left .wc-reply-button{border:1px solid #00B38F!important; color: #00B38F;}
+                #wpcomm .wpf-cta:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-left .wc-reply-button.wc-cta-active, #wpcomm .wc-cta-active{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-cta-button:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-right .wc-toggle,
+                #wpcomm .wc-footer-right .wc-toggle a,
+                #wpcomm .wc-footer-right .wc-toggle i{color:#00B38F;}
+                /* STICKY COMMENT HEADER */
+                #wpcomm .wc-sticky-comment.wc-comment .wc-comment-header .wpd-sticky{background: #1ecea8; color: #ffffff; }
+                #wpcomm .wc-closed-comment.wc-comment .wc-comment-header .wpd-closed{background: #aaaaaa; color: #ffffff;}
+                /* PRIVATE COMMENT HEADER */
+                #wpcomm .wc-private-comment.wc-comment .wc-comment-header .wpd-private{background: #999999; color: #ffffff;}
+                /* FOLLOW LINK */
+
+                #wpcomm .wc-follow{color:#777777;}
+                #wpcomm .wc-follow-active{color:#ff7a00;}
+                #wpcomm .wc-follow:hover i,
+                #wpcomm .wc-unfollow:hover i,
+                #wpcomm .wc-follow-active:hover i{color:#00B38F;}
+                                .wpd-wrapper .wpd-list-item.wpd-active{border-top: 3px solid #00B38F;}
+                                .comments-area{width:auto;}
+            </style>
+            <style data-context="foundation-flickity-css">/*! Flickity v2.0.2
+http://flickity.metafizzy.co
+---------------------------------------------- */.flickity-enabled{position:relative}.flickity-enabled:focus{outline:0}.flickity-viewport{overflow:hidden;position:relative;height:100%}.flickity-slider{position:absolute;width:100%;height:100%}.flickity-enabled.is-draggable{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.flickity-enabled.is-draggable .flickity-viewport{cursor:move;cursor:-webkit-grab;cursor:grab}.flickity-enabled.is-draggable .flickity-viewport.is-pointer-down{cursor:-webkit-grabbing;cursor:grabbing}.flickity-prev-next-button{position:absolute;top:50%;width:44px;height:44px;border:none;border-radius:50%;background:#fff;background:hsla(0,0%,100%,.75);cursor:pointer;-webkit-transform:translateY(-50%);transform:translateY(-50%)}.flickity-prev-next-button:hover{background:#fff}.flickity-prev-next-button:focus{outline:0;box-shadow:0 0 0 5px #09f}.flickity-prev-next-button:active{opacity:.6}.flickity-prev-next-button.previous{left:10px}.flickity-prev-next-button.next{right:10px}.flickity-rtl .flickity-prev-next-button.previous{left:auto;right:10px}.flickity-rtl .flickity-prev-next-button.next{right:auto;left:10px}.flickity-prev-next-button:disabled{opacity:.3;cursor:auto}.flickity-prev-next-button svg{position:absolute;left:20%;top:20%;width:60%;height:60%}.flickity-prev-next-button .arrow{fill:#333}.flickity-page-dots{position:absolute;width:100%;bottom:-25px;padding:0;margin:0;list-style:none;text-align:center;line-height:1}.flickity-rtl .flickity-page-dots{direction:rtl}.flickity-page-dots .dot{display:inline-block;width:10px;height:10px;margin:0 8px;background:#333;border-radius:50%;opacity:.25;cursor:pointer}.flickity-page-dots .dot.is-selected{opacity:1}</style><style data-context="foundation-slideout-css">.slideout-menu{position:fixed;left:0;top:0;bottom:0;right:auto;z-index:0;width:256px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}.slideout-menu.pushit-right{left:auto;right:0}.slideout-panel{position:relative;z-index:1;will-change:transform}.slideout-open,.slideout-open .slideout-panel,.slideout-open body{overflow:hidden}.slideout-open .slideout-menu{display:block}.pushit{display:none}</style>
+<link rel="dns-prefetch" href="//v0.wordpress.com">
+
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="SQL pie chart">
+<meta property="og:url" content="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart">
+<meta property="og:description" content="My other half says I’m losing it. But I think that as an enthusiast kernel developer she doesn’t have the right to criticize people. (“I like user space better!” – she…">
+<meta property="article:published_time" content="2009-08-12T10:49:41+00:00">
+<meta property="article:modified_time" content="2009-08-12T10:49:41+00:00">
+<meta property="og:site_name" content="code.openark.org">
+<meta property="og:image" content="https://s0.wp.com/i/blank.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:text:title" content="SQL pie chart">
+<meta name="twitter:card" content="summary">
+
+
+<style>.ios7.web-app-mode.has-fixed header{ background-color: rgba(242,101,34,.88);}</style></head>
+
+<body class="post-template-default single single-post postid-1093 single-format-standard no-sidebar">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#primary">Skip to content</a>
+
+	<header id="masthead" class="site-header">
+		<div class="site-branding">
+							<p class="site-title"><a href="https://shlomi-noach.github.io/blog/" rel="home">code.openark.org</a></p>
+								<p class="site-description">Blog by Shlomi Noach</p>
+			
+			<nav id="site-navigation" class="main-navigation">
+				<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false">primary-menu</button>
+				<div class="menu-primary-menu-container"><ul id="menu-primary-menu" class="menu"><li id="menu-item-8109" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8109"><a href="https://shlomi-noach.github.io/blog/archives">archives</a></li>
+<li id="menu-item-8050" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8050"><a href="https://shlomi-noach.github.io/blog/presentations">presentations</a></li>
+<li id="menu-item-8055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8055"><a href="https://shlomi-noach.github.io/blog/about">about</a></li>
+<li id="menu-item-8071" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8071"><a href="https://github.com/shlomi-noach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a></li>
+<li id="menu-item-8074" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8074"><a href="https://www.linkedin.com/in/shlominoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg></a></li>
+<li id="menu-item-8072" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8072"><a href="https://twitter.com/ShlomiNoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"></path></svg></a></li>
+<li id="menu-item-8073" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8073"><a href="https://shlomi-noach.github.io/blog/feed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-12.832 20c-1.197 0-2.168-.969-2.168-2.165s.971-2.165 2.168-2.165 2.167.969 2.167 2.165-.97 2.165-2.167 2.165zm5.18 0c-.041-4.029-3.314-7.298-7.348-7.339v-3.207c5.814.041 10.518 4.739 10.561 10.546h-3.213zm5.441 0c-.021-7.063-5.736-12.761-12.789-12.792v-3.208c8.83.031 15.98 7.179 16 16h-3.211z"></path></svg></a></li>
+</ul></div>			</nav>
+		</div>
+	</header>
+
+	<main id="primary" class="site-main">
+
+		
+<article id="post-1093" class="post-1093 post type-post status-publish format-standard hentry category-mysql tag-graphs tag-sql">
+	<header class="entry-header">
+		<h1 class="entry-title">SQL pie chart</h1>			<div class="entry-meta">
+				<span class="cat-links"><a href="https://shlomi-noach.github.io/blog/category/mysql" rel="category tag">MySQL</a></span><span class="tags-links"><a href="https://shlomi-noach.github.io/blog/tag/graphs" rel="tag">Graphs</a><a href="https://shlomi-noach.github.io/blog/tag/sql" rel="tag">SQL</a></span><span class="posted-on alignright"><a href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" rel="bookmark"><time class="entry-date published updated" datetime="2009-08-12T12:49:41+02:00">August 12, 2009</time></a></span>			</div>
+			</header>
+
+	
+	<div class="entry-content">
+		<p>My other half says I’m losing it. But I think that as an enthusiast kernel developer she doesn’t have the right to criticize people. (“I like user space better!” – she exclaims upon reading this).</p>
+<p>Shown below is a (single query) SQL-generated pie chart. I will walk through the steps towards making this happen, and conclude with what, I hope you’ll agree, are real-world, useful usage samples.</p>
+<blockquote>
+<pre>+----------------------------------------------------------------------+
+| pie_chart                                                            |
++----------------------------------------------------------------------+
+|                                                                      |
+|                         ;;;;;;;;;;;;;;;;;;;;;                        |
+|                  oooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;                 |
+|             oooooooooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;            |
+|          ooooooooooooooooo                 ;;;;;;;;;;;;#####         |
+|        oooooooooooooo                           ;#############       |
+|       oooooooooooo                                 ############      |
+|      oooooooooooo                                   ############     |
+|      ooooooooooo                                     ###########     |
+|      oooooooooooo                                   ::::::::::::     |
+|       oooooooooooo                                 ::::::::::::      |
+|        ooooooooo:::::                           ::::::::::::::       |
+|          o::::::::::::::::                 :::::::::::::::::         |
+|             :::::::::::::::::::::::::::::::::::::::::::::            |
+|                  :::::::::::::::::::::::::::::::::::                 |
+|                         :::::::::::::::::::::                        |
+|                                                                      |
+| ##  red: 1 (10%)                                                     |
+| ;;  blue: 2 (20%)                                                    |
+| oo  orange: 3 (30%)                                                  |
+| ::  white: 4 (40%)                                                   |
++----------------------------------------------------------------------+</pre>
+</blockquote>
+<h4>Requirements</h4>
+<p>We need a generic query, which returns at least these two columns: <strong>name_column</strong> and <strong>value_column</strong>. For example, the following query will do:<span id="more-1093"></span></p>
+<blockquote>
+<pre>SELECT name AS name_column, value AS value_column FROM sample_values2;
++-------------+--------------+
+| name_column | value_column |
++-------------+--------------+
+| red         |            1 |
+| blue        |            2 |
+| orange      |            3 |
+| white       |            4 |
++-------------+--------------+</pre>
+</blockquote>
+<p>Find sample data in <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/08/pie_data.sql">pie_data.sql</a>.</p>
+<h4>Part 1: expanding the original query</h4>
+<p>We’re going to need to take the above query’s results and expand them: how much is the ratio from total, per value? As first step, accumulate values:</p>
+<blockquote>
+<pre>SELECT
+  name_column,
+  value_column,
+  @accumulating_value := @accumulating_value+value_column AS accumulating_value
+FROM (
+  SELECT name AS name_column, value AS value_column FROM sample_values2
+  ) select_values,
+  (SELECT @accumulating_value := 0) select_accumulating_value
+;
++-------------+--------------+--------------------+
+| name_column | value_column | accumulating_value |
++-------------+--------------+--------------------+
+| red         |            1 |                  1 |
+| blue        |            2 |                  3 |
+| orange      |            3 |                  6 |
+| white       |            4 |                 10 |
++-------------+--------------+--------------------+</pre>
+</blockquote>
+<p>Next, we calculate ratio of accumulating value, and present it both in [0..1] range, as well as in [0..2*PI] (radians):</p>
+<blockquote>
+<pre>SELECT
+  name_order,
+  name_column,
+  value_column,
+  accumulating_value,
+  accumulating_value/@accumulating_value AS accumulating_value_ratio,
+  2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+FROM (
+  SELECT
+    name_column,
+    value_column,
+    @name_order := @name_order+1 AS name_order,
+    @accumulating_value := @accumulating_value+value_column AS accumulating_value,
+    @aggregated_name_column := CONCAT(@aggregated_name_column, name_column, ',') AS aggregated_name_column
+  FROM (
+    SELECT name AS name_column, value AS value_column FROM sample_values2
+    ) select_values,
+    (SELECT @name_order := 0) select_name_order,
+    (SELECT @accumulating_value := 0) select_accumulating_value,
+    (SELECT @aggregated_name_column := '') select_aggregated_name_column
+  ) select_accumulating_values
+;
++------------+-------------+--------------+--------------------+--------------------------+----------------------------+
+| name_order | name_column | value_column | accumulating_value | accumulating_value_ratio | accumulating_value_radians |
++------------+-------------+--------------+--------------------+--------------------------+----------------------------+
+|          1 | red         |            1 |                  1 |                      0.1 |           0.62831853071796 |
+|          2 | blue        |            2 |                  3 |                      0.3 |            1.8849555921539 |
+|          3 | orange      |            3 |                  6 |                      0.6 |            3.7699111843078 |
+|          4 | white       |            4 |                 10 |                        1 |            6.2831853071796 |
++------------+-------------+--------------+--------------------+--------------------------+----------------------------+</pre>
+</blockquote>
+<p>The radians value will help us decide where in the pie chart lies each value.</p>
+<h4>Part 2: behind the scenes of the pie chart</h4>
+<p>We now explain how the pie chart works. Later on we combine with <strong>Part 1</strong>, to produce the complete chart.</p>
+<p>We first generate a coordinates system (see <a href="https://shlomi-noach.github.io/blog/mysql/sql-graphics">SQL graphics</a>):</p>
+<blockquote>
+<pre>SELECT
+  GROUP_CONCAT(CONCAT(t2.value,'.',t1.value) order by t1.value separator ' ') as circle
+FROM
+  tinyint_asc t1,
+  tinyint_asc t2,
+  (select @size := 10) sel_size,
+  (select @radius := (@size/2 - 1)) sel_radius
+WHERE
+  t1.value < @size
+  AND t2.value < @size
+GROUP BY t2.value
+;
++-----------------------------------------+
+| circle                                  |
++-----------------------------------------+
+| 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 |
+| 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 |
+| 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 |
+| 3.0 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8 3.9 |
+| 4.0 4.1 4.2 4.3 4.4 4.5 4.6 4.7 4.8 4.9 |
+| 5.0 5.1 5.2 5.3 5.4 5.5 5.6 5.7 5.8 5.9 |
+| 6.0 6.1 6.2 6.3 6.4 6.5 6.6 6.7 6.8 6.9 |
+| 7.0 7.1 7.2 7.3 7.4 7.5 7.6 7.7 7.8 7.9 |
+| 8.0 8.1 8.2 8.3 8.4 8.5 8.6 8.7 8.8 8.9 |
+| 9.0 9.1 9.2 9.3 9.4 9.5 9.6 9.7 9.8 9.9 |
++-----------------------------------------+</pre>
+</blockquote>
+<p>Taking a slightly big step further, we calculate the angle per coordinate, in relation to center of coordinate system. Calculation is in radians, but presented in degrees, since it’s more readable. Also, we note in which quarter of the graph each point lies.</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    round(radians*180/PI())
+    order by col_number separator ' ') as circle
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) >= 0 THEN @abs_radians
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) <= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) <= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) >= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 15) sel_size,
+    (select @radius := (@size/2 - 1)) sel_radius
+  WHERE
+    t1.value < @size
+    AND t2.value < @size) select_combinations
+  GROUP BY row_number
+;
++-------------------------------------------------------------+
+| circle                                                      |
++-------------------------------------------------------------+
+| 135 131 126 120 113 106 98 90 82 74 67 60 54 49 45          |
+| 139 135 130 124 117 108 99 90 81 72 63 56 50 45 41          |
+| 144 140 135 129 121 112 101 90 79 68 59 51 45 40 36         |
+| 150 146 141 135 127 117 104 90 76 63 53 45 39 34 30         |
+| 157 153 149 143 135 124 108 90 72 56 45 37 31 27 23         |
+| 164 162 158 153 146 135 117 90 63 45 34 27 22 18 16         |
+| 172 171 169 166 162 153 135 90 45 27 18 14 11 9 8           |
+| 180 180 180 180 180 180 180 90 0 0 0 0 0 0 0                |
+| 188 189 191 194 198 207 225 270 315 333 342 346 349 351 352 |
+| 196 198 202 207 214 225 243 270 297 315 326 333 338 342 344 |
+| 203 207 211 217 225 236 252 270 288 304 315 323 329 333 337 |
+| 210 214 219 225 233 243 256 270 284 297 307 315 321 326 330 |
+| 216 220 225 231 239 248 259 270 281 292 301 309 315 320 324 |
+| 221 225 230 236 243 252 261 270 279 288 297 304 310 315 319 |
+| 225 229 234 240 247 254 262 270 278 286 293 300 306 311 315 |
++-------------------------------------------------------------+</pre>
+</blockquote>
+<p>The above needs some formattign to present well, but that’s not the purpose; I’m only showing the above to explain the steps taken.</p>
+<h4>Part 3: combining the two</h4>
+<p>Next step is probably the most significant one: we’re going to present a rough, square, weird looking pie chart using the original values:</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    (SELECT name_order FROM
+      (
+      SELECT
+        name_order,
+        name_column,
+        value_column,
+        accumulating_value,
+        accumulating_value/@accumulating_value AS accumulating_value_ratio,
+        2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+      FROM (
+        SELECT
+          name_column,
+          value_column,
+          @name_order := @name_order+1 AS name_order,
+          @accumulating_value := @accumulating_value+value_column AS accumulating_value,
+          @aggregated_name_column := CONCAT(@aggregated_name_column, name_column, ',') AS aggregated_name_column
+        FROM (
+          SELECT name AS name_column, value AS value_column FROM sample_values2
+          ) select_values,
+          (SELECT @name_order := 0) select_name_order,
+          (SELECT @accumulating_value := 0) select_accumulating_value,
+          (SELECT @aggregated_name_column := '') select_aggregated_name_column
+        ) select_accumulating_values
+      ) select_for_radians
+    WHERE accumulating_value_radians >= radians LIMIT 1
+    )
+    order by col_number separator ' ') as circle
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) >= 0 THEN @abs_radians
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) <= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) <= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) >= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 21) sel_size,
+    (select @radius := (@size/2 - 1)) sel_radius
+  WHERE
+    t1.value < @size
+    AND t2.value < @size) select_combinations
+  GROUP BY row_number
+;
++-------------------------------------------+
+| circle                                    |
++-------------------------------------------+
+| 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 |
+| 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 |
+| 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 |
+| 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 1 |
+| 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 1 1 |
+| 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 2 2 2 2 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 2 2 1 1 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 2 1 1 1 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 1 1 1 1 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
++-------------------------------------------+</pre>
+</blockquote>
+<p>The interesting SQL trick is that <em>everything goes within the GROUP_CONCAT clause</em>. Instead of presenting the coordinate, we check on the enhanced values table, looking for the first row which has a greater angle (in radians) than the current pixel has. We then display <strong>1</strong>, <strong>2</strong>, etc. to denote the value.</p>
+<p>The next step is actually very simple: instead of drawing the full square, limit to a circle!</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    IF(round(sqrt(pow(col_number-(@size-1)/2, 2) + pow(row_number-(@size-1)/2, 2))) BETWEEN @radius/2 AND @radius,
+    (SELECT name_order FROM
+      (
+      SELECT
+        name_order,
+        name_column,
+        value_column,
+        accumulating_value,
+        accumulating_value/@accumulating_value AS accumulating_value_ratio,
+        2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+      FROM (
+        SELECT
+          name_column,
+          value_column,
+          @name_order := @name_order+1 AS name_order,
+          @accumulating_value := @accumulating_value+value_column AS accumulating_value,
+          @aggregated_name_column := CONCAT(@aggregated_name_column, name_column, ',') AS aggregated_name_column
+        FROM (
+          SELECT name AS name_column, value AS value_column FROM sample_values2
+          ) select_values,
+          (SELECT @name_order := 0) select_name_order,
+          (SELECT @accumulating_value := 0) select_accumulating_value,
+          (SELECT @aggregated_name_column := '') select_aggregated_name_column
+        ) select_accumulating_values
+      ) select_for_radians
+    WHERE accumulating_value_radians >= radians LIMIT 1
+    ), '-')
+    order by col_number separator ' ') as circle
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) >= 0 THEN @abs_radians
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) <= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) <= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) >= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 21) sel_size,
+    (select @radius := 7) sel_radius
+  WHERE
+    t1.value < @size
+    AND t2.value < @size) select_combinations
+  GROUP BY row_number
+;
++-------------------------------------------+
+| circle                                    |
++-------------------------------------------+
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - 2 2 2 2 2 - - - - - - - - |
+| - - - - - - 3 3 3 2 2 2 2 2 2 - - - - - - |
+| - - - - - 3 3 3 3 2 2 2 2 2 2 2 - - - - - |
+| - - - - 3 3 3 3 3 2 2 2 2 2 2 2 1 - - - - |
+| - - - - 3 3 3 3 3 - - - 2 2 2 1 1 - - - - |
+| - - - 3 3 3 3 3 - - - - - 1 1 1 1 1 - - - |
+| - - - 3 3 3 3 - - - - - - - 1 1 1 1 - - - |
+| - - - 3 3 3 3 - - - - - - - 1 1 1 1 - - - |
+| - - - 3 3 3 3 - - - - - - - 4 4 4 4 - - - |
+| - - - 3 3 3 3 3 - - - - - 4 4 4 4 4 - - - |
+| - - - - 3 3 4 4 4 - - - 4 4 4 4 4 - - - - |
+| - - - - 3 4 4 4 4 4 4 4 4 4 4 4 4 - - - - |
+| - - - - - 4 4 4 4 4 4 4 4 4 4 4 - - - - - |
+| - - - - - - 4 4 4 4 4 4 4 4 4 - - - - - - |
+| - - - - - - - - 4 4 4 4 4 - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
++-------------------------------------------+</pre>
+</blockquote>
+<p>That looks a lot more like a pie chart.</p>
+<h4>Part 4: doing the fancy work</h4>
+<p>We will now add (in one big step):</p>
+<ul>
+<li>Stretching along the X-axis.</li>
+<li>Condensing the spaces.</li>
+<li>Coloring for the pie parts.</li>
+<li>A legend.</li>
+</ul>
+<p>The text in <strong>bold</strong> is the original query, and is the only thing you need to change in order to create your own pie charts.</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    IF(round(sqrt(pow(col_number/@stretch-0.5-(@size-1)/2, 2) + pow(row_number-(@size-1)/2, 2))) BETWEEN @radius*2/3 AND @radius,
+    (SELECT SUBSTRING(@colors, name_order, 1) FROM
+      (
+      SELECT
+        name_order,
+        name_column,
+        value_column,
+        accumulating_value,
+        accumulating_value/@accumulating_value AS accumulating_value_ratio,
+        @aggregated_data := CONCAT(@aggregated_data, name_column, ': ', value_column, ' (', ROUND(100*value_column/@accumulating_value), '%)', '|') AS aggregated_name_column,
+        2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+      FROM (
+        SELECT
+          name_column,
+          value_column,
+          @name_order := @name_order+1 AS name_order,
+          @accumulating_value := @accumulating_value+value_column AS accumulating_value
+        FROM (
+          <strong>SELECT name AS name_column, value AS value_column FROM sample_values2 LIMIT 4</strong>
+          ) select_values,
+          (SELECT @name_order := 0) select_name_order,
+          (SELECT @accumulating_value := 0) select_accumulating_value,
+          (SELECT @aggregated_data := '') select_aggregated_name_column
+        ) select_accumulating_values
+      ) select_for_radians
+    WHERE accumulating_value_radians >= radians LIMIT 1
+    ), ' ')
+    order by col_number separator '') as pie
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value/@stretch - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) >= 0 THEN @abs_radians
+      WHEN SIGN(@dy) >= 0 AND SIGN(@dx) <= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) <= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) <= 0 AND SIGN(@dx) >= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 23) sel_size,
+    (select @radius := (@size/2 - 1)) sel_radius,
+    (select @stretch := 4) sel_stretch,
+    (select @colors := '#;o:X"@+-=123456789abcdef') sel_colors
+  WHERE
+    t1.value < @size*@stretch
+    AND t2.value < @size) select_combinations
+  GROUP BY row_number
+UNION ALL
+  SELECT
+    CONCAT(
+      REPEAT(SUBSTRING(@colors, value, 1), 2),
+      '  ',
+      SUBSTRING_INDEX(SUBSTRING_INDEX(@aggregated_data, '|', value), '|', -1)
+    )
+  FROM
+    tinyint_asc
+  WHERE
+    value BETWEEN 1 AND @name_order
+;
++----------------------------------------------------------------------------------------------+
+| pie                                                                                          |
++----------------------------------------------------------------------------------------------+
+|                                                                                              |
+|                                   ;;;;;;;;;;;;;;;;;;;;;;;;;                                  |
+|                          oooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;                         |
+|                    ooooooooooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;                   |
+|                oooooooooooooooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;               |
+|             oooooooooooooooooooooooo                     ;;;;;;;;;;;;;;;;;;;;;###            |
+|           oooooooooooooooooooo                                 ;;;;;;;;;###########          |
+|         oooooooooooooooooo                                         ##################        |
+|       ooooooooooooooooo                                               #################      |
+|      ooooooooooooooooo                                                 #################     |
+|      oooooooooooooooo                                                   ################     |
+|     oooooooooooooooo                                                     ################    |
+|      oooooooooooooooo                                                   ::::::::::::::::     |
+|      ooooooooooooooooo                                                 :::::::::::::::::     |
+|       ooooooooooooooooo                                               :::::::::::::::::      |
+|         oooooooooooooo::::                                         ::::::::::::::::::        |
+|           ooooooo:::::::::::::                                 ::::::::::::::::::::          |
+|             ::::::::::::::::::::::::                     ::::::::::::::::::::::::            |
+|                :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::               |
+|                    :::::::::::::::::::::::::::::::::::::::::::::::::::::::                   |
+|                          :::::::::::::::::::::::::::::::::::::::::::                         |
+|                                   :::::::::::::::::::::::::                                  |
+|                                                                                              |
+| ##  red: 1 (10%)                                                                             |
+| ;;  blue: 2 (20%)                                                                            |
+| oo  orange: 3 (30%)                                                                          |
+| ::  white: 4 (40%)                                                                           |
++----------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>Making the legend is by itself an interesting hack: aggregating an unknown number of rows using a session user variable, then splitting it again. Of course, this works well if we only have a small number of rows (values), as we expect in our case.</p>
+<h4>Showcase</h4>
+<p>OK. Why? <em>Why?</em></p>
+<p>Here are three charts I hope will convince the skeptic reader:</p>
+<p><em>Given the <strong>sakila</strong> database, list the 8 largest tables (size in KB):</em></p>
+<blockquote>
+<pre>+------------------------------------------------------------------------------+
+| pie_chart                                                                    |
++------------------------------------------------------------------------------+
+|                                                                              |
+|                            #######################                           |
+|                    #######################################                   |
+|               #################################################              |
+|            ##################                   ##################           |
+|         ###############                               ###############        |
+|        ;;###########                                     #############       |
+|      ;;;;;;;;;;;;;                                         #############     |
+|      ;;;;;;;;;;;;                                           ############     |
+|     ;;;;;;;;;;;;;                                           #############    |
+|      ;;;;;;;;;;;;                                           @@@@@@@@@@@@     |
+|      ;;;;;;;;;;;;;                                         """""""""""""     |
+|        ;;;;;;;;;;;;;                                     XX"""""""""""       |
+|         ;;;;;;;;;;;;;;;                               XXXXXXXXXXXXX""        |
+|            ;;;;;;;;;;;;;;;;;;                   ::::::::::XXXXXXXX           |
+|               ;;;;;;;;;;;;;;;;;;;;;;;;;;oooooooooo::::::::::::X              |
+|                    ;;;;;;;;;;;;;;;;;;;;;;ooooooooooo::::::                   |
+|                            ;;;;;;;;;;;;;;ooooooooo                           |
+|                                                                              |
+| ##  rental: 2850816 (43%)                                                    |
+| ;;  payment: 2228224 (34%)                                                   |
+| oo  inventory: 376832 (6%)                                                   |
+| ::  film_text: 325440 (5%)                                                   |
+| XX  film: 278528 (4%)                                                        |
+| ""  film_actor: 278528 (4%)                                                  |
+| @@  customer: 131072 (2%)                                                    |
+| ++  staff: 98304 (1%)                                                        |
++------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p><em>How much disk space does each storage engine consume (sum table size per engine)?</em></p>
+<blockquote>
+<pre>+------------------------------------------------------------------------------+
+| pie_chart                                                                    |
++------------------------------------------------------------------------------+
+|                                                                              |
+|                            #######################                           |
+|                    #######################################                   |
+|               #################################################              |
+|            ##################                   ##################           |
+|         ###############                               ###############        |
+|        #############                                     #############       |
+|      #############                                         #############     |
+|      ############                                           ############     |
+|     #############                                           #############    |
+|      ############                                           oooooooooooo     |
+|      #############                                         ;;;;;;;;;;;oo     |
+|        #############                                     ;;;;;;;;;;;;;       |
+|         ###############                               ;;;;;;;;;;;;;;;        |
+|            ##################                   #;;;;;;;;;;;;;;;;;           |
+|               #####################################;;;;;;;;;;;;              |
+|                    ###################################;;;;                   |
+|                            #######################                           |
+|                                                                              |
+| ##  InnoDB: 1908732 (84%)                                                    |
+| ;;  MyISAM: 284074 (12%)                                                     |
+| oo  ARCHIVE: 84276 (4%)                                                      |
++------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p><em>What were the most popular DMLs during the last 10 seconds?</em></p>
+<blockquote>
+<pre>+------------------------------------------------------------------------------+
+| pie_chart                                                                    |
++------------------------------------------------------------------------------+
+|                                                                              |
+|                            #######################                           |
+|                    #######################################                   |
+|               #################################################              |
+|            ##################                   ##################           |
+|         ###############                               ###############        |
+|        #############                                     #############       |
+|      #############                                         #############     |
+|      ############                                           ############     |
+|     #############                                           #############    |
+|      ############                                           oooo::::::::     |
+|      #############                                         ooooooooooooo     |
+|        #############                                     ooooooooooooo       |
+|         ###############                               ooooooooooooooo        |
+|            #################;                   ;;;;;;;;;ooooooooo           |
+|               #############;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;oo              |
+|                    ######;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;                   |
+|                            ;;;;;;;;;;;;;;;;;;;;;;;                           |
+|                                                                              |
+| ##  com_select: 1876 (69%)                                                   |
+| ;;  com_insert: 514 (19%)                                                    |
+| oo  com_delete: 277 (10%)                                                    |
+| ::  com_update: 63 (2%)                                                      |
++------------------------------------------------------------------------------+</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>ASCII graphics always look funny; some would say the same about <em>top</em>, <em>wget</em>,  <em>cal</em>, etc. (should I even mention <em>lynx</em>?)</p>
+<p>I think it is possible to do most common charting with SQL: I’ve already shown how to do horizontal graphs and pie charts. Multi-column bar charts can also be worked out. These are not meant as a permanent solution; but it’s good to be able to visualize some values without having to install Nagios (along with <em>apache</em>, <em>php</em>, drivers, etc.), or otherwise exporting table, copying to desktop machines, loading into OpenOffice impress, generating graphs.</p>
+<p>Sometimes you just need an immediate overlook. This is where I find SQL charting to be useful.</p>
+<p>Sure, there are Perl and Python solutions for that; that’s easily achieved as well. But doing it from with the MySQL client gives, in my opinion, a level of confidence: you’ll always be able to produce the graph; <em>perl-DBD-MySQL</em> or no <em>perl-DBD-MySQL</em>; Linux or Windows.</p>
+<p>Besides, it was fun doing it.</p>
+<div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><div class="sd-content"><ul><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-1093" class="share-twitter sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-1093" class="share-linkedin sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-jetpack-whatsapp"><a rel="nofollow noopener noreferrer" data-shared="" class="share-jetpack-whatsapp sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" target="_blank" title="Click to share on WhatsApp"><span>WhatsApp</span></a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-1093" class="share-facebook sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>	</div>
+
+	<footer class="entry-footer">
+			</footer>
+</article>
+
+	<nav class="navigation post-navigation" role="navigation" aria-label="Posts">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://shlomi-noach.github.io/blog/mysql/sql-graphics" rel="prev"><span class="nav-subtitle">Previous:</span> <span class="nav-title">SQL graphics</span></a></div><div class="nav-next"><a href="https://shlomi-noach.github.io/blog/mysql/generating-numbers-out-of-seemingly-thin-air" rel="next"><span class="nav-subtitle">Next:</span> <span class="nav-title">Generating numbers out of seemingly thin air</span></a></div></div>
+	</nav>    <div class="wpdiscuz_top_clearing"></div>
+    <div id="comments" class="comments-area"><div id="respond" style="width: 0;height: 0;clear: both;margin: 0;padding: 0;"></div>            <h3 id="wc-comment-header">
+                                    <div class="wpdiscuz-comment-count">
+                        <div class="wpd-cc-value">80</div>
+                        <div class="wpd-cc-arrow"></div>
+                    </div>
+                                Leave a Reply            </h3>
+                    <div id="wpcomm" class="wpdiscuz_unauth wpd-default">
+            <div class="wpdiscuz-form-top-bar">
+                <div class="wpdiscuz-ftb-left">
+                                                            <div id="wc_show_hide_loggedin_username">
+                                            </div>
+                </div>
+                                <div class="wpd-clear"></div>
+            </div>
+
+
+                        <div class="wc_social_plugin_wrapper">
+                            </div>
+                    <div class="wc-form-wrapper wc-main-form-wrapper" id="wc-main-form-wrapper-0_0">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                                        <form class="wc_comm_form wc_main_comm_form" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=40&d=mm&r=g" srcset="http://1.gravatar.com/avatar/?s=80&d=mm&r=g 2x" class="avatar avatar-40 photo avatar-default" height="40" width="40">                                    </div>
+                                
+                                <textarea id="wc-textarea-0_0" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="0_0" name="wpdiscuz_unique_id">
+                </form>
+                    <div class="wpdiscuz-form-bottom-bar">
+                    <div class="wpdiscuz-fbb-left">
+                                                                        <div class="wpdiscuz-stat wpd-stat-threads wpd-tooltip-left">
+                        <i class="fas fa-align-left fa-rotate-180" data-fa-transform="rotate-180"></i><span class="wpd-stat-threads-count">80</span>
+                        <wpdtip>Comment threads</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-replies wpd-tooltip-left">
+                        <i class="far fa-comments"></i><span class="wpd-stat-replies-count">0</span>
+                        <wpdtip>Thread replies</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-subscribers wpd-tooltip-left">
+                        <i class="fas fa-rss"></i><span>0</span>
+                        <wpdtip>Followers</wpdtip>
+                    </div> 
+                                                                    
+                    <div class="wpdiscuz-stat wpd-stat-reacted wpd-tooltip">
+                        <i class="fas fa-bolt"></i>
+                        <wpdtip>Most reacted comment</wpdtip>
+                    </div>
+                                                                    <div class="wpdiscuz-stat wpd-stat-hot wpd-tooltip">
+                        <i class="fab fa-hotjar"></i>
+                        <wpdtip>Hottest comment thread</wpdtip>
+                    </div>
+                            </div>
+                                        <div class="wpdiscuz-fbb-right">
+                                                        <div class="wpdiscuz-stat wpd-stat-users wpd-tooltip">
+                        <i class="fas fa-user-circle"></i> <span class="wpd-stat-authors-count">40</span>
+                        <wpdtip>Comment authors</wpdtip>
+                    </div>
+                                                                                                            <div class="wpdiscuz-users wpd-tooltip-right">
+                        <img alt="giovanni" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/912be27f87124c101fea73c8d599be21.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/912be27f87124c101fea73c8d599be21.gif 2x" class="avatar avatar-64 photo" height="64" width="64" title="giovanni"><img alt="John" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/fd99dd014d7470f93f5a79eb59103b15.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/fd99dd014d7470f93f5a79eb59103b15.gif 2x" class="avatar avatar-64 photo" height="64" width="64" title="John"><img alt="dinesh" src="http://2.gravatar.com/avatar/e3e8862008099d408c0148181955d5a2?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e3e8862008099d408c0148181955d5a2?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="dinesh"><img alt="Animal" src="http://0.gravatar.com/avatar/066d1e75c9b938053ee6b3d48b1c0f6a?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/066d1e75c9b938053ee6b3d48b1c0f6a?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Animal"><img alt="Dave" src="http://1.gravatar.com/avatar/7c8d0be40a784fb7ad95c802367d3173?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/7c8d0be40a784fb7ad95c802367d3173?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Dave">                        <wpdtip>Recent comment authors</wpdtip>
+                    </div>
+                            </div>
+                <div class="wpd-clear"></div>
+    </div>
+            </div>
+                <div id="wpdiscuz_hidden_secondary_form" style="display: none;">
+                    <div class="wc-form-wrapper wc-secondary-form-wrapper" id="wc-secondary-form-wrapper-wpdiscuzuniqueid" style="display: none;">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                            <div class="wc-secondary-forms-social-content"></div><div class="clearfix"></div>
+                                        <form class="wc_comm_form wc-secondary-form-wrapper" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=48&d=mm&r=g" srcset="http://2.gravatar.com/avatar/?s=96&d=mm&r=g 2x" class="avatar avatar-48 photo avatar-default" height="48" width="48">                                    </div>
+                                
+                                <textarea id="wc-textarea-wpdiscuzuniqueid" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="wpdiscuzuniqueid" name="wpdiscuz_unique_id">
+                </form>
+                        </div>
+                </div>
+        <p class="akismet_comment_form_privacy_notice">This site uses Akismet to reduce spam. <a href="https://akismet.com/privacy/" target="_blank" rel="nofollow noopener">Learn how your comment data is processed</a>.</p>                                   
+
+                                    <div class="wpdiscuz-front-actions">
+                                                    <div class="wpdiscuz-sbs-wrap">
+                                <span><i class="far fa-envelope" aria-hidden="true"></i>  Subscribe  <i class="fas fa-caret-down" aria-hidden="true"></i></span>
+                            </div>
+                                                                        <div class="clearfix"></div>
+                    </div>
+                                                    <div class="wpdiscuz-subscribe-bar wpdiscuz-hidden">
+                                                    <form action="https://shlomi-noach.github.io/blog/wp-admin/admin-ajax.php?action=addSubscription" method="post" id="wpdiscuz-subscribe-form">
+                                <div class="wpdiscuz-subscribe-form-intro">Notify of </div>
+                                <div class="wpdiscuz-subscribe-form-option" style="width:40%;">
+                                    <select class="wpdiscuz_select" name="wpdiscuzSubscriptionType">
+                                                                                    <option value="post">new follow-up comments</option>
+                                                                                                                            <option value="all_comment" disabled>new replies to my comments</option>
+                                                                            </select>
+                                </div>
+                                                                    <div class="wpdiscuz-item wpdiscuz-subscribe-form-email">
+                                        <input class="email" type="email" name="wpdiscuzSubscriptionEmail" required="required" value="" placeholder="Email">
+                                    </div>
+                                                                <div class="wpdiscuz-subscribe-form-button">
+                                    <input id="wpdiscuz_subscription_button" type="submit" value="›" name="wpdiscuz_subscription_button">
+                                </div> 
+                                                                <input type="hidden" id="wpdiscuz_subscribe_form_nonce" name="wpdiscuz_subscribe_form_nonce" value="12fac97726"><input type="hidden" name="_wp_http_referer" value="/blog/mysql/sql-pie-chart/comment-page-2">                                                                <input type="hidden" value="1093" name="wpdiscuzSubscriptionPostId">
+                            </form>
+                                                <div class="wpdiscuz_clear"></div>
+                                            </div>
+                    
+                                <div id="wcThreadWrapper" class="wc-thread-wrapper">
+                    <div id="wc-comm-3320_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-3320" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Gerg%3A%0APlease+do+put+it+on+postgres+snippets.+I+would+appre...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3320" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3320" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Gerg:<br>
+Please do put it on postgres snippets. I would appreciate source/author credit.</p>
+<p>Regards</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3320_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-3321_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-3321" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40TheVoo+%28%2348%29%0AWonderful%21+Colors+are+magical+%F0%9F%99%82%0AThanks+for+th...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3321" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3321" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@TheVoo (#48)</p>
+<p>Wonderful! Colors are magical 🙂</p>
+<p>Thanks for the tips,</p>
+<p>Shlomi</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3321_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-3460_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Roland Bouman" src="http://1.gravatar.com/avatar/74299d32f683e43dd6abb4107c67aa74?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/74299d32f683e43dd6abb4107c67aa74?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-3460" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://rpbouman.blogspot.com/" rel="nofollow" target="_blank">Roland Bouman</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hi+Shlomi%21+%0AI+take+a+2+week+holiday%2C+and+you+do+what+again%26...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3460" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3460" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi Shlomi! </p>
+<p>I take a 2 week holiday, and you do what again…?! </p>
+<p>🙂</p>
+<p>Seriously, I don’t think it’s a practical solution, but I’d like to credit you with more than being just crazy and having too much time on your hands. I contemplated creating MySQL pie charts after reading this post: </p>
+<p><a href="http://technology.amis.nl/blog/398/pie-charts-in-sql-how-pathetic-can-you-get" rel="nofollow ugc">http://technology.amis.nl/blog/398/pie-charts-in-sql-how-pathetic-can-you-get</a></p>
+<p>but I broke my head over it and deemed it impossible. So I stand corrected and feel humbled by your creativity and achievement. It’s great, it really is 🙂</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3460_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-3463_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-3463" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hi+Roland%2C+Nice+of+you+to+have+dropped+by%21+%28Are+you+reading...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3463" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3463" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi Roland, Nice of you to have dropped by! (Are you reading 2 weeks worth of planet mysql now?) I’ve also seen this post, but only just before I was ready to publish mine. It uses an altogether different method to create the charts. It’s the common belief that there’s nothing practical about SQL pie charts. I got so many funny comments (outside this post) like: “Make useless pie charts even more so with SQL”; and the majority think I’m crazy or evil-geek. I’m willing to accept that it’s not as useful as online ALTER TABLE (which I’ve also implemented).<span id="wpdiscuz-readmore-3463_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3463_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-3484_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-3484" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://lascribe.net/2009/08/25/132/" rel="nofollow" target="_blank">links for 2009-08-24 | Chris F. Waigl</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+SQL+pie+chart+%7C+code.openark.org+OK%2C+this+is+just...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3484" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3484" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] SQL pie chart | code.openark.org OK, this is just silly. But an interesting SQL walkthrough. Maybe. (tags: sql mysql visualization coding funny) […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3484_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-3510_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Chris" src="http://0.gravatar.com/avatar/62a22abbdc33a6005aa8d340067b3676?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/62a22abbdc33a6005aa8d340067b3676?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-3510" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Chris</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=You+are+a+bad+ass%21%21%21%21%21%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3510" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3510" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>You are a bad ass!!!!!</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3510_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-3550_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-3550" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://tweets2blog.wordpress.com/2009/08/28/wow-a-pie-chart-using-sql/" rel="nofollow" target="_blank">wow..!!! a pie chart using SQL… http:… « tweets lead to blog</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+August+28%2C+2009++Permalink+%7C+Reply+++Tags%3A+pie-ch...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-3550" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-3550" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] August 28, 2009  Permalink | Reply   Tags: pie-chart, SQL    wow..!!! a pie chart using SQL… <a href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" rel="nofollow ugc">https://shlomi-noach.github.io/blog/mysql/sql-pie-chart</a>   […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-3550_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-4045_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Marcus" src="http://0.gravatar.com/avatar/34ff2ff879d6515d0f2d1c2311d88500?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/34ff2ff879d6515d0f2d1c2311d88500?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-4045" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Marcus</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=I%26%238217%3Bm+pretty+sure+linking+this+page+to+any+employer+of+...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-4045" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-4045" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>I’m pretty sure linking this page to any employer of your liking will get you hired in a heartbeat. This, my friend, is _FREAKING_ awesome, not to mention sick. 100% bad-ass overload. I couldn’t start comprehend how to build such queries. This is an absolute display of mastering the SQL database. You rock.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-4045_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-4583_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Jared" src="http://2.gravatar.com/avatar/8cc6c8e503965d3f21090b544984cb78?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/8cc6c8e503965d3f21090b544984cb78?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-4583" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Jared</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Just+because+you+can%2C+doesn%26%238217%3Bt+mean+you+should.%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-4583" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-4583" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Just because you can, doesn’t mean you should.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-4583_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-5004_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-5004" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.pythian.com/news/4577/mysar-a-sidekick-for-other-monitoring-tools" rel="nofollow" target="_blank">MySAR, a Sidekick for Other Monitoring Tools | Pythian Group Blog</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+was+to+create+a+graphic+to+visualize+the+results....+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-5004" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-5004" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] was to create a graphic to visualize the results. Taking the ideas from Shlomi Noach’s blog, SQL pie chart, I decided to try and create the charts using the Google Charts […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-5004_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-5169_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="fabijoe" src="http://0.gravatar.com/avatar/9c50568aec7795a1624114c64d9baa3f?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9c50568aec7795a1624114c64d9baa3f?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-5169" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">fabijoe</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=I+wrote+a+sql+procedure+to+create+svg+piecharts%2C+based+on+a...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-5169" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-5169" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>I wrote a sql procedure to create svg piecharts, based on a pichert routine learned from the web. Procedure uses the piedata varray to store data initialized for the demo in the main program (you may, of course, initialize it from a database table, too). Chart is generated row-by-row into a table named text with one field named text (about 500 caracter long varchar2 field). Then you have to spool it’s contents into a file with .svg extension, your browser with an svg plugin will draw it. Procedure piechart maybe can be created as a stored procedure, too, to use<span id="wpdiscuz-readmore-5169_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-5169_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-6245_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-6245" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://edmondlau.ca/wp/2009/11/links-for-2009-11-03/" rel="nofollow" target="_blank">links for 2009-11-03 | Glorified Monkey</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+SQL+pie+chart+%7C+code.openark.org+%28tags%3A+sql+datab...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-6245" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-6245" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] SQL pie chart | code.openark.org (tags: sql database visualization mysql programming piechart) […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-6245_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-6700_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Eric Hynds" src="http://2.gravatar.com/avatar/57721d7c4df5a1e10e9442a79296956e?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/57721d7c4df5a1e10e9442a79296956e?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-6700" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://erichynds.com" rel="nofollow" target="_blank">Eric Hynds</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Very+impressive%21%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-6700" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-6700" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Very impressive!</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-6700_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-6708_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="R M" src="http://2.gravatar.com/avatar/e4f9b79c50d34cd29b39bb4f2d7b3d28?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e4f9b79c50d34cd29b39bb4f2d7b3d28?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-6708" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">R M</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=An+awesome+implementation+of+SQL%0AYep+%26%238211%3B+U+R+nutz+%26%23821...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-6708" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-6708" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>An awesome implementation of SQL</p>
+<p>Yep – U R nutz – but brilliant</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-6708_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-8036_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-8036" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.thehackerslibrary.com/?p=737" rel="nofollow" target="_blank">Code Classics | Hackers' Library</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+Model+clause+Solving+a+Sudoku+using+Recursive+Sub...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-8036" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-8036" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] Model clause Solving a Sudoku using Recursive Subquery Factoring of Oracle Database 11g Release 2 SQL-generated pie chart. (Single […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-8036_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-9108_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="himadri" src="http://1.gravatar.com/avatar/a09c66f694aeb4d971fe92105138ba34?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/a09c66f694aeb4d971fe92105138ba34?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-9108" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">himadri</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=which+planet+do+you+belong+to+..%0Athis+is+insanely+brilliant...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-9108" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-9108" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>which planet do you belong to ..</p>
+<p>this is insanely brilliant …. very very kool .. great stuff ..  </p>
+<p>if only I could have half the intelligence you have ..</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-9108_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-9574_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-9574" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://geeknotes.co.uk/?p=43" rel="nofollow" target="_blank">Geek overload – SQL Ascii Pie Chart – ht… « Geek Notes</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+overload+%26%238211%3B+SQL+Ascii+Pie+Chart+%26%238211%3B+http...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-9574" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-9574" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] overload – SQL Ascii Pie Chart – <a href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" rel="nofollow ugc">https://shlomi-noach.github.io/blog/mysql/sql-pie-chart</a>   var addthis_pub = ''; var addthis_language = 'en';var addthis_options = 'email, favorites, digg, […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-9574_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-10284_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-10284" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://jsolutions.se/2009/08/31/sql-for-yummies/" rel="nofollow" target="_blank">JSolutions.se » SQL for yummies</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+eller+en+d%C3%A5ligt+AA-kodad+film.+N%C3%B6jer+man+sig+med...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-10284" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-10284" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] eller en dåligt AA-kodad film. Nöjer man sig med stillbilder men inte vill ha random brus kanske cirkeldiagram (pie chart) i SQL-prompten vore […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-10284_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-10402_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Darren Dignam" src="http://1.gravatar.com/avatar/a00b373a5642eafaf896c7ec1b7e42ca?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/a00b373a5642eafaf896c7ec1b7e42ca?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-10402" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.blocsoft.com/" rel="nofollow" target="_blank">Darren Dignam</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Thanks.+I+liked+this+a+lot.%0AI+have+mentioned+this+work+ove...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-10402" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-10402" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Thanks. I liked this a lot.<br>
+I have mentioned this work over at my own blog, and also a method for colouring the graph using javascript. I tweaked the SQL to generate non-breaking spaces (otherwise a browser ruins the shape), and filled in the middle of the donut!</p>
+<p><a href="http://blocsoft.com/blog/graph.asp" rel="nofollow ugc">http://blocsoft.com/blog/graph.asp</a></p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-10402_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-10403_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-10403" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Darren%2C%0AThanks%3B+nice+blog%21%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-10403" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-10403" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Darren,</p>
+<p>Thanks; nice blog!</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-10403_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-11205_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Dave" src="http://1.gravatar.com/avatar/7c8d0be40a784fb7ad95c802367d3173?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/7c8d0be40a784fb7ad95c802367d3173?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-11205" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.db-elements.com" rel="nofollow" target="_blank">Dave</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Really+nice+idea+and+implementation.+Thanks+for+sharing.%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-11205" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-11205" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Really nice idea and implementation. Thanks for sharing.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-11205_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-12085_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Animal" src="http://0.gravatar.com/avatar/066d1e75c9b938053ee6b3d48b1c0f6a?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/066d1e75c9b938053ee6b3d48b1c0f6a?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-12085" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Animal</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Feckin%26%238217%3B+hell%21+You%26%238217%3Bre+clearly+insane%21+Hugely+ta...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-12085" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-12085" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Feckin’ hell! You’re clearly insane! Hugely talented, but quite mad!</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-12085_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-33870_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-33870" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://normanweaver.wordpress.com/2011/03/15/oracle-fusion-hybrid-bi-signals-end-of-disco-era/" rel="nofollow" target="_blank">Oracle Fusion hybrid BI signals end of Disco era | Dataweave Blog</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+thick+pile+of+paper%2C+covered+in+uniformly+spaced...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-33870" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-33870" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] thick pile of paper, covered in uniformly spaced alphanumerics. Charts and graphics were rare, and ascii pie charts were a programming miracle (and possibly still are). Analytics involved someone in operations or […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>9 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-33870_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-35743_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-35743" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.markleith.co.uk/?p=471" rel="nofollow" target="_blank">A Big Bag of Epic Awesomeness | Mark Leith</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+So+I+had+to+find+another+way+to+represent+this+n...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-35743" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-35743" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] So I had to find another way to represent this nicely, otherwise it’s just not that obvious how freaking awesome of an advancement in MySQL statement tracing this is.. Yet I love making SQL do things for me without having to wrap a program around it, so I thought I’d do another take on Shlomi Noach’s graphs with SQL. […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>9 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-35743_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-52147_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="dinesh" src="http://2.gravatar.com/avatar/e3e8862008099d408c0148181955d5a2?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e3e8862008099d408c0148181955d5a2?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-52147" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">dinesh</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Fantastic+%26%238230%3B%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-52147" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-52147" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Fantastic …</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-52147_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-55927_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-55927" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://gdm9000.wordpress.com/2011/10/21/sql/" rel="nofollow" target="_blank">SQL « Let's Explore Programming Languages</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+Cleverer+people+may+be+able+to+bastardize+SQL+fu...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-55927" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-55927" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] Cleverer people may be able to bastardize SQL further; I am not a clever man. For a real crime against SQLmanity, check out this neato pie chart (including legend) done entirely in SQL. […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>8 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-55927_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-111693_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-111693" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://radar.oreilly.com/2009/08/four-short-links-14-august-200.html" rel="nofollow" target="_blank">Four short links: 14 August 2009 - O'Reilly Radar</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+SQL+Pie+Chart+%26%238212%3B+an+ASCII+pie+chart%2C+drawn...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-111693" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-111693" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] SQL Pie Chart — an ASCII pie chart, drawn by SQL code. Horrifying and yet inspiring. Compare to PostgreSQL code to produce ASCII Mandelbrot set. (via jdub on Twitter and Simon Willison) […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>7 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-111693_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-238064_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="John" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/fd99dd014d7470f93f5a79eb59103b15.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/fd99dd014d7470f93f5a79eb59103b15.gif 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-238064" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">John</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Very+nice+hack%21+Can+we+get+some+colour%3F+%F0%9F%99%82%0AI+decided+to+ha...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-238064" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-238064" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Very nice hack! Can we get some colour? 🙂</p>
+<p>I decided to have a go at charting the same data using sqlchart:<br>
+<a href="http://www.sqldashboards.com/b/sql-pie-chart-mysql/" rel="nofollow ugc">http://www.sqldashboards.com/b/sql-pie-chart-mysql/</a></p>
+<p>it doesn’t take changing the mysql commands much. Not as awesome as your hack but it works.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>6 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-238064_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-314551_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="giovanni" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/912be27f87124c101fea73c8d599be21.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/912be27f87124c101fea73c8d599be21.gif 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-314551" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.capokkia.it" rel="nofollow" target="_blank">giovanni</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=you%26%238217%3Bre+crazy.%0Athis+is+lovely.%0Abut+you%26%238217%3Bre+craz...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-314551" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-314551" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>you’re crazy.<br>
+this is lovely.<br>
+but you’re crazy.</p>
+<p>wow</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>5 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-314551_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-378676_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-378676" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="https://blog.varonis.com/sql-injection-identification-and-prevention-part-1/" rel="nofollow" target="_blank">SQL Injection Identification and Prevention Part 1</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+SQL+Pie+Charts%3A+http%3A%2F%2Fcode.openark.org%2Fblog%2Fmy...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-pie-chart%2Fcomment-page-2%23comment-378676" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-2#comment-378676" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] SQL Pie Charts: <a href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart" rel="nofollow ugc">https://shlomi-noach.github.io/blog/mysql/sql-pie-chart</a> […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-378676_0" class="wpdiscuz_clear"></div></div>                
+                    <div class="wpdiscuz-comment-pagination">
+                        <a class="prev page-numbers" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-1#comments">« Previous</a>
+<a class="page-numbers" href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/comment-page-1#comments">1</a>
+<span aria-current="page" class="page-numbers current">2</span>                    </div>
+                </div>
+                <div class="wpdiscuz_clear"></div>
+                                                                                </div>
+        </div>
+        <div id="wpdiscuz-loading-bar" class="wpdiscuz-loading-bar wpdiscuz-loading-bar-unauth"></div>
+        
+	</main>
+
+
+	<footer id="colophon" class="site-footer">
+		<div class="site-info">
+			<a href="https://wordpress.org/">
+				Powered by WordPress			</a>
+			<span class="sep"> | </span>
+				Theme: <a href="http://openark.org">openark-primer</a> by <a href="http://underscores.me/">Underscores.me</a>.		</div>
+	</footer>
+</div>
+
+<a id="wpdUserContentInfoAnchor" style="display:none;" rel="#wpdUserContentInfo" data-wpd-lity>wpDiscuz</a><div id="wpdUserContentInfo" style="overflow:auto;background:#FDFDF6;padding:20px;width:600px;max-width:100%;border-radius:6px;" class="lity-hide"></div>	<div style="display:none">
+	<div class="grofile-hash-map-912be27f87124c101fea73c8d599be21">
+	</div>
+	<div class="grofile-hash-map-fd99dd014d7470f93f5a79eb59103b15">
+	</div>
+	<div class="grofile-hash-map-e3e8862008099d408c0148181955d5a2">
+	</div>
+	<div class="grofile-hash-map-066d1e75c9b938053ee6b3d48b1c0f6a">
+	</div>
+	<div class="grofile-hash-map-7c8d0be40a784fb7ad95c802367d3173">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	<div class="grofile-hash-map-7a804b43b6b9882a1c03dc7fe4f41f20">
+	</div>
+	<div class="grofile-hash-map-62a22abbdc33a6005aa8d340067b3676">
+	</div>
+	<div class="grofile-hash-map-34ff2ff879d6515d0f2d1c2311d88500">
+	</div>
+	<div class="grofile-hash-map-8cc6c8e503965d3f21090b544984cb78">
+	</div>
+	<div class="grofile-hash-map-9c50568aec7795a1624114c64d9baa3f">
+	</div>
+	<div class="grofile-hash-map-57721d7c4df5a1e10e9442a79296956e">
+	</div>
+	<div class="grofile-hash-map-e4f9b79c50d34cd29b39bb4f2d7b3d28">
+	</div>
+	<div class="grofile-hash-map-a09c66f694aeb4d971fe92105138ba34">
+	</div>
+	<div class="grofile-hash-map-a00b373a5642eafaf896c7ec1b7e42ca">
+	</div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/shlomi-noach.github.io\/blog\/mysql\/sql-pie-chart":1093};
+	</script>
+					<div id="sharing_email" style="display: none;">
+		<form action="/blog/mysql/sql-pie-chart/comment-page-2" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="">
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="">
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="">
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed">
+			
+			<img style="float: right; display: none" class="loading" src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/sharedaddy/images/loading.gif" alt="loading" width="16" height="16">
+			<input type="submit" value="Send Email" class="sharing_send">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<script>
+var pollsL10n = {"ajax_url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","text_wait":"Your last request is still being processed. Please wait a while ...","text_valid":"Please choose a valid poll answer.","text_multiple":"Maximum number of choices allowed: ","show_loading":"1","show_fading":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-js.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/wpdccjs/wpdcc.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/autogrow/jquery.autogrowtextarea.min.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.form.min.js"></script>
+<script>
+var wpdiscuzAjaxObj = {"url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","customAjaxUrl":"https:\/\/shlomi-noach.github.io\/blog\/wp-content\/plugins\/wpdiscuz\/utils\/ajax\/wpdiscuz-ajax.php","wpdiscuz_options":{"wc_hide_replies_text":"Hide Replies","wc_show_replies_text":"View Replies","wc_msg_required_fields":"Please fill out required fields","wc_invalid_field":"Some of field value is invalid","wc_error_empty_text":"please fill out this field to comment","wc_error_url_text":"url is invalid","wc_error_email_text":"email address is invalid","wc_invalid_captcha":"Invalid Captcha Code","wc_login_to_vote":"You Must Be Logged In To Vote","wc_deny_voting_from_same_ip":"You are not allowed to vote for this comment","wc_self_vote":"You cannot vote for your comment","wc_vote_only_one_time":"You've already voted for this comment","wc_voting_error":"Voting Error","wc_held_for_moderate":"Comment awaiting moderation","wc_comment_edit_not_possible":"Sorry, this comment no longer possible to edit","wc_comment_not_updated":"Sorry, the comment was not updated","wc_comment_not_edited":"You've not made any changes","wc_new_comment_button_text":"new comment","wc_new_comments_button_text":"new comments","wc_new_reply_button_text":"new reply on your comment","wc_new_replies_button_text":"new replies on your comments","wc_msg_input_min_length":"Input is too short","wc_msg_input_max_length":"Input is too long","wc_follow_user":"Follow this user","wc_unfollow_user":"Unfollow this user","wc_follow_success":"You started following this comment author","wc_follow_canceled":"You stopped following this comment author.","wc_follow_email_confirm":"Please check your email and confirm the user following request.","wc_follow_email_confirm_fail":"Sorry, we couldn't send confirmation email.","wc_follow_login_to_follow":"Please login to follow users.","wc_follow_impossible":"We are sorry, but you can't follow this user.","wc_follow_not_added":"Following failed. Please try again later.","is_user_logged_in":false,"commentListLoadType":"0","commentListUpdateType":"0","commentListUpdateTimer":"30","liveUpdateGuests":"1","wc_comment_bg_color":"#FEFEFE","wc_reply_bg_color":"#F8F8F8","wpdiscuzCommentsOrder":"asc","wpdiscuzCommentOrderBy":"comment_date_gmt","commentsVoteOrder":false,"wordpressThreadCommentsDepth":"5","wordpressIsPaginate":"1","commentTextMaxLength":null,"storeCommenterData":100000,"isCaptchaInSession":true,"isGoodbyeCaptchaActive":false,"socialLoginAgreementCheckbox":"1","enableFbLogin":"0","enableFbShare":"0","facebookAppID":"","facebookUseOAuth2":0,"enableGoogleLogin":"0","googleAppID":"","cookiehash":"c616fa5ebd4c9ddc6dc50cbf089ebb1d","isLoadOnlyParentComments":"0","ahk":"ef4t(c4n18s$wj!7(^b9x8#r5pax76x#","enableDropAnimation":1,"isNativeAjaxEnabled":1,"cookieCommentsSorting":"wpdiscuz_comments_sorting","enableLastVisitCookie":0,"version":"5.3.5","wc_post_id":1093,"loadLastCommentId":0,"lastVisitKey":"wpdiscuz_last_visit","isCookiesEnabled":true,"wc_captcha_show_for_guest":"0","wc_captcha_show_for_members":"0","is_email_field_required":"1"}};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz.js"></script>
+<script>
+var wpdiscuzUCObj = {"msgConfirmDeleteComment":"Are you sure you want to delete this comment?","msgConfirmCancelSubscription":"Are you sure you want to cancel this subscription?","msgConfirmCancelFollow":"Are you sure you want to cancel this follow?"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz-user-content.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/lity/lity.js"></script>
+<script src="https://secure.gravatar.com/js/gprofiles.js?ver=2020Junaa"></script>
+<script>
+var WPGroHo = {"my_hash":""};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/wpgroho.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/navigation.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/skip-link-focus-fix.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/js/prettify.min.js"></script>
+<script>
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/build/sharedaddy/sharing.min.js"></script>
+<script>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+</script>
+<script type="text/javascript" src="https://stats.wp.com/e-202024.js" async="async" defer></script>
+<script type="text/javascript">
+	_stq = window._stq || [];
+	_stq.push([ 'view', {v:'ext',j:'1:8.2.1',blog:'32412571',post:'1093',tz:'2',srv:'code.openark.org'} ]);
+	_stq.push([ 'clickTrackerInit', '32412571', '1093' ]);
+</script>
+
+</body>
+</html>

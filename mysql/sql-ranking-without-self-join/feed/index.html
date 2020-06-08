@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: SQL: Ranking without self join	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sat, 14 Feb 2015 23:09:06 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Rubear				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-309440</link>
+		<dc:creator><![CDATA[Rubear]]></dc:creator>
+		<pubDate>Sat, 14 Feb 2015 23:09:06 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-309440</guid>
+					<description><![CDATA[Hi, 
+
+Stumbled across here while looking for a ranking solution. I also required the version where ties affect the ranking as described in comment 32. Shlomi&#039;s solution is on the right lines it&#039;s just the order needs to be swapped around for it to work properly as you want step evaluated after rank. Thanks Shlomi for posting this, it&#039;s been a big help!
+
+SELECT user_name, user_score,
+        @prev := @curr,
+        @curr := user_score,
+	@rank := IF(@prev = @curr, @rank, @rank + @step) AS rank,
+        @step := IF(@prev = @curr, (@step + 1), 1) AS step
+        
+FROM your_score_table_or_leaderboard_query, 
+(SELECT @curr := null, @prev := null, @rank := 0, @step := 1) as holders
+ORDER BY user_score DESC]]></description>
+		<content:encoded><![CDATA[<p>Hi, </p>
+<p>Stumbled across here while looking for a ranking solution. I also required the version where ties affect the ranking as described in comment 32. Shlomi&#8217;s solution is on the right lines it&#8217;s just the order needs to be swapped around for it to work properly as you want step evaluated after rank. Thanks Shlomi for posting this, it&#8217;s been a big help!</p>
+<p>SELECT user_name, user_score,<br />
+        @prev := @curr,<br />
+        @curr := user_score,<br />
+	@rank := IF(@prev = @curr, @rank, @rank + @step) AS rank,<br />
+        @step := IF(@prev = @curr, (@step + 1), 1) AS step</p>
+<p>FROM your_score_table_or_leaderboard_query,<br />
+(SELECT @curr := null, @prev := null, @rank := 0, @step := 1) as holders<br />
+ORDER BY user_score DESC</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: A simple query &#124; my experiments				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-243922</link>
+		<dc:creator><![CDATA[A simple query &#124; my experiments]]></dc:creator>
+		<pubDate>Fri, 06 Jun 2014 17:21:50 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-243922</guid>
+					<description><![CDATA[[&#8230;] attempt one : Using Self joins., group-by. Complexity : O(n2) Some genius came up with the idea to avoid the O(n2) costs involved with self joins. Lets modify it to suit our [&#8230;]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] attempt one : Using Self joins., group-by. Complexity : O(n2) Some genius came up with the idea to avoid the O(n2) costs involved with self joins. Lets modify it to suit our [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-54745</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 13 Oct 2011 18:07:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-54745</guid>
+					<description><![CDATA[@Nandhagopal,
+You would use something like this:
+@step := IF(@prev = @curr, @step+1, 1) AS step
+@rank := IF(@prev = @curr, @rank, @rank+@step) AS rank
+...
+SELECT @step := 1]]></description>
+		<content:encoded><![CDATA[<p>@Nandhagopal,<br />
+You would use something like this:<br />
+@step := IF(@prev = @curr, @step+1, 1) AS step<br />
+@rank := IF(@prev = @curr, @rank, @rank+@step) AS rank<br />
+&#8230;<br />
+SELECT @step := 1</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Nandhagopal				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-54737</link>
+		<dc:creator><![CDATA[Nandhagopal]]></dc:creator>
+		<pubDate>Thu, 13 Oct 2011 16:42:51 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-54737</guid>
+					<description><![CDATA[I am new to the world of sql, so I apologise if my doubt sounds childish... In your examples, if two people are tied for the second spot then the one following them is 3rd. In actual conventional ranking systems, we place that fellow 4th. So, how would you change your query to incorporate it such that if m people are tied for the n&#039;th rank, then the next person after them must be ranked (m+n).]]></description>
+		<content:encoded><![CDATA[<p>I am new to the world of sql, so I apologise if my doubt sounds childish&#8230; In your examples, if two people are tied for the second spot then the one following them is 3rd. In actual conventional ranking systems, we place that fellow 4th. So, how would you change your query to incorporate it such that if m people are tied for the n&#8217;th rank, then the next person after them must be ranked (m+n).</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Subrata				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-36708</link>
+		<dc:creator><![CDATA[Subrata]]></dc:creator>
+		<pubDate>Tue, 12 Apr 2011 09:13:04 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-36708</guid>
+					<description><![CDATA[Try this one
+
+SELECT
+  s1.score_id, s1.student_name, s1.score, COUNT(DISTINCT s2.score) AS rank
+FROM
+  score s1 JOIN score s2 ON (s1.score &#060;= s2.score)
+GROUP BY s1.score_id ORDER BY rank]]></description>
+		<content:encoded><![CDATA[<p>Try this one</p>
+<p>SELECT<br />
+  s1.score_id, s1.student_name, s1.score, COUNT(DISTINCT s2.score) AS rank<br />
+FROM<br />
+  score s1 JOIN score s2 ON (s1.score &lt;= s2.score)<br />
+GROUP BY s1.score_id ORDER BY rank</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: bigcode				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-22929</link>
+		<dc:creator><![CDATA[bigcode]]></dc:creator>
+		<pubDate>Sat, 11 Dec 2010 15:36:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-22929</guid>
+					<description><![CDATA[I don&#039;t have an example of doing a rank without the self join but my example does allow for grouping.
+http://bigcode.wordpress.com/2010/12/11/5/]]></description>
+		<content:encoded><![CDATA[<p>I don&#8217;t have an example of doing a rank without the self join but my example does allow for grouping.<br />
+<a href="http://bigcode.wordpress.com/2010/12/11/5/" rel="nofollow ugc">http://bigcode.wordpress.com/2010/12/11/5/</a></p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-18828</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 12 Oct 2010 05:32:46 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-18828</guid>
+					<description><![CDATA[@Mark,
+
+Was taught that a couple of years ago here:
+&lt;a href=&quot;https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query#comment-63&quot; rel=&quot;nofollow&quot;&gt;https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query#comment-63&lt;/a&gt;]]></description>
+		<content:encoded><![CDATA[<p>@Mark,</p>
+<p>Was taught that a couple of years ago here:<br />
+<a href="https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query#comment-63" rel="nofollow">https://shlomi-noach.github.io/blog/mysql/dynamic-sequencing-with-a-single-query#comment-63</a></p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Mark Plutowski				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-18773</link>
+		<dc:creator><![CDATA[Mark Plutowski]]></dc:creator>
+		<pubDate>Mon, 11 Oct 2010 20:44:47 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-18773</guid>
+					<description><![CDATA[@shlomi: thanks for the neat trick of using cross join to initialize the variables. 
+
+@GSnyder : this matters when using a tool (e.g., BI or reporting tool) that only allows entering a single SQL statement. 
+
+@Jay: as you say: &quot;Now try your trick when you need a GROUP BY&quot;  -- Indeedy, unfort&#039;y this is the showstopper for me too.  I can&#039;t get it to work with a GROUP BY.  
+
+But hey, I still got one neat trick out of this, so thanks again for that Shlomi !]]></description>
+		<content:encoded><![CDATA[<p>@shlomi: thanks for the neat trick of using cross join to initialize the variables. </p>
+<p>@GSnyder : this matters when using a tool (e.g., BI or reporting tool) that only allows entering a single SQL statement. </p>
+<p>@Jay: as you say: &#8220;Now try your trick when you need a GROUP BY&#8221;  &#8212; Indeedy, unfort&#8217;y this is the showstopper for me too.  I can&#8217;t get it to work with a GROUP BY.  </p>
+<p>But hey, I still got one neat trick out of this, so thanks again for that Shlomi !</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: links for 2010-06-25 &#124; Digitalistic - Mashup or die trying				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-15133</link>
+		<dc:creator><![CDATA[links for 2010-06-25 &#124; Digitalistic - Mashup or die trying]]></dc:creator>
+		<pubDate>Fri, 25 Jun 2010 14:03:51 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-15133</guid>
+					<description><![CDATA[[...] SQL: Ranking without self join &#124; code.openark.org (tags: sql join ranking optimization mysql) [...]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] SQL: Ranking without self join | code.openark.org (tags: sql join ranking optimization mysql) [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-ranking-without-self-join/comment-page-1#comment-10147</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 02 Feb 2010 19:53:03 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1293#comment-10147</guid>
+					<description><![CDATA[George,
+
+Reset as in @c := 0, nothing fancy...]]></description>
+		<content:encoded><![CDATA[<p>George,</p>
+<p>Reset as in @c := 0, nothing fancy&#8230;</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

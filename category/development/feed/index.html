@@ -1,0 +1,818 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Development &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/category/development/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 20 Jun 2017 04:05:39 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Observations on the hashicorp/raft library, and notes on RDBMS</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms#comments</comments>
+				<pubDate>Tue, 20 Jun 2017 04:05:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[freno]]></category>
+		<category><![CDATA[golang]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7717</guid>
+				<description><![CDATA[The hashicorp/raft library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s Consul. I&#8217;ve had the opportunity to work with this library a couple projects, namely freno and orchestrator. Here are a few observations on working with this library: TL;DR on Raft: a group communication protocol; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The <a href="https://github.com/hashicorp/raft">hashicorp/raft</a> library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s <a href="https://github.com/hashicorp/consul">Consul</a>.</p>
+<p>I&#8217;ve had the opportunity to work with this library a couple projects, namely <a href="https://github.com/github/freno">freno</a> and <a href="https://github.com/github/orchestrator/pull/183/">orchestrator</a>. Here are a few observations on working with this library:</p>
+<ul>
+<li>TL;DR on Raft: a group communication protocol; multiple nodes communicate, elect a leader. A leader leads a <em>consensus</em> (any subgroup of more than half the nodes of the original group, or hopefully all of them). Nodes may leave and rejoin, and will remain consistent with consensus.</li>
+<li>The hashicorp/raft library is an implementation of the Raft protocol. There are <a href="https://raft.github.io/#implementations">other implementations</a>, and different implementations support different features.</li>
+<li>The most basic premise is leader election. This is pretty straightforward to implement; you set up nodes to communicate to each other, and they elect a leader. You may query for the leader identity via <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Leader">Leader()</a>, <a href="https://godoc.org/github.com/hashicorp/raft#Raft.VerifyLeader">VerifyLeader()</a>, or observing <a href="https://godoc.org/github.com/hashicorp/raft#Raft.LeaderCh">LeaderCh</a>.</li>
+<li>You have no control over the identity of the leader. You cannot &#8220;prefer&#8221; one node to be the leader. You cannot <em>grab</em> leadership from an elected leader, and you cannot demote a leader unless by killing it.</li>
+<li>The next premise is gossip, sending messages between the raft nodes. With <code>hashicorp/raft</code>, only the leader may send messages to the group. This is done via the <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Apply">Apply()</a> function.</li>
+<li>Messages are nothing but blobs. Your app encodes the messages into <code>[]byte</code> and ships it via raft. Receiving ends need to decode the bytes into a meaningful message.</li>
+<li>You will check the result of Apply(), an <a href="https://godoc.org/github.com/hashicorp/raft#ApplyFuture">ApplyFuture</a>. The call to <a href="https://godoc.org/github.com/hashicorp/raft#Future">Error()</a> will wait for consensus.</li>
+<li>Just what is a message consensus? It&#8217;s a guarantee that the consensus of nodes has received and registered the message.</li>
+<li>Messages form the raft log.</li>
+<li>Messages are guaranteed to be handled in-order across all nodes.</li>
+<li>The leader is satisfied when the followers receive the messages/log, but it cares not for their interpretation of the log.</li>
+<li>The leader does not collect the output, or return value, of the followers applying of the log.</li>
+<li>Consequently, your followers may not abort the message. They may not cast an opinion. They must adhere to the instruction received from the leader.</li>
+<li><code>hashicorp/raft</code> uses either an <a href="http://github.com/hashicorp/raft-mdb">LMDB-based</a> store or <a href="https://github.com/boltdb/bolt">BoltDB</a> for persisting your messages. Both are transactional stores.</li>
+<li>Messages are expected to be idempotent: a node that, say, happens to restart, will request to join back the consensus (or to form a consensus with some other node). To do that, it will have to reapply historical messages that it may have applied in the past.</li>
+<li>Number of messages (log entries) will grow infinitely. Snapshots are taken so as to truncate the log history. You will implement the snapshot dump &amp; load.</li>
+<li>A snapshot includes the log index up to which it covers.</li>
+<li>Upon startup, your node will look for the most recent snapshot. It will read it, then resume replication from the aforementioned log index.</li>
+<li><code>hashicorp/raft</code> provides a file-system based snapshot implementation.</li>
+</ul>
+<p>One of my use cases is completely satisfied with the existing implementations of <code>BoltDB</code> and of the filesystem snapshot.</p>
+<p>However in another (<code>orchestrator</code>), my app stores its state in a relational backend. To that effect, I&#8217;ve modified the logstore and snapshot store. I&#8217;m using either MySQL or <code>sqlite</code> as backend stores for my app. How does that affect my <code>raft</code> use?<span id="more-7717"></span></p>
+<ul>
+<li>My backend RDBMS is the de-facto state of my <code>orchestrator</code> app. Anything written to this DB is persisted and durable.</li>
+<li>When <code>orchestrator</code> applies a raft log/message, it runs some app logic which ends with a write to the backend DB. At that time, the raft log is effectively not required anymore to persist. I care not for the history of logs.</li>
+<li>Moreover, I care not for snapshotting. To elaborate, I care not for snapshot data. My backend RDBMS <em>is the snapshot data</em>.</li>
+<li>Since I&#8217;m running a RDBMS, I find <code>BoltDB</code> to be wasteful, an additional transaction store on top a transaction store I already have.</li>
+<li>Likewise, the filesystem snapshots are yet another form of store.</li>
+<li>Log Store (including Stable Store) are <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_store.go">easily re-implemented</a> on top of RDBMS. The log is a classic relational entity.</li>
+<li>Snapshot is <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_snapshot.go">also implemented</a> on top of RDBMS,  however I only care for the snapshot metadata (what log entry is covered by a snapshot) and completely discard storing/loading snapshot <em>state</em> or <em>content</em>.</li>
+<li>With all these in place, I have a single entity that defines:
+<ul>
+<li>What my data looks like</li>
+<li>Where my node fares in the group gossip</li>
+</ul>
+</li>
+<li>A single RDBMS restore returns a dataset that will catch up with raft log correctly. However my restore window is limited by the number of snapshots I store and their frequency.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7717</post-id>	</item>
+		<item>
+		<title>Forking Golang repositories on GitHub and managing the import path</title>
+		<link>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path</link>
+				<comments>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path#comments</comments>
+				<pubDate>Mon, 23 Nov 2015 12:22:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[golang]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7506</guid>
+				<description><![CDATA[Problem: there&#8217;s an awesome Golang project on GitHub which you want to fork. You want to develop &#38; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything. A couple solutions offered below. First, though, let&#8217;s get some names. A sample case, the problem at hand There&#8217;s an [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Problem: there&#8217;s an awesome Golang project on GitHub which you want to fork. You want to develop &amp; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything.</p>
+<p>A couple solutions offered below. First, though, let&#8217;s get some names.</p>
+<h3>A sample case, the problem at hand</h3>
+<p>There&#8217;s an awesome tool on <strong><em>http://github.com/awsome-org/tool</em></strong>. You successfully fork it onto <strong><em>http://github.com/awesome-you/tool</em></strong>.</p>
+<p>You want to collaborate on <strong><em>http://github.com/awesome-you/tool</em></strong>; you wish to pull, commit &amp; push. Maybe you want to send pull requests to the origin.</p>
+<p>The following is commonly found throughout <strong>.go</strong> files in the repository:</p>
+<blockquote>
+<pre>import (
+    "github.com/awesome-org/tool/config"
+    "github.com/awesome-org/tool/driver"
+    "github.com/awesome-org/tool/net"
+    "github.com/awesome-org/tool/util"
+)</pre>
+</blockquote>
+<p>If you:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p><em>golang</em> creates your <strong>$GOPATH/src/github.com/awesome-you/tool/</strong>, which is awesome. However, as you resolve dependencies via</p>
+<blockquote>
+<pre>cd $GOPATH/src/github.com/awesome-you/tool/ ; go get ./...</pre>
+</blockquote>
+<p><em>golang</em> digs into the source code, finds references to <strong>github.com/awesome-org/tool/config</strong>, <strong>github.com/awesome-org/tool/driver</strong> etc, and fetches <em>those</em> from <strong>http://github.com/awsome-org/tool</strong> and onto <strong>$GOPATH/src/github.com/awesome-org/tool/</strong>, which is not awesome. You actually have two copies of the code, one from your fork, one from the origin, and your own fork will be largely ignored as it mostly points back to the origin.</p>
+<h3>A bad solution</h3>
+<p>The dirty, bad solution would be for you to go over the source code and replace <strong>&#8220;github.com/awesome-org/tool&#8221;</strong> entries with <strong>&#8220;github.com/awesome-you/tool&#8221;</strong>. It is bad for two reasons:</p>
+<ul>
+<li>You will not be able to further pull changes from upstream</li>
+<li>You will not be able to pull-request and push your own changes upstream</li>
+</ul>
+<p><span id="more-7506"></span>When I say &#8220;You will not be able&#8221; I mean &#8220;in a reasonable, developer-friendly manner&#8221;. The code will be incompatible with upstream and you have effectively detached your code. You will need to keep editing and re-editing those entries anytime you wish to pull/push upstream.</p>
+<h3>Solution #1: add remote</h3>
+<p>Described in <a href="http://blog.campoy.cat/2014/03/github-and-go-forking-pull-requests-and.html">GitHub and Go: forking, pull requests, and go-getting</a>, follow these procedures:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-org/tool
+git remote add <strong>awesome-you-fork</strong> http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p>You&#8217;re adding your repository as <a href="http://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes">remote</a>. You will from now on need to explicitly:</p>
+<blockquote>
+<pre>git pull --rebase <strong>awesome-you-fork</strong>
+git push <strong>awesome-you-fork</strong></pre>
+</blockquote>
+<p>If you forget to add the <strong>&#8220;awesome-you-fork&#8221;</strong> argument, you are pulling and pushing from upstream.</p>
+<h3>Solution #2: cheat &#8220;go get&#8221;, DIY</h3>
+<p>The problem began with the <strong>go get</strong> command, which copied the URI path onto <strong>$GOPATH/src</strong>. However <strong>go get</strong> implicitly issues a git clone, and we can do the same ourselves. We will dirty our hands just once, and then benefit from an ambiguous-less environment.</p>
+<p>We will now create our git repository in the name of <strong>awesome-org</strong> but with the contents of <strong>awesome-you</strong>:</p>
+<blockquote>
+<pre>cd $GOPATH
+mkdir -p {src,bin,pkg}
+mkdir -p <strong>src/github.com/awesome-org/</strong>
+cd src/github.com/awesome-org/
+git clone git@github.com:<strong>awesome-you/tool.git</strong> # OR: git clone https://github.com/<strong>awesome-you/tool.git</strong>
+cd tool/
+go get ./...</pre>
+</blockquote>
+<p>The <strong>mkdir -p {src,bin,pkg}</strong> is there just in case you do not have anything setup in your <strong>$GOPATH</strong>. We then create the repository path under the name of <strong>awesome-org</strong>, but once inside clone from <strong>awesome-you</strong>.</p>
+<p>The source code&#8217;s import path fits your directory layout now, but as you push/pull you are only speaking to your own <strong>awesome-you</strong> repository.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7506</post-id>	</item>
+		<item>
+		<title>zookeepercli: lightweight, powerful, controlled command line client for ZooKeeper</title>
+		<link>https://shlomi-noach.github.io/blog/linux/zookeepercli-lightweight-powerful-controlled-command-line-client-for-zookeeper</link>
+				<comments>https://shlomi-noach.github.io/blog/linux/zookeepercli-lightweight-powerful-controlled-command-line-client-for-zookeeper#comments</comments>
+				<pubDate>Wed, 17 Sep 2014 07:08:20 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[command line]]></category>
+		<category><![CDATA[go]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[ZooKeeper]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6980</guid>
+				<description><![CDATA[I&#8217;m happy to announce the availability of zookeepercli: a lightweight, simple, fast and controlled command line client for ZooKeeper. zookeepercli allows for: Basic CRUD-like operations: create,  set,  delete,  exists,  get,  ls (aka children). Extended operations: lsr (ls recursive),  creater (create recursively) Well formatted and controlled output: supporting either txt or json format Single, no-dependencies binary [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m happy to announce the availability of <a href="https://github.com/outbrain/zookeepercli"><strong>zookeepercli</strong></a>: a lightweight, simple, fast and controlled command line client for ZooKeeper.</p>
+<p><strong>zookeepercli</strong> allows for:</p>
+<ul class="task-list">
+<li>Basic CRUD-like operations: <strong><code>create</code></strong>,  <strong><code>set</code></strong>,  <strong><code>delete</code></strong>,  <strong><code>exists</code></strong>,  <strong><code>get</code></strong>,  <strong><code>ls</code></strong> (aka <strong><code>children</code></strong>).</li>
+<li>Extended operations: <strong><code>lsr</code></strong> (ls recursive),  <strong><code>creater</code></strong> (create recursively)</li>
+<li>Well formatted and controlled output: supporting either <strong><code>txt</code></strong> or <strong><code>json</code></strong> format</li>
+<li>Single, no-dependencies binary file, based on a native Go ZooKeeper library by <a href="http://github.com/samuel/go-zookeeper">github.com/samuel/go-zookeeper</a> (<a href="https://github.com/outbrain/zookeepercli/blob/master/go-zookeeper-LICENSE">LICENSE</a>)</li>
+</ul>
+<p>I was dissatisfied with existing command line access to ZooKeeper. Uncontrolled and noisy output as well as large footprint were among the reasons. <strong>zookeepercli</strong> overcomes the above and provides with often required powers.</p>
+<p>Usage samples:</p>
+<blockquote>
+<pre><code>
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only "path placeholder"
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only/key1 "value1"
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only/key2 "value2"
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c create /demo_only/key3 "value3"
+
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c ls /demo_only
+<span style="color: #808000;">key3
+key2
+key1
+</span>
+<span style="color: #ff6600;"># Same as above, JSON format output:</span>
+$ zookeepercli --servers srv-1,srv-2,srv-3 --format=json -c ls /demo_only
+<span style="color: #808000;">["key3","key2","key1"]</span>
+
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only/key1
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only/key2
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only/key3
+$ zookeepercli --servers srv-1,srv-2,srv-3 -c delete /demo_only
+
+<span style="color: #ff6600;"># Create a path recursively (auto-generate parent directories if not exist):</span>
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c creater "/demo_only/child/key1" "val1"
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c creater "/demo_only/child/key2" "val2"
+
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c get "/demo_only/child/key1"
+<span style="color: #808000;">val1</span>
+
+<span style="color: #ff6600;"># This path was auto generated due to recursive create:</span>
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c get "/demo_only" 
+<span style="color: #808000;">zookeepercli auto-generated</span>
+
+<span style="color: #ff6600;"># ls recursively a path and all sub children:</span>
+$ zookeepercli --servers=srv-1,srv-2,srv-3 -c lsr "/demo_only" 
+<span style="color: #808000;">child
+child/key1
+child/key2 </span></code></pre>
+</blockquote>
+<p><strong>zookeepercli</strong> is released as open source by <a href="https://github.com/outbrain">Outbrain</a> under the <a href="https://github.com/outbrain/zookeepercli/blob/master/LICENSE">Apache 2.0 license</a>.</p>
+<p>Quick links:</p>
+<ul>
+<li><a href="https://github.com/outbrain/zookeepercli">Project page</a></li>
+<li><a href="https://github.com/outbrain/zookeepercli/releases">Pre-built binaries</a> for download</li>
+<li><a href="https://github.com/outbrain/zookeepercli/blob/master/LICENSE">License</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/linux/zookeepercli-lightweight-powerful-controlled-command-line-client-for-zookeeper/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6980</post-id>	</item>
+		<item>
+		<title>Documentation in SQL: CALL for help()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/documentation-in-sql-call-for-help</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/documentation-in-sql-call-for-help#comments</comments>
+				<pubDate>Wed, 11 Jan 2012 07:01:54 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[documentation]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4536</guid>
+				<description><![CDATA[Documentation is an important part of any project. On the projects I maintain I put a lot of effort on documentation, and, frankly, the majority of time spent on my projects is on documentation. The matter of keeping the documentation faithful is a topic of interest. I&#8217;d like to outline a few documentation bundling possibilities, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Documentation is an important part of any project. On the projects I maintain I put a lot of effort on documentation, and, frankly, the majority of time spent on my projects is on documentation.</p>
+<p>The matter of keeping the documentation faithful is a topic of interest. I&#8217;d like to outline a few documentation bundling possibilities, and the present the coming new documentation method for <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>. I&#8217;ll talk about any bundling that is NOT <em>man pages</em>.</p>
+<h4>High level: web docs</h4>
+<p>This is the initial method of documentation I used for <a title="openark kit" href="../../forge/openark-kit">openark kit</a> and <a title="mycheckpoint" href="../../forge/mycheckpoint">mycheckpoint</a>. It&#8217;s still valid for <em>mycheckpoint</em>. Documentation is web-based. You need Internet access to read it. It&#8217;s in HTML format.</p>
+<p>Well, not exactly HTML format: I wrote it in WordPress. Yes, it&#8217;s HTML, but there&#8217;s a lot of noise around (theme, menus, etc.) which is not strictly part of the documentation.</p>
+<p>While this is perhaps the easiest way to go, here&#8217;s a few drawbacks:<span id="more-4536"></span></p>
+<ul>
+<li>You&#8217;re bound to some framework (WordPress in this case)</li>
+<li>Docs are split between MySQL database (my underlying WordPRess storage) &amp; WordPress files (themes, style, header, footer etc.)</li>
+<li>Documentation is separate from your code &#8211; they&#8217;re just not in the same place</li>
+<li>There is no version control over the documentation.</li>
+</ul>
+<p>The result is a single source of documentation, which applies to whatever version is latest. It&#8217;s impossible to maintain docs for multiple versions. You must manually synchronize your WordPress updates with code commits (or rather &#8211; code release!).</p>
+<h4>Mid level: version controlled HTML docs</h4>
+<p>I first saw this approach on Baron&#8217;s <a href="http://www.xaprb.com/blog/2010/09/22/aspersa-gets-a-user-manual/" rel="bookmark">Aspersa gets a user manual</a> post. I loved it: the documentation is HTML, but stored as part of your project&#8217;s code, in same version control.</p>
+<p>This means one can <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html">browse the documentation</a> (<em>openark kit</em> in this example) exactly as it appears in the baseline. Depending on your project hosting, one may be able to do so per version.</p>
+<p>The approach has the great benefit of having the docs tightly coupled with the code in terms of development. Before committing code, one updates documentation for that code, then commits/releases both together.</p>
+<p>You&#8217;re also not bound to any development framework. You may edit with <em>vim, emacs, gedit, bluefish, eclipse,</em> &#8230; any tool of your choice. It&#8217;s all down to plain old text files.</p>
+<h4>Mid level #2: documentation bundling</h4>
+<p>One thing I started doing with common_schema is to release a doc bundle with the code. So one can download a compressed bundle of all HTML files. That way one is absolutely certain what&#8217;s the right documentation for revision <strong>178</strong>. There&#8217;s no effort about it: the docs are already tightly coupled with code versions. Just compress and distribute.</p>
+<h4>Low level: documentation coupled with your code</h4>
+<p>Perl scripts can be written as Perl modules, in which case they are eligible for using the <em>perldoc</em> convention. You code your documentation within your script itself, as comment. <em>Perldoc</em> can extract the documentation and present in man-like format. Same happens with Python&#8217;s <em>pydoc</em>. Baron&#8217;s <a href="http://www.xaprb.com/blog/2011/11/07/when-documentation-is-code/" rel="bookmark">When documentation is code</a> illustrates that approach. <a href="http://www.maatkit.org/">Maatkit</a> (now <em>Percona Toolkit</em>) has been using it for years.</p>
+<p>This method has the advantage of having the documentation ready right within your shell. You don&#8217;t need a browser, nor firewall access. The docs are just there for you in the same environment where you&#8217;re executing the code.</p>
+<h4>SQL Low level: CALL for help()</h4>
+<p><em>common_schema</em> is a different type of project. It is merely a schema. There&#8217;s no Perl nor Python. One imports the schema into one&#8217;s MySQL server.</p>
+<p>What&#8217;s the low-level approach for this type of code?</p>
+<p>For <em>common_schema</em> I use three levels of documentation: the mid-level, where one can <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html">browse through the versioned docs</a>, the 2nd mid-level, where one can <a href="http://code.google.com/p/common-schema/downloads/list">download bundled documentation</a>, and then a low-level approach: documentation embedded within the code.</p>
+<p>MySQL&#8217;s documentation is also built into the server: see the <strong>help_*</strong> tables within the <strong>mysql</strong> schema. The <em>mysql</em> command line client allows one to access help by supporting the help command, e.g.</p>
+<blockquote>
+<pre>mysql&gt; help create table;</pre>
+</blockquote>
+<p>The client intercepts this command (this is not server side command) and searches through the <strong>mysql.help_*</strong> docs.</p>
+<p>With <em>common_schema</em>, I don&#8217;t have control over the client; it&#8217;s all on server side. But the code being a schema, what with stored routines and tables, it&#8217;s easy enough to set up documentation.</p>
+<p>As of the next version of <em>common_schema</em>, and following MySQL&#8217;s method, <em>common_schema</em> provides a <strong>help</strong> table:</p>
+<blockquote>
+<pre>DESC help;
++--------------+-------------+------+-----+---------+-------+
+| Field        | Type        | Null | Key | Default | Extra |
++--------------+-------------+------+-----+---------+-------+
+| topic        | varchar(32) | NO   | PRI | NULL    |       |
+| help_message | text        | NO   |     | NULL    |       |
++--------------+-------------+------+-----+---------+-------+</pre>
+</blockquote>
+<p>And a <strong>help()</strong> procedure, so that you can call for <em>help()</em>. The procedure will look for the best matching document based on your search expression:</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; <strong>CALL help('match');</strong>
+<strong>+---------------------------------------</strong>----------------------------------------+
+| help                                                                          |
++-------------------------------------------------------------------------------+
+|                                                                               |
+| NAME                                                                          |
+|                                                                               |
+| match_grantee(): Match an existing account based on user+host.                |
+|                                                                               |
+| TYPE                                                                          |
+|                                                                               |
+| Function                                                                      |
+|                                                                               |
+| DESCRIPTION                                                                   |
+|                                                                               |
+| MySQL does not provide with identification of logged in accounts. It only     |
+| provides with user + host:port combination within processlist. Alas, these do |
+| not directly map to accounts, as MySQL lists the host:port from which the     |
+| connection is made, but not the (possibly wildcard) user or host.             |
+| This function matches a user+host combination against the known accounts,     |
+| using the same matching method as the MySQL server, to detect the account     |
+| which MySQL identifies as the one matching. It is similar in essence to       |
+| CURRENT_USER(), only it works for all sessions, not just for the current      |
+| session.                                                                      |
+|                                                                               |
+| SYNOPSIS                                                                      |
+|                                                                               |
+|                                                                               |
+|                                                                               |
+|        match_grantee(connection_user char(16) CHARSET utf8,                   |
+|        connection_host char(70) CHARSET utf8)                                 |
+|          RETURNS VARCHAR(100) CHARSET utf8                                    |
+|                                                                               |
+|                                                                               |
+| Input:                                                                        |
+|                                                                               |
+| * connection_user: user login (e.g. as specified by PROCESSLIST)              |
+| * connection_host: login host. May optionally specify port number (e.g.       |
+|   webhost:12345), which is discarded by the function. This is to support      |
+|   immediate input from as specified by PROCESSLIST.                           |
+|                                                                               |
+|                                                                               |
+| EXAMPLES                                                                      |
+|                                                                               |
+| Find an account matching the given use+host combination:                      |
+|                                                                               |
+|                                                                               |
+|        mysql&gt; SELECT match_grantee('apps', '192.128.0.1:12345') AS            |
+|        grantee;                                                               |
+|        +------------+                                                         |
+|        | grantee    |                                                         |
+|        +------------+                                                         |
+|        | 'apps'@'%' |                                                         |
+|        +------------+                                                         |
+|                                                                               |
+|                                                                               |
+|                                                                               |
+| ENVIRONMENT                                                                   |
+|                                                                               |
+| MySQL 5.1 or newer                                                            |
+|                                                                               |
+| SEE ALSO                                                                      |
+|                                                                               |
+| processlist_grantees                                                          |
+|                                                                               |
+| AUTHOR                                                                        |
+|                                                                               |
+| Shlomi Noach                                                                  |
+|                                                                               |
++-------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>I like HTML for documentation. I think it&#8217;s a good format, provided you don&#8217;t start doing funny things. Perhaps <em>TROFF</em> is more suitable; certainly more popular on Unix machines. But I already have everything in HTML. So, what do I do?</p>
+<p>My decision was to keep documentation in HTML, and use the handy <em>html2text</em> tool to do the job. And it does it pretty well! The sample you see above is an automated translation of HTML to plain text.</p>
+<p>I add a few touches of my own: SELECTing long texts is ugly, whether you do it via &#8220;<strong>;</strong>&#8221; or &#8220;<strong>\G</strong>&#8220;. The <strong>help()</strong> routine breaks the text by &#8216;<strong>\n</strong>&#8216;, returning a multi row result set. The above sample makes for some <strong>60+</strong> rows, nicely formatted, broken from the original single text appearing in the <strong>help</strong> table.</p>
+<p>So now you have an internal help method for <em>common_schema</em>, right where the code is. You don&#8217;t have to leave the command line client in order to get help.</p>
+<p><a href="http://datacharmer.blogspot.com/">Giuseppe</a> offered me the idea for this, even while my own thinking about it was in early stages.</p>
+<p>The next version of <em>common_schema</em> will be available in a few weeks. The code is pretty much ready. I just need to work on, ahem&#8230;, the documentation.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/documentation-in-sql-call-for-help/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4536</post-id>	</item>
+		<item>
+		<title>More MySQL foreach()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach#comments</comments>
+				<pubDate>Fri, 02 Dec 2011 13:55:32 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4171</guid>
+				<description><![CDATA[In my previous post I&#8217;ve shown several generic use cases for foreach(), a new scripting functionality introduced in common_schema. In this part I present DBA&#8217;s handy syntax for schema and table operations and maintenance. Confession: while I love INFORMATION_SCHEMA&#8216;s power, I just hate writing queries against it. It&#8217;s just so much typing! Just getting the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In my <a href="https://shlomi-noach.github.io/blog/mysql/mysql-foreach">previous post</a> I&#8217;ve shown several generic use cases for <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/foreach.html"><em>foreach()</em></a>, a new scripting functionality introduced in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>.</p>
+<p>In this part I present DBA&#8217;s handy syntax for schema and table operations and maintenance.</p>
+<p>Confession: while I love <strong>INFORMATION_SCHEMA</strong>&#8216;s power, I just <em>hate</em> writing queries against it. It&#8217;s just so much typing! Just getting the list of tables in a schema makes for this heavy duty query:</p>
+<blockquote>
+<pre>SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='sakila' AND TABLE_TYPE='BASE TABLE';</pre>
+</blockquote>
+<p>When a join is involved this really becomes a nightmare. I think it&#8217;s cumbersome, and as result, many do not remember the names and meaning of columns, making for <em>&#8220;oh, I need to read the manual all over again just to get that query right&#8221;</em>. Anyway, that&#8217;s my opinion.</p>
+<p>A <strong>SHOW TABLES</strong> statement is easier to type, but cannot be integrated into a <strong>SELECT</strong> query (though <a href="https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side">we have a partial solution</a> for that, too), and besides, when filtering out the views, the <strong>SHOW</strong> statement becomes almost as cumbersome as the one on <strong>INFORMATION_SCHEMA</strong>.</p>
+<p>Which is why <em>foreach()</em> offers handy shortcuts to common iterations on schemata and tables, as follows:</p>
+<h4>Use case: iterate all databases</h4>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema'</span>, <span style="color: #003366;">'CREATE TABLE ${schema}.event(event_id INT, msg VARCHAR(128))'</span>);</pre>
+</blockquote>
+<p>In the above we execute a query on each database. Hmmm, maybe not such a good idea to perform this operation on all databases? Let&#8217;s filter them:</p>
+<h4>Use case: iterate databases by name match</h4>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema like wordpress_%'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.wp_posts MODIFY COLUMN comment_author VARCHAR(96) NOT NULL'</span>);</pre>
+</blockquote>
+<p>The above will only iterate my WordPress databases (I have several of these), performing an <strong>ALTER</strong> on <strong>wp_posts</strong> for each of those databases.<span id="more-4171"></span></p>
+<p>I don&#8217;t have to quote the <em>like</em> expression, but I can, if I wish to.</p>
+<p>I can also use a regular expression match:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema ~ /^wordpress_[0-9]+$/'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.wp_posts MODIFY COLUMN comment_author VARCHAR(96) NOT NULL'</span>);</pre>
+</blockquote>
+<h4>Use case: iterate tables in a specific schema</h4>
+<p>Time to upgrade our <strong>sakila</strong> tables to InnoDB&#8217;s compressed format. We use <strong>$()</strong>, a synonym for <em>foreach()</em>.</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'table in sakila'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB ROW_FORMAT=COMPRESSED'</span>);</pre>
+</blockquote>
+<p>The above will iterate on tables in <strong>sakila</strong>. I say <em>tables</em>, since it will avoid iterating views (there is still no specific syntax for views iteration). This is done on purpose, as my experience shows there is very little in common between tables and views when it comes to maintenance and operations.</p>
+<h4>Use case: iterate tables by name match</h4>
+<p>Here&#8217;s a interesting scenario: you wish to work on all tables matching some name. The naive approach would be to:</p>
+<blockquote>
+<pre>SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'wp_posts' AND TABLE_TYPE = 'BASE TABLE'</pre>
+</blockquote>
+<p><em><strong>Wait!</strong></em> Are you aware this may bring your server down? This query will open all databases at once, opening all <strong>.frm</strong> files (though thankfully not data files, since we only check for name and type).</p>
+<p>Here&#8217;s a better approach:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'table like wp_posts'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB'</span>);</pre>
+</blockquote>
+<p>(There&#8217;s now FULLTEXT to InnoDB, so the above can make sense in the near future!)</p>
+<p>The good part is that <em>foreach()</em> will look for matching tables <em>one database at a time</em>. It will iterate the list of database, then look for matching tables per database, thereby optimizing the query on <strong>INFORMATION_SCHEMA</strong>.</p>
+<p>Here, too, I can use regular expressions:</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'table ~ /^wp_.*$/'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB'</span>);</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>This is work in the making, but, as someone who maintains a few productions servers, I&#8217;ve already put it to work.</p>
+<p>I&#8217;m hoping the syntax is easy to comprehend. I know that since I developed it it must be far more intuitive to myself than to others. I&#8217;ve tried to keep close on common syntax and concepts from various programming languages.</p>
+<p>I would like to get as much feedback as possible. I have further ideas and thoughts on the direction <a href="http://code.google.com/p/common-schema/">common_schema</a> is taking, but wish take it in small steps. Your feedback is appreciated!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4171</post-id>	</item>
+		<item>
+		<title>Test-driven SQL development</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/test-driven-sql-development</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/test-driven-sql-development#comments</comments>
+				<pubDate>Thu, 20 Oct 2011 17:55:04 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Ant]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4036</guid>
+				<description><![CDATA[I&#8217;m having a lot of fun writing common_schema, an SQL project which includes views, tables and stored routines. As the project grows (and it&#8217;s taking some interesting directions, in my opinion) more dependencies are being introduced, and a change to one routine or view may affect many others. This is why I&#8217;ve turned the development [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m having a lot of fun writing <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>, an SQL project which includes views, tables and stored routines.</p>
+<p>As the project grows (and it&#8217;s taking some interesting directions, in my opinion) more dependencies are being introduced, and a change to one routine or view may affect many others. This is why I&#8217;ve turned the development on <em>common_schema</em> to be <em>test driven</em>.</p>
+<p>Now, just how do you test drive an SQL project?</p>
+<p>Well, much like the way you test any other project in your favorite programming language. If its functions you&#8217;re testing, that&#8217;s all too familiar: functions get some input and provide some output. Hmmm, they might be changing SQL data during that time. With procedures it&#8217;s slightly more complex, since they do not directly return output but result sets.</p>
+<p>Here&#8217;s the testing scheme I use:<span id="more-4036"></span></p>
+<ul>
+<li>Tests are divided to families. For example, there is a family of tests for the <em>eval()</em> function.</li>
+<li>Each test in a family is responsible for checking the simplest, most &#8220;atomic&#8221; issue. This means many small tests.</li>
+<li>Each test can have a <em>&#8220;pre-test&#8221;</em> step, which prepares the ground (for example, create a table and populate it)</li>
+<li>Likewise, a test can have a <em>&#8220;post-test&#8221;</em> step, which is typically just cleanup code (since the test is already complete by the time the post step is invoked).</li>
+<li>Each test is an SQL file: a set of commands to be executed.</li>
+<li>A test may have an <em>&#8220;expected output&#8221;</em> file.</li>
+</ul>
+<ul>
+<li>If no explicit <em>expected</em> exists, the test is expected to return <strong>&#8220;1&#8221;</strong> (just as the most basic <em>JUnit</em> test assumes an &#8220;assert true&#8221;)</li>
+<li>A test family may also have <em>pre-</em> and <em>post-</em> steps.</li>
+<li>Any failure in any step fails the entire process. Failures may include:
+<ul>
+<li>Failure to prepare the grounds for a test or family of tests</li>
+<li>Failure in executing the test</li>
+<li>Mismatch between test&#8217;s output and expected result.</li>
+<li>Failure in executing the <em>post-</em> step (may indicate yet invalid test result not intercepted by the test)</li>
+</ul>
+</li>
+</ul>
+<h4>An example</h4>
+<p>The following image presents a single test family: the <em>eval</em> family, testing the <em>eval()</em> routine.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/10/test-driven-sql-development-01.png"><img class="size-full wp-image-4205 alignnone" title="test-driven-sql-development-01" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/10/test-driven-sql-development-01.png" alt="Test driven SQL development - sample" width="198" height="258" /></a></p></blockquote>
+<ul>
+<li>In this family, there are two tests.</li>
+<li>In both tests, we have a <em>pre-test</em> step, and a test.</li>
+<li>We have no <em>post-test</em> here.</li>
+<li>Nor do we have an <em>expected-output</em> sample, which means the tests expect to return with <strong>&#8220;1&#8221;</strong>.</li>
+</ul>
+<h4>Implementation</h4>
+<p>But how are tests conducted? Via <em>mysql</em>, of course. While tests are plain SQL text file, they are being executed against a running MySQL server using the <em>mysql</em> client. It is given the test files as input, and its output is directed to file as well.</p>
+<p>This makes it very easy to code the test using a simple shell script. It takes a small measure of file iteration, process invocation, exit code check, and <em>diff</em> execution.</p>
+<p>For example, to test <em>eval()</em>&#8216;s <strong>01</strong> test, we first execute <em>mysql</em> with <strong>01/pre.sql</strong> as input. Assuming success, we execute <em>mysql</em> again, this time with <strong>01/test.sql</strong>. We capture the output of this execution, and compare it with <em>expected-output</em>, or with <strong>&#8220;1&#8221;</strong> when no <em>expected-output</em> specified.</p>
+<h4>Tests pass, or no code!</h4>
+<p>Some <strong>12</strong> years ago, I worked with a less-known version system called <a href="http://aegis.sourceforge.net/documents.html">aegis</a>. The thing I remember most from <em>aegis</em> was that it had a good tests infrastructure. Long before &#8220;test-driven development&#8221; was coined, or was even commonly practiced, <em>aegis</em> supported tests right into your version control. &#8220;Right into&#8221;, in the sense that <em>you could not merge your code back to the baseline</em> if it didn&#8217;t pass all of the tests.</p>
+<p>I work with SVN for <em>common_schema</em>, and I do not know of such an option in SVN. But I also use <em>ant</em> to build this project, and the dependency is clear there: <strong>ant dist</strong>, my target which creates the distribution files, is dependent on <strong>ant test</strong>, the target which works out the tests.</p>
+<p>That is, you cannot generate the distribution files when tests fail.</p>
+<h4>Further notes</h4>
+<p>Since I&#8217;m now retroactively patching tests for already existing functionality, calling it <em>test-driven</em> development is an overstatement; nevertheless new tests are already proving invaluable when I keep changing and improving existing code. Suddenly dependent functionality no longer works as expected. What fun!</p>
+<p><a href="http://code.google.com/p/common-schema/source/browse/trunk/common_schema/tests/test_all.sh">The code</a> for the testing suite is actually much shorter than this blog post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/test-driven-sql-development/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4036</post-id>	</item>
+		<item>
+		<title>oak-hook-general-log: your poor man&#8217;s Query Analyzer</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer#respond</comments>
+				<pubDate>Wed, 15 Dec 2010 17:46:06 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[logs]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3032</guid>
+				<description><![CDATA[The latest release of openark kit introduces oak-hook-general-log, a handy tool which allows for some analysis of executing queries. Initially I just intended for the tool to be able to dump the general log to standard output, from any machine capable to connect to MySQL. Quick enough, I realized the power it brings. With this [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The latest release of <a href="http://code.openark.org/forge/openark-kit">openark kit</a> introduces <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-hook-general-log.html">oak-hook-general-log</a>, a handy tool which allows for some analysis of executing queries.</p>
+<p>Initially I just intended for the tool to be able to dump the general log to standard output, from any machine capable to connect to MySQL. Quick enough, I realized the power it brings.</p>
+<p>With this tool, one can dump to standard output all queries using temporary tables; or using a specific index; or doing a full index scan; or just follow up on connections; or&#8230; For example, the following execution will only log queries which make for filesort:</p>
+<blockquote>
+<pre>oak-hook-general-log --user=root --host=localhost --password=123456 --filter-explain-filesort</pre>
+</blockquote>
+<h4>The problem with using the standard logs</h4>
+<p>So you have the <em>general log</em>, which you don&#8217;t often enable, since it tends to grow huge within moments. You then have the <em>slow log</em>. Slow log is great, and is among the top tools for MySQL diagnosis.</p>
+<p>The slow log allows for <strong>log-queries-not-using-indexes</strong>, which is yet another nice feature. Not only should you log any query running for over <strong>X</strong> seconds, but also log any query which does not use an index.</p>
+<p>Wait. This logs all single-row tables (no single row table will use an index), as well as very small tables (a common <strong>20</strong> rows lookup table will most often be scanned). These are OK scans. This makes for some noise in the slow log.</p>
+<p>And how about queries which do use an index, but do so poorly? They use an index, but retrieve some <strong>12,500,000</strong> rows, <em>using temporary</em> table &amp; <em>filesort</em>?</p>
+<h4>What oak-hook-general-log does for you</h4>
+<p>This tool streams out the general log, and filters out queries based on their <em>role</em> or on their <em>execution plan</em>.</p>
+<p>To work at all, it must enable the general log. Moreover, it directs the general log to log table. Mind that this makes for a performance impact, which is why the tool auto-terminates and restores original log settings (default is <strong>1</strong> minute, configurable). It&#8217;s really not a tool you should keep running for days. But during the few moments it runs, it will:</p>
+<ul>
+<li>Routinely rotate the <strong>mysql.general_log</strong> table so that it doesn&#8217;t fill up</li>
+<li>Examine entries found in the general log</li>
+<li>Cross reference entries to the PROCESSLIST so as to deduce database context (<a href="http://bugs.mysql.com/bug.php?id=52554">bug #52554</a>)</li>
+<li>If required and appropriate, evaluate a query&#8217;s execution plan</li>
+<li>Decide whether to dump each entry based on filtering rules</li>
+</ul>
+<h4>Filtering rules</h4>
+<p>Filtering rules are passed as command line options. At current, only one filtering rule applies (if more than one specified only one is used, so no point in passing more than one). Some of the rules are:<span id="more-3032"></span></p>
+<ul>
+<li><strong>filter-connection</strong>: only log connect/quit entries</li>
+<li><strong>filter-explain-fullscan</strong>: only log full table scans</li>
+<li><strong>filter-explain-temporary</strong>: only log queries which create implicit temporary tables</li>
+<li><strong>filter-explain-rows-exceed</strong>: only log queries where more than <strong>X</strong> number of rows are being accessed on some table (estimated)</li>
+<li><strong>filter-explain-total-rows-exceed</strong>: only log queries where more than <strong>X</strong> number of rows are accessed on all tables combined (estimated, with possibly incorrect numbers on some queries)</li>
+<li><strong>filter-explain-key</strong>: only log queries using a specific index. This feature somewhat overlaps with Maatkit&#8217;s <em>mk-index-usage</em> (read <a href="http://www.mysqlperformanceblog.com/2010/11/11/advanced-index-analysis-with-mk-index-usage/">announcement</a>).</li>
+<li><strong>filter-explain-contains</strong>: a general purpose <em>grep</em> on the execution plan. Log queries where the execution plan contains <em>some text</em>.</li>
+</ul>
+<p>There are other filters, and I will possibly add more in due time.</p>
+<p>Here are a couple cases I used <em>oak-hook-general-log</em> for:</p>
+<h4>Use case: temporary tables</h4>
+<p>I have a server with this alarming chart (courtesy <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>) of temporary tables:</p>
+<blockquote>
+<pre><img class="alignnone" title="Created tmp tables per second" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=370x180&amp;chts=303030,12&amp;chtt=Latest+24+hours:+Dec+9,+06:30++-++Dec+10,+06:30&amp;chf=c,s,ffffff&amp;chdl=created_tmp_tables_psec|created_tmp_disk_tables_psec&amp;chdlp=b&amp;chco=ff8c00,4682b4&amp;chd=s:yzzy02zzz100zzz0rv9zz0zyzyz0yy2xz1t11xzztz0xr1xt2tz07vwzz100100z31z111yz1vzzzzz1zs80r902s1111010y20z03z11487zz011z11011002w0q5rxxz0y00z0s02xy1yy0,gggfghggfgggghhgYekhhghhhhhghfjghhdihfhgdghgZhgcicihpcehhhhhhhifkigjihghjehgiigjgYqiYqgiaihiifkhekhfijgiihhggggggggggfhgghffZoYgggggggggdihfggghg&amp;chxt=x,y&amp;chxr=1,0,35.060000&amp;chxl=0:||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||+|&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,2.08,0&amp;chxp=0,2.08,6.25,10.42,14.59,18.76,22.93,27.10,31.27,35.44,39.61,43.78,47.95,52.12,56.29,60.46,64.63,68.80,72.97,77.14,81.31,85.48,89.65,93.82,97.99&amp;tsstart=2010-12-09+06:30:00&amp;tsstep=600" alt="" width="370" height="180" />
+</pre>
+</blockquote>
+<p>What could possibly create <strong>30</strong> temporary tables per second on average?</p>
+<p>The slow log produced nothing helpful, even with <strong>log-queries-not-using-indexes</strong> enabled. There were a lot of queries not using indexes there, but nothing at these numbers. With:</p>
+<blockquote>
+<pre>oak-hook-general-log --filter-explain-temporary</pre>
+</blockquote>
+<p>enabled for <strong>1</strong> minute, nothing came out. Weird. Enabled for <strong>5</strong> minutes, I got one entry. Turned out a scheduled script, acting once per <strong>5</strong> minutes, was making a single complicated query involving many nested views, which accounted for some <em>hundreds</em> of temporary tables created. All of them very small, query time was very fast. There is no temporary tables problem with this server, case closed.</p>
+<h4>Use case: connections</h4>
+<p>A server had issues with some exceptions being thrown on the client side. There was a large number of new connections created per second although the client was using a connection pool. Suspecting the pool didn&#8217;t work well, I issued:</p>
+<blockquote>
+<pre>oak-hook-general-log --filter-connect</pre>
+</blockquote>
+<p>The pool was working well, all right. No entries for that client were recorder in <strong>1</strong> minute of testing. However, it turned out some old script was flooding the MySQL server with requests, every second. The log showed root@somehost, and sure enough, the script was disabled. Exceptions were due to another reason; it was good to eliminate a suspect.</p>
+<p>Some of the tool&#8217;s use case is relatively easy to solve with tail, grep &amp; awk; others are not. I am using it more and more often, and find it to make significant shortcuts in tracking down queries.</p>
+<h4>Get it</h4>
+<p>Download the tool as part of <em>openark kit</em>: access the <a href="http://code.google.com/p/openarkkit/">openark kit project page</a>.</p>
+<p>Or get the <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/src/oak/oak-hook-general-log.py">source code</a> directly.</p>
+<p>Feedback is most welcome.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3032</post-id>	</item>
+		<item>
+		<title>openark-kit (rev. 170): new tools, new functionality</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/openark-kit-rev-170-new-tools-new-functionality</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/openark-kit-rev-170-new-tools-new-functionality#comments</comments>
+				<pubDate>Wed, 15 Dec 2010 06:31:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3124</guid>
+				<description><![CDATA[I&#8217;m pleased to announce a new release of the openark kit. There&#8217;s a lot of new functionality inside; following is a brief overview. The openark kit is a set of utilities for MySQL. They solve everyday maintenance tasks, which may be complicated or time consuming to work by hand. It&#8217;s been a while since the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m pleased to announce a new release of the <a href="http://code.openark.org/forge/openark-kit">openark kit</a>. There&#8217;s a lot of new functionality inside; following is a brief overview.</p>
+<p>The <em>openark kit</em> is a set of utilities for MySQL. They  solve everyday maintenance tasks, which may be complicated or time  consuming to work by hand.</p>
+<p>It&#8217;s been a while since the last announced release. Most of my attention was on <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>, building new features, writing documentation etc. However my own use of <em>openark kit</em> has only increased in the past few months, and there&#8217;s new useful solutions to common problems that have been developed.</p>
+<p>I&#8217;ve used and improved many tools over this time, but doing the final cut, along with proper documentation, took some time. Anyway, here are the highlights:</p>
+<h4>New tool: oak-hook-general-log</h4>
+<p><em>oak-hook-general-log</em> hooks up a MySQL server and dumps the general log based on filtering rules, applying to query role or execution plan. It is possible to only dump connect/disconnect entries, queries which make a full table scan, or use temporary tables, or scan more than X number of rows, or&#8230;</p>
+<p>I&#8217;ll write more on this tool shortly.</p>
+<h4>New tool: oak-prepare-shutdown</h4>
+<p>This tool makes for an orderly and faster shutdown by safely stopping replication, and flushing InnoDB pages to disk prior to shutting down (keeping server available for connections even while attempting to flush dirty pages to disk). A typical use case would be:</p>
+<blockquote>
+<pre>oak-prepare-shutdown --user=root --ask-pass --socket=/tmp/mysql.sock &amp;&amp; /etc/init.d/mysql stop</pre>
+</blockquote>
+<h4>New tool: oak-repeat query</h4>
+<p><em>oak-repeat-query</em> repeats executing a given query until some condition holds. The condition can be:</p>
+<ul>
+<li>Number of given iterations has been reached</li>
+<li>Given time has elapsed</li>
+<li>No rows have been affected by query</li>
+</ul>
+<p>The tool comes in handy for cleanup jobs, warming up caches, etc.<span id="more-3124"></span></p>
+<h4>New tool: oak-get-slave-lag</h4>
+<p>This simple tool just returns the number of seconds a slave is behind master. But it also returns with an appropriate exit code, based on a given threshold: <strong>0</strong> when lag is good, <strong>1</strong> (error exit code) when lag is too great or slave fails to replicate.</p>
+<p>This tool has been used by 3rd party applications, such as a load balancer, to determine whether a slave should be accessed.</p>
+<h4>Updated tool: oak-chunk-update</h4>
+<p>This extremely useful utility breaks down very long queries into smaller chunks. These could be queries which should affect a huge amount of rows, or queries which cannot utilize an index.</p>
+<p>Updates to the tool include limiting the range of rows the tool scans, by specifying start and stop position (either by providing constant values or by SELECT query). Also added is auto-termination when no rows are found to be affected. Last, it is possible to override INFORMATION_SCHEMA lookup by explicitly specifying chunking key.</p>
+<p>This tool works great for your daily/weekly/monthly batch jobs; in creating DWH tables; populating new columns; purging old entries; clearing data based on non-indexed values; generating summary tables; and more.</p>
+<h4>Frozen tool: oak-apply-ri</h4>
+<p>I haven&#8217;t been using this tool for a while. The main work down by this tool can be done with <em>oak-chunk-update</em>. There are some additional safety checks <em>oak-apply-ri</em> provides; I&#8217;m thinking over if they justify the tool&#8217;s existence.</p>
+<h4>Frozen tool: oak-online-alter-table</h4>
+<p>With the appearance of Facebook’s <a href="http://www.facebook.com/note.php?note_id=430801045932">Online Schema Change</a> (OSC) tool, which derives from <em>oak-online-alter-table</em>, I&#8217;m not sure I will continue developing the tool. I intend to wait for general feedback on OSC before making a decision.</p>
+<h4>Documentation</h4>
+<p><a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html">Documentation</a> is now part of <em>openark kit</em>&#8216;s SVN repository.</p>
+<h4>Download</h4>
+<p>The <em>openark kit</em> project is currently hosted by Google Code.  Downloads are available at the Google Code <a href="http://code.google.com/p/openarkkit/">openark kit project page</a>.</p>
+<p>Downloads are available in the following packaging formats:</p>
+<ul>
+<li><strong>.deb</strong> package, to be installed on <em>debian</em>, <em>ubuntu</em> and otherwise debian based distributions.</li>
+<li><strong>.rpm</strong> package, architecture free (<em>noarch</em>), for RPM supporting Linux distributions such as <em>RedHat</em>, <em>Fedora</em>, <em>CentOS</em> etc.</li>
+<li><strong>.tar.gz</strong> using python&#8217;s distutils installer.</li>
+<li><strong>source</strong>, directly retrieved from SVN or from above python package.</li>
+<li>Some distribution specific <a href="http://software.opensuse.org/search?baseproject=ALL&amp;p=1&amp;q=openark-kit">RPM packages</a>, courtesy Lenz Grimmer.</li>
+</ul>
+<h4>Feedback</h4>
+<p>Your feedback is welcome! I may not always respond promptly; and I confess that some bugs were left open for more than I would have liked them to. I hope to make for good quality of code, and bug reporting is one major factor you can control.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/openark-kit-rev-170-new-tools-new-functionality/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3124</post-id>	</item>
+		<item>
+		<title>Thoughts and ideas for Online Schema Change</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change#comments</comments>
+				<pubDate>Thu, 07 Oct 2010 08:29:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Schema]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3005</guid>
+				<description><![CDATA[Here&#8217;s a few thoughts on current status and further possibilities for Facebook&#8217;s Online Schema Change (OSC) tool. I&#8217;ve had these thoughts for months now, pondering over improving oak-online-alter-table but haven&#8217;t got around to implement them nor even write them down. Better late than never. The tool has some limitations. Some cannot be lifted, some could. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here&#8217;s a few thoughts on current status and further possibilities for Facebook&#8217;s <a href="http://www.facebook.com/note.php?note_id=430801045932">Online Schema Change</a> (OSC) tool. I&#8217;ve had these thoughts for months now, pondering over improving <a href="../../forge/openark-kit/oak-online-alter-table">oak-online-alter-table</a> but haven&#8217;t got around to implement them nor even write them down. Better late than never.</p>
+<p>The tool has some limitations. Some cannot be lifted, some could. Quoting from the <a href="http://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932">announcement</a> and looking at the code, I add a few comments. I conclude with a general opinion on the tool&#8217;s abilities.</p>
+<h4>&#8220;The original table must have PK. Otherwise an error is returned.&#8221;</h4>
+<p>This restriction could be lifted: it&#8217;s enough that the table has a UNIQUE KEY. My original <em>oak-online-alter-table</em> handled that particular case. As far as I see from their code, the Facebook code would work just as well with any unique key.</p>
+<p>However, this restriction is of no real interest. As we&#8217;re mostly interested in InnoDB tables, and since any InnoDB table <em>should have</em> a PRIMARY KEY, we shouldn&#8217;t care too much.</p>
+<h4>&#8220;No foreign keys should exist. Otherwise an error is returned.&#8221;</h4>
+<p>Tricky stuff. With <em>oak-online-alter-table</em>, changes to the original table were immediately reflected in the <em>ghost</em> table. With InnoDB tables, that meant same transaction. And although I never got to update the text and code, there shouldn&#8217;t be a reason for not using child-side foreign keys (the child-side is the table on which the FK constraint is defined).</p>
+<p>The Facebook patch works differently: it captures changes and writes them to a <strong>delta</strong> table,  to be later (asynchronously) analyzed and make for a <em>replay</em> of actions on the <em>ghost</em> table.<span id="more-3005"></span></p>
+<p>So in the Facebook code, some cases will lead to undesired behavior. Consider two tables, <strong>country</strong> and <strong>city</strong>, with city holding a RESTRICT/NO ACTION foreign key on <strong>country</strong>&#8216;s id. Now consider the scenario:</p>
+<ol>
+<li>Rows from <strong>city</strong> are DELETEd, where the country Id is Spain&#8217;s.
+<ul>
+<li><strong>city</strong>&#8216;s ghost table is still unaffected, Spain&#8217;s cities are still there.</li>
+<li>A change is written to the delta table to mark these rows for deletion.</li>
+</ul>
+</li>
+<li>A DELETE is issued on <strong>country</strong>&#8216;s Spain record.
+<ul>
+<li>The DELETE should work, from the user&#8217;s perspective</li>
+<li>But it will fail: city&#8217;s ghost table has not received the changes yet. There&#8217;s still matching rows. The NO ACTION constraint will fail the DELETE statement.</li>
+</ul>
+</li>
+</ol>
+<p>Now, this does not lead to corruption, just to seemingly unreasonable behavior on the database part. This behavior is probably undesired. NO ACTION constraint won&#8217;t do.</p>
+<p>However, with CASCADE or SET NULL options, there is less of an issue: operations on the parent table (e.g. <strong>country</strong>) cannot fail. We must make sure operations on the ghost table make it consistent with the original table (e.g. <strong>city</strong>).</p>
+<p>Consider the following scenario:</p>
+<ol>
+<li>A new country is created, called &#8220;Sleepyland&#8221;. An INSERT is made to <strong>country</strong>.
+<ul>
+<li>Both <strong>city</strong> and <strong>city</strong>&#8216;s ghost are immediately aware of it.</li>
+</ul>
+</li>
+<li>A new town is created and INSERTed to <strong>city</strong>. The town is called &#8220;Naphaven&#8221;.
+<ul>
+<li>The change takes time to propagate to <strong>city</strong>&#8216;s ghost table.</li>
+</ul>
+</li>
+<li>Meanwhile, we realized we made a mistake. We&#8217;ve been had. There&#8217;s no such city nor country.
+<ol>
+<li>We DELETE &#8220;Naphaven&#8221; from <strong>city</strong>.</li>
+<li>We DELETE &#8220;Sleepyland&#8221; from <strong>country</strong>.</li>
+</ol>
+<ul>
+<li>Note that <strong>city</strong>&#8216;s ghost table still hasn&#8217;t caught up with the changes.</li>
+</ul>
+</li>
+<li>Eventually, the INSERT statement for &#8220;Naphaven&#8221; reaches <strong>city</strong>&#8216;s ghost table.
+<ul>
+<li>What should happen now? The INSERT cannot succeed.</li>
+<li>Will this fail the entire process?</li>
+</ul>
+</li>
+</ol>
+<p>Looking at the PHP code, I see that changes written on the <strong>delta</strong> table are blindly replayed on the ghost table.</p>
+<p>Since the process is asynchronous, this should not be the case. We can solve the above if we use INSERT IGNORE instead of INSERT. The statement will fail without failing anything else. The row cannot exist, and that&#8217;s because the original row does not exist anymore.</p>
+<p>Unlike a replication corruption, this does not lead to accumulation mistakes. The <strong>replay</strong> is static, somewhat like in <em>binary log format</em>. Changes are <em>just written</em>, regardless of existing data.</p>
+<p>I have given this considerable thought, and I can&#8217;t say I&#8217;ve covered all the possible scenario. However I believe that with proper use of INSERT IGNORE and REPLACE INTO (two statements I heavily relied on with <em>oak-online-alter-table</em>), correctness can be achieved.</p>
+<p>There&#8217;s the small pain of re-generating the foreign key definition on the &#8220;ghost&#8221; table (<strong>CREATE TABLE LIKE &#8230;</strong> does not copy FK definitions). And since foreign key names are unique, a new name must be picked up. Not pretty, but perfectly doable.</p>
+<h4>&#8220;No AFTER_{INSERT/UPDATE/DELETE} triggers must exist.&#8221;</h4>
+<p>It would be nicer if MySQL had an ALTER TRIGGER statement. There isn&#8217;t such statement. If there were such an atomic statement, then we would be able to rewrite the trigger, so as to add our own code to the <em>end of the trigger&#8217;s code</em>. Yuck. Would be even nicer if we were <a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">allowed to have multiple triggers</a> of same event.</p>
+<p>So, we are left with DROP and CREATE triggers. Alas, this makes for a short period where the trigger does not exist. Bad. The easy solution would be to LOCK WRITE the table, but apparently you can&#8217;t DROP the trigger (*) when the table is locked. Sigh.</p>
+<p>(*) Happened to me, apparently to Facebook too; With latest 5.1 (5.1.51) version this actually works. With 5.0 it didn&#8217;t use to; this needs more checking.</p>
+<h4>Use of INFORMATION_SCHEMA</h4>
+<p>As with oak-online-alter-table, the OSC checks for triggers, indexes, column by searching on the INFORMATION_SCHEMA tables. This makes for nice SQL for getting the exact listing and types of PRIMARY KEY columns, whether or not AFTER triggers exist, and so on.</p>
+<p>I&#8217;ve always considered this to be the weak part of <a href="http://code.openark.org/forge/openark-kit">openark-kit</a>, that it relies on INFORMATION_SCHEMA so much. It&#8217;s easier, it&#8217;s cleaner, it&#8217;s even <em>more correct</em> to work that way &#8212; but it just puts too much locks. I think Baron Schwartz (and now Daniel Nichter) did amazing work on analyzing table schemata by parsing the SHOW CREATE TABLE and other SHOW commands regex-wise with <a href="http://www.maatkit.org/">Maatkit</a>. It&#8217;s a crazy work! Had I written <em>openark-kit</em> in Perl, I would have just import their code. But I&#8217;m too <span style="text-decoration: line-through;">lazy</span> busy to do the conversion from Perl to Python, and rewrite that code, what with all the debugging.</p>
+<p>OSC is written in PHP. Again, much conversion work. I think performance-wise this is an important step to make.</p>
+<h4>A word for the critics</h4>
+<p>Finally, a word for the critics. I&#8217;ve read some Facebook/MySQL bashing comments and wish to relate.</p>
+<p>In his <a href="http://www.theregister.co.uk/2010/09/21/facebook_online_schema_change_for_mysql/">interview to The Register</a>, Mark Callaghan gave the example that &#8220;Open Schema Change lets the company update indexes without user downtime, according to Callaghan&#8221;.</p>
+<p>PostgreSQL was mentioned for being able to add index with only read locks taken, or being able to do the work with no locks using CREATE INDEX CONCURRENTLY. I wish MySQL had that feature! Yes, MySQL has a lot to improve upon, and the latest PostgreSQL 9.0 brings valuable new features. (Did I make it clear I have no intention of bashing PostgreSQL? If not, please re-read this paragraph until convinced).</p>
+<p>Bashing related to the notion of MySQL being so poor that Facebook used an even poorer mechanism to work out the ALTER TABLE.</p>
+<p>Well, allow me to add a few words: the CREATE INDEX is by far not the only thing you can achieve with OSC (although it may be Facebook&#8217;s major concern). You should be able to:</p>
+<ul>
+<li>Add columns</li>
+<li>Drop columns</li>
+<li>Convert character sets</li>
+<li>Modify column types</li>
+<li>Add partitioning</li>
+<li>Reorganize partitioning</li>
+<li>Compress the table</li>
+<li>Otherwise changing table format</li>
+<li>Heck, you could even modify the storage engine! (To other transactional engine)</li>
+</ul>
+<p>These are giant steps. How easy would it be to write these down into the database? It only takes a few weeks time to work out a working solution with reasonable limitations, just using the resources the MySQL server provides you with. The <a href="http://www.facebook.com/MySQLatFacebook">MySQL@Facebook team</a> should be given credit for that.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3005</post-id>	</item>
+		<item>
+		<title>Table refactoring &#038; application version upgrades, Part II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/table-refactoring-application-version-upgrades-part-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/table-refactoring-application-version-upgrades-part-ii#respond</comments>
+				<pubDate>Thu, 12 Aug 2010 03:24:06 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2801</guid>
+				<description><![CDATA[Continuing Table refactoring &#38; application version upgrades, Part I, we now discuss code &#38; database upgrades which require DROP operations. As before, we break apart the upgrade process into sequential steps, each involving either the application or the database, but not both. As I&#8217;ll show, DROP operations are significantly simpler than creation operations. Interestingly, it&#8217;s [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Continuing <a href="https://shlomi-noach.github.io/blog/mysql/table-refactoring-application-version-upgrades-part-i">Table refactoring &amp; application version upgrades, Part I</a>, we now discuss code &amp; database upgrades which require <strong>DROP</strong> operations. As before, we break apart the upgrade process into sequential steps, each involving either the application or the database, but not both.</p>
+<p>As I&#8217;ll show, DROP operations are significantly simpler than creation operations. Interestingly, it&#8217;s the same as in life.</p>
+<h4>DROP COLUMN</h4>
+<p>A column turns to be redundant, unused. Before it is dropped from the database, we must ensure no one is using it anymore. The steps are:</p>
+<ol>
+<li>App: <strong>V1</strong> -&gt; <strong>V2</strong>. Remove all references to column; make sure no queries use said column.</li>
+<li>DB: <strong>V1</strong> -&gt; <strong>V2</strong> (possibly failover from <strong>M1</strong> to <strong>M2</strong>), change is <strong>DROP COLUMN</strong>.</li>
+</ol>
+<h4>DROP INDEX</h4>
+<p>A possibly simpler case here. Why would you drop an index? Is it because you found out you never use it anymore? Then all you have to do is just drop it.</p>
+<p>Or perhaps you don&#8217;t need the functionality the index supports anymore? Then first drop the functionality:</p>
+<ol>
+<li>(optional) App: <strong>V1</strong> -&gt; <strong>V2</strong>. Discard using functionality which relies on index.</li>
+<li>DB: <strong>V1</strong> -&gt; <strong>V2</strong> (possibly failover from <strong>M1</strong> to <strong>M2</strong>), change is <strong>DROP INDEX</strong>. Check out InnoDB Plugin here.<span id="more-2801"></span></li>
+</ol>
+<h4>DROP UNIQUE INDEX</h4>
+<p>When using Master-Slave failover for table refactoring, we&#8217;re now removing a constraint from the slave. Since the master is more constrained than the slave, there is no problem here. It&#8217;s mostly the same as with a normal DROP INDEX, with a minor addition:</p>
+<ol>
+<li>(optional) App: <strong>V1</strong> -&gt; <strong>V2</strong>. Discard using functionality which relies on index.</li>
+<li>DB: <strong>V1</strong> -&gt; <strong>V2</strong> (possibly failover from <strong>M1</strong> to <strong>M2</strong>), change is <strong>DROP INDEX</strong>.</li>
+<li>(optional) App: <strong>V2</strong> -&gt; <strong>V3</strong>. Enable functionality that inserts duplicates.</li>
+</ol>
+<h4>DROP FOREIGN KEY</h4>
+<p>Again, we are removing a constraint.</p>
+<ol>
+<li>DB: <strong>V1</strong> -&gt; <strong>V2</strong> (possibly failover from <strong>M1</strong> to <strong>M2</strong>), change is <strong>DROP INDEX</strong>.</li>
+<li>(optional) App: <strong>V2</strong> -&gt; <strong>V3</strong>. Enable functionality that conflicts with removed constraint. I mean, if you really know what you are doing.</li>
+</ol>
+<h4>DROP TABLE</h4>
+<p>The very simple steps are:</p>
+<ol>
+<li>App: <strong>V1</strong> -&gt; <strong>V2</strong>. Make sure no reference to table is made.</li>
+<li>DB: <strong>V1</strong> -&gt; <strong>V2</strong>. Issue a <strong>DROP TABLE</strong>.</li>
+</ol>
+<p>With <strong>ext3</strong> dropping a large table is no less than a nightmare. Not only does the action take long time, it also locks down the table cache, which very quickly leads to having dozens of queries hang. <strong>xfs</strong> is a good alternative.</p>
+<h4>Conclusion</h4>
+<p>We looked at single table operations, coupled with application upgrades. By carefully looking at the process breakdown, multiple changes can be addressed with ease and safety. Not all operations are completely safe when used with replication failover. But they are mostly safe if you have some trust in your code.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/table-refactoring-application-version-upgrades-part-ii/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2801</post-id>	</item>
+	</channel>
+</rss>

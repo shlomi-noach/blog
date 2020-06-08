@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>sqlite &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/sqlite/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 30 Jan 2017 09:16:18 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Some observations on MySQL to sqlite migration &#038; compatibility</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/some-observations-on-mysql-to-sqlite-migration-compatibility</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/some-observations-on-mysql-to-sqlite-migration-compatibility#comments</comments>
+				<pubDate>Mon, 30 Jan 2017 09:14:33 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[sqlite]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7663</guid>
+				<description><![CDATA[I&#8217;m experimenting with sqlite as backend database for orchestrator. While orchestrator manages MySQL replication topologies, it also uses MySQL as backend. For some deployments, and I&#8217;m looking into such one, having MySQL as backend is a considerable overhead. This sent me to the route of looking into a self contained orchestrator binary + backend DB. I would [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m experimenting with <a href="https://www.sqlite.org/">sqlite</a> as backend database for <a href="https://github.com/github/orchestrator">orchestrator</a>. While <code>orchestrator</code> manages MySQL replication topologies, it also uses MySQL as backend. For some deployments, and I&#8217;m looking into such one, having MySQL as backend is a considerable overhead.</p>
+<p>This sent me to the route of looking into a self contained <code>orchestrator</code> binary + backend DB. I would have <code>orchestrator</code> spawn up its own backend database instead of connecting to an external one.</p>
+<h3>Why even relational?</h3>
+<p>Can&#8217;t <code>orchestrator</code> just use a key-value backend?</p>
+<p>Maybe it could. But frankly I enjoy the power of relational databases, and the versatility they offer has proven itself multiple times with <code>orchestrator</code>, being able to answer interesting, new, complex questions about one&#8217;s topology by crafting SQL queries.</p>
+<p>Moreover, <code>orchestrator</code> is already heavily invested in the relational model. At this time, replacing all SQL queries with key-value reads seems to me as a significant investment in time and risk. So I was looking for a relational, SQL accessible embeddable database for <code>orchestrator</code>.</p>
+<h3>Why sqlite?</h3>
+<p>I am in particular looking at two options: sqlite (via the <a href="https://github.com/mattn/go-sqlite3">go-sqlite3</a> binding) and <a href="https://github.com/pingcap/tidb">TiDB</a>. sqlite does not need much introduction, and I&#8217;ll just say it&#8217;s embeddable within the golang-built binary.<span id="more-7663"></span></p>
+<p>TiDB is a pure-Go, MySQL dialect compatible server which provides relational model on top of key-value store. The store could be local or distributed, and the TiDB project cleverly separates involved layers.</p>
+<p>Of the two, sqlite is mature, alas uses a different SQL dialect and has different behavior. TiDB&#8217;s compatibility with MySQL is an impressive feat, but still ongoing.</p>
+<p>Both require adaptations of SQL code. Here are some observations on adaptations required when moving an existing app from MySQL backend to sqlite backend.</p>
+<h3>Differences</h3>
+<p>Just to answer an obvious question: can&#8217;t everything be abstracted away by an ORM that speaks both dialects?</p>
+<p>I don&#8217;t think so. I always exploit SQL beyond the standard <code>insert</code>/<code>delete</code>/<code>update</code>/<code>select</code>, exploits that ORMs just don&#8217;t support.</p>
+<p>Here&#8217;s an incomplete list of differences I found. Some purely syntactical, some semantical, some behavioral, and some operational.</p>
+<ul>
+<li>Data types: no <code>CHARACTER SET</code> clause</li>
+<li>Data types: you can&#8217;t associate <code>UNSIGNED</code> to any int type</li>
+<li>Data types: no <code>enum</code>. However there&#8217;s an alternative in the form of:<br />
+<code>race text check (race in ('human', 'dog', 'alien'))</code></li>
+<li><code>auto_increment</code> is called <code>integer</code></li>
+<li>Data types: timestamps are not a thing. There&#8217;s no timezone info.</li>
+<li><code>TIMESTAMP</code> has no <code>ON UPDATE</code> clause.</li>
+<li>No <code>after</code> clause for adding columns</li>
+<li>Indexes are not part of table creation. Only <code>PRIMARY KEY</code> is. The rest of indexes are created via <code>CREATE INDEX</code> statement</li>
+<li>Indexes have unique names across the schema. This is unfortunate, since it forces me to use longer names for indexes so as to differentiate them. For example, in MySQL I can have an index named <code>name_idx</code> in two different tables; in <code>sqlite</code> I append table name for &#8220;namespacing&#8221;</li>
+<li>Temporal values and functions: poor support for time arithmetic.
+<ul>
+<li>Getting the diff between two datetimes is non-trivial (what&#8217;s the diff in months for a leap year?)<br />
+<code></code></li>
+<li><code>INTERVAL</code> keyword not respected. Appending/subtracting dates can be done via:<br />
+<code>datetime('now', '-3 hour')</code><br />
+Can you see the problem in the above? What is the number <code>3</code> is a positional argument? In MySQL I would use <code>NOW() - INTERVAL ? HOUR</code>. To make positional arguments work in <code>sqlite</code>, the above gets to be <code>datetime('now', printf('-%d hour', ?))</code>. How would you even translate <code>NOW() - INTERVAL (? * 2) SECOND</code>?</li>
+<li><code>UNIX_TIMESTAMP</code> not respected. Instead using <code>strftime('%s', 'now')</code>, I dislike the use of string functions to generate times.</li>
+</ul>
+</li>
+<li><code>insert ignore</code> turns to <code>insert or ignore</code></li>
+<li><code>replace into</code> remains <code>replace into</code>. Yay!</li>
+<li><code>insert on duplicate key update</code> has no equivalent. It&#8217;s worthwhile noting a <code>replace into</code> does not <em>replace</em> (pun intended) an <code>insert ... on duplicate key</code> as the latter can choose to only update a subset of column in the event of a constraint violation. It&#8217;s really very powerful.</li>
+<li><code>IS TRUE</code> and <code>IS FALSE</code> are not respected.</li>
+<li><code>ALTER TABLE</code>:
+<ul>
+<li>When adding a <code>not null</code> column one must specify the default value (e.g. <code>0</code> for an <code>int</code>)</li>
+<li>You cannot add a timestamp column that defaults to <code>CURRENT_TIMESTAMP</code>. You can have such column in your <code>CREATE TABLE</code> definition, but you cannot add such a column. The reason being that <code>CURRENT_TIMESTAMP</code> is not a constant value. When adding a column to a table, <code>sqlite</code> does not actually apply the change to all existing rows, but only to newly created ones. It therefore does not know what value to provide to those older rows.</li>
+<li>You cannot <code>DROP COLUMN</code>. I&#8217;ll say it again. You cannot <code>DROP COLUMN</code></li>
+<li>You cannot modify a <code>PRIMARY KEY</code></li>
+<li>You cannot rename a column or change its datatype.</li>
+<li>In fact, the only supported <code>ALTER TABLE</code> statements are <code>ADD COLUMN </code>and <code>RENAME</code> (renaming the table itself)</li>
+</ul>
+</li>
+</ul>
+<p>Regarding the <code>ALTER TABLE</code> limitations, the advice for dropping/changing/renaming columns or changing the primary key is to &#8220;create a new table with the new format, copy the rows, drop the old table, rename&#8221;. This is certainly feasible, but requires a substantial overhead from the user. And it&#8217;s non atomic. It requires a change in the state of mind but also a change in state of operations, the latter being non-trivial when moving from one DBMS to another, or when wishing to support both.</p>
+<p>I&#8217;m still looking into this, and trying to work my way around differences with cheap regular expressions for as much as possible. I&#8217;m mainly interested right now in finding all semantic/logic differences that would require application changes. So far the <code>TIMESTAMP</code> behavior is such, and so is the <code>INSERT ... ON DUPLICATE KEY</code> statement.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/some-observations-on-mysql-to-sqlite-migration-compatibility/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7663</post-id>	</item>
+	</channel>
+</rss>

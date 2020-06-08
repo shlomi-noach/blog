@@ -1,0 +1,910 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Performance &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/performance/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 01 Aug 2016 17:19:00 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Introducing gh-ost: triggerless online schema migrations</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations#comments</comments>
+				<pubDate>Mon, 01 Aug 2016 17:19:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[tools]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7596</guid>
+				<description><![CDATA[I&#8217;m thoroughly happy to introduce gh-ost: triggerless, controllable, auditable, testable, trusted online schema change tool released today by GitHub. gh-ost now powers our production schema migrations. We hit some serious limitations using pt-online-schema-change on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m thoroughly happy to introduce <a href="https://github.com/github/gh-ost"><strong>gh-ost</strong></a>: triggerless, controllable, auditable, testable, trusted online schema change tool <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">released today by GitHub</a>.</p>
+<p><em>gh-ost</em> now powers our production schema migrations. We hit some serious limitations using <a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html">pt-online-schema-change</a> on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent of causing outages. With <em>gh-ost</em>, we are now able to migrate our busiest tables at any time, peak hours and heavy workloads included, without causing impact to our service.</p>
+<p>gh-ost supports testing in production. It goes a long way to build trust, both in integrity and in control. Are your databases just too busy and you cannot run existing online-schema-change tools? Have you suffered outages due to migrations? Are you tired of babysitting migrations that run up to 3:00am? Tired of being the only one tailing logs? Please, take a look at <em>gh-ost</em>. I believe it changes online migration paradigm.</p>
+<p>For a more thorough overview, please read the <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">announcement</a> on the GitHub Engineering Blog, and proceed to the <a href="https://github.com/github/gh-ost/blob/master/README.md">documentation</a>.</p>
+<p><em>gh-ost</em> is open sourced under the MIT license.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7596</post-id>	</item>
+		<item>
+		<title>The mystery of MySQL 5.6 excessive buffer pool flushing</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/the-mystery-of-mysql-5-6-excessive-buffer-pool-flushing</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/the-mystery-of-mysql-5-6-excessive-buffer-pool-flushing#comments</comments>
+				<pubDate>Sun, 20 Apr 2014 05:16:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6843</guid>
+				<description><![CDATA[I&#8217;m experimenting with upgrading to MySQL 5.6 and am experiencing an unexplained increase in disk I/O utilization. After discussing this with several people I&#8217;m publishing in the hope that someone has an enlightenment on this. We have a few dozens servers in a normal replication topology. On this particular replication topology we&#8217;ve already evaluated that [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m experimenting with upgrading to MySQL <strong>5.6</strong> and am experiencing an unexplained increase in disk I/O utilization. After discussing this with several people I&#8217;m publishing in the hope that someone has an enlightenment on this.</p>
+<p>We have a few dozens servers in a normal replication topology. On this particular replication topology we&#8217;ve already evaluated that <strong>STATEMENT</strong> based replication is faster than <strong>ROW</strong> based replication, and so we use <strong>SBR</strong>. We have two different workloads on our slaves, applied by two different HAProxy groups, on three different data centres. Hardware-wise, servers of two groups use either Virident SSD cards or normal SAS spindle disks.</p>
+<p>Our servers are I/O bound. A common query used by both workloads looks up data that does not necessarily have a hotspot, and is very large in volume. DML is low, and we only have a few hundred statements per second executed on master (and propagated through replication).</p>
+<p>We have upgraded <strong>6</strong> servers from all datacenters to <strong>5.6</strong>, both on SSD and spindle disks, and are experiencing the following phenomena:<span id="more-6843"></span></p>
+<ul>
+<li>A substantial increase in disk I/O utilization. See a <strong>10</strong> day breakdown (upgrade is visible on <strong>04/14</strong>) this goes on like this many days later:<br />
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-disk-utilization-10-days.png"><img class="alignnone wp-image-6845 size-full" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-disk-utilization-10-days.png" alt="5.5-to-5.6-disk-utilization-10-days" width="700" height="400" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-disk-utilization-10-days.png 700w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-disk-utilization-10-days-300x171.png 300w" sizes="(max-width: 700px) 100vw, 700px" /></a></p></blockquote>
+</li>
+</ul>
+<ul>
+<li>A substantial increase in InnoDB buffer pool pages flush: Mr. Blue is our newly upgraded server; it joins Mr. Green upgraded a couple weeks ago. Mr. Red is still <strong>5.5</strong>. This is the only MySQL graph that I could directly relate to the increase in I/O:<br />
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png"><img class="alignnone size-full wp-image-6848" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png" alt="5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed" width="700" height="350" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed.png 700w, https://shlomi-noach.github.io/blog/wp-content/uploads/2014/04/5.5-to-5.6-rise-in-innodb-buffer-pool-pages-flushed-300x150.png 300w" sizes="(max-width: 700px) 100vw, 700px" /></a></p></blockquote>
+</li>
+<li>No change in workload (it takes some 60 minutes for caches to warm up, so measuring after that time). Same equal share of serving as dictated by HAProxy. Same amount of queries. Same amount of everything.</li>
+<li>Faster replication speed, on single thread &#8211; that&#8217;s the good part! We see <strong>30%</strong> and more improvement in replication speed. Tested by stopping <strong>SLAVE SQL_THREAD</strong> for a number of pre-defined minutes, then measuring time it took for slave to catch up, up to 10 seconds lag. The results vary depending on the time of day and serving workload on slaves, but it is <em>consistently far faster</em> with <strong>5.6</strong>.</li>
+</ul>
+<p>The faster replication speed motivates us to continue with the experiment, and is of a significant factor in our decision. However we are concerned about the I/O utilization and excessive flushing.</p>
+<p>The above graphs depict the <strong>5.6</strong> status without any configuration changes as compared to <strong>5.5</strong>. I took some days to reconfigure the following variables, with no change to the rate of flushed pages (though some changes visible in double-wite buffer writes):</p>
+<ul>
+<li>innodb_log_file_size=128M/2G</li>
+<li>innodb_adaptive_flushing:=0/1</li>
+<li>innodb_adaptive_flushing_lwm:=0/70</li>
+<li>innodb_max_dirty_pages_pct := 75/90</li>
+<li>innodb_flush_neighbors:=0/1</li>
+<li>innodb_max_dirty_pages_pct_lwm:=75/90</li>
+<li>innodb_old_blocks_time:=0/1000</li>
+<li>innodb_io_capacity:=50/100/200</li>
+<li>innodb_io_capacity_max:=50/100/1000</li>
+<li>relay_log_info_repository:=&#8217;table&#8217;/&#8217;file&#8217;</li>
+<li>master_info_repository:=&#8217;table&#8217;/&#8217;file&#8217;</li>
+<li>default_tmp_storage_engine:=&#8217;myisam&#8217;/&#8217;innodb&#8217;</li>
+<li>eq_range_index_dive_limit:=0/10</li>
+</ul>
+<p>And more&#8230; Have done patient one-by-one or combinations of the above where it made sense. As you see I began with the usual suspects and moved on to more esoteric stuff. I concentrated on new variables introduced in <strong>5.6</strong>, or ones where the defaults have changed, or ones we have explicitly changed the defaults from.</p>
+<p>The above is consistent on all upgraded servers. On SSD the disk utilization is lower, but still concerning.</p>
+<p>Our use case is very different from the one <a href="http://yoshinorimatsunobu.blogspot.co.il/2013/12/single-thread-performance-regression-in.html">presented by Yoshinori Matsunobu</a>. and apparently not too many have experienced upgrading to <strong>5.6</strong>. I&#8217;m hoping someone might shed some light.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/the-mystery-of-mysql-5-6-excessive-buffer-pool-flushing/feed</wfw:commentRss>
+		<slash:comments>15</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6843</post-id>	</item>
+		<item>
+		<title>TokuDB configuration variables of interest</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/tokudb-configuration-variables-of-interest</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/tokudb-configuration-variables-of-interest#comments</comments>
+				<pubDate>Wed, 23 Oct 2013 17:42:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6613</guid>
+				<description><![CDATA[During our experiments I came upon a few TokuDB variables of interest; if you are using TokuDB you might want to look into these: tokudb_analyze_time This is a boundary on the number of seconds an ANALYZE TABLE will operate on each index on each partition on a TokuDB table. That is, if tokudb_analyze_time = 5, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>During our experiments I came upon a few TokuDB variables of interest; if you are using TokuDB you might want to look into these:</p>
+<ul>
+<li>
+<h4>tokudb_analyze_time</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">This is a boundary on the number of seconds an <strong>ANALYZE TABLE</strong> will operate on each index on each partition on a TokuDB table.</p>
+<p style="padding-left: 30px;">That is, if <strong>tokudb_analyze_time = 5</strong>, and your table has <strong>4</strong> indexes (including <strong>PRIMARY</strong>) and <strong>7</strong> partitions, then the total runtime is limited to <strong>5*4*7 = 140</strong> seconds.</p>
+<p style="padding-left: 30px;">Default in <strong>7.1.0</strong>: <strong>5</strong> seconds</p>
+<ul>
+<li>
+<h4>tokudb_cache_size</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">Similar to <strong>innodb_buffer_pool_size</strong>, this variable sets the amount of memory allocated by TokuDB for caching pages. Like InnoDB the table is clustered within the index, so the cache includes pages for both indexes and data.</p>
+<p style="padding-left: 30px;">Default: <strong>50%</strong> of total memory</p>
+<ul>
+<li>
+<h4>tokudb_directio</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">Boolean, values are <strong>0/1</strong>. Setting <strong>tokudb_directio = 1</strong> is like specifying <strong>innodb_flush_method = O_DIRECT</strong>. Which in turn means the OS should not cache pages requested by TokuDB. Default: <strong>0</strong>.</p>
+<p style="padding-left: 30px;">Now here&#8217;s the interesting part: we are used to tell InnoDB to get the most memory we can provide (because we want it to cache as much as it can) and to avoid OS caching (because that would mean a page would appear both in the buffer pool and in OS memory, which is a waste). So the following setup is common:<span id="more-6613"></span></p>
+<blockquote style="padding-left: 30px;">
+<pre style="padding-left: 30px;"><strong>innodb_buffer_pool_size</strong> = [as much as you can allocate while leaving room for connection memory]G
+<strong>innodb_flush_method</strong> = O_DIRECT</pre>
+</blockquote>
+<p style="padding-left: 30px;">And my first instinct was to do the same for TokuDB. But after speaking to Gerry Narvaja of Tokutek, I realized it was not that simple. The reason TokuDB&#8217;s default memory allocation is <strong>50%</strong> and not, say, <strong>90%</strong>, is that OS cache caches the data in compressed form, while TokuDB cache caches data in uncompressed form. Which means if you limit the TokuDB cache, you allow for more cache to the OS, that is used to cache compressed data, which means <em>more data</em> (hopefully, pending duplicates) in memory.</p>
+<p style="padding-left: 30px;">I did try both options and did not see an obvious difference, but did not test this thoroughly. My current setup is:</p>
+<blockquote style="padding-left: 30px;">
+<pre style="padding-left: 30px;"><strong>#No setup. just keep to the default for both:</strong>
+#tokudb_cache_size
+#tokudb_directio</pre>
+</blockquote>
+<ul>
+<li>
+<h4>tokudb_commit_sync</h4>
+</li>
+</ul>
+<ul>
+<li>
+<h4>tokudb_fsync_log_period</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">These two variable are similar in essence to <strong>innodb_flush_log_at_trx_commit</strong>, but allow for finer tuning. With <strong>innodb_flush_log_at_trx_commit</strong> you choose between syncing the transaction log to disk upon each commit and once per second. With <strong>tokudb_commit_sync = 1</strong> (which is default) you get transaction log sync to disk per commit. When <strong>tokudb_commit_sync = 0</strong>, then <strong>tokudb_fsync_log_period</strong> dictates the interval between flushes. So a value of <strong>tokudb_fsync_log_period = 1000</strong> means once per second.</p>
+<p style="padding-left: 30px;">Since our original InnoDB installation used <strong>innodb_flush_log_at_trx_commit = 2</strong>, our TokuDB setup is:</p>
+<blockquote style="padding-left: 30px;">
+<pre style="padding-left: 30px;"><strong>tokudb_commit_sync</strong> = 0
+<strong>tokudb_fsync_log_period</strong> = 1000</pre>
+</blockquote>
+<ul>
+<li>
+<h4>tokudb_load_save_space</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">Turned on (value <strong>1</strong>) by default as of TokuDB <strong>7.1.0</strong>, this parameter decides whether temporary file created on bulk load operations (e.g. ALTER TABLE) are compressed or uncompressed. Do yourself a big favour (why? <a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration">read here</a>) and keep it on. Our setup is:</p>
+<blockquote>
+<pre><strong>tokudb_load_save_space</strong> = 1</pre>
+</blockquote>
+<p>TokuDB&#8217;s general recommendation is: don&#8217;t change the variables; the engine should work well right out of the box. I like the approach (by MySQL <strong>5.5</strong> I already lost count of InnoDB variables that can have noticeable impact; with <strong>5.6</strong> I&#8217;m all but lost). The complete list of configuration variables is found in <a href="http://www.tokutek.com/wp-content/uploads/2013/10/mysql-5.5.30-tokudb-7.1.0-users-guide.pdf">TokuDB&#8217;s Users Guide</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/tokudb-configuration-variables-of-interest/feed</wfw:commentRss>
+		<slash:comments>14</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6613</post-id>	</item>
+		<item>
+		<title>Converting an OLAP database to TokuDB, part 1</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1#comments</comments>
+				<pubDate>Tue, 03 Sep 2013 07:04:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6473</guid>
+				<description><![CDATA[This is the first in a series of posts describing my impressions of converting a large OLAP server to TokuDB. There&#8217;s a lot to tell, and the experiment is not yet complete, so this is an ongoing blogging. In this post I will describe the case at hand and out initial reasons for looking at [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the first in a series of posts describing my impressions of converting a large OLAP server to TokuDB. There&#8217;s a lot to tell, and the experiment is not yet complete, so this is an ongoing blogging. In this post I will describe the case at hand and out initial reasons for looking at TokuDB.</p>
+<p>Disclosure: I have no personal interests and no company interests; we did get friendly, useful and free advice from Tokutek engineers. TokuDB is open source and free to use, though commercial license is also available.</p>
+<h4>The case at hand</h4>
+<p>We have a large and fast growing DWH MySQL setup. This data warehouse is but one component in a larger data setup, which includes Hadoop, Cassandra and more. For online dashboards and most reports, MySQL is our service. We populate this warehouse mainly via Hive/Hadoop. Thus, we have an hourly load of data from Hive, as well as a larger daily load.</p>
+<p>There are some updates on the data, but the majority of writes are just <strong>mysqlimport</strong>s of Hive queries.</p>
+<p>Usage of this database is OLAP: no concurrency issues here; we have some should-be-fast-running queries issued by our dashboards, as well as ok-to-run-longer queries issued for reports.</p>
+<p>Our initial and most burning trouble is with size. Today we use <strong>COMPRESSED</strong> InnoDB tables (<strong>KEY_BLOCK_SIZE</strong> is default, i.e. <strong>8</strong>). Our data volume sums right now at about <strong>2TB</strong>. I happen to know this translates as <strong>4TB</strong> of uncompressed data.</p>
+<p>However growth of data is accelerating. A year ago we would capture a dozen GB per month. Today it is a <strong>100GB</strong> per month, and by the end of this year it may climb to <strong>150GB</strong> per month or more.</p>
+<p>Our data is not sharded. We have a simple replication topology of some <strong>6</strong> servers. Machines are quite generous as detailed following. And yet, we will be running out of resources shortly: disk space (total <strong>2.7TB</strong>) is now running low and is expected to run out in about six months. One of my first tasks in Outbrain is to find a solution to our DWH growth problem. The solution could be sharding; it could be a commercial DWH product; anything that works.<span id="more-6473"></span></p>
+<h4>The approach we experiment with</h4>
+<p>It was at my initial interview that I suggested <a href="http://www.tokutek.com/products/tokudb-for-mysql/">TokuDB</a> might be a good solution, with the primary reason of being so good with compression. And we decided to experiment with this simple (setup-wise) solution of compression. If we could compress the data even by <strong>50%</strong>, that would buy us considerable time. And it&#8217;s the simplest approach as we would need to change nothing at the application side, nor add additional frameworks.</p>
+<p>Of course, we were already using InnoDB <strong>COMPRESSED</strong> tables. How about just improving the compression? And here I thought to myself: we can try <strong>KEY_BLOCK_SIZE=4</strong>, which I know would generally compress by <strong>50%</strong> as compared to <strong>KEY_BLOCK_SIZE=8</strong> (not always, but in many use cases). We&#8217;re already using InnoDB so this isn&#8217;t a new beast; it will be &#8220;more of the same&#8221;. It would work.</p>
+<p>I got myself a dedicated machine: a slave in our production topology I am free to play with. I installed TokuDB <strong>7.0.1</strong>, later upgraded to <strong>7.0.3</strong>, based on MySQL <strong>5.5.30</strong>.</p>
+<p>The machine is a Dell Inc. <strong>PowerEdge R510</strong> machine, with <b>16</b> CPUs @ <b>2.1 GHz</b> and <b>126 GiB</b> RAM, <b>16 GiB</b> Swap. OS is CentOS <strong>5.7</strong>,  kernel <strong>2.6.18</strong>. We have RAID <strong>10</strong> over local <strong>10k</strong> RPM SAS disks (10x<strong>600GB</strong> disks)</p>
+<h4>How to compare InnoDB &amp; TokuDB?</h4>
+<p><strong>2TB</strong> of compressed data (for absolute measurement I consider it to be a <strong>4TB</strong> worth of data) is quite a large setup. How do I do the comparison? I don&#8217;t even have too much disk space here&#8230;</p>
+<p>We have tables of various size. Our largest is in itself <strong>1TB</strong> (<strong>2TB</strong> uncompressed) &#8211; half of the entire volume. The rest ranging <strong>330GB</strong>, <strong>140GB</strong>, <strong>120GB</strong>, <strong>90GB</strong>, <strong>50GB</strong> and below. We have <strong>MONTH</strong>ly partitioning schemes on most tables and obviously on our larger tables.</p>
+<p>For our smaller tables, we could just <strong>CREATE TABLE test_table LIKE small_table</strong>, populating it and comparing compression. However, the really interesting question (and perhaps the only interesting question compression-wise) is how well would our larger (and specifically largest) tables would compress.</p>
+<p>Indeed, for our smaller tables we saw between <strong>20%</strong> to <strong>70%</strong> reduction in size when using stronger InnoDB compression: <strong>KEY_BLOCK_SIZE=4/2/1</strong>. How well would that work on our larger tables? How much slower would it be?</p>
+<p>We know MySQL partitions are implemented by actual <em>independent</em> tables. Our testing approach was: let&#8217;s build a test_table from a one month worth of data (== one single partition) of our largest table. We tested:</p>
+<ul>
+<li>The time it takes to load the entire partition (about <strong>120M</strong> rows, <strong>100GB COMPRESSED</strong> data as seen on <strong>.idb</strong> file)</li>
+<li>The time it would take to load a single day&#8217;s worth of data from Hive/Hadoop (loading real data, as does our nightly import)</li>
+<li>The time it would take for various important <strong>SELECT</strong> query to execute on this data.</li>
+</ul>
+<h4>InnoDB vs. TokuDB comparison</h4>
+<p>In this post I will only describe our impressions of compression size. I have a lot to say about TokuDB vs InnoDB partitioning and queries; this will wait till later post.</p>
+<p>So here goes:</p>
+<table border="0" cellspacing="0">
+<colgroup width="85"></colgroup>
+<colgroup width="155"></colgroup>
+<colgroup width="152"></colgroup>
+<colgroup width="147"></colgroup>
+<colgroup width="141"></colgroup>
+<tbody>
+<tr>
+<td align="LEFT" bgcolor="#E6E6E6" height="31"><b>Engine</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Compression</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Time to Insert 1 month</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Table size (optimized)</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Time to import 1 day</b></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">InnoDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">8k</td>
+<td align="LEFT" bgcolor="#FFFFCC"><strong>10.5h</strong></td>
+<td align="LEFT" bgcolor="#FFFFCC">58GB</td>
+<td align="LEFT" bgcolor="#FFFFCC"><b>32m</b></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">InnoDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">4k</td>
+<td align="LEFT" bgcolor="#FFFFCC">48h</td>
+<td align="LEFT" bgcolor="#FFFFCC">33GB</td>
+<td align="LEFT" bgcolor="#FFFFCC">unknown (too long)</td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">TokuDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">quicklz</td>
+<td align="LEFT" bgcolor="#FFFFCC">14h</td>
+<td align="LEFT" bgcolor="#FFFFCC">17GB</td>
+<td align="LEFT" bgcolor="#FFFFCC">40m</td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">TokuDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">lzma (small/aggresive)</td>
+<td align="LEFT" bgcolor="#FFFFCC">15h</td>
+<td align="LEFT" bgcolor="#FFFFCC"><b>7.5GB</b></td>
+<td align="LEFT" bgcolor="#FFFFCC">42m</td>
+</tr>
+</tbody>
+</table>
+<p>Some comments and insights:</p>
+<ul>
+<li>Each test was performed 3-4 times. There were no significant differences on the various cycles.</li>
+<li>The <strong>1</strong> month insert was done courtesy <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">QueryScript split</a>,  <strong>5,000</strong> rows at a time, no throttling.</li>
+<li>The <strong>1</strong> day import via <em>mysqlimport</em>. There were multiple files imported. Each file is sorted by <strong>PRIMARY KEY ASC</strong>.</li>
+<li>Isn&#8217;t it nice to know that your <strong>100GB</strong> InnoDB table actually fits within <strong>58GB</strong> when rebuilt?</li>
+<li>For InnoDB <strong>flush_logs_at_trx_commit=2</strong>, <strong>flush_method=O_DIRECT</strong>.</li>
+<li>I used default configuration to TokuDB &#8212; touched nothing. More on this in later post.</li>
+<li>InnoDB <strong>4k</strong> was <em>prohibitively</em> slow to load data. It was so slow so as to be unacceptable. For the 1 day load it took <strong>1</strong> hour for a mere <strong>20%</strong> of data to load. <strong>1</strong> hour was already marginal for our requirements; waiting for <strong>5</strong> hours was out of the question. I tested several times, never got to wait for completion. Did I say it would just be &#8220;more of the same&#8221;? <strong>4k</strong> turned to be &#8220;not an option&#8221;.</li>
+<li>I saw almost no difference in load time between the two TokuDB compression formats. Both somewhat (30%) longer than InnoDB to load, but comparable.</li>
+<li>TokuDB compression: nothing short of <em>amazing</em>.</li>
+</ul>
+<p>With InnoDB <strong>4k</strong> being &#8220;not an option&#8221;, and with both TokuDB compressions being similar in load time yet so different in compression size, we are left with the following conclusion: if we want to compress more than our existing 8k (and we have to) &#8211; TokuDB&#8217;s <em>agressive compression</em> (aka small, aka lzma) is our only option.</p>
+<h4>Shameless plug</h4>
+<p><a href="http://code.google.com/p/common-schema/">common_schema</a> turned to be quite the &#8220;save the day&#8221; tool here. Not only did we use it to extract 100GB of data from a large dataset and load it onto our tables, it also helped out in the ALTER process for TokuDB: at this time (&lt;=<strong> 7.0.4</strong>) TokuDB still has a bug with <strong>KEY_BLOCK_SIZE</strong>: when this option is found in table definition, it impacts TokuDB&#8217;s indexes by bloating them. This is how <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html">sql_alter_table_tokudb</a> was born. Hopefully it will be redundant shortly.</p>
+<h4>More to come</h4>
+<p>Was our test fair? Should we have configure TokuDB differently? Is loading via small <strong>5,000</strong> row chunks the right way?</p>
+<p>In the next post I will describe the process of migrating our 4TB worth of data to TokuDB, pitfalls, issues, party crushers, sport spoilers, configuration, recovery, cool behaviour and general advice you should probably want to embrace. At later stage I&#8217;ll describe how our DWH looks after migration. Finally I&#8217;ll share some (ongoing) insights on performance.</p>
+<p>You&#8217;ll probably want to know &#8220;How much is (non compressed) <strong>4TB</strong> of data worth in TokuDB?&#8221; Let&#8217;s keep the suspense <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6473</post-id>	</item>
+		<item>
+		<title>DELETE, don&#8217;t INSERT</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert#comments</comments>
+				<pubDate>Wed, 27 Jun 2012 05:25:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[QueryScript]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5008</guid>
+				<description><![CDATA[Have just read INSERT, Don’t DELETE by Aaron Brown, and have some lengthy response, which is why I write this post instead of commenting on said post. I wish to offer my counter thought and suggest that DELETEs are probably the better choice. Aaron suggests that, when one wishes to purge rows from some table, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Have just read <a href="http://blog.9minutesnooze.com/insert-delete/">INSERT, Don’t DELETE</a> by Aaron Brown, and have some lengthy response, which is why I write this post instead of commenting on said post.</p>
+<p>I wish to offer my counter thought and suggest that <strong>DELETE</strong>s are probably the better choice.</p>
+<p>Aaron suggests that, when one wishes to purge rows from some table, a trick can be used: instead of <strong>DELETE</strong>ing unwanted rows, one can <strong>INSERT</strong> &#8220;good&#8221; rows into a new table, then switch over with <strong>RENAME</strong> (but please read referenced post for complete details).</p>
+<p>I respectfully disagree on several points discussed.</p>
+<h4>Lockdown</h4>
+<p>The fact one needs to block writes during the time of creation of new table is problematic: you need to essentially turn off parts of your application. The posts suggests one could use a slave &#8211; but this solution is far from being trivial as well. To switch over, you yet again need to turn off access to DB, even if for a short while.<span id="more-5008"></span></p>
+<p>A switch over to a slave is quite a big deal, in my opinion, for the mere purpose of deletion of rows.</p>
+<h4>DELETEs are easy</h4>
+<p>The DELETEs are so much easier: the first thing to note is the following: <em>You don&#8217;t actually have to delete all the rows *at once*</em>.</p>
+<p>You just need to drop some rows, right? Why waste a huge transaction that takes minutes, when you can drop the rows by chunks, one at a time?<br />
+For that, you can use either <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archive</a> from <em>Percona Toolkit</em>, <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> from <em>openark-kit</em>, or write a simple <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a> code with <em>common_schema</em>:</p>
+<blockquote>
+<pre>while (DELETE FROM title WHERE title &lt;= 'g' LIMIT 1000)
+{
+  throttle 1;
+}</pre>
+</blockquote>
+<p>So, drop <strong>1,000</strong> rows or so at a time, then sleep some time, etc. The total runtime is longer, but who cares? The impact can be reduced to be unnoticeable.</p>
+<h4>Space reclaim</h4>
+<p>You can use online table operations to rebuild your table and reclaim the disk space. Either see <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a> or <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-online-schema-change.html">pt-online-schema-change</a>. Again, both work in small chunks, so no long stalls.</p>
+<p>But more on this: my usual purge scenario shows that it is repetitive. You purge, data fills again, you purge again, and so on.</p>
+<p>Which is why it doesn&#8217;t make much sense to rebuild the table and reclaim the disk space: it just grows again to roughly same dimensions.<br />
+For a one time operation (e.g. after neglect of cleanup for long time) &#8212; yes, absolutely, do a rebuild and reclaim. For repetitive cleanup &#8211; I don&#8217;t bother.</p>
+<h4>Conclusion</h4>
+<p>Aaron does make note at the end of his post that <strong>DELETE</strong> operations can be done online, while the <strong>INSERT</strong> trick requires downtime, and this is a fair assessment.</p>
+<p>But just to make a point: none of the <strong>DELETE</strong> timings are interesting. Since we are not concerned with deleting the rows in a given time (no &#8220;press the red button&#8221;), we can spread them over time and make the impact negligible. So not only is everything done online, it also goes unnoticed by the user. And this, I believe, is the major thing to consider.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/delete-dont-insert/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5008</post-id>	</item>
+		<item>
+		<title>Self throttling MySQL queries</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries#comments</comments>
+				<pubDate>Tue, 01 Nov 2011 07:55:47 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4294</guid>
+				<description><![CDATA[Recap on the problem: A query takes a long time to complete. During this time it makes for a lot of I/O. Query&#8217;s I/O overloads the db, making for other queries run slow. I introduce the notion of self-throttling queries: queries that go to sleep, by themselves, throughout the runtime. The sleep period means the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Recap on the problem:</p>
+<ul>
+<li>A query takes a long time to complete.</li>
+<li>During this time it makes for a lot of I/O.</li>
+<li>Query&#8217;s I/O overloads the db, making for other queries run slow.</li>
+</ul>
+<p>I introduce the notion of self-throttling queries: queries that go to sleep, by themselves, throughout the runtime. The sleep period means the query does not perform I/O at that time, which then means other queries can have their chance to execute.</p>
+<p>I present two approaches:</p>
+<ul>
+<li>The naive approach: for every <strong>1,000</strong> rows, the query sleep for <strong>1</strong> second</li>
+<li>The factor approach: for every <strong>1,000</strong> rows, the query sleeps for the amount of time it took to iterate those <strong>1,000</strong> rows (effectively doubling the total runtime of the query).<span id="more-4294"></span></li>
+</ul>
+<h4>Sample query</h4>
+<p>We use a simple, single-table scan. No aggregates (which complicate the solution considerably).</p>
+<blockquote>
+<pre>SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental
+;</pre>
+</blockquote>
+<h4>The naive solution</h4>
+<p>We need to know every <strong>1,000</strong> rows. So we need to count the rows. We do that by using a counter, as follows:</p>
+<blockquote>
+<pre>SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days,
+  @row_counter := @row_counter + 1
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>A thing that bothers me, is that I wasn&#8217;t asking for an additional column. I would like the result set to remain as it were; same result structure. We also want to sleep for <strong>1</strong> second for each <strong>1,000</strong> rows. So we merge the two together along with one of the existing columns, like this:</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    IF(
+      (@row_counter := @row_counter + 1) % 1000 = 0,
+      SLEEP(1), 0
+    ) AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>To remain faithful to <a href="https://shlomi-noach.github.io/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql">my slides</a>, I rewrite as follows, and this is <em>the naive solution</em>:</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN <strong>(@row_counter := @row_counter + 1) % 1000 = 0</strong> THEN <strong>SLEEP(1)</strong>
+      ELSE <strong>0</strong>
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>The <strong>WHEN</strong> clause always returns <strong>0</strong>, so it does not affect the value of <strong>rental_id</strong>.</p>
+<h4>The factor approach</h4>
+<p>In the factor approach we wish to keep record of query execution, every <strong>1,000</strong> rows. I introduce a nested <strong>WHEN</strong> statement which updates time records. I rely on <strong>SYSDATE()</strong> to return the true time, and on <strong>NOW()</strong> to return query execution start time.</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN <strong>@row_counter % 1000 = 0</strong> THEN
+        CASE
+          WHEN (@time_now := <strong>SYSDATE()</strong>) IS NULL THEN NULL
+          WHEN (@time_diff := (<strong>TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now)</strong>)) IS NULL THEN NULL
+          WHEN <strong>SLEEP(@time_diff)</strong> IS NULL THEN NULL
+          WHEN (@chunk_start_time := <strong>SYSDATE()</strong>) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;</pre>
+</blockquote>
+<h4>Proof</h4>
+<p>How can we prove that the queries do indeed work?</p>
+<p>We can see if the total runtime sums up to the number of sleep calls, in seconds; but how do we know that sleeps do occur at the correct times?</p>
+<p>A solution I offer is to use a stored routines which logs to a MyISAM table (a non transactional table) the exact time (using <strong>SYSDATE()</strong>) and value per row. The following constructs are introduced:</p>
+<blockquote>
+<pre><strong>CREATE TABLE</strong> test.proof(
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dt DATETIME NOT NULL,
+  msg VARCHAR(255)
+) <strong>ENGINE=MyISAM</strong>;
+
+DELIMITER $$
+<strong>CREATE FUNCTION</strong> test.prove_it(message VARCHAR(255)) RETURNS TINYINT
+DETERMINISTIC
+MODIFIES SQL DATA
+BEGIN
+  <strong>INSERT INTO test.proof (dt, msg) VALUES (SYSDATE(), message); RETURN 0;</strong>
+END $$
+DELIMITER ;</pre>
+</blockquote>
+<p>The <strong>prove_it()</strong> function records the immediate time and a message into the MyISAM table, which immediately accepts the write, being non-transactional. It returns with <strong>0</strong>, so we will now embed it within the query. Of course, the function itself incurs some overhead, but it will nevertheless convince you that <strong>SLEEP()</strong>s do occur at the right time!</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN @row_counter % 1000 = 0 THEN
+        CASE
+          WHEN (@time_now := SYSDATE()) IS NULL THEN NULL
+          WHEN (@time_diff := (TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now))) IS NULL THEN NULL
+          WHEN SLEEP(@time_diff)<strong> + test.prove_it(CONCAT('will sleep for ', @time_diff, ' seconds'))</strong> IS NULL THEN NULL
+          WHEN (@chunk_start_time := SYSDATE()) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;
+
+mysql&gt; SELECT * FROM test.proof;
++----+---------------------+--------------------------+
+| id | dt                  | msg                      |
++----+---------------------+--------------------------+
+|  1 | 2011-11-01 09:22:36 | will sleep for 1 seconds |
+|  2 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  3 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  4 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  5 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  6 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  7 | 2011-11-01 09:22:38 | will sleep for 1 seconds |
+|  8 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+|  9 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 10 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 11 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 12 | 2011-11-01 09:22:40 | will sleep for 1 seconds |
+| 13 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 14 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 15 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
++----+---------------------+--------------------------+</pre>
+</blockquote>
+<p>The above query is actually very fast. Try adding <strong>BENCHMARK(1000,ENCODE(&#8216;hello&#8217;,&#8217;goodbye&#8217;))</strong> to rental_id so as to make it slower, or just use it on a really large table, see what happens (this is what I actually used to make the query run for several seconds in the example above).</p>
+<p>Observant reads will note that the <strong>&#8220;will sleep&#8230;&#8221;</strong> message actually gets written <em>after</em> the <strong>SLEEP()</strong> call. I leave this as it is.</p>
+<p>Another very nice treat of the code is that you don&#8217;t need sub-second resolution for it to work. If you look at the above, we don&#8217;t actually go to sleep every <strong>1,000</strong> rows (<strong>1,000</strong> is just too quick in the query &#8212; perhaps I should have used <strong>10,000</strong> seconds). But we <em>do</em> make it once a second has <em>elapsed</em>. Which means it works correctly <em>on average</em>. Of course, the entire discussion is only of interest when a query executes for a <em>substantial</em> number of seconds, so this is just an anecdote.</p>
+<h4>And the winner is&#8230;</h4>
+<p>Wow, this <a href="https://shlomi-noach.github.io/blog/mysql/contest-for-glory-write-a-self-throttling-mysql-query">contest</a> was anything but popular. <strong><a href="http://marcalff.blogspot.com/">Marc Alff</a></strong> is the obvious winner: he is the <em>only</em> one to suggest a solution <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>But Marc uses a very nice trick: he reads the <strong>PERFORMANCE_SCHEMA</strong>. Now, I&#8217;m not sure how the <strong>PERFORMANCE_SCHEMA</strong> gets updated. I know that the <strong>INFORMATION_SCHEMA.GLOBAL_STATUS</strong> table does not get updated by a query until the query completes (so you cannot expect a change in <strong>innodb_rows_read</strong> throughout the execution of the query). I just didn&#8217;t test it (homework, anyone?). If it does get updated, then we can throttle the query based on InnoDB page reads using a simple query. Otherwise, an access to <strong>/proc/diskstats</strong> is possible, assuming no <em>apparmor</em> or <em>SELinux</em> are blocking us.</p>
+<p>Marc also uses a stored function, which is the <em>clean</em> way of doing it; however I distrust the overhead incurred by s stored routine and prefer my solution (which is, admittedly, not a pretty SQL sight!).</p>
+<p>Happy throttling!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4294</post-id>	</item>
+		<item>
+		<title>On generating unique IDs using LAST_INSERT_ID() and other tools</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools#comments</comments>
+				<pubDate>Wed, 02 Feb 2011 06:50:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[NoSQL]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[Query Cache]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3283</guid>
+				<description><![CDATA[There&#8217;s a trick for using LAST_INSERT_ID() to generate sequences in MySQL. Quoting from the Manual: Create a table to hold the sequence counter and initialize it: mysql&#62; CREATE TABLE sequence (id INT NOT NULL); mysql&#62; INSERT INTO sequence VALUES (0); Use the table to generate sequence numbers like this: mysql&#62; UPDATE sequence SET id=LAST_INSERT_ID(id+1); mysql&#62; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s a <a href="http://dev.mysql.com/doc/refman/5.1/en/information-functions.html#function_last-insert-id">trick</a> for using <strong>LAST_INSERT_ID()</strong> to generate sequences in MySQL. Quoting from the Manual:</p>
+<blockquote>
+<ol type="1">
+<li>Create a table to hold the sequence counter and initialize               it:
+<pre>mysql&gt; <strong><code>CREATE TABLE sequence (id INT NOT NULL);</code></strong>
+mysql&gt; <strong><code>INSERT INTO sequence VALUES (0);</code></strong>
+</pre>
+</li>
+<li>Use the table to generate sequence numbers like this:
+<pre>mysql&gt; <strong><code>UPDATE sequence SET id=LAST_INSERT_ID(id+1);</code></strong>
+mysql&gt; <strong><code>SELECT LAST_INSERT_ID();</code></strong>
+</pre>
+</li>
+</ol>
+</blockquote>
+<p>This trick calls for trouble.</p>
+<h4>Contention</h4>
+<p>A customer was using this trick to generate unique session IDs for his JBoss sessions. These IDs would eventually be written back to the database in the form of log events. Business go well, and one day the customer adds three new JBoss servers (doubling the amount of webapps). All of a sudden, nothing works quite as it used to. All kinds of queries take long seconds to complete; load average becomes very high.<span id="more-3283"></span></p>
+<p>A short investigation reveals that a very slight load is enough to make for an accumulation of sequence-UPDATE queries. Dozens of them are active at any given time, waiting for long seconds.</p>
+<p>InnoDB or MyISAM both make for poor response times. No wonder! Everyone&#8217;s contending for one lock.</p>
+<h4>Not just one</h4>
+<p>Other queries seem to hang as well. Why?</p>
+<p>It is easy to forget or let go unnoticed that there are quite a few global locks involved with each query. If query cache is activated, then any query must pass through that cache, holding the query cache mutex. There&#8217;s a global mutex on MyISAM&#8217;s key cache. There&#8217;s one on InnoDB&#8217;s buffer pool (see multiple buffer pools in InnoDB 5.5), albeit less of an overhead. And there&#8217;s the table cache.</p>
+<p>When table cache is enabled, any completed query attempts to return file handles to the cache. Any new query attempts to retrieve handles from the cache. While writing to the cache (extracting, adding), the cache is locked. When everyone&#8217;s busy doing the sequence-UPDATE, table cache lock is being abused. Other queries are unable to find the time to squire the lock and get on with their business.</p>
+<h4>What can be done?</h4>
+<p>One could try and increase the <strong>table_open_cache</strong> value. That may help to some extent, and for limited time. But the more requests are made, the quicker the problem surfaces again. When, in fact, <em>reducing</em> the <strong>table_open_cache</strong> to zero (well, minimum value is <strong>1</strong>) can make for a great impact. If there&#8217;s nothing to fight for, everyone just get by on their own.</p>
+<p>I know the following is not a scientific explanation, but it hits me as a good comparison: when my daughter brings a friend over, and there&#8217;s a couple of toys, both are happy. A third friend makes for a fight: <em>&#8220;I saw it first! She took it from me! I was holding it!&#8221;</em>. Any parent knows the ultimate solution to this kind of fight: take away the toys, and have them find something else to enjoy doing. OK, sorry for this unscientific display, I had to share my daily stress.</p>
+<p>When no table cache is available, a query will go on opening the table by itself, and will not attempt to return the file handle back to the cache. The file handle will simply be destroyed. Now, usually this is not desired. Caching is good. But in our customer&#8217;s case, the cost of not using a table cache was minified by the cost of having everyone fight for the sequence table. Reducing the table cache made for an immediate relaxation of the database, with observable poorer responsiveness on peak times, however way better than with large table cache.</p>
+<h4>Other tools?</h4>
+<p>I don&#8217;t consider the above to be a good solution. It&#8217;s just a temporary hack.</p>
+<p>I actually don&#8217;t like the <strong>LAST_INSERT_ID()</strong> trick. Moreover, I don&#8217;t see that it&#8217;s the database&#8217;s job to provide with unique IDs. Let it do relational stuff. If generating IDs is too intensive, let someone else do it.</p>
+<p>NoSQL solutions provide such a service. <a href="http://memcached.org/">Memcached</a>, <a href="http://redis.io/">redis</a>, <a href="http://www.mongodb.org/">MongoDB</a> (and probably more) all provide with increment functions. Check them out.</p>
+<h4>Application level solutions</h4>
+<p>I actually use an application level solution to generate unique IDs. I mean, there&#8217;s always <strong>GUID()</strong>, but it&#8217;s result is just too long. Take a look at the following Java code:</p>
+<blockquote>
+<pre>public class Utils {
+  private static long lastUniqueNumber = 0;
+
+  public static synchronized long uniqueNumber() {
+    long unique = System.currentTimeMillis();
+    if (unique &lt;= lastUniqueNumber)
+      unique = lastUniqueNumber + 1;
+    lastUniqueNumber = unique;
+    return unique;
+  }
+}</pre>
+</blockquote>
+<p>Within a Java application this above method returns with unique IDs, up to 1000 per second on average (and it can perform way more than 1000 times per second).</p>
+<p>On consequential executions of applications on the same machine one would still expect unique values due to the time-related nature of values. However, computer time changes. It&#8217;s possible that <strong>System.currentTimeMillis()</strong> would return a value already used in the past.</p>
+<p>And, what about two processes running on the same machine at the same time? Or on different machine?</p>
+<p>Which is why I use the following combination to generate my unique IDs:</p>
+<ul>
+<li>Server ID (much like MySQL&#8217;s server_id parameter). this could be the last byte in the server&#8217;s IP address, or just 4 or 5 bits if not too many players are expected.</li>
+<li>Process ID (plain old <em>pid</em>) which I pass to the Java runtime in the form of system properties. Any two processes running on the same machine are assured to have different IDs. Two consequently spawned processes will have different IDs. The time it would take to cycle the process IDs is way more than would make for a &#8220;time glitch&#8221; problem as described above</li>
+<li>Current time in milliseconds.</li>
+</ul>
+<p>If you have to have everything withing 64 bit (BIGINT) then you&#8217;ll have to do bit manipulation, and drop some of the MSB on the milliseconds so as to overwrite with server &amp; process IDs.</p>
+<p>If you are willing to have your IDs unique in the bounds of a given time frame (so, for example, a month from now you wouldn&#8217;t mind reusing old IDs), then the problem is significantly easier. You may just use &#8220;day of month&#8221; and &#8220;millis since day start&#8221; and save those precious bits.</p>
+<h4>Still other?</h4>
+<p>Please share your solutions below!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3283</post-id>	</item>
+		<item>
+		<title>How often should you use OPTIMIZE TABLE? &#8211; followup</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/how-often-should-you-use-optimize-table-followup</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/how-often-should-you-use-optimize-table-followup#comments</comments>
+				<pubDate>Mon, 04 Oct 2010 08:07:45 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Performance]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2882</guid>
+				<description><![CDATA[This post follows up on Baron&#8217;s How often should you use OPTIMIZE TABLE?. I had the opportunity of doing some massive purging of data from large tables, and was interested to see the impact of the OPTIMIZE operation on table&#8217;s indexes. I worked on some production data I was authorized to provide as example. The [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post follows up on Baron&#8217;s <a href="http://www.xaprb.com/blog/2010/02/07/how-often-should-you-use-optimize-table/">How often should you use OPTIMIZE TABLE?</a>. I had the opportunity of doing some massive purging of data from large tables, and was interested to see the impact of the <strong>OPTIMIZE</strong> operation on table&#8217;s indexes. I worked on some production data I was authorized to provide as example.</p>
+<h4>The use case</h4>
+<p>I&#8217;ll present a single use case here. The table at hand is a compressed InnoDB table used for logs. I&#8217;ve rewritten some column names for privacy:</p>
+<blockquote>
+<pre>mysql&gt; show create table logs \G
+
+Create Table: CREATE TABLE `logs` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `name` varchar(20) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ `ts` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `origin` varchar(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ `message` text NOT NULL,
+ `level` tinyint(11) NOT NULL DEFAULT '0',
+ `s` char(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',
+ PRIMARY KEY (`id`),
+ KEY `s` (`s`),
+ KEY `name` (`name`,`ts`),
+ KEY `origin` (`origin`,`ts`)
+) ENGINE=InnoDB AUTO_INCREMENT=186878729 DEFAULT CHARSET=utf8 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8</pre>
+</blockquote>
+<p>The table had log records starting <strong>2010-08-23</strong> and up till <strong>2010-09-02</strong> noon. Table status:<span id="more-2882"></span></p>
+<blockquote>
+<pre>mysql&gt; show table status like 'logs'\G
+*************************** 1. row ***************************
+           Name: logs
+         Engine: InnoDB
+        Version: 10
+     Row_format: Compressed
+           Rows: 22433048
+ Avg_row_length: 206
+    Data_length: 4625285120
+Max_data_length: 0
+   Index_length: 1437073408
+      Data_free: 4194304
+ Auto_increment: 186878920
+    Create_time: 2010-08-24 18:10:49
+    Update_time: NULL
+     Check_time: NULL
+      Collation: utf8_general_ci
+       Checksum: NULL
+ Create_options: row_format=COMPRESSED KEY_BLOCK_SIZE=8
+        Comment:</pre>
+</blockquote>
+<p>(A bit puzzled on the <strong>Create_time</strong>; the table was taken from an LVM snapshot of another server, so it existed for a very long time before. Not sure why the <strong>Create_time</strong> field is as it is here; I assume the MySQL upgrade marked it so, did not have the time nor need to look into it).</p>
+<p>I was using <a href="http://www.percona.com/downloads/Percona-Server-5.1/">Percona-Server-5.1.47-11.2</a>, and so was able to look at the index statistics for that table:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM information_schema.INNODB_INDEX_STATS WHERE table_name='logs';
++--------------+------------+--------------+--------+----------------+------------+------------+
+| table_schema | table_name | index_name   | fields | row_per_keys   | index_size | leaf_pages |
++--------------+------------+--------------+--------+----------------+------------+------------+
+| newsminer    | logs       | PRIMARY      |      1 | 1              |     282305 |     246856 |
+| newsminer    | logs       | s            |      2 | 17, 1          |      38944 |      33923 |
+| newsminer    | logs       | name         |      3 | 2492739, 10, 2 |      22432 |      19551 |
+| newsminer    | logs       | origin       |      3 | 1303, 4, 1     |      26336 |      22931 |
++--------------+------------+--------------+--------+----------------+------------+------------+</pre>
+</blockquote>
+<h4>Status after massive purge</h4>
+<p>My first requirement was to purge out all record up to <strong>2010-09-01 00:00:00</strong>. I did so in small chunks, using <a href="http://code.openark.org/forge/openark-kit">openark kit</a>&#8216;s oak-chunk-update (same can be achieved with <a href="http://www.maatkit.org/">maatkit</a>&#8216;s mk-archiver). The process purged <strong>1000</strong> rows at a time, with some sleep in between, and ran for about a couple of hours. It may be interesting to note that since ts is in <a href="https://shlomi-noach.github.io/blog/mysql/monotonic-functions-sql-and-mysql">monotonically ascending</a> values, purging of old rows also means purging of lower PKs, which means we&#8217;re trimming the PK tree from left.</p>
+<p>Even while purging took place, I could see the index_size/leaf_pages values dropping, until, finally:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM information_schema.INNODB_INDEX_STATS WHERE table_name='logs';
++--------------+------------+--------------+--------+--------------+------------+------------+
+| table_schema | table_name | index_name   | fields | row_per_keys | index_size | leaf_pages |
++--------------+------------+--------------+--------+--------------+------------+------------+
+| newsminer    | logs       | PRIMARY      |      1 | 1            |      40961 |      35262 |
+| newsminer    | logs       | s            |      2 | 26, 1        |      34440 |       3798 |
+| newsminer    | logs       | name         |      3 | 341011, 4, 1 |       4738 |       2774 |
+| newsminer    | logs       | origin       |      3 | 341011, 4, 2 |      10178 |       3281 |
++--------------+------------+--------------+--------+--------------+------------+------------+</pre>
+</blockquote>
+<p>The number of deleted rows was roughly <strong>85%</strong> of total rows, so down to <strong>15%</strong> number of rows.</p>
+<h4>Status after OPTIMIZE TABLE</h4>
+<p>Time to see whether <strong>OPTIMIZE</strong> really optimizes! Will it reduce number of leaf pages in PK? In secondary keys?</p>
+<blockquote>
+<pre>mysql&gt; OPTIMIZE TABLE logs;
+...
+mysql&gt; SELECT * FROM information_schema.INNODB_INDEX_STATS WHERE table_name='logs';
++--------------+------------+--------------+--------+--------------+------------+------------+
+| table_schema | table_name | index_name   | fields | row_per_keys | index_size | leaf_pages |
++--------------+------------+--------------+--------+--------------+------------+------------+
+| newsminer    | logs       | PRIMARY      |      1 | 1            |      40436 |      35323 |
+| newsminer    | logs       | s            |      2 | 16, 1        |       5489 |       4784 |
+| newsminer    | logs       | name         |      3 | 335813, 7, 1 |       3178 |       2749 |
+| newsminer    | logs       | origin       |      3 | 335813, 5, 2 |       3951 |       3446 |
++--------------+------------+--------------+--------+--------------+------------+------------+
+4 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>The above shows no significant change in either of the indexes: not for <strong>index_size</strong>, not for <strong>leaf_pages</strong>, not for statistics (<strong>row_per_keys</strong>). The <strong>OPTIMIZE</strong> did not reduce index size. It did not reduce the number of index pages (<strong>leaf_pages</strong> are the major factor here). Some <strong>leaff_pages</strong> values have even increased, but in small enough margin to consider as equal.</p>
+<p>Index-wise, the above example does not show an advantage to using <strong>OPTIMIZE</strong>. I confess, I was surprised. And for the better. This indicates InnoDB makes good merging of index pages after massive purging.</p>
+<h4>So, no use for OPTIMIZE?</h4>
+<p>Think again: file system-wise, things look different.</p>
+<p>Before purging of data:</p>
+<blockquote>
+<pre>bash:~# ls -l logs.* -h
+-rw-r----- 1 mysql mysql 8.6K 2010-08-15 17:40 logs.frm
+-rw-r----- 1 mysql mysql 2.9G 2010-09-02 14:01 logs.ibd</pre>
+</blockquote>
+<p>After purging of data:</p>
+<blockquote>
+<pre>bash:~# ls -l logs.* -h
+-rw-r----- 1 mysql mysql 8.6K 2010-08-15 17:40 logs.frm
+-rw-r----- 1 mysql mysql 2.9G 2010-09-02 14:21 logs.ibd</pre>
+</blockquote>
+<p>Recall that InnoDB never releases table space back to file system!</p>
+<p>After <strong>OPTIMIZE</strong> on table:</p>
+<blockquote>
+<pre>bash:~# ls -l logs.* -h
+-rw-rw---- 1 mysql mysql 8.6K 2010-09-02 14:26 logs.frm
+-rw-rw---- 1 mysql mysql 428M 2010-09-02 14:43 logs.ibd</pre>
+</blockquote>
+<p>On <strong>innodb_file_per_table</strong> an <strong>OPTIMIZE</strong> creates a new table space, and the old one gets destroyed. Space goes back to file system. Don&#8217;t know about you; I like to have my file system with as much free space as possible.</p>
+<h4>Need to verify</h4>
+<p>I&#8217;ve tested Percona Server, since this is where I can find <strong>INNODB_INDEX_STATS</strong>. But this begs the following questions:</p>
+<ul>
+<li>Perhaps the results only apply for Percona Server? (I&#8217;m guessing not).</li>
+<li>Or only for InnoDB plugin? Does the same hold for &#8220;builtin&#8221; InnoDB? (dunno)</li>
+<li>Only on &gt;= 5.1? (Maybe; 5.0 is becoming rare now anyway)</li>
+<li>Only on InnoDB (Well, of course this test is storage engine dependent!)</li>
+</ul>
+<h4>Conclusion</h4>
+<p>The use case above is a particular example. Other use cases may include tables where deletions often occur in middle of table (remember we were trimming the tree from left side only). Other yet may need to handle <strong>UPDATE</strong>s to indexed columns. I have some more operations to do here, with larger tables (e.g. <strong>40GB</strong> compressed). If anything changes, I&#8217;ll drop a note.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/how-often-should-you-use-optimize-table-followup/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2882</post-id>	</item>
+		<item>
+		<title>Views: better performance with condition pushdown</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/views-better-performance-with-condition-pushdown</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/views-better-performance-with-condition-pushdown#comments</comments>
+				<pubDate>Thu, 20 May 2010 05:17:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Execution plan]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1328</guid>
+				<description><![CDATA[Justin&#8217;s A workaround for the performance problems of TEMPTABLE views post on mysqlperformanceblog.com reminded me of a solution I once saw on a customer&#8217;s site. The customer was using nested views structure, up to depth of some 8-9 views. There were a lot of aggregations along the way, and even the simplest query resulted with [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Justin&#8217;s <a href="http://www.mysqlperformanceblog.com/2010/05/19/a-workaround-for-the-performance-problems-of-temptable-views/">A workaround for the performance problems of TEMPTABLE views</a> post on <a href="http://www.mysqlperformanceblog.com/">mysqlperformanceblog.com</a> reminded me of a solution I once saw on a customer&#8217;s site.</p>
+<p>The customer was using nested views structure, up to depth of some 8-9 views. There were a lot of aggregations along the way, and even the simplest query resulted with a LOT of subqueries, temporary tables, and vast amounts of data, even if only to return with a couple of rows.</p>
+<p>While we worked to solve this, a developer showed me his own trick. His trick is now impossible to implement, but there&#8217;s a hack around this.</p>
+<p>Let&#8217;s use the world database to illustrate. Look at the following view definition:<span id="more-1328"></span></p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+CREATE
+  ALGORITHM=TEMPTABLE
+VIEW country_languages AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON (Country.CODE = CountryLanguage.CountryCode)
+  GROUP BY
+    Country.CODE;
+</pre>
+</blockquote>
+<p>The view presents with a list of spoken languages per country. The execution plan for querying this view looks like this:</p>
+<blockquote>
+<pre>mysql&gt; EXPLAIN SELECT * FROM country_languages;
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+| id | select_type | table           | type   | possible_keys | key     | key_len | ref                               | rows | Extra                                        |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+|  1 | PRIMARY     | &lt;derived2&gt;      | ALL    | NULL          | NULL    | NULL    | NULL                              |  233 |                                              |
+|  2 | DERIVED     | CountryLanguage | index  | PRIMARY       | PRIMARY | 33      | NULL                              |  984 | Using index; Using temporary; Using filesort |
+|  2 | DERIVED     | Country         | eq_ref | PRIMARY       | PRIMARY | 3       | world.CountryLanguage.CountryCode |    1 |                                              |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+</pre>
+</blockquote>
+<p>And, even if we only want to filter out a single country, we still get the same plan:</p>
+<blockquote>
+<pre>mysql&gt; EXPLAIN SELECT * FROM country_languages WHERE Code='USA';
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+| id | select_type | table           | type   | possible_keys | key     | key_len | ref                               | rows | Extra                                        |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+|  1 | PRIMARY     | &lt;derived2&gt;      | ALL    | NULL          | NULL    | NULL    | NULL                              |  233 | Using where                                  |
+|  2 | DERIVED     | CountryLanguage | index  | PRIMARY       | PRIMARY | 33      | NULL                              |  984 | Using index; Using temporary; Using filesort |
+|  2 | DERIVED     | Country         | eq_ref | PRIMARY       | PRIMARY | 3       | world.CountryLanguage.CountryCode |    1 |                                              |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+</pre>
+</blockquote>
+<p>So, we need to scan the entire country_language and country tables in order to return results for just one row.</p>
+<h4>A non-working solution</h4>
+<p>The solution offered by the developer was this:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+CREATE
+  ALGORITHM=MERGE
+  VIEW country_languages_non_working AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON
+      (Country.CODE = CountryLanguage.CountryCode)
+  WHERE
+    Country.CODE = @country_code
+  GROUP BY Country.CODE;
+</pre>
+</blockquote>
+<p>And follow by:</p>
+<blockquote>
+<pre>mysql&gt; SET @country_code='USA';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; SELECT * FROM country_languages_2;
++------+---------------+----------------------------------------------------------------------------------------------------+
+| CODE | country       | languages                                                                                          |
++------+---------------+----------------------------------------------------------------------------------------------------+
+| USA  | United States | Chinese,English,French,German,Italian,Japanese,Korean,Polish,Portuguese,Spanish,Tagalog,Vietnamese |
++------+---------------+----------------------------------------------------------------------------------------------------+
+</pre>
+</blockquote>
+<p>So, pushdown a <strong>WHERE</strong> condition into the view&#8217;s definition. The session variable @country_code is used to filter rows. In the above simplified code the value is assumed to be set; tweak it as you see fit (using <strong>IFNULL</strong>, for example, or <strong>OR</strong> statements) to allow for full scan in case the variable is undefined.</p>
+<p>This doesn&#8217;t work. It used to work a couple years back; but today you cannot create a view which uses session variables or parameters. It is a restriction imposed by views.</p>
+<h4>A workaround</h4>
+<p>Justin showed a workaround using an additional table. There is another workaround which does not involve tables, but rather stored routines. Now, this is a patch, and an ugly one. It may not work in future versions of MySQL for all I know. But, here it goes:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` FUNCTION `get_session_country`() RETURNS CHAR(3)
+    NO SQL
+    DETERMINISTIC
+BEGIN
+  RETURN @country_code;
+END $$
+DELIMITER ;
+
+CREATE
+  ALGORITHM=MERGE
+  VIEW country_languages_2 AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON
+      (Country.CODE = CountryLanguage.CountryCode)
+  WHERE
+    Country.CODE = get_session_country()
+  GROUP BY Country.CODE;
+</pre>
+</blockquote>
+<p>And now:</p>
+<blockquote>
+<pre>mysql&gt; SET @country_code='USA';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; SELECT * FROM country_languages_2;
++------+---------------+----------------------------------------------------------------------------------------------------+
+| CODE | country       | languages                                                                                          |
++------+---------------+----------------------------------------------------------------------------------------------------+
+| USA  | United States | Chinese,English,French,German,Italian,Japanese,Korean,Polish,Portuguese,Spanish,Tagalog,Vietnamese |
++------+---------------+----------------------------------------------------------------------------------------------------+
+1 row in set, 1 warning (0.00 sec)
+
+mysql&gt; EXPLAIN SELECT * FROM country_languages_2;
++----+-------------+-----------------+--------+---------------+---------+---------+------+------+--------------------------+
+| id | select_type | table           | type   | possible_keys | key     | key_len | ref  | rows | Extra                    |
++----+-------------+-----------------+--------+---------------+---------+---------+------+------+--------------------------+
+|  1 | PRIMARY     | &lt;derived2&gt;      | system | NULL          | NULL    | NULL    | NULL |    1 |                          |
+|  2 | DERIVED     | Country         | const  | PRIMARY       | PRIMARY | 3       |      |    1 |                          |
+|  2 | DERIVED     | CountryLanguage | ref    | PRIMARY       | PRIMARY | 3       |      |    8 | Using where; Using index |
++----+-------------+-----------------+--------+---------------+---------+---------+------+------+--------------------------+
+</pre>
+</blockquote>
+<p>Since views are allowed to call stored routines (Justing used this to call upon <strong>CONNECTION_ID()</strong>), and since stored routines can use session variables, we can take advantage and force the view into filtering out irrelevant rows before these accumulate to temporary tables and big joins.</p>
+<p>Back in the customer&#8217;s office, we witnessed, what with their real data and multiple views, a reduction of query times from ~30 minutes to a few seconds.</p>
+<h4>Another kind of use</h4>
+<p>Eventually we worked to make better view definitions and query splitting, resulting in clearer code and fast queries, but this solution plays nicely into another kind of problem:</p>
+<p>Can we force different customers to see different parts of a given table? e.g., only those rows that relate to the customers?</p>
+<p>There can be many solutions: different tables; multiple views (one per customer), stored procedures, what have you. The above provides a solution, and I&#8217;ve seen it in use.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/views-better-performance-with-condition-pushdown/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1328</post-id>	</item>
+		<item>
+		<title>Reducing locks by narrowing primary key</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key#comments</comments>
+				<pubDate>Tue, 04 May 2010 06:46:01 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Performance]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1269</guid>
+				<description><![CDATA[In a period of two weeks, I had two cases with the exact same symptoms. Database users were experiencing low responsiveness. DBAs were seeing locks occurring on seemingly normal tables. In particular, looking at Innotop, it seemed that INSERTs were causing the locks. In both cases, tables were InnoDB. In both cases, there was a [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In a period of two weeks, I had two cases with the exact same symptoms.</p>
+<p>Database users were experiencing low responsiveness. DBAs were seeing locks occurring on seemingly normal tables. In particular, looking at Innotop, it seemed that <strong>INSERT</strong>s were causing the locks.</p>
+<p>In both cases, tables were InnoDB. In both cases, there was a <strong>PRIMARY KEY</strong> on the combination of all <strong>5</strong> columns. And in both cases, there was no clear explanation as for why the <strong>PRIMARY KEY</strong> was chosen as such.</p>
+<h4>Choosing a proper PRIMARY KEY</h4>
+<p>Especially with InnoDB, which uses clustered index structure, the <strong>PRIMARY KEY</strong> is of particular importance. Besides the fact that a bloated <strong>PRIMARY KEY</strong> bloats the entire clustered index and secondary keys (see: <a href="https://shlomi-noach.github.io/blog/mysql/the-depth-of-an-index-primer">The depth of an index: primer</a>), it is also a source for locks. It&#8217;s true that any <strong>UNIQUE KEY</strong> can serve as a <strong>PRIMARY KEY</strong>. But not all such keys are good candidates.<span id="more-1269"></span></p>
+<h4>Reducing the locks</h4>
+<p>In both described cases, the solution was to add an <strong>AUTO_INCREMENT</strong> column to serve as the <strong>PRIMARY KEY</strong>, and have that <strong>5</strong> column combination under a secondary <strong>UNIQUE KEY</strong>. The impact was immediate: no further locks on that table were detected, and query responsiveness turned very high.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1269</post-id>	</item>
+	</channel>
+</rss>

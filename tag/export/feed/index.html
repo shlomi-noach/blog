@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>export &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/export/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 15 Aug 2012 09:23:23 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Ways to export MySQL result set to file on client side</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/ways-to-export-mysql-result-set-to-file-on-client-side</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/ways-to-export-mysql-result-set-to-file-on-client-side#comments</comments>
+				<pubDate>Wed, 15 Aug 2012 09:23:23 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[client]]></category>
+		<category><![CDATA[export]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4081</guid>
+				<description><![CDATA[Problem: you wish to write table data to file, but you wish to do so on client side. SELECT &#8230; INTO OUTFILE writes the file on server. What are your options on client? 1. mysql client If you have direct access from your client machine to your DB server machine, and can connect via mysql [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>Problem</strong>: you wish to write table data to file, but you wish to do so on client side.</p>
+<p><strong>SELECT &#8230; INTO OUTFILE</strong> writes the file on server. What are your options on client?</p>
+<h4>1. mysql client</h4>
+<p>If you have direct access from your client machine to your DB server machine, and can connect via <strong>mysql</strong> client, you get a very customizable file write:</p>
+<blockquote>
+<pre>bash$ <strong>mysql</strong> -h db_host --execute "SELECT * FROM my_table" &gt; /tmp/output.txt</pre>
+</blockquote>
+<p>The above writes fancy tables, so you probably want to:</p>
+<blockquote>
+<pre>bash$ <strong>mysql</strong> -h db_host --execute "SELECT * FROM my_table" --bat &gt; /tmp/output.txt</pre>
+</blockquote>
+<p>Also try:</p>
+<blockquote>
+<pre>bash$ <strong>mysql</strong> -h db_host --execute "SELECT * FROM my_table" --silent --raw &gt; /tmp/output.txt</pre>
+</blockquote>
+<p>To turn off headers.</p>
+<p>More options include the <strong>&#8211;xml</strong> or <strong>&#8211;html</strong> formats.<span id="more-4081"></span></p>
+<h4>2. tee</h4>
+<p><strong>tee</strong> works similarly to a unix <em>tee</em> command. From the mysql command line, issue:</p>
+<blockquote>
+<pre>mysql&gt; <strong>tee</strong> <em>file_name.txt</em></pre>
+</blockquote>
+<p>Anything you type from that moment on, and anything returned from the server, are written to given file, in the same format by which they are displayed on your client.</p>
+<p>This means result sets are written in table format (what with all the <strong>+&#8212;+&#8212;&#8211;+&#8212;+</strong> frames), which is not most convenient to parse later on.</p>
+<h4>3. pager</h4>
+<p>If you&#8217;re on unix/linux, you have a third option: use the <strong>pager</strong> command to write result sets to file. For example, use:</p>
+<blockquote>
+<pre>mysql&gt; <strong>pager</strong> cat - &gt;&gt; /tmp/pager_output.txt</pre>
+</blockquote>
+<p>This will work similarly to the tee command, but will not verbose to screen. In the above we <em>append</em> results to file.</p>
+<h4>4. pager, Unix tee</h4>
+<p>So, while we&#8217;re at it, one can:</p>
+<blockquote>
+<pre>mysql&gt; <strong>pager</strong> <strong>tee</strong> /tmp/tee_file.txt</pre>
+</blockquote>
+<p>The above will rewrite the file for every result set. Play at your own leisure to generate different files. For example, use</p>
+<blockquote>
+<pre>mysql&gt; <strong>pager</strong> <strong>tee</strong> /tmp/tee_$(date +%M%H)_file.txt</pre>
+</blockquote>
+<p>for timestamp signature.</p>
+<p><strong>pager</strong> + unix command open an endless gateway of opportunities. Use <strong>awk</strong> to get rid of table frames. Use <strong>grep</strong> to filter frame rows out. What have you.</p>
+<h4>5. GUI Clients</h4>
+<p>I&#8217;m pretty sure your favorite GUI client does that, as well. Like the <strong>mysql</strong> client, you will need direct access to the DB server.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/ways-to-export-mysql-result-set-to-file-on-client-side/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4081</post-id>	</item>
+	</channel>
+</rss>

@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+
+	<title>MySQL vs. PostgreSQL, gh-ost perspective – code.openark.org</title>
+<link rel="dns-prefetch" href="//secure.gravatar.com">
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="https://shlomi-noach.github.io/blog/wp-includes/css/dist/block-library/style.min.css" media="all">
+<style id="wp-block-library-inline-css">
+.has-text-align-justify{text-align:justify;}
+</style>
+<link rel="stylesheet" id="wp-polls-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-css.css" media="all">
+<style id="wp-polls-inline-css">
+.wp-polls .pollbar {
+	margin: 1px;
+	font-size: 6px;
+	line-height: 8px;
+	height: 8px;
+	background-image: url('https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/images/default/pollbg.gif');
+	border: 1px solid #c8c8c8;
+}
+
+</style>
+<link rel="stylesheet" id="wpdiscuz-font-awesome-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/font-awesome-5.0.6/css/fontawesome-all.min.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-frontend-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-user-content-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz-user-content.css" media="all">
+<link rel="stylesheet" id="openark-primer-style-css" href="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/style.css" media="all">
+<link rel="stylesheet" id="wp-markdown-prettify-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/css/prettify.css" media="all">
+<link rel="stylesheet" id="social-logos-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/social-logos/social-logos.min.css" media="all">
+<link rel="stylesheet" id="jetpack_css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/css/jetpack.css" media="all">
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery-migrate.min.js"></script>
+
+
+
+
+
+
+
+
+
+            <style>
+                #wpcomm .wc_new_comment{background:#00B38F;}
+                #wpcomm .wc_new_reply{background:#00B38F;}
+                #wpcomm .wc-form-wrapper{ background:none; } /* ->formBGColor */
+                #wpcomm .wpdiscuz-front-actions{background:#F9F9F9;}
+                #wpcomm .wpdiscuz-subscribe-bar{background:#F9F9F9;}
+                #wpcomm select,
+                #wpcomm input[type="text"],
+                #wpcomm input[type="email"],
+                #wpcomm input[type="url"],
+                #wpcomm input[type="date"],
+                #wpcomm input[type="color"]{border:#D9D9D9 1px solid;}
+                #wpcomm .wc-comment .wc-comment-right{background:#FEFEFE;}
+                #wpcomm .wc-reply .wc-comment-right{background:#F8F8F8;}
+                #wpcomm .wc-comment-right .wc-comment-text, 
+                #wpcomm .wc-comment-right .wc-comment-text *{
+                    font-size:14px;
+                }
+                #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-administrator > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-editor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-contributor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-subscriber > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_admin > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_check > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_helper > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-post_author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-guest > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }                #wpcomm .wc-comment .wc-comment-left .wc-comment-label{ background: #ffffff;}
+                #wpcomm .wc-comment-left .wc-follow-user{color:#00B38F;}
+                #wpcomm .wc-load-more-submit{border:1px solid #D9D9D9;}
+                #wpcomm .wc-new-loaded-comment > .wc-comment-right{background:#FFFAD6;}
+                #wpcomm .wpdiscuz-subscribe-bar{color:#777;}
+                #wpcomm .wpdiscuz-front-actions .wpdiscuz-sbs-wrap span{color: #777;}
+                #wpcomm .page-numbers{color:#555;border:#555 1px solid;}
+                #wpcomm span.current{background:#555;}
+                #wpcomm .wpdiscuz-readmore{cursor:pointer;color:#00B38F;}
+                #wpcomm .wpdiscuz-textarea-wrap{border:#D9D9D9 1px solid;} .wpd-custom-field .wcf-pasiv-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label {color: #DDDDDD;}
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating:not(:checked) > label:hover,.wpdiscuz-rating:not(:checked) > label:hover ~ label {   }#wpcomm .wpdiscuz-item .wpdiscuz-rating > input ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label{color: #FFED85;} 
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label:hover ~ input:checked ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked + label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover ~ label, .wpd-custom-field .wcf-active-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label{ color:#FFD700;}
+                #wpcomm .wc-comment-header{border-top: 1px solid #dedede;}
+                #wpcomm .wc-reply .wc-comment-header{border-top: 1px solid #dedede;}
+                /* Buttons */
+                #wpcomm button, 
+                #wpcomm input[type="button"], 
+                #wpcomm input[type="reset"], 
+                #wpcomm input[type="submit"]{ border: 1px solid #555555; color: #FFFFFF; background-color: #555555; }
+                #wpcomm button:hover, 
+                #wpcomm button:focus,
+                #wpcomm input[type="button"]:hover, 
+                #wpcomm input[type="button"]:focus, 
+                #wpcomm input[type="reset"]:hover, 
+                #wpcomm input[type="reset"]:focus, 
+                #wpcomm input[type="submit"]:hover, 
+                #wpcomm input[type="submit"]:focus{ border: 1px solid #333333; background-color: #333333;  }
+                #wpcomm .wpdiscuz-sort-buttons{color:#777777;}
+                #wpcomm .wpdiscuz-sort-button{color:#777777; cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button:hover{color:#00B38F!important;cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button-active{color:#00B38F!important;cursor:default!important;}
+                #wpcomm .wc-cta-button, 
+                #wpcomm .wc-cta-button-x{color:#777777; }
+                #wpcomm .wc-vote-link.wc-up{color:#999999;}
+                #wpcomm .wc-vote-link.wc-down{color:#999999;}
+                #wpcomm .wc-vote-result{color:#999999;}
+                #wpcomm .wpf-cta{color:#999999; }
+                #wpcomm .wc-comment-link .wc-share-link .wpf-cta{color:#eeeeee;}
+                #wpcomm .wc-footer-left .wc-reply-button{border:1px solid #00B38F!important; color: #00B38F;}
+                #wpcomm .wpf-cta:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-left .wc-reply-button.wc-cta-active, #wpcomm .wc-cta-active{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-cta-button:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-right .wc-toggle,
+                #wpcomm .wc-footer-right .wc-toggle a,
+                #wpcomm .wc-footer-right .wc-toggle i{color:#00B38F;}
+                /* STICKY COMMENT HEADER */
+                #wpcomm .wc-sticky-comment.wc-comment .wc-comment-header .wpd-sticky{background: #1ecea8; color: #ffffff; }
+                #wpcomm .wc-closed-comment.wc-comment .wc-comment-header .wpd-closed{background: #aaaaaa; color: #ffffff;}
+                /* PRIVATE COMMENT HEADER */
+                #wpcomm .wc-private-comment.wc-comment .wc-comment-header .wpd-private{background: #999999; color: #ffffff;}
+                /* FOLLOW LINK */
+
+                #wpcomm .wc-follow{color:#777777;}
+                #wpcomm .wc-follow-active{color:#ff7a00;}
+                #wpcomm .wc-follow:hover i,
+                #wpcomm .wc-unfollow:hover i,
+                #wpcomm .wc-follow-active:hover i{color:#00B38F;}
+                                .wpd-wrapper .wpd-list-item.wpd-active{border-top: 3px solid #00B38F;}
+                                .comments-area{width:auto;}
+            </style>
+            <style data-context="foundation-flickity-css">/*! Flickity v2.0.2
+http://flickity.metafizzy.co
+---------------------------------------------- */.flickity-enabled{position:relative}.flickity-enabled:focus{outline:0}.flickity-viewport{overflow:hidden;position:relative;height:100%}.flickity-slider{position:absolute;width:100%;height:100%}.flickity-enabled.is-draggable{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.flickity-enabled.is-draggable .flickity-viewport{cursor:move;cursor:-webkit-grab;cursor:grab}.flickity-enabled.is-draggable .flickity-viewport.is-pointer-down{cursor:-webkit-grabbing;cursor:grabbing}.flickity-prev-next-button{position:absolute;top:50%;width:44px;height:44px;border:none;border-radius:50%;background:#fff;background:hsla(0,0%,100%,.75);cursor:pointer;-webkit-transform:translateY(-50%);transform:translateY(-50%)}.flickity-prev-next-button:hover{background:#fff}.flickity-prev-next-button:focus{outline:0;box-shadow:0 0 0 5px #09f}.flickity-prev-next-button:active{opacity:.6}.flickity-prev-next-button.previous{left:10px}.flickity-prev-next-button.next{right:10px}.flickity-rtl .flickity-prev-next-button.previous{left:auto;right:10px}.flickity-rtl .flickity-prev-next-button.next{right:auto;left:10px}.flickity-prev-next-button:disabled{opacity:.3;cursor:auto}.flickity-prev-next-button svg{position:absolute;left:20%;top:20%;width:60%;height:60%}.flickity-prev-next-button .arrow{fill:#333}.flickity-page-dots{position:absolute;width:100%;bottom:-25px;padding:0;margin:0;list-style:none;text-align:center;line-height:1}.flickity-rtl .flickity-page-dots{direction:rtl}.flickity-page-dots .dot{display:inline-block;width:10px;height:10px;margin:0 8px;background:#333;border-radius:50%;opacity:.25;cursor:pointer}.flickity-page-dots .dot.is-selected{opacity:1}</style><style data-context="foundation-slideout-css">.slideout-menu{position:fixed;left:0;top:0;bottom:0;right:auto;z-index:0;width:256px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}.slideout-menu.pushit-right{left:auto;right:0}.slideout-panel{position:relative;z-index:1;will-change:transform}.slideout-open,.slideout-open .slideout-panel,.slideout-open body{overflow:hidden}.slideout-open .slideout-menu{display:block}.pushit{display:none}</style>
+<link rel="dns-prefetch" href="//v0.wordpress.com">
+
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL vs. PostgreSQL, gh-ost perspective">
+<meta property="og:url" content="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective">
+<meta property="og:description" content="Last week we released gh-ost, GitHub’s online schema migration tool for MySQL. As with other open source releases in the MySQL ecosystem, this release was echoed by several “Why not Pos…">
+<meta property="article:published_time" content="2016-08-11T20:34:10+00:00">
+<meta property="article:modified_time" content="2016-08-13T06:13:09+00:00">
+<meta property="og:site_name" content="code.openark.org">
+<meta property="og:image" content="https://imgs.xkcd.com/comics/internet_argument.png">
+<meta property="og:image:width" content="460">
+<meta property="og:image:height" content="693">
+<meta property="og:image:alt" content="XKCD: Internet Argument">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:text:title" content="MySQL vs. PostgreSQL, gh-ost perspective">
+<meta name="twitter:card" content="summary">
+
+
+<style>.ios7.web-app-mode.has-fixed header{ background-color: rgba(242,101,34,.88);}</style></head>
+
+<body class="post-template-default single single-post postid-7603 single-format-standard no-sidebar">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#primary">Skip to content</a>
+
+	<header id="masthead" class="site-header">
+		<div class="site-branding">
+							<p class="site-title"><a href="https://shlomi-noach.github.io/blog/" rel="home">code.openark.org</a></p>
+								<p class="site-description">Blog by Shlomi Noach</p>
+			
+			<nav id="site-navigation" class="main-navigation">
+				<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false">primary-menu</button>
+				<div class="menu-primary-menu-container"><ul id="menu-primary-menu" class="menu"><li id="menu-item-8109" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8109"><a href="https://shlomi-noach.github.io/blog/archives">archives</a></li>
+<li id="menu-item-8050" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8050"><a href="https://shlomi-noach.github.io/blog/presentations">presentations</a></li>
+<li id="menu-item-8055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8055"><a href="https://shlomi-noach.github.io/blog/about">about</a></li>
+<li id="menu-item-8071" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8071"><a href="https://github.com/shlomi-noach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a></li>
+<li id="menu-item-8074" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8074"><a href="https://www.linkedin.com/in/shlominoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg></a></li>
+<li id="menu-item-8072" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8072"><a href="https://twitter.com/ShlomiNoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"></path></svg></a></li>
+<li id="menu-item-8073" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8073"><a href="https://shlomi-noach.github.io/blog/feed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-12.832 20c-1.197 0-2.168-.969-2.168-2.165s.971-2.165 2.168-2.165 2.167.969 2.167 2.165-.97 2.165-2.167 2.165zm5.18 0c-.041-4.029-3.314-7.298-7.348-7.339v-3.207c5.814.041 10.518 4.739 10.561 10.546h-3.213zm5.441 0c-.021-7.063-5.736-12.761-12.789-12.792v-3.208c8.83.031 15.98 7.179 16 16h-3.211z"></path></svg></a></li>
+</ul></div>			</nav>
+		</div>
+	</header>
+
+	<main id="primary" class="site-main">
+
+		
+<article id="post-7603" class="post-7603 post type-post status-publish format-standard hentry category-mysql">
+	<header class="entry-header">
+		<h1 class="entry-title">MySQL vs. PostgreSQL, gh-ost perspective</h1>			<div class="entry-meta">
+				<span class="cat-links"><a href="https://shlomi-noach.github.io/blog/category/mysql" rel="category tag">MySQL</a></span><span class="posted-on alignright"><a href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" rel="bookmark"><time class="entry-date published" datetime="2016-08-11T22:34:10+02:00">August 11, 2016</time><time class="updated" datetime="2016-08-13T08:13:09+02:00">August 13, 2016</time></a></span>			</div>
+			</header>
+
+	
+	<div class="entry-content">
+		<p>Last week we released <a href="https://github.com/github/gh-ost">gh-ost</a>, <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">GitHub’s online schema migration tool for MySQL</a>. As with other open source releases in the MySQL ecosystem, this release was echoed by several “Why not PostgreSQL?” comments. Having been active in open source since many years now, I’m familiar with these responses, and I find this is a good time to share my thoughts. Why? <a href="https://xkcd.com/386/">XKCD</a> knows the answer:</p>
+<blockquote><p><a href="https://xkcd.com/386/"><img class="alignnone" src="https://imgs.xkcd.com/comics/duty_calls.png" alt="XKCD: Duty Calls" width="300" height="330"></a></p></blockquote>
+<p>I picked <a href="https://brandur.org/fragments/gh-ost">one post I wish to address</a> (latest commit: <a href="https://github.com/brandur/sorg/blob/3dfbd2cd3f5468f035ec86442d2c670a510118d8/content/fragments/gh-ost.md">3dfbd2cd3f5468f035ec86442d2c670a510118d8</a>). The author invested some time writing it. It nicely summarizes claims I’ve heard over the years, as well as some prejudice. Through responding to this post I will be generalizing thoughts and impressions to address the common reactions. Dear @brandur, let’s grab a beer some day; I fundamentally disagree with your post and with its claims.</p>
+<p><strong>EDIT</strong>: linked post has been updated following this writing; I’d like to thank the author for his consideration. Also see his <a href="https://gist.github.com/brandur/1374c9266c1d9dc32464695df84d9699">followup post</a>. The version I’ve responded to in this post is <a href="https://github.com/brandur/sorg/blob/3dfbd2cd3f5468f035ec86442d2c670a510118d8/content/fragments/gh-ost.md">this commit</a>.<span id="more-7603"></span></p>
+<h3>This is not an anti-PostgreSQL post</h3>
+<p>Disclosure: I appreciate PostgreSQL. I always wanted to be a proficient PostgreSQL user/DBA. I think this project is one of the finest examples of quality open source. It sets some high standards for open source in general, and for RDBMS in particular. I am not emotionally attached to MySQL to the extent that I would hate everything that is not called “MySQL”. I never understood this approach. I am not interested in religious wars. I’m an engineer and this post follows engineering guidelines.</p>
+<h3>Background</h3>
+<p><strong>gh-ost</strong> delivers powerful online schema migrations to MySQL, differentiating itself from existing tools by being triggerless, auditable, controllable, testable, imposing low workload on the migrated master. It addresses the same problem addressed by existing tools as of 2009.</p>
+<h3>Feature X</h3>
+<p>The most basic premise of this post is: <i>MySQL does not have feature X, PostgreSQL does, therefore PostgreSQL. </i></p>
+<p>We’ll discuss the truth of the above shortly, but let’s first discuss the essence of this guideline.</p>
+<p>It should be generally agreed that a statement of the form <em>“<strong>A</strong> doesn’t have feature <strong>X</strong> therefore <strong>B</strong>“</em> is incomplete. We understand complex systems have varying feature sets.</p>
+<p>MySQL has some features PostgreSQL doesn’t. Take, as example, the feature <strong>R</strong>: MySQL has got it since ages ago, and yet PostgreSQL is slow to adapt it, and relied on 3rd party solutions for many years. MySQL’s implementation of <strong>R</strong> is far more elaborate than PostgreSQL’s.</p>
+<p>But if we follow the rule suggested above, we must now migrate from PostgreSQL to MySQL, because PostgreSQL does not have feature <strong>R</strong> (or one of its variants). Infinite loop!</p>
+<p>In practice, we evaluate the pros and cons, the features the products <strong>A</strong> and <strong>B</strong> have or do not have. Which feature is more important to us? <strong>X</strong> or <strong>R</strong>? Is one of them fundamentally required for our operation? Can we work around it if we don’t get it directly from the product? That, and experimentation, is the way an engineer should approach a choice of technology.</p>
+<p>In the world of RDBMS we are interested, among others and in no particular order, in write latency and throughput, read scale out, durability, loss of data in the event of failure, failure promotion schemes, DR, consistency, SQL features, etc. by this list alone it is impossible to claim <em>“PostgreSQL is better than MySQL”</em>  nor <em>“MySQL is better than PostgreSQL”</em>.</p>
+<h3>The particular claim and advice</h3>
+<p>The author suggests we should be using PostgreSQL because it inherently solves the problem for which we embarked on developing <strong>gh-ost</strong>. That is, that PostgreSQL supports true online schema changes. That statement is misleading and I resent the way that statement is delivered.</p>
+<p>The post does not mention that PostgreSQL supports online schema changes for a limited set of operations. I went ahead to double check with the PostgreSQL documentation. I love the documentation! It is detailed and honest. I’m thoroughly satisfied that PostgreSQL only supports a limited set of online operations. I go against the fact the post does not mention that, and leads us to “understand” PostgreSQL has a magic wand.</p>
+<p>Online table operations are supported in PostgreSQL for adding/removing indexes, for removing columns, and for adding columns under certain conditions. As an example, adding a nullable column is an online operation, whereas adding a column with default value is a locking operation.</p>
+<p>A very big part of our schema migration including adding/removing indexes and adding columns. Many of these operations fall under the lockless, online operations PostgreSQL would allow. However a large part of our migrations also consists of adding columns with default values, changing data types (e.g. From <strong>INT</strong> to <strong>BIGINT</strong>), changing character characteristics (e.g. length of text column), space reclamation, and others. These changes are blocking in PostgreSQL.</p>
+<p>The premise of the post now turns to: <i>it’s a pity you invested time and money in developing a tool that solves 100% of your problems when you could have switched to PostgreSQL which would solve 40% of your problems!</i></p>
+<p>If I were to insist my fellow engineers at GitHub migrate to PostgreSQL in order to solve the migration problem, and then, once this technical transition is complete let them know 60% of the migrations are not at all addressed and that we are still stuck with the very same problem we started with, I would not be a very popular engineer.</p>
+<h3>Moreover</h3>
+<p>“the same advancements never happened in MySQL” is a false statement.</p>
+<p>As mentioned in the <strong>gh-ost</strong> announcement, MySQL as of 5.6 does indeed support online, non blocking alter table. In fact, it supports many more variants of online alter table than PostgreSQL does (however, noticeable difference is that PostgreSQL makes those changes <em>transactional</em> whereas MySQL does not).</p>
+<p>Also as mentioned, one of the shortcomings of the MySQL implementation is that it is aggressive, and may cause a high impact on the running master. In my understanding the PostgreSQL implementation is no different. There’s nothing to cause throttling, to play nice with the running workload. Yes, in PostgreSQL you can Ctrl-C your <strong>ALTER</strong>, but who wants to Ctrl-C a <strong>10</strong> hour operation?</p>
+<p><strong>gh-ost</strong> addresses that as well. Its throttling gives super powers over the migration process, kicking in throttling based on master load, replication lag, various human controlled criteria, effectively making it very lightweight on the master.</p>
+<h3>Misdirection?</h3>
+<p>“there’s a level of seemingly willful misdirection here that I just can’t wrap my head around”</p>
+<p>XKCD to the rescue again:</p>
+<blockquote><p><a href="https://xkcd.com/438/"><img class="alignnone" src="https://imgs.xkcd.com/comics/internet_argument.png" alt="XKCD: Internet Argument" width="460" height="693"></a></p></blockquote>
+<p>I dare say this is not the kind of thing a person would say in person, and the accusation is rather severe. It is also ironic. Dear author, consider:</p>
+<ul>
+<li>PostgreSQL does not really solve 100% of the problem <strong>gh-ost</strong> does, and yet you claim we’d be better off with PostgreSQL.</li>
+<li>MySQL does indeed provide more variants of online alter table than PostgreSQL does, and yet you claim it has no online alter capabilities.</li>
+<li>I might claim there’s a seemingly willful misdirection in your post. I might claim nowhere in your write up do you mention the deficiencies in PostgreSQL.</li>
+</ul>
+<p>Instead, I’d rather like to think that you, and others, are misinformed, basing your opinion on rumors and prejudice instead of facts.</p>
+<p>I also observe that people all around the world like to willfully differentiate themselves from others. Even in tech. this is the topic for another post, but consider explaining to a complete outsider, say your doctor, why people who work in tech, are engineers, work with data, work with databases, work with relational databases, work with open source relational databases, people who have so much shared experience, still insist on “us and them”, and seek to see the negative in the other. Sheesh.</p>
+<p>Paraphrasing a memorable sarcastic quote from the movie <a href="http://www.imdb.com/title/tt0195685/">Erin Brockovich</a>: the fact so many of the largest tech companies today choose to use MySQL as their backend database does not mean it’s crap.</p>
+<p>No. We really think MySQL does a good job. It is not perfect. We work around some of its limitations.</p>
+<h3>Claims</h3>
+<p>The claim “you’d be better off with PostgreSQL” (not a quote from aforementioned post) cannot be made without understanding the specific workload of a company/product. It would be presumptuous of me to approach a PostgreSQL based company and say “oh hey why use PostgreSQL? You’d be better off with MySQL!”</p>
+<p>It makes perfect sense to say “PostgreSQL handles problem X better than MySQL” or even “if your one most important requirement is X, you should switch to PostgreSQL”. Otherwise claiming one database is wholly better than the other cannot be taken seriously.</p>
+<p>Deficiencies? Any project of scale has deficiencies. It is granted. We observe and measure, and take features and deficiencies into calculation, and that makes for good engineering.</p>
+<ul>
+<li>If you’re using PostgreSQL and it works well for you, you’re doing the right thing.</li>
+<li>It you’re using MySQL and it works well for you, you’re doing the right thing.</li>
+<li>If you found that PostgreSQL works better for you where MySQL does not, and you decided to switch over, you’re doing the right thing.</li>
+<li>If you found that MySQL works better for you where PostgreSQL wasn’t, and you decided to switch over, you’re doing the right thing.</li>
+<li>If you found that PostgreSQL works better for you where MySQL wasn’t, but decided to stick with MySQL because migrating would be too costly, you’re doing the right thing.</li>
+<li>If you found that MySQL works better for you where PostgreSQL wasn’t, but decided to stick with PostgreSQL because migrating would be too costly, you’re doing the right thing.</li>
+<li>If you pick one over the other because of licensing constraints, you’re doing the right thing.</li>
+<li>If you choose to switch over because of rumors, prejudice, FUD, politics, religion, you’re doing it wrong.</li>
+</ul>
+<h3>Final personal note, on pride</h3>
+<p>“Yesterday, GitHub broadcasted an indomitable sense of self-satisfaction far and wide…”</p>
+<p>Oh hey, <a href="https://xkcd.com/438/">XKCD again</a>. But I would like to ask an honest question: if some <strong>pg-gh-ost</strong> were to be released, a tool that would solve 100% of your PostgreSQL migrations requirements, doing it better than PostgreSQL does, covering all cases, throttling as your daily <em>sqoop</em> imports kick in, as your rush hour traffic kicks in, giving you far and wide greater control over the migration process, what would you do?</p>
+<p>Would you write an offensive post filled with accusations, ranting about the deficiencies of PostgreSQL and how people even consider using such a database that needs a third party tool to do a better job at migrations? Would you tweet something like “Or… Use MySQL!”</p>
+<p>Or would you embrace a project that enriches the PostgreSQL ecosystem, makes it even a greater database to work with, understanding PostgreSQL is not yet perfect and that more work need to be done?</p>
+<p>I take pride in my craft and love making an impact; if we ever do meet for beer I’m happy to share more  thoughts.</p>
+<p>s/gh-ost/anything/g</p>
+<p>Peace on earth</p>
+<div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><div class="sd-content"><ul><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-7603" class="share-twitter sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-7603" class="share-linkedin sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-jetpack-whatsapp"><a rel="nofollow noopener noreferrer" data-shared="" class="share-jetpack-whatsapp sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" target="_blank" title="Click to share on WhatsApp"><span>WhatsApp</span></a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-7603" class="share-facebook sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>	</div>
+
+	<footer class="entry-footer">
+			</footer>
+</article>
+
+	<nav class="navigation post-navigation" role="navigation" aria-label="Posts">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations" rel="prev"><span class="nav-subtitle">Previous:</span> <span class="nav-title">Introducing gh-ost: triggerless online schema migrations</span></a></div><div class="nav-next"><a href="https://shlomi-noach.github.io/blog/mysql/gh-ost-1-0-17-hooks-sub-second-lag-control-amazon-rds-and-more" rel="next"><span class="nav-subtitle">Next:</span> <span class="nav-title">gh-ost 1.0.17: Hooks, Sub-second lag control, Amazon RDS and more</span></a></div></div>
+	</nav>    <div class="wpdiscuz_top_clearing"></div>
+    <div id="comments" class="comments-area"><div id="respond" style="width: 0;height: 0;clear: both;margin: 0;padding: 0;"></div>            <h3 id="wc-comment-header">
+                                    <div class="wpdiscuz-comment-count">
+                        <div class="wpd-cc-value">6</div>
+                        <div class="wpd-cc-arrow"></div>
+                    </div>
+                                Leave a Reply            </h3>
+                    <div id="wpcomm" class="wpdiscuz_unauth wpd-default">
+            <div class="wpdiscuz-form-top-bar">
+                <div class="wpdiscuz-ftb-left">
+                                                            <div id="wc_show_hide_loggedin_username">
+                                            </div>
+                </div>
+                                <div class="wpd-clear"></div>
+            </div>
+
+
+                        <div class="wc_social_plugin_wrapper">
+                            </div>
+                    <div class="wc-form-wrapper wc-main-form-wrapper" id="wc-main-form-wrapper-0_0">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                                        <form class="wc_comm_form wc_main_comm_form" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://0.gravatar.com/avatar/?s=40&d=mm&r=g" srcset="http://2.gravatar.com/avatar/?s=80&d=mm&r=g 2x" class="avatar avatar-40 photo avatar-default" height="40" width="40">                                    </div>
+                                
+                                <textarea id="wc-textarea-0_0" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="0_0" name="wpdiscuz_unique_id">
+                </form>
+                    <div class="wpdiscuz-form-bottom-bar">
+                    <div class="wpdiscuz-fbb-left">
+                                                                        <div class="wpdiscuz-stat wpd-stat-threads wpd-tooltip-left">
+                        <i class="fas fa-align-left fa-rotate-180" data-fa-transform="rotate-180"></i><span class="wpd-stat-threads-count">6</span>
+                        <wpdtip>Comment threads</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-replies wpd-tooltip-left">
+                        <i class="far fa-comments"></i><span class="wpd-stat-replies-count">0</span>
+                        <wpdtip>Thread replies</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-subscribers wpd-tooltip-left">
+                        <i class="fas fa-rss"></i><span>0</span>
+                        <wpdtip>Followers</wpdtip>
+                    </div> 
+                                                                    
+                    <div class="wpdiscuz-stat wpd-stat-reacted wpd-tooltip">
+                        <i class="fas fa-bolt"></i>
+                        <wpdtip>Most reacted comment</wpdtip>
+                    </div>
+                                                                    <div class="wpdiscuz-stat wpd-stat-hot wpd-tooltip">
+                        <i class="fab fa-hotjar"></i>
+                        <wpdtip>Hottest comment thread</wpdtip>
+                    </div>
+                            </div>
+                                        <div class="wpdiscuz-fbb-right">
+                                                        <div class="wpdiscuz-stat wpd-stat-users wpd-tooltip">
+                        <i class="fas fa-user-circle"></i> <span class="wpd-stat-authors-count">6</span>
+                        <wpdtip>Comment authors</wpdtip>
+                    </div>
+                                                                                                            <div class="wpdiscuz-users wpd-tooltip-right">
+                        <img alt="avi tshuva" src="http://2.gravatar.com/avatar/522f112d309d3372aef3259889e93b91?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/522f112d309d3372aef3259889e93b91?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="avi tshuva"><img alt="Emanuele" src="http://0.gravatar.com/avatar/32b2a839cc1b23480122282ecbb888d1?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/32b2a839cc1b23480122282ecbb888d1?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Emanuele"><img alt="Alon Edelman" src="http://0.gravatar.com/avatar/fb6d137530eca0461fe9d4079efc7979?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/fb6d137530eca0461fe9d4079efc7979?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Alon Edelman"><img alt="Nadav Kavalerchik" src="http://1.gravatar.com/avatar/d4317216686c588c2d3449a9f65cfd5c?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/d4317216686c588c2d3449a9f65cfd5c?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Nadav Kavalerchik"><img alt="Miguel" src="http://2.gravatar.com/avatar/e5e408026f76b5bdced34665160fca04?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e5e408026f76b5bdced34665160fca04?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Miguel">                        <wpdtip>Recent comment authors</wpdtip>
+                    </div>
+                            </div>
+                <div class="wpd-clear"></div>
+    </div>
+            </div>
+                <div id="wpdiscuz_hidden_secondary_form" style="display: none;">
+                    <div class="wc-form-wrapper wc-secondary-form-wrapper" id="wc-secondary-form-wrapper-wpdiscuzuniqueid" style="display: none;">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                            <div class="wc-secondary-forms-social-content"></div><div class="clearfix"></div>
+                                        <form class="wc_comm_form wc-secondary-form-wrapper" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=48&d=mm&r=g" srcset="http://0.gravatar.com/avatar/?s=96&d=mm&r=g 2x" class="avatar avatar-48 photo avatar-default" height="48" width="48">                                    </div>
+                                
+                                <textarea id="wc-textarea-wpdiscuzuniqueid" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="wpdiscuzuniqueid" name="wpdiscuz_unique_id">
+                </form>
+                        </div>
+                </div>
+        <p class="akismet_comment_form_privacy_notice">This site uses Akismet to reduce spam. <a href="https://akismet.com/privacy/" target="_blank" rel="nofollow noopener">Learn how your comment data is processed</a>.</p>                                   
+
+                                    <div class="wpdiscuz-front-actions">
+                                                    <div class="wpdiscuz-sbs-wrap">
+                                <span><i class="far fa-envelope" aria-hidden="true"></i>  Subscribe  <i class="fas fa-caret-down" aria-hidden="true"></i></span>
+                            </div>
+                                                                        <div class="clearfix"></div>
+                    </div>
+                                                    <div class="wpdiscuz-subscribe-bar wpdiscuz-hidden">
+                                                    <form action="https://shlomi-noach.github.io/blog/wp-admin/admin-ajax.php?action=addSubscription" method="post" id="wpdiscuz-subscribe-form">
+                                <div class="wpdiscuz-subscribe-form-intro">Notify of </div>
+                                <div class="wpdiscuz-subscribe-form-option" style="width:40%;">
+                                    <select class="wpdiscuz_select" name="wpdiscuzSubscriptionType">
+                                                                                    <option value="post">new follow-up comments</option>
+                                                                                                                            <option value="all_comment" disabled>new replies to my comments</option>
+                                                                            </select>
+                                </div>
+                                                                    <div class="wpdiscuz-item wpdiscuz-subscribe-form-email">
+                                        <input class="email" type="email" name="wpdiscuzSubscriptionEmail" required="required" value="" placeholder="Email">
+                                    </div>
+                                                                <div class="wpdiscuz-subscribe-form-button">
+                                    <input id="wpdiscuz_subscription_button" type="submit" value="›" name="wpdiscuz_subscription_button">
+                                </div> 
+                                                                <input type="hidden" id="wpdiscuz_subscribe_form_nonce" name="wpdiscuz_subscribe_form_nonce" value="12fac97726"><input type="hidden" name="_wp_http_referer" value="/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1">                                                                <input type="hidden" value="7603" name="wpdiscuzSubscriptionPostId">
+                            </form>
+                                                <div class="wpdiscuz_clear"></div>
+                                            </div>
+                    
+                                <div id="wcThreadWrapper" class="wc-thread-wrapper">
+                    <div id="wc-comm-371186_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Roland Bouman" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/74299d32f683e43dd6abb4107c67aa74.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/74299d32f683e43dd6abb4107c67aa74.gif 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-371186" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://rpbouman.blogspot.com/" rel="nofollow" target="_blank">Roland Bouman</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hey%2C+great+job%21+No+time+for+hate...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-vs-postgresql-gh-ost-perspective%2Fcomment-page-1%23comment-371186" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1#comment-371186" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hey, great job! No time for haters 🙂</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-371186_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-371236_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Miguel" src="http://2.gravatar.com/avatar/e5e408026f76b5bdced34665160fca04?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e5e408026f76b5bdced34665160fca04?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-371236" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Miguel</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Excellent+lesson+on+avoiding+fun...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-vs-postgresql-gh-ost-perspective%2Fcomment-page-1%23comment-371236" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1#comment-371236" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Excellent lesson on avoiding fundamentalism and focus on facts while making engineering opinions / decisions.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-371236_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-371486_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Nadav Kavalerchik" src="http://1.gravatar.com/avatar/d4317216686c588c2d3449a9f65cfd5c?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/d4317216686c588c2d3449a9f65cfd5c?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-371486" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://moodlemagic.info/blog/" rel="nofollow" target="_blank">Nadav Kavalerchik</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Beautiful+post.%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-vs-postgresql-gh-ost-perspective%2Fcomment-page-1%23comment-371486" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1#comment-371486" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Beautiful post.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-371486_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-371598_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Alon Edelman" src="http://0.gravatar.com/avatar/fb6d137530eca0461fe9d4079efc7979?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/fb6d137530eca0461fe9d4079efc7979?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-371598" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://nextstage.co.il" rel="nofollow" target="_blank">Alon Edelman</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Amazing+Shlomi%2C+grate+work+%21%0A&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-vs-postgresql-gh-ost-perspective%2Fcomment-page-1%23comment-371598" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1#comment-371598" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Amazing Shlomi, grate work !</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-371598_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-373297_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Emanuele" src="http://0.gravatar.com/avatar/32b2a839cc1b23480122282ecbb888d1?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/32b2a839cc1b23480122282ecbb888d1?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-373297" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Emanuele</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Shlomi%2C+as+usual+you+did+a+great...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-vs-postgresql-gh-ost-perspective%2Fcomment-page-1%23comment-373297" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1#comment-373297" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Shlomi, as usual you did a great job with gh-ost and an excellent post.<br>
+Proud to met you!</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-373297_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-378885_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="avi tshuva" src="http://2.gravatar.com/avatar/522f112d309d3372aef3259889e93b91?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/522f112d309d3372aef3259889e93b91?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-378885" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">avi tshuva</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Should+be+added%3A%0A%2A+if+you+are+do...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-vs-postgresql-gh-ost-perspective%2Fcomment-page-1%23comment-378885" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1#comment-378885" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Should be added:<br>
+* if you are doing the right thing, at the right time you are left with the right.<br>
+* if you are left with the right thing and you rights has left wrongly right, you righting the left thing.<br>
+* if you are still reading this and didn’t left, you are right, but …</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-378885_0" class="wpdiscuz_clear"></div></div>                
+                    <div class="wpdiscuz-comment-pagination">
+                                            </div>
+                </div>
+                <div class="wpdiscuz_clear"></div>
+                                                                                </div>
+        </div>
+        <div id="wpdiscuz-loading-bar" class="wpdiscuz-loading-bar wpdiscuz-loading-bar-unauth"></div>
+        
+	</main>
+
+
+	<footer id="colophon" class="site-footer">
+		<div class="site-info">
+			<a href="https://wordpress.org/">
+				Powered by WordPress			</a>
+			<span class="sep"> | </span>
+				Theme: <a href="http://openark.org">openark-primer</a> by <a href="http://underscores.me/">Underscores.me</a>.		</div>
+	</footer>
+</div>
+
+<a id="wpdUserContentInfoAnchor" style="display:none;" rel="#wpdUserContentInfo" data-wpd-lity>wpDiscuz</a><div id="wpdUserContentInfo" style="overflow:auto;background:#FDFDF6;padding:20px;width:600px;max-width:100%;border-radius:6px;" class="lity-hide"></div>	<div style="display:none">
+	<div class="grofile-hash-map-522f112d309d3372aef3259889e93b91">
+	</div>
+	<div class="grofile-hash-map-32b2a839cc1b23480122282ecbb888d1">
+	</div>
+	<div class="grofile-hash-map-fb6d137530eca0461fe9d4079efc7979">
+	</div>
+	<div class="grofile-hash-map-d4317216686c588c2d3449a9f65cfd5c">
+	</div>
+	<div class="grofile-hash-map-e5e408026f76b5bdced34665160fca04">
+	</div>
+	<div class="grofile-hash-map-74299d32f683e43dd6abb4107c67aa74">
+	</div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/shlomi-noach.github.io\/blog\/mysql\/mysql-vs-postgresql-gh-ost-perspective":7603};
+	</script>
+					<div id="sharing_email" style="display: none;">
+		<form action="/blog/mysql/mysql-vs-postgresql-gh-ost-perspective/comment-page-1" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="">
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="">
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="">
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed">
+			
+			<img style="float: right; display: none" class="loading" src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/sharedaddy/images/loading.gif" alt="loading" width="16" height="16">
+			<input type="submit" value="Send Email" class="sharing_send">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<script>
+var pollsL10n = {"ajax_url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","text_wait":"Your last request is still being processed. Please wait a while ...","text_valid":"Please choose a valid poll answer.","text_multiple":"Maximum number of choices allowed: ","show_loading":"1","show_fading":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-js.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/wpdccjs/wpdcc.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/autogrow/jquery.autogrowtextarea.min.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.form.min.js"></script>
+<script>
+var wpdiscuzAjaxObj = {"url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","customAjaxUrl":"https:\/\/shlomi-noach.github.io\/blog\/wp-content\/plugins\/wpdiscuz\/utils\/ajax\/wpdiscuz-ajax.php","wpdiscuz_options":{"wc_hide_replies_text":"Hide Replies","wc_show_replies_text":"View Replies","wc_msg_required_fields":"Please fill out required fields","wc_invalid_field":"Some of field value is invalid","wc_error_empty_text":"please fill out this field to comment","wc_error_url_text":"url is invalid","wc_error_email_text":"email address is invalid","wc_invalid_captcha":"Invalid Captcha Code","wc_login_to_vote":"You Must Be Logged In To Vote","wc_deny_voting_from_same_ip":"You are not allowed to vote for this comment","wc_self_vote":"You cannot vote for your comment","wc_vote_only_one_time":"You've already voted for this comment","wc_voting_error":"Voting Error","wc_held_for_moderate":"Comment awaiting moderation","wc_comment_edit_not_possible":"Sorry, this comment no longer possible to edit","wc_comment_not_updated":"Sorry, the comment was not updated","wc_comment_not_edited":"You've not made any changes","wc_new_comment_button_text":"new comment","wc_new_comments_button_text":"new comments","wc_new_reply_button_text":"new reply on your comment","wc_new_replies_button_text":"new replies on your comments","wc_msg_input_min_length":"Input is too short","wc_msg_input_max_length":"Input is too long","wc_follow_user":"Follow this user","wc_unfollow_user":"Unfollow this user","wc_follow_success":"You started following this comment author","wc_follow_canceled":"You stopped following this comment author.","wc_follow_email_confirm":"Please check your email and confirm the user following request.","wc_follow_email_confirm_fail":"Sorry, we couldn't send confirmation email.","wc_follow_login_to_follow":"Please login to follow users.","wc_follow_impossible":"We are sorry, but you can't follow this user.","wc_follow_not_added":"Following failed. Please try again later.","is_user_logged_in":false,"commentListLoadType":"0","commentListUpdateType":"0","commentListUpdateTimer":"30","liveUpdateGuests":"1","wc_comment_bg_color":"#FEFEFE","wc_reply_bg_color":"#F8F8F8","wpdiscuzCommentsOrder":"asc","wpdiscuzCommentOrderBy":"comment_date_gmt","commentsVoteOrder":false,"wordpressThreadCommentsDepth":"5","wordpressIsPaginate":"1","commentTextMaxLength":null,"storeCommenterData":100000,"isCaptchaInSession":true,"isGoodbyeCaptchaActive":false,"socialLoginAgreementCheckbox":"1","enableFbLogin":"0","enableFbShare":"0","facebookAppID":"","facebookUseOAuth2":0,"enableGoogleLogin":"0","googleAppID":"","cookiehash":"c616fa5ebd4c9ddc6dc50cbf089ebb1d","isLoadOnlyParentComments":"0","ahk":"ef4t(c4n18s$wj!7(^b9x8#r5pax76x#","enableDropAnimation":1,"isNativeAjaxEnabled":1,"cookieCommentsSorting":"wpdiscuz_comments_sorting","enableLastVisitCookie":0,"version":"5.3.5","wc_post_id":7603,"loadLastCommentId":0,"lastVisitKey":"wpdiscuz_last_visit","isCookiesEnabled":true,"wc_captcha_show_for_guest":"0","wc_captcha_show_for_members":"0","is_email_field_required":"1"}};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz.js"></script>
+<script>
+var wpdiscuzUCObj = {"msgConfirmDeleteComment":"Are you sure you want to delete this comment?","msgConfirmCancelSubscription":"Are you sure you want to cancel this subscription?","msgConfirmCancelFollow":"Are you sure you want to cancel this follow?"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz-user-content.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/lity/lity.js"></script>
+<script src="https://secure.gravatar.com/js/gprofiles.js?ver=2020Junaa"></script>
+<script>
+var WPGroHo = {"my_hash":""};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/wpgroho.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/navigation.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/skip-link-focus-fix.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/js/prettify.min.js"></script>
+<script>
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/build/sharedaddy/sharing.min.js"></script>
+<script>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+</script>
+<script type="text/javascript" src="https://stats.wp.com/e-202024.js" async="async" defer></script>
+<script type="text/javascript">
+	_stq = window._stq || [];
+	_stq.push([ 'view', {v:'ext',j:'1:8.2.1',blog:'32412571',post:'7603',tz:'2',srv:'code.openark.org'} ]);
+	_stq.push([ 'clickTrackerInit', '32412571', '7603' ]);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,881 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Analysis &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/analysis/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 04 Mar 2016 11:43:18 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Reading RBR binary logs with pt-query-digest</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest#comments</comments>
+				<pubDate>Mon, 26 Jan 2015 15:50:46 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Percona Toolkit]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7180</guid>
+				<description><![CDATA[For purposes of auditing anything that goes on our servers we&#8217;re looking to parse the binary logs of all servers (masters), as with &#8220;Anemomaster&#8220;. With Row Based Replication this is problematic since pt-query-digest does not support parsing RBR binary logs (true for 2.2.12, latest at this time). I&#8217;ve written a simple script that translates RBR [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>For purposes of auditing anything that goes on our servers we&#8217;re looking to parse the binary logs of all servers (masters), as with &#8220;<a href="https://shlomi-noach.github.io/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow">Anemomaster</a>&#8220;. With Row Based Replication this is problematic since <strong>pt-query-digest</strong> <a href="https://bugs.launchpad.net/percona-toolkit/+bug/1377887">does not support parsing RBR binary logs</a> (true for <strong>2.2.12</strong>, latest at this time).</p>
+<p>I&#8217;ve written a simple script that translates RBR logs to SBR-like logs, with a little bit of cheating. My interest is that <strong>pt-query-digest</strong> is able to capture and count the queries, nothing else. By doing some minimal text manipulation on the binary log I&#8217;m able to now feed it to <strong>pt-query-digest</strong> which seems to be happy.</p>
+<p>The script of course does not parse the binary log directly; furthermore, it requires the binary log to be extracted via:</p>
+<blockquote>
+<pre class="brush: bash; title: ; notranslate">mysqlbinlog --verbose --base64-output=DECODE-ROWS your-mysql-binlog-filemame.000001</pre>
+</blockquote>
+<p>The above adds the interpretation of the RBR entires in the form of (unconventional) statements, commented, and strips out the cryptic RBR text. All that is left is to do a little manipulation on entry headers and uncomment the interpreted queries.</p>
+<p>The script can be found in <a href="https://gist.github.com/shlomi-noach/cc243fd690403e7617e3">my gist repositories</a>. Current version is as follows:<span id="more-7180"></span></p>
+<blockquote>
+<pre class="brush: python; title: ; notranslate">
+#!/usr/bin/python
+#
+# Convert a Row-Based-Replication binary log to Statement-Based-Replication format, cheating a little.
+# This script exists since Percona Toolkit's pt-query-digest cannot digest RBR format. The script
+# generates enough for it to work with.
+# Expecting standard input
+# Expected input is the output of &quot;mysqlbinlog --verbose --base64-output=DECODE-ROWS &lt;binlog_file_name&gt;&quot;
+# For example:
+# $ mysqlbinlog --verbose --base64-output=DECODE-ROWS mysql-bin.000006 | python binlog-rbr-to-sbr.py | pt-query-digest --type=binlog --order-by Query_time:cnt --group-by fingerprint
+#
+
+import fileinput
+
+def convert_rbr_to_pseudo_sbr():
+    inside_rbr_statement = False
+    for line in fileinput.input():
+        line = line.strip()
+        if line.startswith(&quot;#&quot;) and &quot;end_log_pos&quot; in line:
+            for rbr_token in [&quot;Update_rows:&quot;, &quot;Write_rows:&quot;, &quot;Delete_rows:&quot;, &quot;Rows_query:&quot;, &quot;Table_map:&quot;,]:
+                if rbr_token in line:
+                    line = &quot;%s%s&quot; % (line.split(rbr_token)[0], &quot;Query\tthread_id=1\texec_time=0\terror_code=0&quot;)
+        if line.startswith(&quot;### &quot;):
+            inside_rbr_statement = True
+            # The &quot;### &quot; commented rows are the pseudo-statement interpreted by mysqlbinlog's &quot;--verbose&quot;,
+            # and which we will feed into pt-query-digest
+            line = line[4:]
+        else:
+            if inside_rbr_statement:
+                print(&quot;/*!*/;&quot;)
+            inside_rbr_statement = False
+        print(line) 
+
+convert_rbr_to_pseudo_sbr()
+</pre>
+</blockquote>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7180</post-id>	</item>
+		<item>
+		<title>Bash script: report largest InnoDB files</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/bash-script-report-largest-innodb-files</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/bash-script-report-largest-innodb-files#comments</comments>
+				<pubDate>Thu, 19 Dec 2013 08:58:17 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6682</guid>
+				<description><![CDATA[The following script will report the largest InnoDB tables under the data directory: schema, table &#38; length in bytes. The tables could be non-partitioned, in which case this is simply the size of the corresponding .ibd file, or they can be partitioned, in which case the reported size is the sum of all partition files. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The following script will report the largest InnoDB tables under the data directory: schema, table &amp; length in bytes. The tables could be non-partitioned, in which case this is simply the size of the corresponding <strong>.ibd</strong> file, or they can be partitioned, in which case the reported size is the sum of all partition files. It is assumed tables reside in their own tablespace files, i.e. created with <strong>innodb_file_per_table=1</strong>.</p>
+<blockquote>
+<pre>(
+    mysql_datadir=$(grep datadir /etc/my.cnf | cut -d "=" -f 2)
+    cd $mysql_datadir
+    for frm_file in $(find . -name "*.frm")
+    do
+        tbl_file=${frm_file//.frm/.ibd}
+        table_schema=$(echo $frm_file | cut -d "/" -f 2)
+        table_name=$(echo $frm_file | cut -d "/" -f 3 | cut -d "." -f 1)
+        if [ -f $tbl_file ]
+        then
+            # unpartitioned table
+            file_size=$(du -cb $tbl_file 2&gt; /dev/null | tail -n 1) 
+        else
+            # attempt partitioned innodb table
+            tbl_file_partitioned=${frm_file//.frm/#*.ibd}
+            file_size=$(du -cb $tbl_file_partitioned 2&gt; /dev/null | tail -n 1)
+        fi
+        file_size=${file_size//total/}
+        # Replace the below with whatever action you want to take,
+        # for example, push the values into graphite.
+        echo $file_size $table_schema $table_name
+    done
+) | sort -k 1 -nr | head -n 20</pre>
+</blockquote>
+<p>We use this to push table statistics to our graphite service; we keep an eye on table growth (we actually do not limit to top <strong>20</strong> but just monitor them all). File size does not report the real table data size (this can be smaller due to tablespace fragmentation). It does give the correct information if you&#8217;re concerned about disk space. For table data we also monitor <strong>SHOW TABLE STATUS</strong> / <strong>INFORMATION_SCHEMA.TABLES</strong>, themselves being inaccurate. Gotta go by something.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/bash-script-report-largest-innodb-files/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6682</post-id>	</item>
+		<item>
+		<title>common_schema 1.1 released: split(), try-catch, killall(), profiling</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling#comments</comments>
+				<pubDate>Tue, 04 Sep 2012 06:15:25 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4999</guid>
+				<description><![CDATA[I&#8217;m very happy to announce the release of common_schema, version 1.1 (revision 300). This version boasts with compelling new features: innovative QueryScript syntax, libraries, views which add to your skills as a DBA, making some maintenance and management tasks a breeze. QueryScript, split statement: automagically break long queries into smaller chunks, avoid long locks and [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m very happy to announce the release of <a href="http://code.google.com/p/common-schema/">common_schema</a>, version <strong>1.1</strong> (revision <strong>300</strong>).</p>
+<p>This version boasts with compelling new features: innovative QueryScript syntax, libraries, views which add to your skills as a DBA, making some maintenance and management tasks a breeze.</p>
+<ul>
+<li>QueryScript, <strong>split</strong> statement: automagically break long queries into smaller chunks, avoid long locks and reduce query/transaction overhead</li>
+<li>QueryScript, <strong>try-catch</strong> statement: just <strong>try { something; } catch { act_on_error; }</strong>.</li>
+<li><strong>killall()</strong>: quickly kill connections based on grantee/user/host information.</li>
+<li><strong>profiling</strong>/<strong>profiling_last</strong>: utility views to assist in query profiling diagnostics</li>
+<li><strong>1 size fits all</strong>: a single installer which auto-recognizes available server features and enables respective <em>common_schema</em> features accordingly.</li>
+<li>QueryScript performance boost</li>
+<li>much much more&#8230;</li>
+</ul>
+<p>Not familiar with <em>common_schema</em>? It allows you to do stuff on server side, by selecting from views, calling upon useful routines or writing <em>easy-to-manage</em> scripts.</p>
+<p>I&#8217;m suggesting that <em>common_schema</em> should be a <em>really-should-have</em> tool to accompany your MySQL install. Did I say &#8220;tool&#8221;? It&#8217;s merely a <em>schema</em>. But it makes for a great framework:</p>
+<p>In <a href="http://www.amazon.com/High-Performance-MySQL-Optimization-Replication/dp/1449314287/ref=dp_ob_title_bk">High Performance MySQL, 3rd edition</a>, Baron Schwartz describes <em>common_schema</em>:</p>
+<blockquote><p>The <em>common_schema</em> is to MySQL as jQuery is to javaScript</p></blockquote>
+<p>Reviewing highlights for version <strong>1.1</strong>:</p>
+<h4>QueryScript</h4>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a> is a scripting language. It sees some major improvements here. I&#8217;ve made some speed boosts by <a href="https://shlomi-noach.github.io/blog/mysql/on-stored-routines-and-dynamic-statements">avoiding using temporary tables</a>, and by using string parsing instead.</p>
+<p>Without doubt the two most handy statements added to <em>QueryScript</em> are:<span id="more-4999"></span></p>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a>: automagically break a long query into smaller, distinct chunks, and execute those iteratively. Just write your query; <em>split</em> will parse it, analyze it, rewrite it, break your table into parts, iterate your table and apply query for each chunk of rows. You can reduce lock time, avoid huge transactions and give your server room to breathe on operations such as massive updates of rows, transferring of rows between tables, massive purging of rows etc. Consider: the following query will execute <strong>1,000</strong> rows at a time, and the script will throttle execution so as to sleep in between chunks. And you need know nothing about how it works internally (though it&#8217;s quite interesting):</li>
+</ul>
+<blockquote>
+<pre>create table world.City_dup like world.City;
+split (insert into world.City_dup select * from world.City)
+{
+  throttle 2;
+}</pre>
+</blockquote>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_try_catch.html"><strong>try-catch</strong></a>: if, like me, you are frustrated with stored routines way of handling errors, QueryScript now offers you familiar (yet enhanced) form of <strong>try something catch do_something_on_error</strong>. It is limited in that you cant have a catch for particular error codes &#8211; MySQL <a href="https://shlomi-noach.github.io/blog/mysql/mysql-error-handling-on-server-side-a-no-go">does not provide such info on server side</a>. Nevertheless, consider:</li>
+</ul>
+<blockquote>
+<pre>while (true)
+{
+  try
+  {
+    -- Attempt query which is expected to abort on deadlock:
+    UPDATE some_table SET some_column = 1 WHERE some_condition;
+    -- Got here? This means query is successful! We can leave now.
+    break;
+  }
+  catch
+  {
+    -- Apparently there was a deadlock. Rest, then loop again until succeeds
+    sleep 1;
+  }
+}</pre>
+</blockquote>
+<p>QueryScript also adds:</p>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_eval.html"><strong>eval</strong></a>: evaluate SQL statements on the fly. I&#8217;ve got some very cool use cases already in production.</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_sleep.html"><strong>sleep</strong></a>: just&#8230; sleep.</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_pass.html"><strong>pass</strong></a>: similar to Python&#8217;s pass statement, this statement does nothing and makes for a placeholder.</li>
+</ul>
+<p>QueryScript <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_variables.html">variables</a> now support:</p>
+<ul>
+<li>Declare &amp; assign syntax: <strong>var $sum := 0</strong></li>
+<li>New expansion syntax: <strong>DELETE FROM t LIMIT :${number_of_rows},</strong> or<strong> CREATE TABLE customer_:${shard_number}_details<br />
+</strong></li>
+<li>Support for expanded variables in expressions, <em>throttle</em>, <em>sleep</em>, <em>throw</em> statements.</li>
+</ul>
+<h4>Routines:</h4>
+<p>Plenty of new routines. Most notable:</p>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/killall.html"><strong>killall()</strong></a>: much like Unix <em>killall</em> command, this routine kills connections based on names, rather than process IDs. Names are <em>grantee name</em>, or just the <em>user</em> part, or just the <em>host</em> part. Which allows for quick killing of all connections coming from a specific user or host:</li>
+</ul>
+<blockquote>
+<pre>CALL killall('host3.analytics.mycompany.com');
+CALL killall('reporting_user');</pre>
+</blockquote>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_exists.html"><strong>table_exists()</strong></a>: test for (isn&#8217;t it clear?) table existence. This uses INFORMATION_SCHEMA optimizations: it&#8217;s a lightweight query.</li>
+</ul>
+<blockquote>
+<pre>SELECT table_exists('sakila', 'rental') AS does_it_exist;</pre>
+</blockquote>
+<p>We also have text manipulation routines: <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/encode_xml.html"><strong>encode_xml()</strong></a> and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/decode_xml.html"><strong>decode_xml()</strong></a>, <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/strip_urls.html"><strong>strip_urls()</strong></a>, <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/prettify_message.html"><strong>prettify_message()</strong></a></p>
+<h4>Views</h4>
+<ul>
+<li>Profiling views, inspired by <a href="http://www.mysqlperformanceblog.com/2012/02/20/how-to-convert-show-profiles-into-a-real-profile/">How to convert MySQL’s SHOW PROFILES into a real profile</a>: <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_profiling.html"><strong>query_profiling</strong></a> &amp; <strong><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/last_query_profiling.html">last_query_profiling</a>:</strong></li>
+</ul>
+<blockquote>
+<pre>mysql&gt; SET PROFILING := 1;
+
+mysql&gt; SELECT COUNT(*) FROM sakila.nicer_but_slower_film_list INTO @dummy;
+
+mysql&gt; SELECT * FROM last_query_profiling;
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+
+| QUERY_ID | STATE                | state_calls | state_sum_duration | state_duration_per_call | state_duration_pct | state_seqs |
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+
+|       41 | checking permissions |           5 |           0.000320 |            0.0000640000 |               0.33 | 5,6,7,8,9  |
+|       41 | cleaning up          |           1 |           0.000007 |            0.0000070000 |               0.01 | 31         |
+|       41 | closing tables       |           1 |           0.000016 |            0.0000160000 |               0.02 | 29         |
+|       41 | Copying to tmp table |           1 |           0.042363 |            0.0423630000 |              44.34 | 15         |
+|       41 | Creating tmp table   |           1 |           0.000123 |            0.0001230000 |               0.13 | 13         |
+|       41 | end                  |           1 |           0.000004 |            0.0000040000 |               0.00 | 23         |
+|       41 | executing            |           2 |           0.000014 |            0.0000070000 |               0.01 | 14,22      |
+|       41 | freeing items        |           2 |           0.000216 |            0.0001080000 |               0.23 | 25,27      |
+|       41 | init                 |           1 |           0.000012 |            0.0000120000 |               0.01 | 20         |
+|       41 | logging slow query   |           1 |           0.000004 |            0.0000040000 |               0.00 | 30         |
+|       41 | Opening tables       |           1 |           0.028909 |            0.0289090000 |              30.26 | 2          |
+|       41 | optimizing           |           2 |           0.000026 |            0.0000130000 |               0.03 | 10,21      |
+|       41 | preparing            |           1 |           0.000018 |            0.0000180000 |               0.02 | 12         |
+|       41 | query end            |           1 |           0.000004 |            0.0000040000 |               0.00 | 24         |
+|       41 | removing tmp table   |           3 |           0.000130 |            0.0000433333 |               0.14 | 18,26,28   |
+|       41 | Sending data         |           2 |           0.016823 |            0.0084115000 |              17.61 | 17,19      |
+|       41 | Sorting result       |           1 |           0.006302 |            0.0063020000 |               6.60 | 16         |
+|       41 | starting             |           1 |           0.000163 |            0.0001630000 |               0.17 | 1          |
+|       41 | statistics           |           1 |           0.000048 |            0.0000480000 |               0.05 | 11         |
+|       41 | System lock          |           1 |           0.000017 |            0.0000170000 |               0.02 | 3          |
+|       41 | Table lock           |           1 |           0.000018 |            0.0000180000 |               0.02 | 4          |
++----------+----------------------+-------------+--------------------+-------------------------+--------------------+------------+</pre>
+</blockquote>
+<p><em>common_schema</em> meta info is in the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/status.html"><strong>status</strong></a> view, which can be used, for example, in bug reports. It indicated version, revision, time and status of installation process.</p>
+<h4>Installer</h4>
+<p><em>common_schema</em> comes with an invisible installer. It&#8217;s just a SQL file, imported via <strong>SOURCE</strong> command or your favorite import method. But, once base components are installed, it activates itself to spawn a smart-mode install phase, where it checks upon existing MySQL server features, and adding respective <em>common_schema</em> features. So, if InnoDB plugin is present, you get the InnoDB plugin views in <em>common_schema</em>. If this is a Percona Server, you also get those related views. This makes for a single distribution file, as opposed to <strong>3</strong> different distributions in previous versions.</p>
+<h4>Documentation</h4>
+<p>There are no compromises here. Documenting <em>common_schema</em> takes more time than writing &amp; testing it. But everything is well documented. You can read the documentation online, or <a href="http://code.google.com/p/common-schema/">download</a> a bundle, or call for <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/help.html"><strong>help()</strong></a> from within <em>common_schema</em>: the documentation is internal, too.</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; CALL help('try');
++--------------------------------------------------------------------------------+
+| help                                                                           |
++--------------------------------------------------------------------------------+
+| QueryScript Flow Control: try-catch statement                                  |
+|                                                                                |
+| SYNOPSIS                                                                       |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|        try                                                                     |
+|          statement;                                                            |
+|        catch                                                                   |
+|          statement;                                                            |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+| DESCRIPTION                                                                    |
+|                                                                                |
+| try-catch is an error handling flow control structure. Flow is determined      |
+| based on the appearance or non-appearance of execution errors.                 |
+| The try statement (or block of statements) is executed. If no error occurs, it |
+| completes, and the catch statement is never executed.                          |
+| If an error is detected within execution of the try statement, the try         |
+| statement is aborted at the point of error (i.e. all statements following the  |
+| point of error are discarded), and the catch statement (or block of            |
+| statements) is executed.                                                       |
+...
++--------------------------------------------------------------------------------+</pre>
+</blockquote>
+<h4>Tests</h4>
+<p>With over <strong>350</strong> tests and counting, <em>common_schema</em> and <em>QueryScript</em> are well tested. There are still tests to write, the cover is not complete, and I&#8217;m working on it.</p>
+<h4>Bugfixes</h4>
+<p>Changed view definitions affected by <a href="http://bugs.mysql.com/65388">MySQL bug #65388</a>.</p>
+<h4>Download</h4>
+<p><a href="http://code.google.com/p/common-schema/">Download common_schema</a>. You will find it is rich and smart.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4999</post-id>	</item>
+		<item>
+		<title>common_schema, rev. 178: foreach(), repeat_exec(), Roland Bouman, query analysis</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-178-foreach-repeat_exec-roland-bouman-query-analysis</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-178-foreach-repeat_exec-roland-bouman-query-analysis#respond</comments>
+				<pubDate>Thu, 01 Dec 2011 09:33:01 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4133</guid>
+				<description><![CDATA[common_schema, revision 178 is now released, with major additions. This revision turns common_schema into a framework, rather than a set of views and functions. common_schema provides with query scripting, analysis &#38; informational views, and a function library, allowing for easier administration and diagnostics for MySQL. It introduces SQL based tools which simplify otherwise complex shell [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>, revision <strong>178</strong> is now released, with major additions. This revision turns <em>common_schema</em> into a <em>framework</em>, rather than a set of views and functions.</p>
+<p><em>common_schema</em> provides with query scripting, analysis &amp; informational views, and a function library, allowing for easier administration and diagnostics for MySQL. It introduces SQL based tools which simplify otherwise complex shell and client scripts, allowing the DBA to be independent of operating system, installed packages and dependencies.</p>
+<p>There&#8217;s no Perl nor Python, and no dependencies to install. It&#8217;s just a <em>schema</em>.</p>
+<p>Some highlights for the new revision:</p>
+<ul>
+<li><strong>foreach()</strong>, aka <strong>$()</strong>: loop through a collection, execute callback commands per element.</li>
+<li><strong>repeat_exec()</strong>: a repeat-until device: execute queries until some condition holds.</li>
+<li><strong>exec_file()</strong>: execute files a-la SOURCE, but on server side</li>
+<li><strong>Query analysis</strong>: analyze query text, view or routine definitions to detect dependency objects.</li>
+<li>Improvements to views and routines, new routines introduced.</li>
+</ul>
+<p>Let&#8217;s take a closer look:</p>
+<h4>rpbouman</h4>
+<p>I&#8217;m very happy to have <a href="http://rpbouman.blogspot.com/">Roland Bouman</a> working on this project. He introduced some sophisticated code without which some functionality could not take place. I&#8217;m sure I don&#8217;t need to introduce his great capabilities; I&#8217;ll just pass the note that it is very good working with him!</p>
+<h4>foreach()</h4>
+<p>Introducing a looping device which can iterate a collection and execute callback commands.</p>
+<p>What&#8217;s a collection? A range of numbers; a set of constants; the result set of a <strong>SELECT</strong> query; tables in your database and more.</p>
+<p>What is a callback? A query or set of queries to invoke on the specific elements in the collection. For example:</p>
+<blockquote>
+<pre>call <strong>foreach</strong>(<span style="color: #808000;">'table in sakila'</span>, <span style="color: #000080;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB ROW_FORMAT=COMPRESSED'</span>);</pre>
+</blockquote>
+<p>I&#8217;ll publish dedicated posts on <em>foreach()</em>, aka <em>$()</em>, following this post. Official documentation is <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/foreach.html">here</a>.</p>
+<h4>repeat_exec()</h4>
+<p>Repeat executing queries in a given interval, until some condition holds.</p>
+<p>What kind of condition? You can loop forever, or until a given time has passed, a given number of iteration has passed.<span id="more-4133"></span></p>
+<p>You can iterate until no rows are affected by your commands (your callbacks), or until some dynamic condition holds (a query evaluates to <strong>true</strong>).</p>
+<p>For example: purge rows from a table until no more rows are affected; in interval of <strong>3</strong> second:</p>
+<blockquote>
+<pre>call <strong>repeat_exec</strong>(3, 'DELETE FROM test.event WHERE ts &lt; CURDATE() ORDER BY id LIMIT 1000', 0);</pre>
+</blockquote>
+<p>Official documentation is <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/repeat_exec.html">here</a>.</p>
+<h4>exec_file()</h4>
+<p>If you need to execute commands from a file, you usually invoke SOURCE:</p>
+<blockquote>
+<pre>mysql&gt; SOURCE '/tmp/somefile.sql';</pre>
+</blockquote>
+<p>Or you invoke mysql client and redirect its input to read from file:</p>
+<blockquote>
+<pre>bash$ mysql some_db &lt; /tmp/somefile.sql</pre>
+</blockquote>
+<p><strong>SOURCE</strong> is a MySQL client command. The file must reside on your client. Running the <strong>mysql</strong> client is great, but you need to work it out from <em>outside</em> the server.</p>
+<p><em>call_exec()</em> will let you import a file <em>on server side</em>, from <em>within the server</em>:</p>
+<blockquote>
+<pre>call <strong>exec_file</strong>('/tmp/some_file.sql');</pre>
+</blockquote>
+<p>You will need to have the file readable; it is limited to 64K at this moment; it may not use DELIMITER, and it may not include dynamic SQL. These are the limitations.</p>
+<p>Official documentation is <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/exec_file.html">here</a>.</p>
+<h4>exec() / exec_single()</h4>
+<p>All of the above rely on the <em>exec()</em> / <em>exec_single()</em> routines, which dynamically execute a set of queries. One one hand, it&#8217;s no big deal: they only have to use prepared statements in order to invoke the queries. But then, they knows how to parse multiple queries (find the &#8220;;&#8221; delimiter correctly), plus they allow for configuration: if you set <strong>@common_schema_dryrun</strong>, queries are not actually executes; just printed out. If you set <strong>@common_schema_verbose</strong>, queries are verbosed in addition to being executed. Since all execution routines rely on these,we get a standardized pattern.</p>
+<p>Official documentation <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/exec_single.html">is</a> <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/exec.html">here</a>.</p>
+<h4>Query analysis</h4>
+<p>Query parsing routines allow for detection of dependencies within queries. While not full-blown SQL parser, these allow one to realize on which tables or routines a view depends on; or a routines depends on; or an event; or just any query.</p>
+<p>These routines can analyze the text of not only a <strong>SELECT</strong> query, but also <strong>UPDATE</strong>, <strong>DELETE</strong>, <strong>CREATE</strong>, etc. They can read the code of a stored routines, including queries and control flow constructs; thus, they are also able to analyze events and triggers.</p>
+<p>At this stage forward-dependencies resolution is supported. This can eventually lead to dependency graphs or to reverse-dependency resolution (i.e. &#8220;which view, routine, trigger or event depend on table <strong>t</strong>?&#8221;)</p>
+<p>Example:</p>
+<blockquote>
+<pre>mysql&gt; call <strong>get_view_dependencies</strong>('sakila', 'actor_info');
++-------------+---------------+-------------+--------+
+| schema_name | object_name   | object_type | action |
++-------------+---------------+-------------+--------+
+| sakila      | actor         | table       | select |
+| sakila      | category      | table       | select |
+| sakila      | film          | table       | select |
+| sakila      | film_actor    | table       | select |
+| sakila      | film_category | table       | select |
++-------------+---------------+-------------+--------+</pre>
+</blockquote>
+<p>The query analysis routines are in BETA stage.</p>
+<p>Official documentation is <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_analysis_routines.html">here</a>.</p>
+<h4>Test quite</h4>
+<p><em>common_schema</em> is now tested. Not all code is as yet under tests; all new code is, and some of the older code. Work is in progress to add more and more tests.</p>
+<h4>Further changes:</h4>
+<ul>
+<li><strong>candidate_keys</strong> does not give higher score for <strong>PRIMARY KEY</strong>s any longer. It ranks all unique keys according to its own heuristic; it also provides with the  <strong>is_primary</strong> and <strong>is_nullable</strong> columns.</li>
+<li>Added <strong>candidate_keys_recommended</strong> view, recommending best candidate key per table (while noting whether it qualifies as <strong>PRIMARY KEY</strong> in terms of <strong>NULL</strong>able columns).</li>
+<li>Added many text parsing and text manipulation routines, such as better trim, tokenizing, etc. Improved existing code significantly.</li>
+</ul>
+<h4>Get it</h4>
+<p><em>common_schema</em> is <a href="http://code.google.com/p/common-schema/">available for downloaded</a>. It is released under the <strong>BSD</strong> license, and is free.</p>
+<p>I&#8217;ve put very hard work into <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html">common_schema&#8217;s documentation</a>. It is very thorough and provides with clear examples. The documentation is also available for download.</p>
+<p>If you encounter problems, <a href="http://code.google.com/p/common-schema/issues/list">please report on the issues page</a>.</p>
+<p><em>common_schema</em> is meant to be downloaded &amp; installed on any MySQL server. It provides with general and essential functionality. Spread the word!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-178-foreach-repeat_exec-roland-bouman-query-analysis/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4133</post-id>	</item>
+		<item>
+		<title>MySQL Global status difference using single query</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-global-status-difference-using-single-query</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-global-status-difference-using-single-query#comments</comments>
+				<pubDate>Fri, 12 Aug 2011 16:31:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3908</guid>
+				<description><![CDATA[Have just read MySQL Global status difference using MySQL procedures / functions, by Andres Karlsson. Have commented, but realized I did not provide with a direct answer. In the comment, I suggested checking out a solution based on views, found in common_schema. But the solution in common_schema is split into two views, due to the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Have just read <a href="http://karlssonondatabases.blogspot.com/2011/08/mysql-global-status-difference-using_12.html">MySQL Global status difference using MySQL procedures / functions</a>, by Andres Karlsson. Have commented, but realized I did not provide with a direct answer. In the comment, I suggested checking out <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/global_status_diff.html">a solution based on views</a>, found in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>. But the solution in <em>common_schema</em> is split into two views, due to the fact views cannot handle derived tables subqueries.</p>
+<p>Well, here&#8217;s a single query to do that: it checks <strong>GLOBAL_STATUS</strong> twice, <strong>10</strong> seconds apart in the following sample. It uses <strong>SLEEP()</strong> to actually wait between the two reads. Yes, you can do that with a query.</p>
+<p>The following query shows all <strong>GLOBAL_STATUS</strong> values that have changed during the sample period.</p>
+<p><strong>[UPDATE]</strong> query updated to work with MySQL <strong>5.6</strong> optimizer<span id="more-3908"></span></p>
+<blockquote>
+<pre>SELECT STRAIGHT_JOIN
+   LOWER(gs0.VARIABLE_NAME) AS variable_name,
+   gs0.VARIABLE_VALUE AS variable_value_0,
+   gs1.VARIABLE_VALUE AS variable_value_1,
+   (gs1.VARIABLE_VALUE - gs0.VARIABLE_VALUE) AS variable_value_diff,
+   (gs1.VARIABLE_VALUE - gs0.VARIABLE_VALUE) / 10 AS variable_value_psec,
+   (gs1.VARIABLE_VALUE - gs0.VARIABLE_VALUE) * 60 / 10 AS
+variable_value_pminute
+FROM
+   (
+     SELECT
+       VARIABLE_NAME,
+       VARIABLE_VALUE
+     FROM
+       INFORMATION_SCHEMA.GLOBAL_STATUS
+     UNION ALL
+     SELECT
+       '',
+       SLEEP(10)
+     FROM DUAL
+   ) AS gs0
+   JOIN (
+     SELECT 
+       VARIABLE_NAME,
+       VARIABLE_VALUE
+     FROM 
+       INFORMATION_SCHEMA.GLOBAL_STATUS
+   ) gs1 USING (VARIABLE_NAME)
+WHERE
+   gs1.VARIABLE_VALUE != gs0.VARIABLE_VALUE
+;
++-----------------------------------+------------------+------------------+---------------------+---------------------+------------------------+
+| variable_name                     | variable_value_0 | variable_value_1 | variable_value_diff | variable_value_psec | variable_value_pminute |
++-----------------------------------+------------------+------------------+---------------------+---------------------+------------------------+
+| aborted_clients                   | 2210669          | 2210686          |                  17 |                 1.7 |                    102 |
+| bytes_received                    | 53259933210      | 53260211104      |              277894 |             27789.4 |                1667364 |
+| bytes_sent                        | 351130988015     | 351132884956     |             1896941 |            189694.1 |               11381646 |
+| com_change_db                     | 3760546          | 3760584          |                  38 |                 3.8 |                    228 |
+| com_delete                        | 6774784          | 6774801          |                  17 |                 1.7 |                    102 |
+| com_insert                        | 52743750         | 52744012         |                 262 |                26.2 |                   1572 |
+| com_insert_select                 | 13362650         | 13362740         |                  90 |                   9 |                    540 |
+| com_select                        | 51722818         | 51723107         |                 289 |                28.9 |                   1734 |
+| com_set_option                    | 108564134        | 108564754        |                 620 |                  62 |                   3720 |
+| com_show_collations               | 3760530          | 3760568          |                  38 |                 3.8 |                    228 |
+| com_show_processlist              | 366078           | 366082           |                   4 |                 0.4 |                     24 |
+| com_show_status                   | 366047           | 366051           |                   4 |                 0.4 |                     24 |
+| com_show_variables                | 3760535          | 3760573          |                  38 |                 3.8 |                    228 |
+| com_update                        | 6271283          | 6271324          |                  41 |                 4.1 |                    246 |
+| connections                       | 3781382          | 3781420          |                  38 |                 3.8 |                    228 |
+| created_tmp_disk_tables           | 983223           | 983224           |                   1 |                 0.1 |                      6 |
+| created_tmp_tables                | 9134044          | 9134126          |                  82 |                 8.2 |                    492 |
+| handler_commit                    | 125798040        | 125798688        |                 648 |                64.8 |                   3888 |
+| handler_delete                    | 6849562          | 6849578          |                  16 |                 1.6 |                     96 |
+| handler_read_first                | 5332451          | 5332498          |                  47 |                 4.7 |                    282 |
+| handler_read_key                  | 373910509        | 373912469        |                1960 |                 196 |                  11760 |
+| handler_read_next                 | 850122025        | 850170403        |               48378 |              4837.8 |                 290268 |
+| handler_read_rnd                  | 255104660        | 255105932        |                1272 |               127.2 |                   7632 |
+| handler_read_rnd_next             | 992505444        | 992549948        |               44504 |              4450.4 |                 267024 |
+| handler_update                    | 27930283         | 27930465         |                 182 |                18.2 |                   1092 |
+| handler_write                     | 2051582925       | 2051602416       |               19491 |              1949.1 |                 116946 |
+| innodb_buffer_pool_pages_data     | 77232            | 77243            |                  11 |                 1.1 |                     66 |
+| innodb_buffer_pool_pages_dirty    | 626              | 645              |                  19 |                 1.9 |                    114 |
+| innodb_buffer_pool_pages_flushed  | 38429812         | 38430032         |                 220 |                  22 |                   1320 |
+| innodb_buffer_pool_pages_misc     | 4294922063       | 4294922052       |                 -11 |                -1.1 |                    -66 |
+| innodb_buffer_pool_read_requests  | 1933796064       | 1933871603       |               75539 |              7553.9 |                 453234 |
+| innodb_buffer_pool_reads          | 11360212         | 11360214         |                   2 |                 0.2 |                     12 |
+| innodb_buffer_pool_write_requests | 1074109722       | 1074115394       |                5672 |               567.2 |                  34032 |
+| innodb_data_fsyncs                | 5583880          | 5583905          |                  25 |                 2.5 |                    150 |
+| innodb_data_read                  | 3339489280       | 3339501568       |               12288 |              1228.8 |                  73728 |
+| innodb_data_reads                 | 11796492         | 11796494         |                   2 |                 0.2 |                     12 |
+| innodb_data_writes                | 105587582        | 105588145        |                 563 |                56.3 |                   3378 |
+| innodb_data_written               | 3721600000       | 3727315968       |             5715968 |            571596.8 |               34295808 |
+| innodb_dblwr_pages_written        | 38429812         | 38430032         |                 220 |                  22 |                   1320 |
+| innodb_dblwr_writes               | 596503           | 596506           |                   3 |                 0.3 |                     18 |
+| innodb_log_write_requests         | 380978894        | 380981368        |                2474 |               247.4 |                  14844 |
+| innodb_log_writes                 | 74407604         | 74407990         |                 386 |                38.6 |                   2316 |
+| innodb_os_log_fsyncs              | 2310799          | 2310807          |                   8 |                 0.8 |                     48 |
+| innodb_os_log_written             | 2905292800       | 2906502656       |             1209856 |            120985.6 |                7259136 |
+| innodb_pages_created              | 1341584          | 1341593          |                   9 |                 0.9 |                     54 |
+| innodb_pages_read                 | 13117652         | 13117654         |                   2 |                 0.2 |                     12 |
+| innodb_pages_written              | 38429812         | 38430032         |                 220 |                  22 |                   1320 |
+| innodb_rows_deleted               | 6849552          | 6849568          |                  16 |                 1.6 |                     96 |
+| innodb_rows_inserted              | 43787980         | 43788207         |                 227 |                22.7 |                   1362 |
+| innodb_rows_read                  | 4289845136       | 4289919560       |               74424 |              7442.4 |                 446544 |
+| innodb_rows_updated               | 24119627         | 24119809         |                 182 |                18.2 |                   1092 |
+| key_read_requests                 | 41262330         | 41262338         |                   8 |                 0.8 |                     48 |
+| open_files                        | 7                | 5                |                  -2 |                -0.2 |                    -12 |
+| opened_files                      | 4212920          | 4212924          |                   4 |                 0.4 |                     24 |
+| questions                         | 253158874        | 253160331        |                1457 |               145.7 |                   8742 |
+| select_full_join                  | 546              | 547              |                   1 |                 0.1 |                      6 |
+| select_range                      | 721945           | 721947           |                   2 |                 0.2 |                     12 |
+| select_scan                       | 12828865         | 12828989         |                 124 |                12.4 |                    744 |
+| sort_range                        | 170971           | 170973           |                   2 |                 0.2 |                     12 |
+| sort_rows                         | 255175383        | 255176655        |                1272 |               127.2 |                   7632 |
+| sort_scan                         | 534078           | 534080           |                   2 |                 0.2 |                     12 |
+| table_locks_immediate             | 142673687        | 142674454        |                 767 |                76.7 |                   4602 |
+| threads_cached                    | 7                | 8                |                   1 |                 0.1 |                      6 |
+| threads_connected                 | 5                | 10               |                   5 |                 0.5 |                     30 |
+| threads_created                   | 840486           | 840509           |                  23 |                 2.3 |                    138 |
++-----------------------------------+------------------+------------------+---------------------+---------------------+------------------------+</pre>
+</blockquote>
+<p>Some values don&#8217;t make sense to do difference on (e.g. <strong>threads_connected</strong>), since they present with momentary status and are not incrementing as others (e.g. <strong>threads_created</strong>).</p>
+<p>Happy SQLing!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-global-status-difference-using-single-query/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3908</post-id>	</item>
+		<item>
+		<title>Announcing common_schema: common views &#038; routines for MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql#comments</comments>
+				<pubDate>Wed, 13 Jul 2011 04:25:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3794</guid>
+				<description><![CDATA[Today I have released common_schema, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server. What does it do? There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &#38; transactions, security, internals&#8230; There are [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Today I have released <a title="common_schema" href="http://code.openark.org/forge/common_schema">common_schema</a>, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server.</p>
+<h4>What does it do?</h4>
+<p>There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &amp; transactions, security, internals&#8230; There are basic functions answering for common needs.</p>
+<p>Some of the views/routines simply formalize those queries we tend to write over and over again. Others take the place of external tools, answering complex questions via SQL and metadata. Still others help out with SQL generation.</p>
+<p>Here are a few highlights:</p>
+<ul>
+<li>Did you know you can work out <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/global_status_diff_nonzero.html">simple monitoring</a> of your server with a <em>query</em>?  There&#8217;s a view to do that for you.</li>
+<li>How about showing just <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_top.html">the good parts of the processlist</a>?</li>
+<li>Does your schema have <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">redundant keys</a>?</li>
+<li>Or InnoDB tables with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/no_pk_innodb_tables.html">no PRIMARY KEY</a>?</li>
+<li>Is AUTO_INCREMENT <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/auto_increment_columns.html">running out of space</a>?</li>
+<li>Can I get the SQL statements to <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">generate my FOREIGN KEYs</a>? To drop them?</li>
+<li>And can we finally get <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">SHOW GRANTS for all accounts</a>, and as an <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">SQL query</a>?</li>
+<li>Ever needed a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/general_functions.html#crc64">64 bit CRC function</a>?</li>
+<li>And aren&#8217;t you tired of writing the cumbersome SUBSTRING_INDEX(SUBSTRING_INDEX(str, &#8216;,&#8217;, 3), &#8216;,&#8217;, -1)? <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/string_functions.html#split_token">There&#8217;s an alternative</a>.</li>
+</ul>
+<p>There&#8217;s more. Take a look at the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html">common_schema documentation</a> for full listing. And it&#8217;s evolving: I&#8217;ve got quite a few ideas already for future components.</p>
+<p>Some of these views rely on heavyweight INFORMATION_SCHEMA tables. You should be aware of the impact and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/risks.html">risks</a>.</p>
+<h4>What do I need to install?</h4>
+<p>There&#8217;s no script or executable file. It&#8217;s just a schema. The distribution in an SQL file which generates <em>common_schema</em>. Much like a dump file.</p>
+<h4><span id="more-3794"></span>What are the system requirements?</h4>
+<p>It&#8217;s just between you and your MySQL. There are currently three distribution files, dedicated for different versions of MySQL (and allowing for increased functionality):</p>
+<ul>
+<li><strong>common_schema_mysql_51</strong>: fits all MySQL &gt;= 5.1 distributions</li>
+<li><strong>common_schema_innodb_plugin</strong>: fits MySQL &gt;= 5.1, with InnoDB plugin + INFORMATION_SCHEMA tables enabled</li>
+<li><strong>common_schema_percona_server</strong>: fits Percona Server &gt;= 5.1</li>
+</ul>
+<p>Refer to the <a rel="nofollow" href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/download.html">documentation</a> for more details.</p>
+<h4>What are the terms of use?</h4>
+<p><em>common_schema</em> is released under the <a href="http://www.opensource.org/licenses/bsd-license.php">BSD license</a>.</p>
+<h4>Where can I download it?</h4>
+<p>On the <a href="http://code.google.com/p/common-schema/">common_schema project page</a>. Enjoy it!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3794</post-id>	</item>
+		<item>
+		<title>Checking for AUTO_INCREMENT capacity with single query</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query#comments</comments>
+				<pubDate>Tue, 05 Apr 2011 05:36:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[openark kit]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421</guid>
+				<description><![CDATA[Darn! This means oak-show-limits becomes redundant. Am I not supposed to speak about it on my coming presentation? Bad timing! You have AUTO_INCREMENT columns. How far are you pushing the limits? Are you going to run out of AUTO_INCREMENT values soon? Perhaps you wonder whether you should ALTER from INT to BIGINT? The answer is [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><em>Darn!</em> This means <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-show-limits.html">oak-show-limits</a> becomes redundant. Am I not supposed to speak about it on my <a href="http://en.oreilly.com/mysql2011/public/schedule/detail/17155">coming presentation</a>? Bad timing!</p>
+<p>You have <strong>AUTO_INCREMENT</strong> columns. How far are you pushing the limits? Are you going to run out of <strong>AUTO_INCREMENT</strong> values soon? Perhaps you wonder whether you should <strong>ALTER</strong> from <strong>INT</strong> to <strong>BIGINT</strong>?</p>
+<p>The answer is all there in <strong>INFORMATION_SCHEMA</strong>. The <strong>TABLES</strong> table shows the current <strong>AUTO_INCREMENT</strong> value per table, and the <strong>COLUMNS</strong> table tells us all about a column&#8217;s data type.</p>
+<p>It takes some ugly code to deduce the maximum value per column type, what with signed/unsigned and data type, but then its very simple. Here is the query:<span id="more-3421"></span></p>
+<blockquote>
+<pre>SELECT
+  TABLE_SCHEMA,
+  TABLE_NAME,
+  COLUMN_NAME,
+  DATA_TYPE,
+  COLUMN_TYPE,
+  IF(
+    LOCATE('unsigned', COLUMN_TYPE) &gt; 0,
+    1,
+    0
+  ) AS IS_UNSIGNED,
+  (
+    CASE DATA_TYPE
+      WHEN 'tinyint' THEN 255
+      WHEN 'smallint' THEN 65535
+      WHEN 'mediumint' THEN 16777215
+      WHEN 'int' THEN 4294967295
+      WHEN 'bigint' THEN 18446744073709551615
+    END &gt;&gt; IF(LOCATE('unsigned', COLUMN_TYPE) &gt; 0, 0, 1)
+  ) AS MAX_VALUE,
+  AUTO_INCREMENT,
+  AUTO_INCREMENT / (
+    CASE DATA_TYPE
+      WHEN 'tinyint' THEN 255
+      WHEN 'smallint' THEN 65535
+      WHEN 'mediumint' THEN 16777215
+      WHEN 'int' THEN 4294967295
+      WHEN 'bigint' THEN 18446744073709551615
+    END &gt;&gt; IF(LOCATE('unsigned', COLUMN_TYPE) &gt; 0, 0, 1)
+  ) AS AUTO_INCREMENT_RATIO
+FROM
+  INFORMATION_SCHEMA.COLUMNS
+  INNER JOIN INFORMATION_SCHEMA.TABLES USING (TABLE_SCHEMA, TABLE_NAME)
+WHERE
+  TABLE_SCHEMA NOT IN ('mysql', 'INFORMATION_SCHEMA', 'performance_schema')
+  AND EXTRA='auto_increment'
+;
+</pre>
+</blockquote>
+<p>There&#8217;s one row in the result set for each <strong>AUTO_INCREMENT</strong> column. since at most one <strong>AUTO_INCREMENT</strong> column can exist for any given table, each row also identifies a unique table. Resulting columns are mostly self-explanatory, but here&#8217;s some details on some of the columns:</p>
+<ul>
+<li><strong>IS_UNSIGNED</strong>: <strong>1</strong> when the column is <strong>UNSIGNED</strong>, <strong>0</strong> otherwise.</li>
+<li><strong>MAX_VALUE</strong>: maximum value that can be contained within column.</li>
+<li><strong>AUTO_INCREMENT</strong>: current <strong>AUTO_INCREMENT</strong> value for table.</li>
+<li><strong>AUTO_INCREMENT_RATIO</strong>: value in the range <strong>[0..1]</strong>, where <strong>1</strong> means &#8220;100% full&#8221;.</li>
+</ul>
+<p>A sample output:</p>
+<blockquote>
+<pre>+--------------+------------+--------------+-----------+-----------------------+-------------+------------+----------------+----------------------+
+| TABLE_SCHEMA | TABLE_NAME | COLUMN_NAME  | DATA_TYPE | COLUMN_TYPE           | IS_UNSIGNED | MAX_VALUE  | AUTO_INCREMENT | AUTO_INCREMENT_RATIO |
++--------------+------------+--------------+-----------+-----------------------+-------------+------------+----------------+----------------------+
+| sakila       | actor      | actor_id     | smallint  | smallint(5) unsigned  |           1 |      65535 |            201 |               0.0031 |
+| sakila       | address    | address_id   | smallint  | smallint(5) unsigned  |           1 |      65535 |            606 |               0.0092 |
+| sakila       | category   | category_id  | tinyint   | tinyint(3) unsigned   |           1 |        255 |             17 |               0.0667 |
+| sakila       | city       | city_id      | smallint  | smallint(5) unsigned  |           1 |      65535 |            601 |               0.0092 |
+| sakila       | country    | country_id   | smallint  | smallint(5) unsigned  |           1 |      65535 |            110 |               0.0017 |
+| sakila       | customer   | customer_id  | smallint  | smallint(5) unsigned  |           1 |      65535 |            600 |               0.0092 |
+| sakila       | film       | film_id      | smallint  | smallint(5) unsigned  |           1 |      65535 |           1001 |               0.0153 |
+| sakila       | inventory  | inventory_id | mediumint | mediumint(8) unsigned |           1 |   16777215 |           4582 |               0.0003 |
+| sakila       | language   | language_id  | tinyint   | tinyint(3) unsigned   |           1 |        255 |              7 |               0.0275 |
+| sakila       | payment    | payment_id   | smallint  | smallint(5) unsigned  |           1 |      65535 |          16050 |               0.2449 |
+| sakila       | rental     | rental_id    | int       | int(11)               |           0 | 2147483647 |          16050 |               0.0000 |
+| sakila       | staff      | staff_id     | tinyint   | tinyint(3) unsigned   |           1 |        255 |              3 |               0.0118 |
+| sakila       | store      | store_id     | tinyint   | tinyint(3) unsigned   |           1 |        255 |              3 |               0.0118 |
++--------------+------------+--------------+-----------+-----------------------+-------------+------------+----------------+----------------------+
+</pre>
+</blockquote>
+<h4>Bonus: free advice on increasing your AUTO_INCREMENT capacity</h4>
+<p>Make it <strong>UNSIGNED</strong>. No, really. Check your definitions now.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/feed</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3421</post-id>	</item>
+		<item>
+		<title>oak-hook-general-log: your poor man&#8217;s Query Analyzer</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer#respond</comments>
+				<pubDate>Wed, 15 Dec 2010 17:46:06 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[logs]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3032</guid>
+				<description><![CDATA[The latest release of openark kit introduces oak-hook-general-log, a handy tool which allows for some analysis of executing queries. Initially I just intended for the tool to be able to dump the general log to standard output, from any machine capable to connect to MySQL. Quick enough, I realized the power it brings. With this [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The latest release of <a href="http://code.openark.org/forge/openark-kit">openark kit</a> introduces <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-hook-general-log.html">oak-hook-general-log</a>, a handy tool which allows for some analysis of executing queries.</p>
+<p>Initially I just intended for the tool to be able to dump the general log to standard output, from any machine capable to connect to MySQL. Quick enough, I realized the power it brings.</p>
+<p>With this tool, one can dump to standard output all queries using temporary tables; or using a specific index; or doing a full index scan; or just follow up on connections; or&#8230; For example, the following execution will only log queries which make for filesort:</p>
+<blockquote>
+<pre>oak-hook-general-log --user=root --host=localhost --password=123456 --filter-explain-filesort</pre>
+</blockquote>
+<h4>The problem with using the standard logs</h4>
+<p>So you have the <em>general log</em>, which you don&#8217;t often enable, since it tends to grow huge within moments. You then have the <em>slow log</em>. Slow log is great, and is among the top tools for MySQL diagnosis.</p>
+<p>The slow log allows for <strong>log-queries-not-using-indexes</strong>, which is yet another nice feature. Not only should you log any query running for over <strong>X</strong> seconds, but also log any query which does not use an index.</p>
+<p>Wait. This logs all single-row tables (no single row table will use an index), as well as very small tables (a common <strong>20</strong> rows lookup table will most often be scanned). These are OK scans. This makes for some noise in the slow log.</p>
+<p>And how about queries which do use an index, but do so poorly? They use an index, but retrieve some <strong>12,500,000</strong> rows, <em>using temporary</em> table &amp; <em>filesort</em>?</p>
+<h4>What oak-hook-general-log does for you</h4>
+<p>This tool streams out the general log, and filters out queries based on their <em>role</em> or on their <em>execution plan</em>.</p>
+<p>To work at all, it must enable the general log. Moreover, it directs the general log to log table. Mind that this makes for a performance impact, which is why the tool auto-terminates and restores original log settings (default is <strong>1</strong> minute, configurable). It&#8217;s really not a tool you should keep running for days. But during the few moments it runs, it will:</p>
+<ul>
+<li>Routinely rotate the <strong>mysql.general_log</strong> table so that it doesn&#8217;t fill up</li>
+<li>Examine entries found in the general log</li>
+<li>Cross reference entries to the PROCESSLIST so as to deduce database context (<a href="http://bugs.mysql.com/bug.php?id=52554">bug #52554</a>)</li>
+<li>If required and appropriate, evaluate a query&#8217;s execution plan</li>
+<li>Decide whether to dump each entry based on filtering rules</li>
+</ul>
+<h4>Filtering rules</h4>
+<p>Filtering rules are passed as command line options. At current, only one filtering rule applies (if more than one specified only one is used, so no point in passing more than one). Some of the rules are:<span id="more-3032"></span></p>
+<ul>
+<li><strong>filter-connection</strong>: only log connect/quit entries</li>
+<li><strong>filter-explain-fullscan</strong>: only log full table scans</li>
+<li><strong>filter-explain-temporary</strong>: only log queries which create implicit temporary tables</li>
+<li><strong>filter-explain-rows-exceed</strong>: only log queries where more than <strong>X</strong> number of rows are being accessed on some table (estimated)</li>
+<li><strong>filter-explain-total-rows-exceed</strong>: only log queries where more than <strong>X</strong> number of rows are accessed on all tables combined (estimated, with possibly incorrect numbers on some queries)</li>
+<li><strong>filter-explain-key</strong>: only log queries using a specific index. This feature somewhat overlaps with Maatkit&#8217;s <em>mk-index-usage</em> (read <a href="http://www.mysqlperformanceblog.com/2010/11/11/advanced-index-analysis-with-mk-index-usage/">announcement</a>).</li>
+<li><strong>filter-explain-contains</strong>: a general purpose <em>grep</em> on the execution plan. Log queries where the execution plan contains <em>some text</em>.</li>
+</ul>
+<p>There are other filters, and I will possibly add more in due time.</p>
+<p>Here are a couple cases I used <em>oak-hook-general-log</em> for:</p>
+<h4>Use case: temporary tables</h4>
+<p>I have a server with this alarming chart (courtesy <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>) of temporary tables:</p>
+<blockquote>
+<pre><img class="alignnone" title="Created tmp tables per second" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=370x180&amp;chts=303030,12&amp;chtt=Latest+24+hours:+Dec+9,+06:30++-++Dec+10,+06:30&amp;chf=c,s,ffffff&amp;chdl=created_tmp_tables_psec|created_tmp_disk_tables_psec&amp;chdlp=b&amp;chco=ff8c00,4682b4&amp;chd=s:yzzy02zzz100zzz0rv9zz0zyzyz0yy2xz1t11xzztz0xr1xt2tz07vwzz100100z31z111yz1vzzzzz1zs80r902s1111010y20z03z11487zz011z11011002w0q5rxxz0y00z0s02xy1yy0,gggfghggfgggghhgYekhhghhhhhghfjghhdihfhgdghgZhgcicihpcehhhhhhhifkigjihghjehgiigjgYqiYqgiaihiifkhekhfijgiihhggggggggggfhgghffZoYgggggggggdihfggghg&amp;chxt=x,y&amp;chxr=1,0,35.060000&amp;chxl=0:||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||+|&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,2.08,0&amp;chxp=0,2.08,6.25,10.42,14.59,18.76,22.93,27.10,31.27,35.44,39.61,43.78,47.95,52.12,56.29,60.46,64.63,68.80,72.97,77.14,81.31,85.48,89.65,93.82,97.99&amp;tsstart=2010-12-09+06:30:00&amp;tsstep=600" alt="" width="370" height="180" />
+</pre>
+</blockquote>
+<p>What could possibly create <strong>30</strong> temporary tables per second on average?</p>
+<p>The slow log produced nothing helpful, even with <strong>log-queries-not-using-indexes</strong> enabled. There were a lot of queries not using indexes there, but nothing at these numbers. With:</p>
+<blockquote>
+<pre>oak-hook-general-log --filter-explain-temporary</pre>
+</blockquote>
+<p>enabled for <strong>1</strong> minute, nothing came out. Weird. Enabled for <strong>5</strong> minutes, I got one entry. Turned out a scheduled script, acting once per <strong>5</strong> minutes, was making a single complicated query involving many nested views, which accounted for some <em>hundreds</em> of temporary tables created. All of them very small, query time was very fast. There is no temporary tables problem with this server, case closed.</p>
+<h4>Use case: connections</h4>
+<p>A server had issues with some exceptions being thrown on the client side. There was a large number of new connections created per second although the client was using a connection pool. Suspecting the pool didn&#8217;t work well, I issued:</p>
+<blockquote>
+<pre>oak-hook-general-log --filter-connect</pre>
+</blockquote>
+<p>The pool was working well, all right. No entries for that client were recorder in <strong>1</strong> minute of testing. However, it turned out some old script was flooding the MySQL server with requests, every second. The log showed root@somehost, and sure enough, the script was disabled. Exceptions were due to another reason; it was good to eliminate a suspect.</p>
+<p>Some of the tool&#8217;s use case is relatively easy to solve with tail, grep &amp; awk; others are not. I am using it more and more often, and find it to make significant shortcuts in tracking down queries.</p>
+<h4>Get it</h4>
+<p>Download the tool as part of <em>openark kit</em>: access the <a href="http://code.google.com/p/openarkkit/">openark kit project page</a>.</p>
+<p>Or get the <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/src/oak/oak-hook-general-log.py">source code</a> directly.</p>
+<p>Feedback is most welcome.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/oak-hook-general-log-your-poor-mans-query-analyzer/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3032</post-id>	</item>
+		<item>
+		<title>openark-kit (rev. 170): new tools, new functionality</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/openark-kit-rev-170-new-tools-new-functionality</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/openark-kit-rev-170-new-tools-new-functionality#comments</comments>
+				<pubDate>Wed, 15 Dec 2010 06:31:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3124</guid>
+				<description><![CDATA[I&#8217;m pleased to announce a new release of the openark kit. There&#8217;s a lot of new functionality inside; following is a brief overview. The openark kit is a set of utilities for MySQL. They solve everyday maintenance tasks, which may be complicated or time consuming to work by hand. It&#8217;s been a while since the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m pleased to announce a new release of the <a href="http://code.openark.org/forge/openark-kit">openark kit</a>. There&#8217;s a lot of new functionality inside; following is a brief overview.</p>
+<p>The <em>openark kit</em> is a set of utilities for MySQL. They  solve everyday maintenance tasks, which may be complicated or time  consuming to work by hand.</p>
+<p>It&#8217;s been a while since the last announced release. Most of my attention was on <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>, building new features, writing documentation etc. However my own use of <em>openark kit</em> has only increased in the past few months, and there&#8217;s new useful solutions to common problems that have been developed.</p>
+<p>I&#8217;ve used and improved many tools over this time, but doing the final cut, along with proper documentation, took some time. Anyway, here are the highlights:</p>
+<h4>New tool: oak-hook-general-log</h4>
+<p><em>oak-hook-general-log</em> hooks up a MySQL server and dumps the general log based on filtering rules, applying to query role or execution plan. It is possible to only dump connect/disconnect entries, queries which make a full table scan, or use temporary tables, or scan more than X number of rows, or&#8230;</p>
+<p>I&#8217;ll write more on this tool shortly.</p>
+<h4>New tool: oak-prepare-shutdown</h4>
+<p>This tool makes for an orderly and faster shutdown by safely stopping replication, and flushing InnoDB pages to disk prior to shutting down (keeping server available for connections even while attempting to flush dirty pages to disk). A typical use case would be:</p>
+<blockquote>
+<pre>oak-prepare-shutdown --user=root --ask-pass --socket=/tmp/mysql.sock &amp;&amp; /etc/init.d/mysql stop</pre>
+</blockquote>
+<h4>New tool: oak-repeat query</h4>
+<p><em>oak-repeat-query</em> repeats executing a given query until some condition holds. The condition can be:</p>
+<ul>
+<li>Number of given iterations has been reached</li>
+<li>Given time has elapsed</li>
+<li>No rows have been affected by query</li>
+</ul>
+<p>The tool comes in handy for cleanup jobs, warming up caches, etc.<span id="more-3124"></span></p>
+<h4>New tool: oak-get-slave-lag</h4>
+<p>This simple tool just returns the number of seconds a slave is behind master. But it also returns with an appropriate exit code, based on a given threshold: <strong>0</strong> when lag is good, <strong>1</strong> (error exit code) when lag is too great or slave fails to replicate.</p>
+<p>This tool has been used by 3rd party applications, such as a load balancer, to determine whether a slave should be accessed.</p>
+<h4>Updated tool: oak-chunk-update</h4>
+<p>This extremely useful utility breaks down very long queries into smaller chunks. These could be queries which should affect a huge amount of rows, or queries which cannot utilize an index.</p>
+<p>Updates to the tool include limiting the range of rows the tool scans, by specifying start and stop position (either by providing constant values or by SELECT query). Also added is auto-termination when no rows are found to be affected. Last, it is possible to override INFORMATION_SCHEMA lookup by explicitly specifying chunking key.</p>
+<p>This tool works great for your daily/weekly/monthly batch jobs; in creating DWH tables; populating new columns; purging old entries; clearing data based on non-indexed values; generating summary tables; and more.</p>
+<h4>Frozen tool: oak-apply-ri</h4>
+<p>I haven&#8217;t been using this tool for a while. The main work down by this tool can be done with <em>oak-chunk-update</em>. There are some additional safety checks <em>oak-apply-ri</em> provides; I&#8217;m thinking over if they justify the tool&#8217;s existence.</p>
+<h4>Frozen tool: oak-online-alter-table</h4>
+<p>With the appearance of Facebook’s <a href="http://www.facebook.com/note.php?note_id=430801045932">Online Schema Change</a> (OSC) tool, which derives from <em>oak-online-alter-table</em>, I&#8217;m not sure I will continue developing the tool. I intend to wait for general feedback on OSC before making a decision.</p>
+<h4>Documentation</h4>
+<p><a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/introduction.html">Documentation</a> is now part of <em>openark kit</em>&#8216;s SVN repository.</p>
+<h4>Download</h4>
+<p>The <em>openark kit</em> project is currently hosted by Google Code.  Downloads are available at the Google Code <a href="http://code.google.com/p/openarkkit/">openark kit project page</a>.</p>
+<p>Downloads are available in the following packaging formats:</p>
+<ul>
+<li><strong>.deb</strong> package, to be installed on <em>debian</em>, <em>ubuntu</em> and otherwise debian based distributions.</li>
+<li><strong>.rpm</strong> package, architecture free (<em>noarch</em>), for RPM supporting Linux distributions such as <em>RedHat</em>, <em>Fedora</em>, <em>CentOS</em> etc.</li>
+<li><strong>.tar.gz</strong> using python&#8217;s distutils installer.</li>
+<li><strong>source</strong>, directly retrieved from SVN or from above python package.</li>
+<li>Some distribution specific <a href="http://software.opensuse.org/search?baseproject=ALL&amp;p=1&amp;q=openark-kit">RPM packages</a>, courtesy Lenz Grimmer.</li>
+</ul>
+<h4>Feedback</h4>
+<p>Your feedback is welcome! I may not always respond promptly; and I confess that some bugs were left open for more than I would have liked them to. I hope to make for good quality of code, and bug reporting is one major factor you can control.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/openark-kit-rev-170-new-tools-new-functionality/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3124</post-id>	</item>
+		<item>
+		<title>EXPLAIN: missing db info</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/explain-missing-db-info</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/explain-missing-db-info#comments</comments>
+				<pubDate>Tue, 11 May 2010 04:57:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Execution plan]]></category>
+		<category><![CDATA[logs]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2368</guid>
+				<description><![CDATA[I&#8217;m further developing a general log hook, which can stream queries from the general log. A particular direction I&#8217;m taking is to filter queries by their type of actions. For example, the tool (oak-hook-general-log) can be instructed to only stream out those queries which involve creation of a temporary table; or those which cause for [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m further developing a general log hook, which can stream queries from the general log.</p>
+<p>A particular direction I&#8217;m taking is to filter queries by their type of actions. For example, the tool (<a href="http://code.google.com/p/openarkkit/source/browse/trunk/openarkkit/src/oak/oak-hook-general-log.py">oak-hook-general-log</a>) can be instructed to only stream out those queries which involve creation of a temporary table; or those which cause for a filesort, or full index scan, etc.</p>
+<p>This is done by evaluating of query execution plans on the fly. I suspect the <a href="http://www.mysql.com/why-mysql/white-papers/mysql_wp_queryanalyzer.php">MySQL query analyzer</a> roughly does the same (as a small part of what it does).</p>
+<p>It&#8217;s almost nothing one cannot do with sed/awk. However, I bumped into a couple of problems:</p>
+<ol>
+<li>The general log (and the <strong>mysql.general_log table</strong>, in  particular) does not indicate the particular database one is using for the query. Since slow log does indicate this data, I <a href="http://bugs.mysql.com/bug.php?id=52554">filed a bug</a> on this. I currently solve this by crossing connection id with the process list, where the current database is listed. It&#8217;s shaky, but mostly works.</li>
+<li>Just realized: there&#8217;s no DB info in the <strong>EXPLAIN</strong> output! It&#8217;s weird, since I&#8217;ve been EXPLAINing queries for years now. But I&#8217;ve always had the advantage of <em>knowing</em> the schema used: either because I was manually executing the query on a known schema, or <a href="http://www.maatkit.org/doc/mk-query-digest.html">mk-query-digest</a> was kind enough to let me know.</li>
+</ol>
+<p><span id="more-2368"></span>For example, look at the following imaginary query, involving both the <strong>world</strong> and <strong>sakila</strong> databases:</p>
+<blockquote>
+<pre>mysql&gt; use test;
+Database changed
+mysql&gt; EXPLAIN SELECT * FROM world.Country JOIN sakila.city WHERE Country.Capital = city.city_id;
++----+-------------+---------+--------+---------------+---------+---------+-----------------------+------+-------------+
+| id | select_type | table   | type   | possible_keys | key     | key_len | ref                   | rows | Extra       |
++----+-------------+---------+--------+---------------+---------+---------+-----------------------+------+-------------+
+|  1 | SIMPLE      | Country | ALL    | NULL          | NULL    | NULL    | NULL                  |  239 |             |
+|  1 | SIMPLE      | city    | eq_ref | PRIMARY       | PRIMARY | 2       | world.Country.Capital |    1 | Using where |
++----+-------------+---------+--------+---------------+---------+---------+-----------------------+------+-------------+
+2 rows in set (0.00 sec)
+</pre>
+</blockquote>
+<p>The query is imaginary, since the tables don&#8217;t actually have anything in common. But look at the <strong>EXPLAIN</strong> result: can you tell where <strong>city</strong> came from? <strong>Country</strong> can somehow be parsed from the <strong>ref</strong> column, but no help on <strong>city</strong>.</p>
+<p>Moreover, table aliases show on the <strong>EXPLAIN</strong> plan (which is good), but with no reference to the original table.</p>
+<p>So, is it back to parsing of the SQL query? I&#8217;m <span style="text-decoration: line-through;">lazy</span> reluctant to do that. It&#8217;s error prone, and one needs to implement, or use, a good parser, which also accepts MySQL dialect. Haven&#8217;t looked into this yet.</p>
+<p>I&#8217;m currently at a standstill with regard to automated query execution plan evaluation where database cannot be determined.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/explain-missing-db-info/feed</wfw:commentRss>
+		<slash:comments>13</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2368</post-id>	</item>
+	</channel>
+</rss>

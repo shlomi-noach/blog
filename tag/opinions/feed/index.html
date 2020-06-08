@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Opinions &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/opinions/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 27 Dec 2016 16:45:41 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Three wishes for a new year</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4#comments</comments>
+				<pubDate>Wed, 28 Sep 2016 14:20:54 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[GTID]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7643</guid>
+				<description><![CDATA[(Almost) another new year by Jewish calendar. What do I wish for the following year? World peace Good health to all Relaxed GTID constraints I&#8217;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>(Almost) another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Relaxed GTID constraints</li>
+</ol>
+<p>I&#8217;m still not using GTID, and still see operational issues with working with GTID. As a latest example, our new schema migration solution, gh-ost, allows us to test migrations in production, on replicas. The GTID catch? <code>gh-ost</code> has to write something to the binary log. Thus, it &#8220;corrupts&#8221; the replica with a bogus GTID entry that will never be met in another server, thus making said replica unsafe to promote. We can work around this, but&#8230;</p>
+<p>I understand the idea and need for the <code>Executed GTID Set</code>. It will certainly come in handy with multi-writer InnoDB Cluster. However for most use cases GTID poses a burden. The reason is that our topologies are imperfect, and we as humans are imperfect, and operations are most certainly imperfect. We may wish to operate on a replica: test something, by intention or mistake. We may wish to use a subchain as the seed for a new cluster split. We may wish to be able to write to downstream replicas. We may use a 3rd party tool that issues a <code>flush tables with read lock</code> without disabling <code>sql_log_bin</code>. Things just happen.</p>
+<p>For that, I would like to suggest GTID control levels, such as:</p>
+<ol>
+<li><em>Strict</em>: same as Oracle&#8217;s existing implementation. Executed sets, purged sets, whatnot.</li>
+<li><em>Last executed</em>: a mode where the only thing that counts is the last executed GTID value. If I repoint replica, all it needs to check is &#8220;hey this is my last executed GTID entry, give me the coordinates of yours. And, no, I don&#8217;t care about comparing executed and purged sets, I will trust you and keep running from that point on&#8221;</li>
+<li><em>Declarative</em>: GTIDs are generated, are visible in each and every binary log entry, but are completely ignored.</li>
+</ol>
+<p>I realize Oracle MySQL GTID is out for some over 3 years now, but I&#8217;m sorry &#8211; I still have reservations and see use cases where I fear it will not serve me right.</p>
+<p>How about my previous years wishes? World peace and good health never came through, however:</p>
+<ul>
+<li>My <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-2015">2015 wish</a> for &#8220;decent, operations friendly built in online table refactoring&#8221; was unmet, however <code>gh-ost</code> is a thing now and exceeds my expectations. No, really. Please come see <a href="https://www.percona.com/live/plam16/sessions/introducing-gh-ost-triggerless-painless-trusted-online-schema-migrations">Tom &amp; myself present gh-ost</a> and how it changed our migration paradigm.</li>
+<li>My <a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201">2012 wish</a> for &#8220;decent, long waited for, implementation of <a href="http://en.wikipedia.org/wiki/Window_function_%28SQL%29#Window_function">Window Functions</a> (aka Analytic Functions) for MySQL&#8221; was met by MariaDB&#8217;s <a href="https://mariadb.com/kb/en/mariadb/window-functions/">window functions</a>.<br />
+Not strictly Window Functions, but Oracle MySQL 8.0 will <a href="http://mysqlserverteam.com/mysql-8-0-labs-recursive-common-table-expressions-in-mysql-ctes/">support CTE</a> (hierarchial/recursive), worth a mention.</li>
+</ul>
+<p>See you in Amsterdam!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-4/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7643</post-id>	</item>
+		<item>
+		<title>Thoughts on MaxScale automated failover (and Orchestrator)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comments</comments>
+				<pubDate>Wed, 18 Nov 2015 09:17:48 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[MaxScale]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7439</guid>
+				<description><![CDATA[Having attended a talk (as part of the MariaDB Developer Meeting in Amsterdam) about recent developments of MaxScale in executing automated failovers, here are some (late) observations of mine. I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Having attended a talk (as part of the <a href="https://blog.mariadb.org/2015-developers-meeting-amsterdam/">MariaDB Developer Meeting in Amsterdam</a>) about recent developments of <a href="https://mariadb.com/products/mariadb-maxscale">MaxScale</a> in executing automated failovers, here are some (late) observations of mine.</p>
+<p>I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food for thought, points for action and otherwise recommendations.</p>
+<p>Some functionality of the MaxScale failover is also implemented by <strong><a href="https://github.com/outbrain/orchestrator">orchestrator</a></strong>, which I author. <em>Orchestrator</em> was built in production environments by and for operational people. In this respect it has gained many insights and had to cope with many real-world cases, special cases &amp; Murphy&#8217;s law cases. This post compares logic, feature set and capabilities of the two where relevant. To some extent the below will read as &#8220;hey, I&#8217;ve already implemented this; shame to re-implement the same&#8221;, and indeed I think that way; but it wouldn&#8217;t be the first time a code of mine would just be re-implemented by someone else and I&#8217;ve done the same, myself.</p>
+<p>I&#8217;m describing the solution the way I understood it from the talk. If I&#8217;m wrong on any account I&#8217;m happy to be corrected via comments below. <strong>Edit:</strong> <em>please see comment by</em> <a class="url" href="http://www.mariadb.com/" rel="external nofollow">Dipti Joshi</a></p>
+<h3>General overview</h3>
+<p>The idea is that MaxScale operates as a proxy to your topology. You do not connect to your master directly, but rather through MaxScale. Thus, MaxScale acts as a proxy to your master.</p>
+<p>The next phase is that MaxScale would also auto-detect master failure, fix the topology for you, promote a new master, and will have your application unaware of all the complexity and without the app having to change setup/DNS/whatever. Of course some write downtime is implied.</p>
+<p>Now for some breakdown.</p>
+<h3>Detection</h3>
+<p>The detection of a dead master, the check by which a failover is initiated, is based on MaxScale not being able to query the master. This calls for some points for consideration:</p>
+<ul>
+<li>Typically, I would see &#8220;I can&#8217;t connect to the master therefore failover&#8221; as too hysterical, and the basis for a lot of false positives.</li>
+<li>However, since in the discussed configuration MaxScale is <em>the only access point</em> to the master, the fact MaxScale cannot connect to the master means the master is inaccessible <em>de-facto</em>.</li>
+<li>In light of the above, the decision makes sense &#8211; but I still hold that it would make false positives.</li>
+<li>I&#8217;m unsure (I <em>think</em> not; can anyone comment?) if MaxScale would make multiple attempts over time and only reach the conclusion after X successive failures. This would reduce the false positives.</li>
+<li>I&#8217;m having a growing dislike to a &#8220;check for 4 successive times then alert/failover&#8221; Nagios-style behavior. <em>Orchestrator</em> takes a different approach where it recognizes a master&#8217;s death by not being able to connect to the master <em>as well as</em> being able to connect to 1st tier slaves, check their status and observe that <em>they&#8217;re unable to connect to the master as well</em>. See <a title="Permanent Link to What makes a MySQL server failure/recovery case?" href="https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case" rel="bookmark">What makes a MySQL server failure/recovery case?</a>. This approach still calls for further refinement (what if the master is temporarily deadlocked? Is this a failover or not?).</li>
+</ul>
+<p><span id="more-7439"></span></p>
+<h3>Assumed topology</h3>
+<p>MaxScale assumes the topology is all MariaDB, and all slaves are using (MariaDB) GTID replication. Well, MaxScale does not actually assumes that. It is assumed so by the <a href="https://github.com/mariadb-corporation/replication-manager">MariaDB Replication Manager</a> which MaxScale invokes. But I&#8217;m getting ahead of myself here.</p>
+<h3>Topology detection</h3>
+<p>MaxScale does not recognize the master by configuration but rather by state. It observes the servers it should observe, and concludes which is the master.</p>
+<p>I&#8217;m using similar approach in <em>orchestrator</em>. I maintain that this approach works well and opens the Chakras for complex recovery options.</p>
+<h3>Upon failure detection</h3>
+<p>When MaxScale detects failure, it invokes external scripts to fix the problem. There are some similar and different particulars here as compared to <em>orchestrator</em>, and I will explain what&#8217;s wrong with the MaxScale approach:</p>
+<ul>
+<li>Although MaxScale observes the topology and understands who is the master and who isn&#8217;t, the executed scripts do not. They need to re-discover everything by themselves.</li>
+<li>This implies the scripts start without memory of &#8220;what was last observed&#8221;. This is one of the greatest strengths of <em>orchestrator</em>: it knows what the state was just before the failure, and, having the bigger picture, can make informed decisions.
+<ul>
+<li>As a nasty example, what do you do when some the first tier slaves also happen to be inaccessible at that time? What if one of those happens to further have slaves of its own?</li>
+</ul>
+</li>
+<li>The MariaDB Replication Manager script (to be referenced as <em>repmgr</em>) assumes all instances to be MariaDB with GTID.
+<ul>
+<li>It is also implied that all my slaves are configured with binary logs &amp; log-slave-updates</li>
+<li>That&#8217;s <strong>way too restrictive</strong>.
+<ul>
+<li><em>Orchestrator</em> handles all following topologies: Oracle MySQL with/out GTID, MariaDB with/out GTID, MariaDB hybrid GTID &amp; non-GTID replication, Pseudo-GTID (MySQL and/or MariaDB), hybrid normal &amp; binlog servers topologies, slaves with/out log-slave-updates, hybrid Oracle &amp; MariaDB &amp; Binlog Servers &amp; Pseudo-GTID.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><em>repmgr</em> is unaware of data centers &amp; physical environments. You want failover to be as local to your datacenters as possible. Avoid too many cross-DC replication streams.</li>
+</ul>
+<h3>Failover invocation</h3>
+<p>MaxScale invokes the failover scripts <em>asynchronously</em>. This is a major flaw imho, as the decoupling between the monitoring and acting processes leads to further problems, see further.</p>
+<h3>After failover</h3>
+<p>MaxScale continuously scans the topology and observes that some other server has been promoted. This behavior is similar to <em>orchestrator&#8217;s</em>. But the following differences are noteworthy:</p>
+<ul>
+<li>Because of both the decoupling as well as the asynchronous invocation by MaxScale, it doesn&#8217;t really have any idea if and how the promotion resolved.</li>
+<li>I don&#8217;t know that there&#8217;s any anti-flapping mechanism, nor that there could be. If MaxScale doesn&#8217;t care what happened to the failover script, it shouldn&#8217;t be able to keep up with flapping scenarios.</li>
+<li>Nor is there a minimal suspend period between any two failure recoveries, that I know of. MaxScale can actually have easier life than <em>orchestrator</em> in this regard as it is (I suspect) strictly associated with <em>a topology</em>. Not like there&#8217;s a single MaxScale handling multiple topologies. So it should be very easy to keep track of failures.</li>
+<li>Or, if there is a minimal period and I&#8217;m just uninformed &#8212; what makes sure it is not smaller than the time it takes for the failover?</li>
+</ul>
+<h3>Further on failover</h3>
+<p>I wish to point out that one component of the system analyses a failure scenario, and another one fixes it. I suggest this is an undesired design. The &#8220;fixer&#8221; must have its own ability to diagnose problems as it makes progress (or else it is naive and would fail in many production cases). And the &#8220;analyzer&#8221; part must have some wisdom of its own so as to suggest course of action; or understand the consequences of the recovery done by the &#8220;fixer&#8221;.</p>
+<h3>Use of shell scripts</h3>
+<p>Generally speaking, the use of shell scripts as external hooks is evil:</p>
+<ul>
+<li>Shell scripts tend to be poorly audited</li>
+<li>With poor clarity as for what went wrong</li>
+<li>Killing them has operational difficulty (detect the shell script, find possible children, detached children)</li>
+<li>The approach of &#8220;if you want something else, just write a shell script for it&#8221; is nice for some things, but as the problem turns complex, you turn out to just write big parts of the solution in shell. This decouples your code to unwanted degree.</li>
+</ul>
+<p>At this time, <em>orchestrator</em> also uses external hooks. However:</p>
+<ul>
+<li>Fixing the topology happens within <em>orchestrator</em>, not by external scripts. There is an elaborate, auditable, visible decision making.
+<ul>
+<li>Decision making includes data center considerations, different configuration of servers involved, servers hinted as candidates, servers configured to be ignored, servers known to be downtimed.</li>
+</ul>
+</li>
+<li>Leaving the external scripts with the task of managing DNS changes or what have you.
+<ul>
+<li>Today, at Booking.com, we have a special operational tool (called the dba tool) which does that, manages rosters, issues puppet etc. This tool is itself well audited. Granted, there is still decoupling, but information does not just get lost.</li>
+<li>Sometime in the future I suspect I will extend <strong><a href="https://github.com/outbrain/orchestrator-agent">orchestrator-agent</a></strong> to participate in failovers, which means the entire flow is within <em>orchestrator&#8217;s</em> scope.</li>
+</ul>
+</li>
+</ul>
+<h3>High availability</h3>
+<p>All the above is only available via a single MaxScale server. What happens if it dies?</p>
+<p>There is a MaxScale/pacemaker setup I&#8217;m aware of. If one MaxScale dies, pacemaker takes charge and starts another on another box.</p>
+<ul>
+<li>But this means real downtime</li>
+<li>There are no multiple-MaxScale servers to load-balance on</li>
+<li>The MaxScale started by pacemaker is newly born, and does not have the big picture of the topology. It needs to go through a &#8220;peaceful time&#8221; to understand what&#8217;s going on.</li>
+</ul>
+<h3>More High Availability</h3>
+<p>At a time where MaxScale will be able to load-balance and run on multiple nodes, MariaDB will have to further tackle:</p>
+<ul>
+<li>Leader election</li>
+<li>Avoiding concurrent initiation of failovers
+<ul>
+<li>Either via group communication</li>
+<li>Or via shared datastore</li>
+</ul>
+</li>
+<li>Taking off from a failed/crashed MaxScale server&#8217;s work
+<ul>
+<li>Or rolling it back</li>
+<li>Or just cleaning it up</li>
+</ul>
+</li>
+<li>And generally share all those little pieces of information, such as &#8220;Hey, now this server is the master&#8221; (are all MaxScales in complete agreement on the topology?) or &#8220;I have failed over this topology, we should avoid failing it over again for the next 10 minutes&#8221; and more.</li>
+</ul>
+<p>The above are supported by <em>orchestrator</em>. It provides leader election, automated leader promotion, fair recognition of various failure scenarios, picking up a failed recovery from a failed <em>orchestrator</em>. Data is shared by a backend MySQL datastore, and before you shout <em>SPOF</em>, make it Galera/NDB.</p>
+<h3>Further little things that can ruin your day</h3>
+<h4>How about having a delayed replica?</h4>
+<p>Here&#8217;s an operational use case we had to tackle.</p>
+<ul>
+<li>You have a slave configured to lag by <strong>24</strong> hours. You know the drill: hackers / accidental <strong>DROP TABLE</strong>&#8230;</li>
+<li>How much time will an automated tool spend on reconnecting this slave to the topology?
+<ul>
+<li>This could take long minutes</li>
+<li>Will your recovery hang till this is resolved?</li>
+</ul>
+</li>
+<li>Since <em>orchestrator</em> heals the topology in-house, it knows how to push certain operations till after specific other operations took place. For example, <em>orchestrator</em> wants to heal the entire topology, but pushes the delayed replicas aside, under the assumption that it will be able to fix them later (fair assumption, because they are known to be behind our promoted master); it will proceed to fix everything else, execute external hooks (change DNS etc.) and only then come back to the delayed replica. All the while, the process is audited.</li>
+</ul>
+<h4>Flapping ruins your day</h4>
+<ul>
+<li>Not only do you want some stall period between two failovers, you also want your team to respond to a failover and acknowledge it. Or clear up the stall period having verified the source of the problem. Or force the next failover even if it comes sooner than the stall period termination.</li>
+</ul>
+<h4>Binlog formats</h4>
+<p>It is still not uncommon to have Statement Based Replication running. And then it is also not uncommon to have one or two slaves translating to Row Based Replication because of:</p>
+<ul>
+<li>Some app that has to read ROW based format</li>
+<li>Experimenting with RBR for purposes of upgrade</li>
+</ul>
+<p>You just can&#8217;t promote such a RBR slave on top of SBR slaves; it wouldn&#8217;t work. <em>Orchestrator</em> is aware of such rules. I still need to integrate this particular consideration into the promotion algorithm.</p>
+<h4>Versions</h4>
+<p>Likewise, not all your slaves are of same version. You should not promote a newer version slave on top of an older version slave. Again, <em>orchestrator</em> will not allow putting such a topology, and again, I still need to integrate this consideration into the promotion algorithm.</p>
+<h3>In summary</h3>
+<p>There is a long way for MaxScale failover to go. When you consider the simplest, all-MariaDB-GTID-equal-slaves small topology case, things are kept simple and probably sustainable. But issues like complex topologies, flapping, special slaves, different configuration, high availability, leadership, acknowledgements, and more, call for a more advanced solution.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7439</post-id>	</item>
+		<item>
+		<title>New statements I&#8217;d like to see in MySQL 5.8</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/new-statements-id-like-to-see-in-mysql-5-8</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/new-statements-id-like-to-see-in-mysql-5-8#comments</comments>
+				<pubDate>Thu, 08 Oct 2015 07:44:50 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Opinions]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7407</guid>
+				<description><![CDATA[Following up on New features I&#8217;d like to see in MySQL 5.8, here are statements I would like to see in MySQL 5.8: ENABLE EVENTS; When promoting a slave to master, I want to be able to enable all those events that are in SLAVESIDE_DISABLED state. Today I script an iteration over the events an constructing [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Following up on <a title="Link to New features I'd like to see in MySQL 5.8" href="https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8" rel="bookmark">New features I&#8217;d like to see in MySQL 5.8</a>, here are <em>statements</em> I would like to see in MySQL 5.8:</p>
+<ul>
+<li><strong>ENABLE EVENTS;</strong><br />
+When promoting a slave to master, I want to be able to enable all those events that are in <strong>SLAVESIDE_DISABLED</strong> state. Today I script an iteration over the events an constructing the <strong>ALTER EVENT&#8230;ENABLE</strong> statement one by one. Just activate those!</li>
+<li><strong>SKIP GTID TRANSACTION;</strong><br />
+I have a transaction on slave that I want to skip, and there&#8217;s GTID. The sequence of</p>
+<blockquote>
+<pre>STOP SLAVE;
+SET GTID_NEXT="...";
+BEGIN;
+COMMIT;
+SET GTID_NEXT="AUTOMATIC";
+START SLAVE;</pre>
+</blockquote>
+<p>is just something I don&#8217;t want to do. To compute the <strong>GTID_NEXT</strong>; to open a transaction; to use session variables; this may seem straightforward to import the above from a shell script, but calculating the next GTID is not entirely trivial; issuing the above from your programming language makes for a weird <em>&#8220;all these have to be in the same session AND you&#8217;re going to do a transaction meanwhile&#8221;</em>. With golang it&#8217;s actually a problem.<br />
+Make it simple for me. I&#8217;m willing to do the <strong>STOP/START SLAVE</strong>.</li>
+<li><strong>BINLOG ENTRY &#8216;&lt;arbitrary text&gt;&#8217;;</strong><br />
+Very selfishly, I want to be able to inject a comment into the binary log, of arbitrary text. I want this comment to appear in SBR format, as if it were a DDL.<br />
+My selfish reason: injection of Pseudo-GTID. But I can see various other use cases, such as application level injection of app-logic checkpointing; chef/glu injection of <em>&#8220;code deployed at this time&#8221;</em>; application injection of <em>&#8220;daily audit done to this point&#8221;</em>. This is too cool and too easy to skip.</li>
+<li><strong>SHOW RELAY LOGS;</strong><br />
+Similar to <strong>SHOW BINARY LOGS;</strong></li>
+<li><strong>PURGE RELAY LOGS TO &#8216;&#8230;&#8217;;</strong><br />
+Similar to <strong>PURGE BINARY LOGS TO &#8216;&#8230;&#8217;;</strong><br />
+It&#8217;s time relay logs stopped being 2nd class citizens.</li>
+<li><strong>SHOW NONBLOCKING [GLOBAL|SESSION] STATUS;</strong><br />
+Issue a SHOW GLOBAL|SESSION STATUS query that only shows those variables for which it does not need to block. i.e. this is a safe, fast <em>&#8220;show me everything you&#8217;ve got that I won&#8217;t need to pay for&#8221;</em>.</li>
+</ul>
+<p>Yes, yes, <em>statements</em> are also features, I know.</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/new-statements-id-like-to-see-in-mysql-5-8/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7407</post-id>	</item>
+		<item>
+		<title>New features I&#8217;d like to see in MySQL 5.8</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8#comments</comments>
+				<pubDate>Wed, 07 Oct 2015 08:02:16 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7417</guid>
+				<description><![CDATA[Following up on Morgan Tocker&#8217;s What would you like to see in MySQL 5.8?, having attended and participated at the brainstorming at Percona Live Amsterdam, and publishing this post while failing to comply with any of Morgan&#8217;s suggested media, these are the features I would like to see in MySQL 5.8: Dynamicly enable/disable log-bin and log-slave-updates Today, when [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Following up on Morgan Tocker&#8217;s <a href="http://www.tocker.ca/2015/09/14/what-would-you-like-to-see-in-mysql-5-8.html">What would you like to see in MySQL 5.8?</a>, having attended and participated at the <a href="https://www.percona.com/live/europe-amsterdam-2015/sessions/mysql-58-dreaming-and-brainstorming">brainstorming at Percona Live Amsterdam</a>, and publishing this post while failing to comply with any of Morgan&#8217;s suggested media, these are the features I would like to see in MySQL <strong>5.8</strong>:</p>
+<ul>
+<li>Dynamicly enable/disable <strong>log-bin</strong> and <strong>log-slave-updates</strong><br />
+Today, when changing chef/puppet role of a server from a simple slave to an intermediate master and vice versa, a MySQL restart is required. This is a very big pain which makes replication automation complex, not to mention warmup times.</li>
+<li>&#8220;<strong><a href="http://man7.org/linux/man-pages/man1/nice.1.html">nice</a></strong>&#8220;.<br />
+I want to be able to execute a query that is <em>nice, i.e</em> has lower priority; will not consume all resources; will stall/throttle so as to allow other queries to complete. Luis asked and I said this could be on a per statement basis, e.g. add a <strong>SQL_NICE</strong> query hint. But I&#8217;m unsure that would be the correct behavior. It also makes sense to do so on a per connection basis (perhaps provide connection attributed to hint <em>niceness</em>?).</li>
+<li>Online-<em>ier</em> <strong>ALTER TABLE</strong>. I would in particular want it to apply the <em>nice</em> feature, above. Otherwise throttle by user defined metrics.</li>
+<li>Online-<em>ier</em> <strong>ALTER TABLE</strong> in replication stream.  Can the slaves run the <strong>ALTER</strong> statement in parallel?</li>
+<li><strong>Re-Group Commit</strong>: in MTS, and when intermediate masters involved, copy+paste the group commit as applied on master as working downstream. I suspect this is easily achievable. The result: same parallelism for replicating slaves in all levels, whether they replicate directly from master or from 2nd, 3rd tier intermediate masters. Today parallelism decreases as we go downstream.</li>
+<li>Global user-defined-variables. I want to be able to define arbitrary (global) variables that I can later query via <strong>SELECT @@global.arbitrary</strong>. This would be similar to HTML <strong>5</strong>&#8216;s <strong>&#8220;data-*&#8221;</strong> attributes. I often wish I could tell &amp; ask MySQL my puppet role; or the server status (is it live? Is it offline? Does it belong to a specific pool? etc.). Similar to <strong>&#8220;loose-*&#8221;</strong> syntax, this could be a <strong>&#8220;data-*&#8221;</strong> or <strong>&#8220;user-*&#8221;</strong> name prefix system.</li>
+</ul>
+<p>I will follow up on new <em>statements</em> I would like to see in MySQL <strong>5.8</strong>.</p>
+<p>The brainstorming session at PerconaLive, I should note, was pure joy, and apart from getting two nice furry dolphins I enjoyed the engagement, the diversity of ideas, and the fact Oracle engineers (Mark in particular) were very busy taking notes or otherwise openly discussing the viability of some requested features.</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/new-features-id-like-to-see-in-mysql-5-8/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7417</post-id>	</item>
+		<item>
+		<title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path#comments</comments>
+				<pubDate>Fri, 07 Aug 2015 12:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[performance_schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7327</guid>
+				<description><![CDATA[MySQL 5.7 introduces a change in the way we query for global variables and status variables: the INFORMATION_SCHEMA.(GLOBAL&#124;SESSION)_(VARIABLES&#124;STATUS) tables are now deprecated and empty. Instead, we are to use the respective performance_schema.(global&#124;session)_(variables&#124;status) tables. But the change goes farther than that; there is also a security change. Oracle created a pitfall of 2 changes at the same time: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL <strong>5.7</strong> introduces a change in the way we query for global variables and status variables: the <strong>INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)</strong> tables are now deprecated and empty. Instead, we are to use the respective <strong>performance_schema.(global|session)_(variables|status)</strong> tables.</p>
+<p>But the change goes farther than that; there is also a security change. Oracle created a pitfall of <strong>2</strong> changes at the same time:</p>
+<ol>
+<li>Variables/status moved to a different table</li>
+<li>Privileges required on said table</li>
+</ol>
+<p>As an example, my non-root user gets:</p>
+<blockquote>
+<pre>mysql&gt; show session variables like 'tx_isolation';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'session_variables'</pre>
+</blockquote>
+<p>Who gets affected by this? Nearly <em>everyone and everything</em>.</p>
+<ul>
+<li>Your Nagios will not be able to read status variables</li>
+<li>Your ORM will not be able to determine session variables</li>
+<li>Your replication user will fail connecting (see <a href="http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html">this post by Giuseppe</a>)</li>
+<li>And most everyone else.</li>
+</ul>
+<p>The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:</p>
+<ol>
+<li>Change your app code to choose the correct schema (information_schema vs. performance_schema)</li>
+<li><strong>GRANT</strong> the permissions on your database</li>
+</ol>
+<p>Perhaps at this point you still do not consider this to be a problem. You may be thinking: <em>well, let&#8217;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code</em>.</p>
+<p>Not so fast. Can you really that simply create those GRANTs?<span id="more-7327"></span></p>
+<h3>Migration woes</h3>
+<p>How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.</p>
+<p>This should not be any different for <strong>5.7</strong>. We would like to provision a <strong>5.7</strong> slave in our topologies and just see that everything works. Well, we have, and things don&#8217;t just work. Our Nagios stops working for that <strong>5.7</strong> slave. <em>Orchestrator</em> started complaining (by this time I&#8217;ve <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.4.291">already fixed it</a> to be more tolerant for the <strong>5.7</strong> problems so no crashes here).</p>
+<p>I hope you see the problem by now.</p>
+<blockquote><p>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO &#8216;&#8230;&#8217;</strong> on your <strong>5.6</strong> master.</p></blockquote>
+<p>The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your <strong>5.7</strong> slave, which means you will not be able to <strong>SHOW GLOBAL VARIABLES</strong> on your slave, which means everything remains broken.</p>
+<p>Yes, you can issue this directly on your <strong>5.7</strong> slaves. It&#8217;s <em>doable</em>, but <em>undesired</em>. It&#8217;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#8217;s unfriendly to GTID (make sure to <strong>SET SQL_LOG_BIN=0</strong> before that).</p>
+<h3>WHY in the first place?</h3>
+<p>It seems like a security thing. I&#8217;m not sure whether this was intended. So you prevent a <strong>SHOW GLOBAL VARIABLES</strong> for a normal user. Makes sense. And yet:</p>
+<blockquote>
+<pre>mysql&gt; show global variables like 'hostname';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'global_variables'
+
+mysql&gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+</pre>
+</blockquote>
+<p>Seems like I&#8217;m allowed access to that info after all. So it&#8217;s not strictly a security design decision. For status variable, I admit, I don&#8217;t have a similar workaround.</p>
+<h3>Solutions?</h3>
+<p>The following are meant to be solutions, but do not really solve the problem:</p>
+<ul>
+<li><strong>SHOW</strong> commands. <strong>SHOW GLOBAL|SESSION VARIABLES|STATUS</strong> will work properly, and will implicitly know whether to provide the results via <strong>information_schema</strong> or <strong>performance_schema</strong> tables.
+<ul>
+<li>But, aren&#8217;t we meant to be happier with <strong>SELECT</strong> queries? So that I can really do stuff that is smarter than <strong>LIKE &#8216;variable_name%&#8217;</strong>?</li>
+<li>And of course you cannot use <strong>SHOW</strong> in server side cursors. Your stored routines are in a mess now.</li>
+<li>This does not solve the GRANTs problem.</li>
+</ul>
+</li>
+<li><strong><a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56">show_compatibility_56</a></strong>: an introduced variable in <strong>5.7</strong>, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+<ul>
+<li>Documentation introduces it, and says it is deprecated.
+<ul>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>But it actually works in <strong>5.7.8</strong> (latest)
+<ul>
+<li>time-travel-paradox plot thickens</li>
+</ul>
+</li>
+<li>Your automation scripts do not know in advance whether your MySQL has this variable
+<ul>
+<li>Hence <strong>SELECT @@global.show_compatibility_56</strong> will produce an error on <strong>5.6</strong></li>
+<li>But the &#8220;safe&#8221; way of <strong>SHOW GLOBAL VARIABLES LIKE &#8216;show_compatibility_56&#8217;</strong> will fail on a privilege error on <strong>5.7</strong></li>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>Actually advised by my colleague Simon J. Mudd, <strong>show_compatibility_56</strong> defaults to <strong>OFF</strong>. I <em>support</em> this line of thought. Or else it&#8217;s <strong>old_passwords=1</strong> all over again.</li>
+<li><strong>show_compatibility_56</strong> doesn&#8217;t solve the GRANTs problem.</li>
+<li>This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from <strong>&#8220;1&#8221;</strong> to <strong>&#8220;0&#8221;</strong>, I&#8217;m back at square one.</li>
+</ul>
+</li>
+</ul>
+<h3>Suggestion</h3>
+<p>I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in <strong>5.6</strong> if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:</p>
+<ol>
+<li><strong>Flow 1</strong>: keep <strong>information_schema</strong>, later migration into <strong>performance_schema</strong>
+<ul>
+<li>In <strong>5.7</strong>, <strong>information_schema</strong> tables should still produce the data.</li>
+<li>No security constraints on <strong>information_schema</strong></li>
+<li>Generate WARNINGs on reading from <strong>information_schema</strong> (&#8220;&#8230;this will be deprecated&#8230;&#8221;)</li>
+<li><strong>performance_schema </strong><em>also available</em>. With security constraints, whatever.</li>
+<li>In <strong>5.8</strong> remove <strong>information_schema</strong> tables; we are left with <strong>performance_schema</strong> only.</li>
+</ul>
+</li>
+<li><strong>Flow 2</strong>: easy migration into <strong>performance_schema</strong>:
+<ul>
+<li>In <strong>5.7</strong>, <strong>performance_schema</strong> tables should not require any special privileges. Any user can read from them.</li>
+<li>Keep <strong>show_compatibility_56 </strong>as it is.</li>
+<li><strong>SHOW</strong> commands choose between <strong>information_schema</strong> or <strong>performance_schema</strong> on their own &#8212; just as things are done now.</li>
+<li>In <strong>5.8</strong>, <strong>performance_schema</strong> tables will require <strong>SELECT</strong> privileges.</li>
+</ul>
+</li>
+</ol>
+<p>As always, I love the work done by the engineers; and I love how they listen to the community.</p>
+<p>Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?</p>
+<h3>[UPDATE 2015-08-19]</h3>
+<p>Please <a href="http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html">see this followup</a> by Morgan Tocker of Oracle.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7327</post-id>	</item>
+		<item>
+		<title>Percona Live 2015: Reflections</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/percona-live-2015-reflections</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/percona-live-2015-reflections#respond</comments>
+				<pubDate>Sat, 18 Apr 2015 01:41:07 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[PerconaLive]]></category>
+		<category><![CDATA[secondary]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7223</guid>
+				<description><![CDATA[Some personal reflections on PerconaLive 2015: Percona acquires Tokutek Well done! Tokutek develops the TokuDB storage engine for MySQL and TokuMX engine for MongoDB. I will discuss the MySQL aspect only. TokuDB was released as open source in 2013. It has attained a lot of traction and I have used it myself for some time. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Some personal reflections on <a href="https://www.percona.com/live/mysql-conference-2015/">PerconaLive 2015</a>:</p>
+<p><strong>Percona acquires Tokutek</strong></p>
+<p>Well done! Tokutek develops the TokuDB storage engine for MySQL and TokuMX engine for MongoDB. I will discuss the MySQL aspect only.</p>
+<p>TokuDB was released as open source in 2013. It has attained a lot of traction and I have used it myself for some time. I met issues with locking or otherwise operational difficulties which I reported, and otherwise was fascinated by such features as great compression, online schema changes, and more.</p>
+<p>Recently another company, InfiniDB, that also released its MySQL-backed codebase as open source, went out of business. I was afraid the same might happen to Tokutek.</p>
+<p>I see Percona&#8217;s purchase as a very good move for the community. I saw a lot of TokuDB interest in Percona for some time now, and it is clearly interested in the technology. I expect they will add their own hands-on experience into the development of more operations-friendly features; put effort in solving locking issues (it&#8217;s been a while since I last checked, of course some of these may have been addressed by now). I am guessing they will work on a Galera/TokuDB integration and offer a &#8220;Toku-XtraDB-Cluster&#8221;.</p>
+<p>TokuDB can compete with InnoDB in many places, while in others each will have its distinct advantage.</p>
+<p>I see this is as good news for the community.</p>
+<p><strong>Community Awards and Lightning Talks</strong></p>
+<p>On a completely different subject, I believe it is commonly accepted that this year&#8217;s setup for the community awards &amp; lightning talks was unsuccessful. The noise was astounding, human traffic was interrupting and overall this was a poor experience. We (Giuseppe Maxia, Kortney Runyan &amp; myself) made a quick, informal brainstorming on this and came up with a couple ideas. One of which we hope to try in the upcoming <em>Percona Live Europe &#8211; Amsterdam</em>.</p>
+<p>We apologize to the speakers for the difficulties.</p>
+<p><strong>Percona Live Europe &#8211; Amsterdam</strong></p>
+<p>Haha! Having recently relocated to the Netherlands I&#8217;m of course very happy. But regardless, Percona Live London was fun &#8211; and yet running on low fuel. I think it was a great idea to change location (and more locations expected in the future). This is the path taken by such conferences as OSCon, Velocity, Strata and more. Amsterdam in particular, as I&#8217;ve recently learned, is especially appreciated by many. I think this conf will do great!</p>
+<p><strong>Woz</strong></p>
+<p>And now for something completely different. Woz&#8217; talk was that. I&#8217;m happy he came; I appreciate that he discussed education; and it was fun.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/percona-live-2015-reflections/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7223</post-id>	</item>
+		<item>
+		<title>Percona Live 2015: Reflections; the Apache CCLA offer</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/percona-live-2015-reflections-the-apache-ccla-offer</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/percona-live-2015-reflections-the-apache-ccla-offer#respond</comments>
+				<pubDate>Sat, 18 Apr 2015 01:11:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[community]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[secondary]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7218</guid>
+				<description><![CDATA[Facebook, Google, Twitter, LinkedIn, Alibaba, MariaDB, Percona team up and offer Oracle all public changes under the Apache CCLA Read again please. My one word summary of this is: Romantic. In the most positive sense. Disclaimer: I am not a lawyer; this is my understanding of the current status and of the offer. Summarizing the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>Facebook, Google, Twitter, LinkedIn, Alibaba, MariaDB, Percona team up and offer Oracle all public changes under the <a href="https://www.apache.org/licenses/cla-corporate.txt">Apache CCLA</a></strong></p>
+<p>Read again please.</p>
+<p>My one word summary of this is: Romantic. In the most positive sense.</p>
+<p><em>Disclaimer: I am not a lawyer; this is my understanding of the current status and of the offer.</em></p>
+<p>Summarizing the deal: the teams participating with WebScaleSQL would like to push code upstream. Current legal issues limit their options. Existing patches/contributions from Percona &amp; MariaDB are licensed by GPLv2, which Oracle cannot import as it distributes a commercial, closed source, edition, in addition to its open source MySQL community edition.</p>
+<p>So what happens is that there is a lot of free code, great patches, new features out there, that are only available via MariaDB or WebscaleSQL or Percona Server, but not in the Oracle MySQL code base. This, in turn, means Oracle re-implements many features originating from said companies. And, more importantly, said companies need to routinely rebase their code on new Oracle releases, repeating tedious work.</p>
+<p>The offer is that Oracle agrees to the Apache CCLA as a license by which it would be able to incorporate contributions. Oracle would then be able to use incorporated code in both open source and commercial edition. Oracle will choose what code to incorporate; hopefully many patches will be accepted upstream, and the community will benefit from a rich featureset, rapid developed MySQL server.</p>
+<p>Clearly a lot of work, persuasion, lawyer time, discussions etc. have been invested in this effort. I would like to add my humble <strong>+1/like/favorite/whathaveyou</strong>. You may add yours by letting Oracle know your opinion on the subject. Media tools are great for this.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/percona-live-2015-reflections-the-apache-ccla-offer/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7218</post-id>	</item>
+		<item>
+		<title>Three wishes for a new year</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-3</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-3#comments</comments>
+				<pubDate>Tue, 23 Sep 2014 09:21:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[secondary]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7002</guid>
+				<description><![CDATA[Another new year by Jewish calendar. What do I wish for the following year? World peace Good health to all Multi-core execution for queries After having evaluated a few columnar databases, and having seen how a single query gets 24 cores busy, I can&#8217;t look at MySQL the same way again. The fact that a [&#8230;]]]></description>
+								<content:encoded><![CDATA[<div>
+<p>Another new year by Jewish calendar. What do I wish for the following year?</p>
+<ol>
+<li>World peace</li>
+<li>Good health to all</li>
+<li>Multi-core execution for queries</li>
+</ol>
+<p>After having evaluated a few columnar databases, and having seen how a single query gets 24 cores busy, I can&#8217;t look at MySQL the same way again. The fact that a single query consumes a single core only doesn&#8217;t seem right in the year 2014. <a href="https://github.com/greenlion/swanhart-tools/tree/master/shard-query">Shard-query</a> is a cool application-level attempt to solve the above; I would like to see stuff like this implemented inside the server (or inside the storage engine where possible).</p>
+<p>None of my wishes in previous years [<a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year">2010</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-2">2011</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-201">2012</a>], [<a href="https://shlomi-noach.github.io/blog/mysql/three-wished-for-a-new-year-2013">2013</a>] came true (and mostly gone worse). I&#8217;m still willing to settle for two out of three.</p>
+</div>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/three-wishes-for-a-new-year-3/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7002</post-id>	</item>
+		<item>
+		<title>Some anecdotes I learned at Percona Live</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/some-anecdotes-i-learned-at-percona-live</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/some-anecdotes-i-learned-at-percona-live#respond</comments>
+				<pubDate>Tue, 08 Apr 2014 02:06:20 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[PerconaLive]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6814</guid>
+				<description><![CDATA[While on the plane back home I wrote down all my impressions from Percona Live 2014. Have lots of TODOs and great ideas to implement. Among all my impressions, there were a few anecdotes worth noting. 5.6 GTID is still unfriendly. It will require complete shutdown &#38; reconfiguration of your entire replication topology; and some [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>While on the plane back home I wrote down all my impressions from Percona Live 2014. Have lots of TODOs and great ideas to implement. Among all my impressions, there were a few anecdotes worth noting.</p>
+<ul>
+<li>5.6 GTID is still unfriendly. It will require complete shutdown &amp; reconfiguration of your entire replication topology; and some companies present hacks around this. Notable, Facebook recoded GTID related code (slave agrees to replicate with GTID even though its master still uses binlog coordinates). Booking.com have their own hack around slowly migrating their topologies. And in a great lightning talk we were shown how to patch MySQL such that the relay logs turn into a  consistent GTID-like coordinate system.</li>
+<li>Galera replication has been implemented for TokuDB (only active-passive mode, not active-active). This came as a surprise to Tokutek ; apparently Codership did this within a few hours of work. The rest is up for Tokutek!</li>
+<li>WebScaleSQL is a cool initiative that aims to assist in pushing commonly desired featured back upstream. It is Web Scale. It is also not a productio0n distribution and I do not expect it to be, It is not a fork that is meant for the common DBA to download and deploy.</li>
+<li>Tungsten replicator has MySQL to Hadoop replication using staging tables &#8211; an auditing of changes that are group-deployed on Hadoop.</li>
+<li>Still so many people unfamiliar with MySQLSandbox. It&#8217;s such a basic tool, especially for testing and local installations.</li>
+<li>Still misconceptions about common_schema. Yes, I do use it on production.</li>
+<li>Everyone has the same problems <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></li>
+<li>Replication is still queen of MySQL&#8217;s featureset. We&#8217;re still all about failing over, promoting, scaling via replication.</li>
+<li>Linux rules. Where two MacBooks failed to connect to the projector, my Lenovo/Ubuntu Linux did the job just fine and saved the day.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/some-anecdotes-i-learned-at-percona-live/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6814</post-id>	</item>
+		<item>
+		<title>Why delegating code to MySQL Stored Routines is poor engineering practice</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice#comments</comments>
+				<pubDate>Thu, 06 Feb 2014 08:32:17 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713</guid>
+				<description><![CDATA[I happen to use stored routines with MySQL. In fact, my open source project common_schema heavily utilizes them. DBA-wise, I think they provide with a lot of power (alas, the ANSI:SQL 2003 syntax feels more like COBOL than a sane programming language, which is why I use QueryScript instead). However I wish to discuss the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I happen to use stored routines with MySQL. In fact, my open source project <a href="http://code.google.com/p/common-schema/">common_schema</a> heavily utilizes them. DBA-wise, I think they provide with a lot of power (alas, the ANSI:SQL 2003 syntax feels more like COBOL than a sane programming language, which is why I use <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a> instead).</p>
+<p>However I wish to discuss the use of stored routines as integral part of your application code, which I discourage.</p>
+<p>The common discussion on whether to use or not use stored routines typically revolves around data transfer (with stored routines you transfer less data since it&#8217;s being processed on server side), security (with stored routines you can obfuscate/hide internal datasets, and provide with limited and expected API) and performance (with MySQL this is not what you would expect, as routines are interpreted &amp; their queries re-evaluated, as opposed to other RDBMS you may be used to).</p>
+<p>But I wish to discuss the use of stored routines from an engineering standpoint. The first couple of points I raise are cultural/behavioural.</p>
+<h4>2nd grade citizens</h4>
+<p>Your stored routines are not likely to integrate well with your IDE. While your Java/Scala/PHP/Ruby/whatnot code comfortably lies within your home directory, the stored routines live in their own space: a database container. They&#8217;re not as visible to you as your standard code. Your IDE is unaware of their existence and is unlikely to have the necessary plugin/state of mind to be able to view these.</p>
+<p>This leads to difficulty in maintaining the code. People typically resort to using some SQL-oriented GUI tool such as MySQL Workbench, SequelPro or other, commercial tools. But these tools, while make it easy to edit your routine code, do not integrate (well?) with your source control. I can&#8217;t say I&#8217;ve used all GUI tools; but how many of them will have Git/SVN/Mercurial connectors? How many of them will keep local history changes once you edit a routine? I&#8217;m happy to get introduced to such a tool.</p>
+<p>Even with such integration, you&#8217;re split between two IDEs. And if you&#8217;re the command line enthusiast, well, you can&#8217;t just <strong>svn ci -m &#8220;fixed my stored procedure bug&#8221;</strong>. Your code is simply not in your trunk directory.</p>
+<p>It <em>can</em> be done. You <em>could</em> maintain the entire routine code from within your source tree, and hats off to all those who do it. Most will not. See later on about deployments for more on this.<span id="more-6713"></span></p>
+<h4>Testing</h4>
+<p>While engineers are keen on writing unit tests for every class and method they create, they are less keen on doing the same for stored routines. This is an observation, having seen many instalments. And I can tell you why: your stored routine testing will not integrate well with your JUnit/PHPUnit/&#8230;</p>
+<p>There are testing frameworks for databases, and indeed I hacked my own mini unit testing code with <em>common_schema</em>. But it&#8217;s a <em>different</em> testing framework. You might also have realized by now that testing databases is somewhat different. It <em>can</em> be done, and hats off again to those that implement it as common practice. Many don&#8217;t. Database are often more heavyweight to test. Not all operations done by routines are easily rolled back, which leads to having to rebuild the entire dataset before tests. This in itself leads to longer test periods and a need for multiple test databases so as to allow for concurrent builds.</p>
+<p>How many companies practice both version control and unit testing over their routine code? I believe not many (and am happy to hear about those who do). To be more direct, of all the companies I ever consulted to: <em>I have never seen one that does both</em>.</p>
+<h4>Debugging</h4>
+<p>MySQL stored routines do not have built in debugging capabilities. To debug your routines, you will have to use one of two methods:</p>
+<ul>
+<li>Simulate your routine code (ie mimic their execution on top of some interpreter). There are tools to do that. For me this is a complete NO GO and utterly untrustworthy. You can mimic what you think is how the routine should behave, but never they full behaviour. While developing <em>common_schema</em> I came upon plenty weird behaviour, some of it bugs, that you just can&#8217;t build into your emulation.</li>
+<li>Inject debugging code into your routine code. I do that with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html">RDebug</a>. You can do breakpoints, step into, step out, most of the interesting stuff. Other tools do that as well. It is not the right way to go: you&#8217;re essentially modifying your code, placing more locks, communicating, and losing some functionality. It is a necessary evil solution for a necessary evil programming method&#8230; How good can that be?</li>
+</ul>
+<p>The right way to go would be to have debugging API built into the MySQL server.</p>
+<p>But, wait, that would still be next to worthless, since our discussion is over programming with stored routines: letting your application call upon stored routines in your database. Until the day where I could use my IntelliJ debugger to step from my java method which calls upon a stored procedure, and into the stored procedure itself, debugging your code is completely detached from your stored routine debugging.</p>
+<h4>Refactoring &amp; deploying</h4>
+<p>Say you wanted to add a column to your table: you would go ahead and add it, and perhaps populate it. You would then modify your application code to support this new column, and deploy. Say you wanted to drop a table column. You would first deploy changes to your application code that ignore said column, and once the code is in place you would go and actually make the DROP.</p>
+<p>How do you do the same with a stored routine? Support your routine accepts two parameters, and you wish to add a third?</p>
+<p>There is no support for optional parameters. Your routine either accepts two parameters or three. Your application code will have to provide the exact number of parameters. You will have to deploy <em>both your SQL changes and your application changes at the same time</em>. This is by definition impossible, unless you are OK with a <em>stop the world approach</em>, which is unlikely in production.</p>
+<h4>Code constraints</h4>
+<p>One solution to the above is to create a new routines. Somehow &#8220;overload&#8221; it. But you can&#8217;t overload a stored routine; you&#8217;ll have to create a routine by a new name. This will allow you to slowly and smoothly migrate between the two.</p>
+<p>Ahem, smoothly? How easy is it to find all invocations of a certain routines from your code? It will be typically lie in some String, or within some XML config file. There is no safe &#8220;find references to this procedure&#8221; IDE mechanism. There is no constraint in your IDE that will tell you &#8220;there is no such procedure&#8221; if you misspell the name.</p>
+<h4>Trash bin</h4>
+<p>Suppose you overcame the above. You now have two routines. You need to remember to DROP the old one, right? Will you?</p>
+<p>When presenting <em>common_schema</em>, a common question I ask the audience is as follows:</p>
+<blockquote><p>Suppose I accessed your database and listed the entire set of stored functions and procedures. How many of them are you not even sure are in use anymore? How many of them you think you can DROP, but are too afraid to, and keep them in <em>just in case</em>?</p></blockquote>
+<p>I wouldn&#8217;t commonly ask that question had it not always provides a common nodding and smiling in the audience. People forget to drop their routines, and then forget about them, and are never sure whether they are used (your IDE doesn&#8217;t easily tell you that, remember? Sure, you can grep around; that&#8217;s not what most engineers would do). And those routines pile up to become trash.</p>
+<h4>Data or code?</h4>
+<p>Last but not least: a stored routine is a piece of code, right? Well, as far as the database is concerned, it&#8217;s really a piece of data. It&#8217;s located within a schema. It&#8217;s <em>stored</em>. It is an integral part of your data set: when you back up your <em>data</em>, you&#8217;re most likely to backup the <em>code</em> as well. When you restore, you&#8217;re likely to restore <em>both</em>. There are obvious advantages to that, DB-wise. Or should I say, DBA-wise. Engineering-wise? Does a database-restore operation count as code deployment? We can argue over beer.</p>
+<h4>Final notes</h4>
+<p>Having said all that: yes, I&#8217;m using an occasional stored routine. I see these occasions as a necessary evil, and sometimes it&#8217;s just the correct solution.</p>
+<p>I&#8217;m happy to know what methods have been developed out there to overcome the above, please share; and please feel free to contradict the above.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/feed</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6713</post-id>	</item>
+	</channel>
+</rss>

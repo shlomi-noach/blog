@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>GitHub &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/github/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 12 May 2020 07:13:37 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>orchestrator: what&#8217;s new in CI, testing &#038; development</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development#respond</comments>
+				<pubDate>Mon, 11 May 2020 08:01:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[dbdeployer]]></category>
+		<category><![CDATA[docker]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[testing]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=8077</guid>
+				<description><![CDATA[Recent focus on development &#38; testing yielded with new orchestrator environments and offerings for developers and with increased reliability and trust. This post illustrates the new changes, and see Developers section on the official documentation for more details. Testing In the past four years orchestrator was developed at GitHub, and using GitHub&#8217;s environments for testing. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Recent focus on development &amp; testing yielded with new <a href="https://github.com/openark/orchestrator">orchestrator</a> environments and offerings for developers and with increased reliability and trust. This post illustrates the new changes, and see <a href="https://github.com/openark/orchestrator/tree/master/docs#developers">Developers</a> section on the official documentation for more details.</p>
+<h2>Testing</h2>
+<p>In the past four years <code>orchestrator</code> was <a href="https://github.blog/2016-12-08-orchestrator-github/">developed at GitHub</a>, and using GitHub&#8217;s environments for <a href="https://github.blog/2017-07-06-mysql-testing-automation-at-github/">testing</a>. This is very useful for testing <code>orchestrator</code>&#8216;s behavior within GitHub, interacting with its internal infrastructure, and validating failover behavior in a production environment. These tests and their results are not visible to the public, though.</p>
+<p>Now that <code>orchestrator</code> is developed <a href="https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy">outside GitHub</a> (that is, outside GitHub the <em>company</em>, not GitHub the <em>platform</em>) I wanted to improve on the testing framework, making it visible, accessible and contribute-able to the community. Thankfully, the GitHub platform has much to offer on that front and <code>orchestrator</code> now uses <a href="https://github.com/features/actions">GitHub Actions</a> more heavily for testing.</p>
+<p>GitHub Actions provide a way to run code in a container in the context of the repository. The most common use case is to run CI tests on receiving a Pull Request. Indeed, when GitHub Actions became available, we switched out of Travis CI and into Actions for <code>orchestrator</code>&#8216;s CI.</p>
+<p>Today, <code>orchestrator</code> runs three different tests:</p>
+<ul>
+<li>Build, unit testing, integration testing, code &amp; doc validation</li>
+<li>Upgrade testing</li>
+<li>System testing</li>
+</ul>
+<p>To highlight what each does:<span id="more-8077"></span></p>
+<h3>Build, unit testing, integration testing</h3>
+<p>Based on the original CI (and possibly will split into distinct tests), this CI Action compiles the code, runs unit tests, runs the suite of <a href="https://github.com/openark/orchestrator/tree/master/tests/integration">integration tests</a> (spins up both <code>MySQL</code> and <code>SQLite</code> databases and runs a series of tests on each backend), this CI job is the &#8220;basic&#8221; test to see that the contributed code even makes sense.</p>
+<p>What&#8217;s new in this test is that it now produces an <em>artifact</em>: an <code>orchestrator</code> binary for Linux/amd64. This is again a feature for GitHub Actions; the artifact is kept for a couple months or so per Actions retention policy. <a href="https://github.com/openark/orchestrator/actions/runs/94337568">Here</a>&#8216;s an example; by the time you read this the binary artifact may or may not still be there.</p>
+<p>This means you don&#8217;t actually need a development environment on your laptop to be able to build and <code>orchestrator</code> binary. More on this later.</p>
+<h3>Upgrade testing</h3>
+<p>Until recently not formalized; I&#8217;d test upgrades by deploying them internally at GitHub onto a staging environment. Now upgrades are tested per Pull Request: we spin up a container, deploy <code>orchestrator</code> from <code>master</code> branch using both <code>MySQL</code> and <code>SQLite</code> backends, then checkout the PR branch, and redeploy <code>orchestrator</code> using the existing backends &#8212; this verifies that at least backend-database wise, there&#8217;s not upgrade errors.</p>
+<p>At this time the test only validates the database changes are applicable; in the future this may expand onto more elaborate tests.</p>
+<h3>System testing</h3>
+<p>I&#8217;m most excited about this one. Taking ideas from our approach to <a href="https://shlomi-noach.github.io/blog/mysql/using-dbdeployer-in-ci-tests">testing gh-ost with dbdeployer</a>, I created <a href="https://github.com/openark/orchestrator-ci-env">https://github.com/openark/orchestrator-ci-env</a>, which offers a full blown testing enviroment for <code>orchestrator</code>, including a MySQL replication topology (courtesy <a href="https://www.dbdeployer.com/">dbdeployer</a>), Consul, HAProxy and more.</p>
+<p>This CI testing environment can also serve as a playground in your local docker setup, see shortly.</p>
+<p>The <a href="https://github.com/openark/orchestrator/tree/master/tests/system">system tests suite</a> offers full blown cluster-wide operations such as graceful takeovers, master failovers, errant GTID transaction analysis and recovery and more. The suite utilizes the CI testing environment, breaks it, rebuilds it, validates it&#8230; Expects specific output, expects specific failure messages, specific analysis, specific outcomes.</p>
+<p>As example, with the system tests suite, we can test the behavior of a master failover in a multi-DC, multi-region (obviously simulated) environment, where a server marked as &#8220;candidate&#8221; is lagging behind all others, with strict rules for cross-site/cross-region failovers, and still we wish to see that particular replica get promoted as master. We can test not only the topology aspect of the failover, but also the failover hooks, Consul integration and its effects, etc.</p>
+<h2>Development</h2>
+<p>There&#8217;s now multiple options for developers/contributors to build or just try out <code>orchestrator</code>.</p>
+<h3>Build on GitHub</h3>
+<p>As mentioned earlier, you actually don&#8217;t need a development environment. You can use <code>orchestrator</code> CI to build and generate a Linux/amd64 <code>orchestrator</code> binary, which you can download &amp; deploy as you see fit.</p>
+<p>I&#8217;ve signed up for the GitHub Codespaces beta program, and hope to make that available for <code>orchestrator</code>, as well.</p>
+<h3>Build via Docker</h3>
+<p><code>orchestrator</code> offers various Docker build/run environments, accessible via the <code>script/dock</code> script:</p>
+<ul>
+<li>`script/dock alpine` will build and spawn `orchestrator` on a minimal <code>alpine</code> linux</li>
+<li>`script/dock test` will build and run the same CI tests (unit, integration) as mentioned earlier, but on your own docker environemtn</li>
+<li>`script/dock pkg` will build and generate `.rpm` and `.deb` packages</li>
+</ul>
+<h3>CI environment: the &#8220;full orchestrator experience&#8221;</h3>
+<p>This is the <code>orchestrator</code> amusement park. Run <code>script/dock system</code> to spawn the aforementioned CI environment used in system tests, and on top of that, an <code>orchestrator</code> setup fully integrated with that system.</p>
+<p>So that&#8217;s an <code>orchestrator</code>-MySQL topology-Consul-HAProxy setup, where <code>orchestrator</code> already has the credentials for, and pre-loads the MySQL topology, pre-configured to update Consul upon failover, HAProxy config populated by <code>consul-template</code>, heartbeat injection, and more. It resembles the <a href="https://github.blog/2018-06-20-mysql-high-availability-at-github/">HA setup at GitHub</a>, and in the future I expect to provide alternate setups (on top).</p>
+<p>Once in that docker environment, one can try running relocations, failovers, test <code>orchestrator</code>&#8216;s behavior, etc.</p>
+<h2>Community</h2>
+<p>GitHub recently announced <a href="https://github.blog/2020-05-06-new-from-satellite-2020-github-codespaces-github-discussions-securing-code-in-private-repositories-and-more/#discussions">GitHub Discussions</a> ; think a stackoverflow like place within one&#8217;s repo to ask questions, discuss, vote on answers. It&#8217;s expected to be available this summer. When it does, I&#8217;ll encourage the community to use it instead of today&#8217;s <a href="https://groups.google.com/forum/#!forum/orchestrator-mysql">orchestrator-mysql</a> Google Group and of course the many questions posted as Issues.</p>
+<p>There&#8217;s been a bunch of PRs merged recently, with more to come later on. I&#8217;m grateful for all contributions. Please understand if I&#8217;m still slow to respond.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">8077</post-id>	</item>
+		<item>
+		<title>The state of Orchestrator, 2020 (spoiler: healthy)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy-2</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy-2#respond</comments>
+				<pubDate>Tue, 18 Feb 2020 19:14:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=8016</guid>
+				<description><![CDATA[This post serves as a pointer to my previous announcement about The state of Orchestrator, 2020. Thank you to Tom Krouper who applied his operational engineer expertise to content publishing problems.]]></description>
+								<content:encoded><![CDATA[<p>This post serves as a pointer to my previous announcement about <a href="https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy">The state of Orchestrator, 2020</a>.</p>
+<p>Thank you to <a href="https://github.com/tomkrouper">Tom Krouper</a> who applied his operational engineer expertise to content publishing problems.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy-2/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">8016</post-id>	</item>
+		<item>
+		<title>The state of Orchestrator, 2020 (spoiler: healthy)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy#respond</comments>
+				<pubDate>Tue, 18 Feb 2020 08:09:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7996</guid>
+				<description><![CDATA[Yesterday was my last day at GitHub, and this post explains what this means for orchestrator. First, a quick historical review: 2014: I began work on orchestrator at Outbrain, as https://github.com/outbrain/orchestrator. I authored several open source projects while working for Outbrain, and created orchestrator to solve discovery, visualization and simple refactoring needs. Outbrain was happy [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Yesterday was my last day at GitHub, and this post explains what this means for <code>orchestrator</code>. First, a quick historical review:</p>
+<ul>
+<li><strong>2014</strong>: I began work on <code>orchestrator</code> at <a href="https://www.outbrain.com/">Outbrain</a>, as <a href="https://github.com/outbrain/orchestrator">https://github.com/outbrain/orchestrator</a>. I authored several open source projects while working for Outbrain, and created <code>orchestrator</code> to solve discovery, visualization and simple refactoring needs. Outbrain was happy to have the project developed as a public, open source repo from day 1, and it was released under the Apache 2 license. Interestingly, the idea to develop <code>orchestrator</code> came after I attended Percona Live Santa Clara 2014 and watched &#8220;ChatOps: How GitHub Manages MySQL&#8221; by one Sam Lambert.</li>
+<li><strong>2015</strong>: Joined <a href="http://booking.com">Booking.com</a> where my main focus was to redesign and solve issues with the existing high availability setup. With Booking.com&#8217;s support, I continued work on <code>orchestrator</code>, pursuing better failure detection and recovery processes. Booking.com was an incredible playground and testbed for <code>orchestrator</code>, a massive deployment of multiple MySQL/MariaDB flavors and configuration.</li>
+<li><strong>2016 &#8211; 2020</strong>: Joined <a href="http://github.com">GitHub</a>. GitHub <a href="https://github.blog/2016-12-08-orchestrator-github/">adopted</a> <code>orchestrator</code> and I developed it under GitHub&#8217;s own org, at <a href="https://github.com/github/orchestrator">https://github.com/github/orchestrator</a>. It became <a href="https://github.blog/2018-06-20-mysql-high-availability-at-github/">a core component</a> in github.com&#8217;s high availability design, running failure detection and recoveries across sites and geographical regions, with more to come. These 4+ years have been critical to <code>orchestrator</code>&#8216;s development and saw its widespread use. At this time I&#8217;m aware of multiple large-scale organizations using <code>orchestrator</code> for high availability and failovers. Some of these are GitHub, Booking.com, Shopify, Slack, Wix, Outbrain, and more. <code>orchestrator</code> is the underlying failover mechanism for <a href="https://vitess.io/">vitess</a>, and is also included in Percona&#8217;s <a href="https://www.percona.com/software/database-tools/percona-monitoring-and-management">PMM</a>. These years saw a significant increase in community adoption and contributions, in published content, such as Pythian and Percona technical blog posts, and, not surprisingly, increase in issues and feature requests.</li>
+</ul>
+<h3><strong><br />
+</strong>2020</h3>
+<p>GitHub was very kind to support moving the <code>orchestrator</code> repo under my own <a href="https://github.com/openark">https://github.com/openark</a> org. This means all issues, pull requests, releases, forks, stars and watchers have automatically transferred to the new location: <a href="https://github.com/openark/orchestrator">https://github.com/openark/orchestrator</a>. The old links do a &#8220;follow me&#8221; and implicitly direct to the new location. All external links to code and docs still work. I&#8217;m grateful to GitHub for supporting this transfer.</p>
+<p>I&#8217;d like to thank all the above companies for their support of <code>orchestrator</code> and of open source in general. Being able to work on the same product throughout three different companies is mind blowing and an incredible opportunity. <code>orchestrator</code> of course remains open source and licensed with Apache 2. Existing Copyrights are unchanged.</p>
+<p>As for what&#8217;s next: some personal time off, please understand if there&#8217;s delays to reviews/answers. My intention is to continue developing <code>orchestrator</code>. Naturally, the shape of future development depends on how <code>orchestrator</code> meets my future work. Nothing changes in that respect: my focus on <code>orchestrator</code> has always been first and foremost the pressing business needs, and then community support as possible. There are some interesting ideas by prominent <code>orchestrator</code> users and adopters and I&#8217;ll share more thoughts in due time.</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7996</post-id>	</item>
+		<item>
+		<title>Speaking at August Penguin, MySQL Track, GitHub sponsored</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/speaking-at-august-penguin-mysql-track-github-sponsored</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/speaking-at-august-penguin-mysql-track-github-sponsored#respond</comments>
+				<pubDate>Sun, 03 Sep 2017 10:42:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[Speaking]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7772</guid>
+				<description><![CDATA[This Thursday I&#8217;ll be presenting at August Penguin, conveniently taking place September 7th, 8th, Ramat Gan, Israel. I will be speaking as part of the MySQL track, 2nd half of Thursday. The (Hebrew) schedule is here. My talk is titled Reliable failovers, safe schema migrations: open source solutions to MySQL problems. I will describe some [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This Thursday I&#8217;ll be presenting at <a href="http://ap.hamakor.org.il/2017/en/">August Penguin</a>, conveniently taking place <em>September</em> 7th, 8th, Ramat Gan, Israel.</p>
+<p>I will be speaking as part of the MySQL track, 2nd half of Thursday. The (Hebrew) schedule is <a href="http://ap.hamakor.org.il/2017/index.html#schedule">here</a>.</p>
+<p>My talk is titled <strong>Reliable failovers, safe schema migrations: open source solutions to MySQL problems</strong>. I will describe some of the open source MySQL infrastructure work we run at GitHub ; how it solves reliability, availability and usability. I&#8217;ll describe some of our internal workflows and our use of chat and chatops.</p>
+<p>I&#8217;m proud to announce <strong><a href="http://github.com/">GitHub</a></strong> sponsors the event. We won&#8217;t have a booth, but please do grab me in the hallways or over lunch to chat!</p>
+<p>And, yes, octocat stickers will be made available <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/speaking-at-august-penguin-mysql-track-github-sponsored/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7772</post-id>	</item>
+		<item>
+		<title>Practical Orchestrator, BoF, GitHub and other talks at Percona Live 2017</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/practical-orchestrator-bof-github-and-other-talks-at-percona-live-2017</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/practical-orchestrator-bof-github-and-other-talks-at-percona-live-2017#respond</comments>
+				<pubDate>Wed, 19 Apr 2017 09:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[PerconaLive]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7704</guid>
+				<description><![CDATA[Next week I will be presenting Practical Orchestrator at Percona Live, Santa Clara. As opposed to previous orchestrator talks I gave, and which were either high level or algorithmic talks, Practical Orchestrator will be, well&#8230; practical. The objective for this talk is that attendees leave the classroom with a good grasp of orchestrator&#8216;s powers, and [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Next week I will be presenting <a href="https://www.percona.com/live/17/sessions/practical-orchestrator">Practical Orchestrator</a> at Percona Live, Santa Clara.</p>
+<p>As opposed to previous <a href="https://github.com/github/orchestrator"><code>orchestrator</code></a> talks I gave, and which were either high level or algorithmic talks, <strong>Practical Orchestrator</strong> will be, well&#8230; practical.</p>
+<p>The objective for this talk is that attendees leave the classroom with a good grasp of <code>orchestrator</code>&#8216;s powers, and know how to set up <code>orchestrator</code> in their environment.</p>
+<p>We will walk through discovery, refactoring, recovery, HA. I will walk through the most important configuration settings, share advice on what makes a good deployment, and tell you how we and others run <code>orchestrator</code>. We&#8217;ll present a few scripting/automation examples. We will literally set up <code>orchestrator</code> on my computer.</p>
+<p>It&#8217;s a <strong>50</strong> minute talk and it will be fast paced!</p>
+<h3>ProxySQL &amp; Orchestrator BoF</h3>
+<p><a href="http://www.proxysql.com/">ProxySQL</a> is all the rage, and throughout the past 18 months René Cannaò and myself discussed a few times the potential for integration between ProxySQL and Orchestrator. We&#8217;ve also received several requests from the community.</p>
+<p>We will run a BoF, a very informal session where we openly discuss our thoughts on possible integration, what makes sense and what doesn&#8217;t, and above all else would love to hear the attendees&#8217; thoughts. We might come out of this session with some plan to pick low hanging fruit, who knows?</p>
+<p>The current link to the BoF sessions is <a href="https://www.percona.com/live/17/sessions/birds-feather-sessions">this</a>. It seems terribly broken, and hopefully I&#8217;ll replace it later on.</p>
+<h3>GitHub talks</h3>
+<p>GitHub engineers will further present these talks:<span id="more-7704"></span></p>
+<ul>
+<li><a href="https://www.percona.com/live/17/sessions/gh-ost-triggerless-painless-trusted-online-schema-migrations">gh-ost: triggerless, painless, trusted online schema migrations</a><br />
+<strong>Jonah Berquist</strong>, <em>25 April &#8211; 2:20 PM &#8211; 3:10 PM @ Ballroom D</em><br />
+This is the &#8220;classic&#8221; introduction to <a href="https://github.com/github/gh-ost">gh-ost</a>, our very own open source schema migration tool. <code>gh-ost</code> enjoys good traction and adoption. For us, it made a significant impact on our development cycle and on our availability and reliability. We hear similar stories from users. This talk will explain how <code>gh-ost</code> works and why it works for us and others so much better. Also: superpowers.</li>
+<li><a href="https://www.percona.com/live/17/sessions/automating-schema-changes-using-gh-ost">Automating Schema Changes using gh-ost</a><br />
+<strong>Tom Krouper</strong>, <em>27 April &#8211; 12:50 PM &#8211; 1:40 PM @ Ballroom D</em><br />
+What&#8217;s the greater picture? <code>gh-ost</code> runs the migration, but what&#8217;s the migration cycle? How do our engineers design the change, get this to run, verify it doesn&#8217;t break our environment? What automation do we have in place? Expect very interesting and definitely not trivial issues.</li>
+<li><a href="https://www.percona.com/live/17/sessions/practical-json-mysql-57-and-beyond">Practical JSON in MySQL 5.7 and beyond</a><strong><br />
+Ike Walker</strong>, <em>27 April &#8211; 3:00 PM &#8211; 3:50 PM @ Ballroom A</em><br />
+Ike will review the JSON data type along with most recent changes, virtual columns, operational concerns and more. I&#8217;m looking forward to a great review!</li>
+</ul>
+<h3>Related</h3>
+<ul>
+<li><a href="https://www.percona.com/live/17/sessions/experiences-using-gh-ost-multi-tier-topology-0">Experiences using gh-ost in a multi-tier topology</a><br />
+<strong>Ivan Groenewold, Valerie Parham-Thompson</strong>, Pythian, <em>26 April &#8211; 5:00 PM &#8211; 5:25 PM @ Ballroom C</em><br />
+Don&#8217;t take it from us. Pythian are running <code>gh-ost</code> in production, and on completely different environments than us. I&#8217;m absolutely curious to hear about their experience and findings.</li>
+<li><a href="https://www.percona.com/live/17/sessions/high-availability-gce">High Availability in GCE</a><br />
+<strong>Carmen Mason, Allan Mason</strong>, <em>26 April &#8211; 3:30 PM &#8211; 4:20 PM @ Ballroom D</em><br />
+This is a story on the road to MySQL HA on Google Cloud Engine. It ends up with MHA picked as the HA solution while <code>orchestrator</code> is not. I&#8217;m curious to hear!</li>
+</ul>
+<p>See you in Santa Clara!</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/practical-orchestrator-bof-github-and-other-talks-at-percona-live-2017/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7704</post-id>	</item>
+		<item>
+		<title>Introducing gh-ost: triggerless online schema migrations</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations#comments</comments>
+				<pubDate>Mon, 01 Aug 2016 17:19:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[operations]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[tools]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7596</guid>
+				<description><![CDATA[I&#8217;m thoroughly happy to introduce gh-ost: triggerless, controllable, auditable, testable, trusted online schema change tool released today by GitHub. gh-ost now powers our production schema migrations. We hit some serious limitations using pt-online-schema-change on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m thoroughly happy to introduce <a href="https://github.com/github/gh-ost"><strong>gh-ost</strong></a>: triggerless, controllable, auditable, testable, trusted online schema change tool <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">released today by GitHub</a>.</p>
+<p><em>gh-ost</em> now powers our production schema migrations. We hit some serious limitations using <a href="https://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html">pt-online-schema-change</a> on our large volume, high traffic tables, to the effect of driving our database to a near grinding halt or even to the extent of causing outages. With <em>gh-ost</em>, we are now able to migrate our busiest tables at any time, peak hours and heavy workloads included, without causing impact to our service.</p>
+<p>gh-ost supports testing in production. It goes a long way to build trust, both in integrity and in control. Are your databases just too busy and you cannot run existing online-schema-change tools? Have you suffered outages due to migrations? Are you tired of babysitting migrations that run up to 3:00am? Tired of being the only one tailing logs? Please, take a look at <em>gh-ost</em>. I believe it changes online migration paradigm.</p>
+<p>For a more thorough overview, please read the <a href="http://githubengineering.com/gh-ost-github-s-online-migration-tool-for-mysql/">announcement</a> on the GitHub Engineering Blog, and proceed to the <a href="https://github.com/github/gh-ost/blob/master/README.md">documentation</a>.</p>
+<p><em>gh-ost</em> is open sourced under the MIT license.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/introducing-gh-ost-triggerless-online-schema-migrations/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7596</post-id>	</item>
+		<item>
+		<title>Orchestrator progress</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-progress</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-progress#comments</comments>
+				<pubDate>Wed, 23 Dec 2015 16:01:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[secondary]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7538</guid>
+				<description><![CDATA[This comes mostly to reassure, having moved into GitHub: orchestrator development continues. I will have the privilege of working on this open source solution in GitHub. There are a few directions we can take orchestrator to, and we will be looking into the possibilities. We will continue to strengthen the crash recovery process, and in [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This comes mostly to reassure, having moved into GitHub: <a href="https://github.com/outbrain/orchestrator">orchestrator</a> development continues.</p>
+<p>I will have the privilege of working on this open source solution in GitHub. There are a few directions we can take orchestrator to, and we will be looking into the possibilities. We will continue to strengthen the crash recovery process, and in fact I&#8217;ve got a couple ideas on drastically shortening Pseudo-GTID recovery time as well as other debts. We will look into yet other directions, which we will share. My new and distinguished team will co-work on/with orchestrator and will no doubt provide useful and actionable input.</p>
+<p>Orchestrator continues to be open for pull requests, with a temporal latency in response time (it&#8217;s the Holidays, mostly).</p>
+<p>Some Go(lang) limitations (namely the import path, I&#8217;ll blog more about it) will most probably imply some changes to the code, which will be well communicated to existing collaborators.</p>
+<p>Most of all, we will keep orchestrator a generic solution, while keeping focus on what we think is most important &#8211; and there&#8217;s some interesting vision here. Time will reveal as we make progress.</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-progress/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7538</post-id>	</item>
+		<item>
+		<title>Joining GitHub</title>
+		<link>https://shlomi-noach.github.io/blog/general/joining-github</link>
+				<comments>https://shlomi-noach.github.io/blog/general/joining-github#respond</comments>
+				<pubDate>Mon, 30 Nov 2015 15:26:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[General]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7447</guid>
+				<description><![CDATA[Today was my last day at Booking.com, and shortly I will be joining the team at GitHub. I&#8217;d like to thank the many kind, friendly &#38; smart people I&#8217;ve worked with at Booking.com! The challenges at Booking.com are big. There is such a diversity within the technology stack; even within the database range. A solution that [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Today was my last day at <strong>Booking.com</strong>, and shortly I will be joining the team at <strong>GitHub</strong>.</p>
+<p>I&#8217;d like to thank the many kind, friendly &amp; smart people I&#8217;ve worked with at Booking.com!</p>
+<p>The challenges at Booking.com are big. There is such a diversity within the technology stack; even within the database range. A solution that <em>works</em> on all the various Booking.com production environments is something to value. Indeed, the Booking.com Production environment it is an amazing playground for developers, offering high volume, large numbers, and differing workloads to tackle. Your code just gets hammered down and you get very quick feedback on whether you did it right or wrong.</p>
+<p>I was happy to have worked on serious reliability and operational topics, and to have made a meaningful contribution.</p>
+<p>Joining GitHub, I&#8217;m to be a systems engineer in a great team (friends included), building great products, in and around the database zone, delivering open source, pretty much expecting to do awesome stuff! That, and the swag.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/general/joining-github/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7447</post-id>	</item>
+		<item>
+		<title>Forking Golang repositories on GitHub and managing the import path</title>
+		<link>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path</link>
+				<comments>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path#comments</comments>
+				<pubDate>Mon, 23 Nov 2015 12:22:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[golang]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7506</guid>
+				<description><![CDATA[Problem: there&#8217;s an awesome Golang project on GitHub which you want to fork. You want to develop &#38; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything. A couple solutions offered below. First, though, let&#8217;s get some names. A sample case, the problem at hand There&#8217;s an [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Problem: there&#8217;s an awesome Golang project on GitHub which you want to fork. You want to develop &amp; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything.</p>
+<p>A couple solutions offered below. First, though, let&#8217;s get some names.</p>
+<h3>A sample case, the problem at hand</h3>
+<p>There&#8217;s an awesome tool on <strong><em>http://github.com/awsome-org/tool</em></strong>. You successfully fork it onto <strong><em>http://github.com/awesome-you/tool</em></strong>.</p>
+<p>You want to collaborate on <strong><em>http://github.com/awesome-you/tool</em></strong>; you wish to pull, commit &amp; push. Maybe you want to send pull requests to the origin.</p>
+<p>The following is commonly found throughout <strong>.go</strong> files in the repository:</p>
+<blockquote>
+<pre>import (
+    "github.com/awesome-org/tool/config"
+    "github.com/awesome-org/tool/driver"
+    "github.com/awesome-org/tool/net"
+    "github.com/awesome-org/tool/util"
+)</pre>
+</blockquote>
+<p>If you:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p><em>golang</em> creates your <strong>$GOPATH/src/github.com/awesome-you/tool/</strong>, which is awesome. However, as you resolve dependencies via</p>
+<blockquote>
+<pre>cd $GOPATH/src/github.com/awesome-you/tool/ ; go get ./...</pre>
+</blockquote>
+<p><em>golang</em> digs into the source code, finds references to <strong>github.com/awesome-org/tool/config</strong>, <strong>github.com/awesome-org/tool/driver</strong> etc, and fetches <em>those</em> from <strong>http://github.com/awsome-org/tool</strong> and onto <strong>$GOPATH/src/github.com/awesome-org/tool/</strong>, which is not awesome. You actually have two copies of the code, one from your fork, one from the origin, and your own fork will be largely ignored as it mostly points back to the origin.</p>
+<h3>A bad solution</h3>
+<p>The dirty, bad solution would be for you to go over the source code and replace <strong>&#8220;github.com/awesome-org/tool&#8221;</strong> entries with <strong>&#8220;github.com/awesome-you/tool&#8221;</strong>. It is bad for two reasons:</p>
+<ul>
+<li>You will not be able to further pull changes from upstream</li>
+<li>You will not be able to pull-request and push your own changes upstream</li>
+</ul>
+<p><span id="more-7506"></span>When I say &#8220;You will not be able&#8221; I mean &#8220;in a reasonable, developer-friendly manner&#8221;. The code will be incompatible with upstream and you have effectively detached your code. You will need to keep editing and re-editing those entries anytime you wish to pull/push upstream.</p>
+<h3>Solution #1: add remote</h3>
+<p>Described in <a href="http://blog.campoy.cat/2014/03/github-and-go-forking-pull-requests-and.html">GitHub and Go: forking, pull requests, and go-getting</a>, follow these procedures:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-org/tool
+git remote add <strong>awesome-you-fork</strong> http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p>You&#8217;re adding your repository as <a href="http://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes">remote</a>. You will from now on need to explicitly:</p>
+<blockquote>
+<pre>git pull --rebase <strong>awesome-you-fork</strong>
+git push <strong>awesome-you-fork</strong></pre>
+</blockquote>
+<p>If you forget to add the <strong>&#8220;awesome-you-fork&#8221;</strong> argument, you are pulling and pushing from upstream.</p>
+<h3>Solution #2: cheat &#8220;go get&#8221;, DIY</h3>
+<p>The problem began with the <strong>go get</strong> command, which copied the URI path onto <strong>$GOPATH/src</strong>. However <strong>go get</strong> implicitly issues a git clone, and we can do the same ourselves. We will dirty our hands just once, and then benefit from an ambiguous-less environment.</p>
+<p>We will now create our git repository in the name of <strong>awesome-org</strong> but with the contents of <strong>awesome-you</strong>:</p>
+<blockquote>
+<pre>cd $GOPATH
+mkdir -p {src,bin,pkg}
+mkdir -p <strong>src/github.com/awesome-org/</strong>
+cd src/github.com/awesome-org/
+git clone git@github.com:<strong>awesome-you/tool.git</strong> # OR: git clone https://github.com/<strong>awesome-you/tool.git</strong>
+cd tool/
+go get ./...</pre>
+</blockquote>
+<p>The <strong>mkdir -p {src,bin,pkg}</strong> is there just in case you do not have anything setup in your <strong>$GOPATH</strong>. We then create the repository path under the name of <strong>awesome-org</strong>, but once inside clone from <strong>awesome-you</strong>.</p>
+<p>The source code&#8217;s import path fits your directory layout now, but as you push/pull you are only speaking to your own <strong>awesome-you</strong> repository.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7506</post-id>	</item>
+	</channel>
+</rss>

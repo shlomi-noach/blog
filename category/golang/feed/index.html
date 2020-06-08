@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>golang &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/category/golang/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 04 Jan 2018 11:37:10 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Implementing non re-entrant functions in Golang</title>
+		<link>https://shlomi-noach.github.io/blog/golang/implementing-non-re-entrant-functions-in-golang</link>
+				<comments>https://shlomi-noach.github.io/blog/golang/implementing-non-re-entrant-functions-in-golang#respond</comments>
+				<pubDate>Thu, 04 Jan 2018 11:34:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[golang]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7820</guid>
+				<description><![CDATA[A non re-entrant function is a function that could only be executing once at any point in time, regardless of how many times it is being invoked and by how many goroutines. This post illustrates blocking non re-entrant functions and yielding non re-entrant functions implementations in golang. A use case A service is polling for [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A non re-entrant function is a function that could only be executing once at any point in time, regardless of how many times it is being invoked and by how many goroutines.</p>
+<p>This post illustrates <em>blocking</em> non re-entrant functions and <em>yielding</em> non re-entrant functions implementations in <code>golang</code>.</p>
+<h3>A use case</h3>
+<p>A service is polling for some conditions, monitoring some statuses once per second. We want each status to be checked independently of others without blocking. An implementation might look like:</p>
+<pre>func main() {
+    tick := time.Tick(time.Second)
+    go func() {
+        for range tick {
+            go CheckSomeStatus()
+            go CheckAnotherStatus()
+        }
+    }()
+}
+</pre>
+<p>We choose to run each status check in its own goroutine so that <code>CheckAnotherStatus()</code> doesn&#8217;t wait upon <code>CheckSomeStatus()</code> to complete.</p>
+<p>Each of these checks typically take a very short amount of time, and much less than a second. What happens, though, if <code>CheckAnotherStatus()</code> itself takes more than one second to run? Perhaps there&#8217;s an unexpected network or disk latency affecting the execution time of the check.</p>
+<p>Does it make sense for the function to be executed twice at the same time? If not, we want it to be non re-entrant.<span id="more-7820"></span></p>
+<h3>Blocking, non-reentrant functions</h3>
+<p>The simple way to prevent a function from operating multiple times concurrently is using a <code>sync.Mutex</code>.</p>
+<p>Assuming we only care about calling this function from the loop above, we can implement the lock from outside the function:</p>
+<pre>import (
+    "sync"
+    "time"
+)
+
+func main() {
+    tick := time.Tick(time.Second)
+    var mu sync.Mutex
+    go func() {
+        for range tick {
+            go CheckSomeStatus()
+            go func() {
+                mu.Lock()
+                defer mu.Unlock()
+                CheckAnotherStatus()
+            }()
+        }
+    }()
+}
+</pre>
+<p>The above ensures <code>CheckAnotherStatus()</code> is not executed by multiple iterations of our loop concurrently. Any subsequent iterations of the loop whilst a previous execution of <code>CheckAnotherStatus()</code> is still running, will be blocked by the mutex.</p>
+<p>The <em>blocking</em> solution has the following properties:</p>
+<ul>
+<li>It ensures as many `CheckAnotherStatus()` invocations as the number of loop iterations.</li>
+<li>Assuming one execution of `CheckAnotherStatus()` stalls, subsequent iterations make for a pileup of requests to invoke same function.</li>
+</ul>
+<h3>Yielding, non re-entrant functions</h3>
+<p>In our status check story, it may not make sense for some 10 subsequent calls to pile up. One the stalled <code>CheckAnotherStatus()</code> execution completes, all 10 calls suddenly execute, sequentially, and possibly all complete within the next second, making for 10 identical checks at that same second.</p>
+<p>Another solution would be to <em>yield</em>. A <em>yielding</em> solution will:</p>
+<ul>
+<li>Abort execution of `CheckAnotherStatus()` if it is already being executed.</li>
+<li>Will run <em>at most</em> one execution of `CheckAnotherStatus()` per second.</li>
+<li>May in effect run less `CheckAnotherStatus()` invocations than the number of loop iterations.</li>
+</ul>
+<p>The solution is achieved via:</p>
+<pre>import (
+    "sync/atomic"
+    "time"
+)
+
+func main() {
+    tick := time.Tick(time.Second)
+    var reentranceFlag int64
+    go func() {
+        for range tick {
+            go CheckSomeStatus()
+            go func() {
+                if atomic.CompareAndSwapInt64(&amp;reentranceFlag, 0, 1) {
+                    defer atomic.StoreInt64(&amp;reentranceFlag, 0)
+                } else {
+                    return
+                }
+                CheckAnotherStatus()
+            }()
+        }
+    }()
+}
+</pre>
+<p><code>atomic.CompareAndSwapInt64(&amp;amp;reentranceFlag, 0, 1)</code> will return <code>true</code> only when <code>reentranceFlag == 0</code>, and will atomically set it to <code>1</code>. In such case, entry is allowed and the function can be executed. <code>reentranceFlag</code> is kept at <code>1</code> until <code>CheckAnotherStatus()</code> completes, at which time it is reset. When <code>CompareAndSwapInt64(...)</code> returns <code>false</code> that means <code>reentranceFlag != 0</code>, meaning the function is already being executing by another goroutine. The code yields and silently exits the function.</p>
+<p>We have chosen to implement the non re-entrant code outside the function in question; we could have implemented it within the function itself. Also, I have a thing for <code>int64</code>. An <code>int32</code> will of course suffice.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/golang/implementing-non-re-entrant-functions-in-golang/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7820</post-id>	</item>
+	</channel>
+</rss>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: SQL mini hack of the day, inverted IN clause	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sun, 15 Nov 2015 14:27:49 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause/comment-page-1#comment-334314</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Sun, 15 Nov 2015 14:27:49 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7451#comment-334314</guid>
+					<description><![CDATA[As I suggested within the post, this negates the use of index:
+
+&lt;pre&gt;
+explain select hostname from database_instance where cluster_name=&#039;our.cluster.name:3306&#039;;
++----+-------------+-------------------+------+------------------+------------------+---------+-------+------+-------------+
+&#124; id &#124; select_type &#124; table             &#124; type &#124; possible_keys    &#124; key              &#124; key_len &#124; ref   &#124; rows &#124; Extra       &#124;
++----+-------------+-------------------+------+------------------+------------------+---------+-------+------+-------------+
+&#124;  1 &#124; SIMPLE      &#124; database_instance &#124; ref  &#124; cluster_name_idx &#124; cluster_name_idx &#124; 130     &#124; const &#124;    4 &#124; Using where &#124;
++----+-------------+-------------------+------+------------------+------------------+---------+-------+------+-------------+
+
+explain select hostname from database_instance where &#039;our.cluster.name:3306&#039; in(cluster_name, &#039;&#039;) ;
++----+-------------+-------------------+------+---------------+------+---------+------+------+-------------+
+&#124; id &#124; select_type &#124; table             &#124; type &#124; possible_keys &#124; key  &#124; key_len &#124; ref  &#124; rows &#124; Extra       &#124;
++----+-------------+-------------------+------+---------------+------+---------+------+------+-------------+
+&#124;  1 &#124; SIMPLE      &#124; database_instance &#124; ALL  &#124; NULL          &#124; NULL &#124; NULL    &#124; NULL &#124; X000 &#124; Using where &#124;
++----+-------------+-------------------+------+---------------+------+---------+------+------+-------------+
+&lt;/pre&gt;
+
+This may, at first glance, make you want to avoid this trick altogether, but it really becomes more viable in your common website &quot;filter by multiple options&quot; type of queries (where multiple columns are involved, and there&#039;s no way for you to index any combination of them), or when you know you&#039;re already filtering by some other column that is indexed.
+
+X000 above is to obscure production number of servers.]]></description>
+		<content:encoded><![CDATA[<p>As I suggested within the post, this negates the use of index:</p>
+<pre>
+explain select hostname from database_instance where cluster_name='our.cluster.name:3306';
++----+-------------+-------------------+------+------------------+------------------+---------+-------+------+-------------+
+| id | select_type | table             | type | possible_keys    | key              | key_len | ref   | rows | Extra       |
++----+-------------+-------------------+------+------------------+------------------+---------+-------+------+-------------+
+|  1 | SIMPLE      | database_instance | ref  | cluster_name_idx | cluster_name_idx | 130     | const |    4 | Using where |
++----+-------------+-------------------+------+------------------+------------------+---------+-------+------+-------------+
+
+explain select hostname from database_instance where 'our.cluster.name:3306' in(cluster_name, '') ;
++----+-------------+-------------------+------+---------------+------+---------+------+------+-------------+
+| id | select_type | table             | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+-------------+-------------------+------+---------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | database_instance | ALL  | NULL          | NULL | NULL    | NULL | X000 | Using where |
++----+-------------+-------------------+------+---------------+------+---------+------+------+-------------+
+</pre>
+<p>This may, at first glance, make you want to avoid this trick altogether, but it really becomes more viable in your common website &#8220;filter by multiple options&#8221; type of queries (where multiple columns are involved, and there&#8217;s no way for you to index any combination of them), or when you know you&#8217;re already filtering by some other column that is indexed.</p>
+<p>X000 above is to obscure production number of servers.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Jean-François Gagné				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause/comment-page-1#comment-334279</link>
+		<dc:creator><![CDATA[Jean-François Gagné]]></dc:creator>
+		<pubDate>Sun, 15 Nov 2015 11:19:31 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7451#comment-334279</guid>
+					<description><![CDATA[Very interesting.
+One question: how does the optimizer react to this type of SQL statements (index on cluster_name) ?
+Thanks for sharing.]]></description>
+		<content:encoded><![CDATA[<p>Very interesting.<br />
+One question: how does the optimizer react to this type of SQL statements (index on cluster_name) ?<br />
+Thanks for sharing.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

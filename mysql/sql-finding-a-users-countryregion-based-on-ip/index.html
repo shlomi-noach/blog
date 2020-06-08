@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+
+	<title>SQL: finding a user’s country/region based on IP – code.openark.org</title>
+<link rel="dns-prefetch" href="//secure.gravatar.com">
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="https://shlomi-noach.github.io/blog/wp-includes/css/dist/block-library/style.min.css" media="all">
+<style id="wp-block-library-inline-css">
+.has-text-align-justify{text-align:justify;}
+</style>
+<link rel="stylesheet" id="wp-polls-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-css.css" media="all">
+<style id="wp-polls-inline-css">
+.wp-polls .pollbar {
+	margin: 1px;
+	font-size: 6px;
+	line-height: 8px;
+	height: 8px;
+	background-image: url('https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/images/default/pollbg.gif');
+	border: 1px solid #c8c8c8;
+}
+
+</style>
+<link rel="stylesheet" id="wpdiscuz-font-awesome-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/font-awesome-5.0.6/css/fontawesome-all.min.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-frontend-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-user-content-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz-user-content.css" media="all">
+<link rel="stylesheet" id="openark-primer-style-css" href="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/style.css" media="all">
+<link rel="stylesheet" id="wp-markdown-prettify-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/css/prettify.css" media="all">
+<link rel="stylesheet" id="social-logos-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/social-logos/social-logos.min.css" media="all">
+<link rel="stylesheet" id="jetpack_css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/css/jetpack.css" media="all">
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery-migrate.min.js"></script>
+
+
+
+
+
+
+
+
+
+            <style>
+                #wpcomm .wc_new_comment{background:#00B38F;}
+                #wpcomm .wc_new_reply{background:#00B38F;}
+                #wpcomm .wc-form-wrapper{ background:none; } /* ->formBGColor */
+                #wpcomm .wpdiscuz-front-actions{background:#F9F9F9;}
+                #wpcomm .wpdiscuz-subscribe-bar{background:#F9F9F9;}
+                #wpcomm select,
+                #wpcomm input[type="text"],
+                #wpcomm input[type="email"],
+                #wpcomm input[type="url"],
+                #wpcomm input[type="date"],
+                #wpcomm input[type="color"]{border:#D9D9D9 1px solid;}
+                #wpcomm .wc-comment .wc-comment-right{background:#FEFEFE;}
+                #wpcomm .wc-reply .wc-comment-right{background:#F8F8F8;}
+                #wpcomm .wc-comment-right .wc-comment-text, 
+                #wpcomm .wc-comment-right .wc-comment-text *{
+                    font-size:14px;
+                }
+                #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-administrator > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-editor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-contributor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-subscriber > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_admin > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_check > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_helper > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-post_author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-guest > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }                #wpcomm .wc-comment .wc-comment-left .wc-comment-label{ background: #ffffff;}
+                #wpcomm .wc-comment-left .wc-follow-user{color:#00B38F;}
+                #wpcomm .wc-load-more-submit{border:1px solid #D9D9D9;}
+                #wpcomm .wc-new-loaded-comment > .wc-comment-right{background:#FFFAD6;}
+                #wpcomm .wpdiscuz-subscribe-bar{color:#777;}
+                #wpcomm .wpdiscuz-front-actions .wpdiscuz-sbs-wrap span{color: #777;}
+                #wpcomm .page-numbers{color:#555;border:#555 1px solid;}
+                #wpcomm span.current{background:#555;}
+                #wpcomm .wpdiscuz-readmore{cursor:pointer;color:#00B38F;}
+                #wpcomm .wpdiscuz-textarea-wrap{border:#D9D9D9 1px solid;} .wpd-custom-field .wcf-pasiv-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label {color: #DDDDDD;}
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating:not(:checked) > label:hover,.wpdiscuz-rating:not(:checked) > label:hover ~ label {   }#wpcomm .wpdiscuz-item .wpdiscuz-rating > input ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label{color: #FFED85;} 
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label:hover ~ input:checked ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked + label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover ~ label, .wpd-custom-field .wcf-active-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label{ color:#FFD700;}
+                #wpcomm .wc-comment-header{border-top: 1px solid #dedede;}
+                #wpcomm .wc-reply .wc-comment-header{border-top: 1px solid #dedede;}
+                /* Buttons */
+                #wpcomm button, 
+                #wpcomm input[type="button"], 
+                #wpcomm input[type="reset"], 
+                #wpcomm input[type="submit"]{ border: 1px solid #555555; color: #FFFFFF; background-color: #555555; }
+                #wpcomm button:hover, 
+                #wpcomm button:focus,
+                #wpcomm input[type="button"]:hover, 
+                #wpcomm input[type="button"]:focus, 
+                #wpcomm input[type="reset"]:hover, 
+                #wpcomm input[type="reset"]:focus, 
+                #wpcomm input[type="submit"]:hover, 
+                #wpcomm input[type="submit"]:focus{ border: 1px solid #333333; background-color: #333333;  }
+                #wpcomm .wpdiscuz-sort-buttons{color:#777777;}
+                #wpcomm .wpdiscuz-sort-button{color:#777777; cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button:hover{color:#00B38F!important;cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button-active{color:#00B38F!important;cursor:default!important;}
+                #wpcomm .wc-cta-button, 
+                #wpcomm .wc-cta-button-x{color:#777777; }
+                #wpcomm .wc-vote-link.wc-up{color:#999999;}
+                #wpcomm .wc-vote-link.wc-down{color:#999999;}
+                #wpcomm .wc-vote-result{color:#999999;}
+                #wpcomm .wpf-cta{color:#999999; }
+                #wpcomm .wc-comment-link .wc-share-link .wpf-cta{color:#eeeeee;}
+                #wpcomm .wc-footer-left .wc-reply-button{border:1px solid #00B38F!important; color: #00B38F;}
+                #wpcomm .wpf-cta:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-left .wc-reply-button.wc-cta-active, #wpcomm .wc-cta-active{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-cta-button:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-right .wc-toggle,
+                #wpcomm .wc-footer-right .wc-toggle a,
+                #wpcomm .wc-footer-right .wc-toggle i{color:#00B38F;}
+                /* STICKY COMMENT HEADER */
+                #wpcomm .wc-sticky-comment.wc-comment .wc-comment-header .wpd-sticky{background: #1ecea8; color: #ffffff; }
+                #wpcomm .wc-closed-comment.wc-comment .wc-comment-header .wpd-closed{background: #aaaaaa; color: #ffffff;}
+                /* PRIVATE COMMENT HEADER */
+                #wpcomm .wc-private-comment.wc-comment .wc-comment-header .wpd-private{background: #999999; color: #ffffff;}
+                /* FOLLOW LINK */
+
+                #wpcomm .wc-follow{color:#777777;}
+                #wpcomm .wc-follow-active{color:#ff7a00;}
+                #wpcomm .wc-follow:hover i,
+                #wpcomm .wc-unfollow:hover i,
+                #wpcomm .wc-follow-active:hover i{color:#00B38F;}
+                                .wpd-wrapper .wpd-list-item.wpd-active{border-top: 3px solid #00B38F;}
+                                .comments-area{width:auto;}
+            </style>
+            <style data-context="foundation-flickity-css">/*! Flickity v2.0.2
+http://flickity.metafizzy.co
+---------------------------------------------- */.flickity-enabled{position:relative}.flickity-enabled:focus{outline:0}.flickity-viewport{overflow:hidden;position:relative;height:100%}.flickity-slider{position:absolute;width:100%;height:100%}.flickity-enabled.is-draggable{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.flickity-enabled.is-draggable .flickity-viewport{cursor:move;cursor:-webkit-grab;cursor:grab}.flickity-enabled.is-draggable .flickity-viewport.is-pointer-down{cursor:-webkit-grabbing;cursor:grabbing}.flickity-prev-next-button{position:absolute;top:50%;width:44px;height:44px;border:none;border-radius:50%;background:#fff;background:hsla(0,0%,100%,.75);cursor:pointer;-webkit-transform:translateY(-50%);transform:translateY(-50%)}.flickity-prev-next-button:hover{background:#fff}.flickity-prev-next-button:focus{outline:0;box-shadow:0 0 0 5px #09f}.flickity-prev-next-button:active{opacity:.6}.flickity-prev-next-button.previous{left:10px}.flickity-prev-next-button.next{right:10px}.flickity-rtl .flickity-prev-next-button.previous{left:auto;right:10px}.flickity-rtl .flickity-prev-next-button.next{right:auto;left:10px}.flickity-prev-next-button:disabled{opacity:.3;cursor:auto}.flickity-prev-next-button svg{position:absolute;left:20%;top:20%;width:60%;height:60%}.flickity-prev-next-button .arrow{fill:#333}.flickity-page-dots{position:absolute;width:100%;bottom:-25px;padding:0;margin:0;list-style:none;text-align:center;line-height:1}.flickity-rtl .flickity-page-dots{direction:rtl}.flickity-page-dots .dot{display:inline-block;width:10px;height:10px;margin:0 8px;background:#333;border-radius:50%;opacity:.25;cursor:pointer}.flickity-page-dots .dot.is-selected{opacity:1}</style><style data-context="foundation-slideout-css">.slideout-menu{position:fixed;left:0;top:0;bottom:0;right:auto;z-index:0;width:256px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}.slideout-menu.pushit-right{left:auto;right:0}.slideout-panel{position:relative;z-index:1;will-change:transform}.slideout-open,.slideout-open .slideout-panel,.slideout-open body{overflow:hidden}.slideout-open .slideout-menu{display:block}.pushit{display:none}</style>
+<link rel="dns-prefetch" href="//v0.wordpress.com">
+
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="SQL: finding a user’s country/region based on IP">
+<meta property="og:url" content="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip">
+<meta property="og:description" content="I’ve encountered the same problem twice for different customers, so I guess it’s worth a discussion. A common task for web applications is to find out the country/region of a user, base…">
+<meta property="article:published_time" content="2009-05-26T06:35:17+00:00">
+<meta property="article:modified_time" content="2009-12-16T07:11:00+00:00">
+<meta property="og:site_name" content="code.openark.org">
+<meta property="og:image" content="https://s0.wp.com/i/blank.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:text:title" content="SQL: finding a user’s country/region based on IP">
+<meta name="twitter:card" content="summary">
+
+
+<style>.ios7.web-app-mode.has-fixed header{ background-color: rgba(242,101,34,.88);}</style></head>
+
+<body class="post-template-default single single-post postid-705 single-format-standard no-sidebar">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#primary">Skip to content</a>
+
+	<header id="masthead" class="site-header">
+		<div class="site-branding">
+							<p class="site-title"><a href="https://shlomi-noach.github.io/blog/" rel="home">code.openark.org</a></p>
+								<p class="site-description">Blog by Shlomi Noach</p>
+			
+			<nav id="site-navigation" class="main-navigation">
+				<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false">primary-menu</button>
+				<div class="menu-primary-menu-container"><ul id="menu-primary-menu" class="menu"><li id="menu-item-8109" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8109"><a href="https://shlomi-noach.github.io/blog/archives">archives</a></li>
+<li id="menu-item-8050" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8050"><a href="https://shlomi-noach.github.io/blog/presentations">presentations</a></li>
+<li id="menu-item-8055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8055"><a href="https://shlomi-noach.github.io/blog/about">about</a></li>
+<li id="menu-item-8071" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8071"><a href="https://github.com/shlomi-noach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a></li>
+<li id="menu-item-8074" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8074"><a href="https://www.linkedin.com/in/shlominoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg></a></li>
+<li id="menu-item-8072" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8072"><a href="https://twitter.com/ShlomiNoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"></path></svg></a></li>
+<li id="menu-item-8073" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8073"><a href="https://shlomi-noach.github.io/blog/feed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-12.832 20c-1.197 0-2.168-.969-2.168-2.165s.971-2.165 2.168-2.165 2.167.969 2.167 2.165-.97 2.165-2.167 2.165zm5.18 0c-.041-4.029-3.314-7.298-7.348-7.339v-3.207c5.814.041 10.518 4.739 10.561 10.546h-3.213zm5.441 0c-.021-7.063-5.736-12.761-12.789-12.792v-3.208c8.83.031 15.98 7.179 16 16h-3.211z"></path></svg></a></li>
+</ul></div>			</nav>
+		</div>
+	</header>
+
+	<main id="primary" class="site-main">
+
+		
+<article id="post-705" class="post-705 post type-post status-publish format-standard hentry category-mysql tag-indexing tag-performance tag-sql">
+	<header class="entry-header">
+		<h1 class="entry-title">SQL: finding a user’s country/region based on IP</h1>			<div class="entry-meta">
+				<span class="cat-links"><a href="https://shlomi-noach.github.io/blog/category/mysql" rel="category tag">MySQL</a></span><span class="tags-links"><a href="https://shlomi-noach.github.io/blog/tag/indexing" rel="tag">Indexing</a><a href="https://shlomi-noach.github.io/blog/tag/performance" rel="tag">Performance</a><a href="https://shlomi-noach.github.io/blog/tag/sql" rel="tag">SQL</a></span><span class="posted-on alignright"><a href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" rel="bookmark"><time class="entry-date published" datetime="2009-05-26T08:35:17+02:00">May 26, 2009</time><time class="updated" datetime="2009-12-16T09:11:00+02:00">December 16, 2009</time></a></span>			</div>
+			</header>
+
+	
+	<div class="entry-content">
+		<p>I’ve encountered the same problem twice for different customers, so I guess it’s worth a discussion.</p>
+<p>A common task for web applications is to find out the country/region of a user, based on her IP address, as can be detected in the HTTP request. Depending on the country of origin, the website can translate dates for different time zones, can change locale settings, and, perhaps most commonly, show advertisements in her native language.</p>
+<p>To start with, there’s a table which lists the IP ranges per country/region. Let’s assume we’re only dealing with IPv4:</p>
+<blockquote>
+<pre>CREATE TABLE regions_ip_range (
+  regions_ip_range_id INT UNSIGNED AUTO_INCREMENT,
+  country VARCHAR(64) CHARSET utf8,
+  region VARCHAR(64) CHARSET utf8,
+  start_ip INT UNSIGNED,
+  end_ip INT UNSIGNED,
+  …
+  PRIMARY KEY(regions_ip_range_id),
+  ...
+);</pre>
+</blockquote>
+<p>The table is fixed, and is populated. Now the question arises: how do we query this table, and which indexes should be created?</p>
+<h4>The wrong way</h4>
+<p>The form I’ve encountered is as follows: an index is declared on regions_ip_range:</p>
+<blockquote>
+<pre>KEY ip_range_idx (start_ip, end_ip)</pre>
+</blockquote>
+<p>And the query goes like this:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE my_ip BETWEEN start_ip AND end_ip</pre>
+</blockquote>
+<p><span id="more-705"></span>It takes a grasp of indexes to understand that this is wrong. I’m not saying the results are wrong, just that the query performance is bad. Let’s rewrite the query to understand why. The following query is the exact equal of the above:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE my_ip >= start_ip AND my_ip <= end_ip</pre>
+</blockquote>
+<p>Can you see the problem?</p>
+<p>There’s a range condition on the first indexed column (<strong>start_ip</strong>). This automatically negates the use of the second column (<strong>end_ip</strong>). Reversing the order won’t do, since there’s also a range condition on <strong>end_ip</strong>.</p>
+<p>Effectively, if this were the only query we were executing, we would get the same performance had we defined the following index:</p>
+<blockquote>
+<pre>KEY ip_range_idx (start_ip)</pre>
+</blockquote>
+<p>Now that doesn’t look promising. It’s fair to guess (as happens in reality) that for the vast majority of ip addresses, MySQL would rather perform a full table scan than use the index.</p>
+<h4>Another wrong way</h4>
+<p>When pointing this to people, the natural response is: “OK, then, let’s index like <em>this</em>:”</p>
+<blockquote>
+<pre>KEY start_ip_idx (start_ip)
+KEY end_ip_idx (end_ip)</pre>
+</blockquote>
+<p>Now we have two indexes, one on each address. But that won’t do at all. Even if we assume MySQL will use both indexes for our query, and do an index_merge, we won’t have good performance. Consider: you can’t have both indexes be selective for any given IP. Either the IP is close to the beginning of the global range (in which case the ‘<strong>my_ip >= start_ip</strong>‘ part is not selective) or it is nearer the upper bound (in which case the ‘<strong>my_ip <= end_ip</strong>‘ part is not selective), or is somewhere in the middle, in which case none is selective.</p>
+<p>In fact, I cannot imagine MySQL would choose to use index_merge at all, and so at most one index is used, if not full table scan again.</p>
+<h4>A solution</h4>
+<p>An important step towards a solution is the realization that the IP ranges are <em>mutually exclusive</em>. No IP can lie in any two ranges, just one (at least, this is the data I’ve worked with. If you have hierarchical ranges, you’ll need to make adjustments). This means I don’t really need to index both columns. One would suffice. Say I was to put the following index:</p>
+<blockquote>
+<pre>KEY start_ip_idx (start_ip)</pre>
+</blockquote>
+<p>We’ve seen that the presented query won’t run well on this. Can we rewrite the query as well? Sure! Here’s one that will work:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE start_ip <= my_ip
+ORDER BY start_ip DESC LIMIT 1</pre>
+</blockquote>
+<p>What we’re asking for, now, is the first range for which our IP is larger than the range’s start, reading <em>backwards</em>. What the optimizer needs to do is find the first entry for which <strong>start_ip <= my_ip</strong>, using the index, and then… oh, there’s no need to go on, as we have <strong>LIMIT 1</strong>.</p>
+<p>If this seems confusing, you can do the opposite. Define this key:</p>
+<blockquote>
+<pre>KEY end_ip_idx (end_ip)</pre>
+</blockquote>
+<p>And use this query, instead:</p>
+<blockquote>
+<pre>SELECT * FROM regions_ip_range
+WHERE my_ip <= end_ip
+ORDER BY end_ip ASC LIMIT 1</pre>
+</blockquote>
+<p>It’s interesting that EXPLAIN would still claim it’s going to scan a large number of rows, since it does not take the <strong>LIMIT 1</strong> into account.</p>
+<p>I’ve <a title="Two storage engines; different plans, Part II" href="https://shlomi-noach.github.io/blog/mysql/two-storage-engines-different-plans-part-ii">written before</a> about the differences between storage engines in the way they recommend the optimizer to use (or not to use) an index. So you may need to end up with a <strong>FORCE_INDEX</strong> after all.</p>
+<h4>Assumptions</h4>
+<p>I’ve made a few assumptions here:</p>
+<ol>
+<li>The table lists ranges are covering: they start with 0.0.0.0 and end with 255.255.255.255.</li>
+<li>There are no ‘holes’ in the table. Meaning there’s bound to be a range for any given IP.</li>
+<li>IP ranges are mutually exclusive (no hierarchical IP ranges)</li>
+</ol>
+<p>If the first two assumptions are not met, it should be checked, once the query returns, that <strong>my_ip</strong> is indeed between <strong>start_ip</strong> and <strong>end_ip</strong>.</p>
+<p>If assumption #3 is not met, the data can be split to two tables: one must hold the mutually exlusive data; the second one may contain whatever data you have, possibly utilizing some hierarchial algorithm such as nested sets etc.</p>
+<div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><div class="sd-content"><ul><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-705" class="share-twitter sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-705" class="share-linkedin sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-jetpack-whatsapp"><a rel="nofollow noopener noreferrer" data-shared="" class="share-jetpack-whatsapp sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" target="_blank" title="Click to share on WhatsApp"><span>WhatsApp</span></a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-705" class="share-facebook sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>	</div>
+
+	<footer class="entry-footer">
+			</footer>
+</article>
+
+	<nav class="navigation post-navigation" role="navigation" aria-label="Posts">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://shlomi-noach.github.io/blog/mysql/reasons-to-use-innodb_file_per_table" rel="prev"><span class="nav-subtitle">Previous:</span> <span class="nav-title">Reasons to use innodb_file_per_table</span></a></div><div class="nav-next"><a href="https://shlomi-noach.github.io/blog/mysql/even-more-on-mysql-password-security" rel="next"><span class="nav-subtitle">Next:</span> <span class="nav-title">Even more on MySQL password security</span></a></div></div>
+	</nav>    <div class="wpdiscuz_top_clearing"></div>
+    <div id="comments" class="comments-area"><div id="respond" style="width: 0;height: 0;clear: both;margin: 0;padding: 0;"></div>            <h3 id="wc-comment-header">
+                                    <div class="wpdiscuz-comment-count">
+                        <div class="wpd-cc-value">20</div>
+                        <div class="wpd-cc-arrow"></div>
+                    </div>
+                                Leave a Reply            </h3>
+                    <div id="wpcomm" class="wpdiscuz_unauth wpd-default">
+            <div class="wpdiscuz-form-top-bar">
+                <div class="wpdiscuz-ftb-left">
+                                                            <div id="wc_show_hide_loggedin_username">
+                                            </div>
+                </div>
+                                <div class="wpd-clear"></div>
+            </div>
+
+
+                        <div class="wc_social_plugin_wrapper">
+                            </div>
+                    <div class="wc-form-wrapper wc-main-form-wrapper" id="wc-main-form-wrapper-0_0">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                                        <form class="wc_comm_form wc_main_comm_form" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://2.gravatar.com/avatar/?s=40&d=mm&r=g" srcset="http://1.gravatar.com/avatar/?s=80&d=mm&r=g 2x" class="avatar avatar-40 photo avatar-default" height="40" width="40">                                    </div>
+                                
+                                <textarea id="wc-textarea-0_0" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="0_0" name="wpdiscuz_unique_id">
+                </form>
+                    <div class="wpdiscuz-form-bottom-bar">
+                    <div class="wpdiscuz-fbb-left">
+                                                                        <div class="wpdiscuz-stat wpd-stat-threads wpd-tooltip-left">
+                        <i class="fas fa-align-left fa-rotate-180" data-fa-transform="rotate-180"></i><span class="wpd-stat-threads-count">20</span>
+                        <wpdtip>Comment threads</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-replies wpd-tooltip-left">
+                        <i class="far fa-comments"></i><span class="wpd-stat-replies-count">0</span>
+                        <wpdtip>Thread replies</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-subscribers wpd-tooltip-left">
+                        <i class="fas fa-rss"></i><span>0</span>
+                        <wpdtip>Followers</wpdtip>
+                    </div> 
+                                                                    
+                    <div class="wpdiscuz-stat wpd-stat-reacted wpd-tooltip">
+                        <i class="fas fa-bolt"></i>
+                        <wpdtip>Most reacted comment</wpdtip>
+                    </div>
+                                                                    <div class="wpdiscuz-stat wpd-stat-hot wpd-tooltip">
+                        <i class="fab fa-hotjar"></i>
+                        <wpdtip>Hottest comment thread</wpdtip>
+                    </div>
+                            </div>
+                                        <div class="wpdiscuz-fbb-right">
+                                                        <div class="wpdiscuz-stat wpd-stat-users wpd-tooltip">
+                        <i class="fas fa-user-circle"></i> <span class="wpd-stat-authors-count">8</span>
+                        <wpdtip>Comment authors</wpdtip>
+                    </div>
+                                                                                                            <div class="wpdiscuz-users wpd-tooltip-right">
+                        <img alt="Joshua K Roberson" src="http://1.gravatar.com/avatar/1975a42f92eef09075288aa0f4deec30?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/1975a42f92eef09075288aa0f4deec30?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Joshua K Roberson"><img alt="shlomi" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="shlomi"><img alt="Michael" src="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Michael"><img alt="PB" src="http://2.gravatar.com/avatar/e10b15207dac0f4d68e2827e6ef9007e?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e10b15207dac0f4d68e2827e6ef9007e?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="PB"><img alt="Jeremy Cole" src="http://0.gravatar.com/avatar/37cd63a9fd0344804fd6a991a55c283a?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/37cd63a9fd0344804fd6a991a55c283a?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Jeremy Cole">                        <wpdtip>Recent comment authors</wpdtip>
+                    </div>
+                            </div>
+                <div class="wpd-clear"></div>
+    </div>
+            </div>
+                <div id="wpdiscuz_hidden_secondary_form" style="display: none;">
+                    <div class="wc-form-wrapper wc-secondary-form-wrapper" id="wc-secondary-form-wrapper-wpdiscuzuniqueid" style="display: none;">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                            <div class="wc-secondary-forms-social-content"></div><div class="clearfix"></div>
+                                        <form class="wc_comm_form wc-secondary-form-wrapper" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=48&d=mm&r=g" srcset="http://0.gravatar.com/avatar/?s=96&d=mm&r=g 2x" class="avatar avatar-48 photo avatar-default" height="48" width="48">                                    </div>
+                                
+                                <textarea id="wc-textarea-wpdiscuzuniqueid" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="wpdiscuzuniqueid" name="wpdiscuz_unique_id">
+                </form>
+                        </div>
+                </div>
+        <p class="akismet_comment_form_privacy_notice">This site uses Akismet to reduce spam. <a href="https://akismet.com/privacy/" target="_blank" rel="nofollow noopener">Learn how your comment data is processed</a>.</p>                                   
+
+                                    <div class="wpdiscuz-front-actions">
+                                                    <div class="wpdiscuz-sbs-wrap">
+                                <span><i class="far fa-envelope" aria-hidden="true"></i>  Subscribe  <i class="fas fa-caret-down" aria-hidden="true"></i></span>
+                            </div>
+                                                                        <div class="clearfix"></div>
+                    </div>
+                                                    <div class="wpdiscuz-subscribe-bar wpdiscuz-hidden">
+                                                    <form action="https://shlomi-noach.github.io/blog/wp-admin/admin-ajax.php?action=addSubscription" method="post" id="wpdiscuz-subscribe-form">
+                                <div class="wpdiscuz-subscribe-form-intro">Notify of </div>
+                                <div class="wpdiscuz-subscribe-form-option" style="width:40%;">
+                                    <select class="wpdiscuz_select" name="wpdiscuzSubscriptionType">
+                                                                                    <option value="post">new follow-up comments</option>
+                                                                                                                            <option value="all_comment" disabled>new replies to my comments</option>
+                                                                            </select>
+                                </div>
+                                                                    <div class="wpdiscuz-item wpdiscuz-subscribe-form-email">
+                                        <input class="email" type="email" name="wpdiscuzSubscriptionEmail" required="required" value="" placeholder="Email">
+                                    </div>
+                                                                <div class="wpdiscuz-subscribe-form-button">
+                                    <input id="wpdiscuz_subscription_button" type="submit" value="›" name="wpdiscuz_subscription_button">
+                                </div> 
+                                                                <input type="hidden" id="wpdiscuz_subscribe_form_nonce" name="wpdiscuz_subscribe_form_nonce" value="12fac97726"><input type="hidden" name="_wp_http_referer" value="/blog/mysql/sql-finding-a-users-countryregion-based-on-ip">                                                                <input type="hidden" value="705" name="wpdiscuzSubscriptionPostId">
+                            </form>
+                                                <div class="wpdiscuz_clear"></div>
+                                            </div>
+                    
+                                <div id="wcThreadWrapper" class="wc-thread-wrapper">
+                    <div id="wc-comm-2078_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Rich" src="http://0.gravatar.com/avatar/9cc281288c9157297d0cfbf914c22f0b?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9cc281288c9157297d0cfbf914c22f0b?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2078" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://richpollock.com" rel="nofollow" target="_blank">Rich</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Smart+stuff.+On+a+tangential+note%3A+as+an+E...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2078" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2078" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Smart stuff. On a tangential note: as an English-speaker living in Switzerland, I find the most common use case of IP geolocation (serving ads in the user’s “native” language) to be extremely frustrating. There are three (some say four) official languages in Switzerland: German, French, Italian (and Romantsch) and the English-speaking expat community is also fairly large (around 5% of the population). I’m currently in Basel, but thanks to dynamic IP allocation, geolocation has been known to place me in Geneva, Zurich, Aarau and even Bellinzona. As such, I see ads served in German, French or Italian. The most frustrating<span id="wpdiscuz-readmore-2078_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2078_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2080_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2080" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Rich%2C+Thanks.+What+an+annoyance+this+must...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2080" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2080" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Rich, Thanks. What an annoyance this must be with all those languages being mixed up! I’m a Hebrew speaker myself, living in Israel, and still I find it shocking to read Hebrew advertisements when I surf through English/American websites. To be honest, I just can’t stand it that in some websites I get “job offers” in my province. Worse yet, of course, are “lonely women who want to meet me” in my province, though a funny thing here: for some reason, and I suspect a smart and cunning Israeli mind behind it, much of the information about the provinces in<span id="wpdiscuz-readmore-2080_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2080_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2081_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Jason Stubbs" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/6c0309f2c24395e957c69c3d5aeafdec.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/6c0309f2c24395e957c69c3d5aeafdec.gif 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2081" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Jason Stubbs</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=You+are+completely+right+about+only+needin...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2081" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2081" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>You are completely right about only needing an index on one of the fields. However, I don’t completely agree with your final query. Taking the original query and just tacking on the ORDER BY and LIMIT to it will get you the performance increase without decreasing readability of the query through hidden assumptions. (Non-hierarchical data is more a design decision.)</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2081_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2082_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2082" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Jason%2C+If+I+understand+correctly%2C+you%26%2382...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2082" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2082" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Jason, If I understand correctly, you’re suggesting an index on a single column (say, on end_ip), and querying: SELECT * FROM regions_ip_range WHERE my_ip BETWEEN start_ip AND end_ip ORDER BY end_ip ASC LIMIT 1 If this is what you meant, then there’s an issue when the contiguity assumption fails. In this case, and when my_ip is inside one of the “holes” this query keeps searching for rows where the end_ip >= start_ip, until it ultimately fails. So it searches a lot of rows. Whereas the query I suggested ultimately searches one row, albeit it needs to be verified that the<span id="wpdiscuz-readmore-2082_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2082_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2083_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Teg" src="http://1.gravatar.com/avatar/dd15b79ca7ff13251eb6e49471498c48?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/dd15b79ca7ff13251eb6e49471498c48?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2083" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Teg</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=In+my+opinion+using+a+database+for+this+is...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2083" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2083" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>In my opinion using a database for this is wrong. Use libgeoip instead. 😉</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2083_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2088_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Jeremy Cole" src="http://0.gravatar.com/avatar/37cd63a9fd0344804fd6a991a55c283a?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/37cd63a9fd0344804fd6a991a55c283a?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2088" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://jcole.us/blog/" rel="nofollow" target="_blank">Jeremy Cole</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hi+Schlomi%2C%0AI%26%238217%3Bve+also+written+about+...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2088" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2088" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi Schlomi,</p>
+<p>I’ve also written about this before:</p>
+<p><a href="http://jcole.us/blog/archives/2007/11/24/on-efficiently-geo-referencing-ips-with-maxmind-geoip-and-mysql-gis/" rel="nofollow ugc">http://jcole.us/blog/archives/2007/11/24/on-efficiently-geo-referencing-ips-with-maxmind-geoip-and-mysql-gis/</a></p>
+<p>For the most part, this is an interesting case of MySQL’s optimizer being *incredibly* hard to please.  I tested quite a few variants of the query in the course of playing with GIS for it.  It’s quite interesting how differently a very similar query can perform.</p>
+<p>Regards,</p>
+<p>Jeremy</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2088_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2089_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2089" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Teg%2C%0AThanks%2C+maybe+I%26%238217%3Bll+take+the+ti...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2089" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2089" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Teg,</p>
+<p>Thanks, maybe I’ll take the time to see how they implemented it in libgeoip. Do you know exactly how they did it?</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2089_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2090_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2090" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Jeremy%2C%0AThanks+for+the+link+to+your+post%2C...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2090" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2090" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Jeremy,</p>
+<p>Thanks for the link to your post, good read! Interesting conversion to GIS.</p>
+<p>As another optimization, we had to run a one time long conversion and matching of all ranges at once, so the solution was still too slow. What I did was to make the table an InnoDB with the PRIMARY KEY on from_ip.<br>
+With this enhancement, total runtime dropped by hundreds of percents. I don’t have numbers or measures though.</p>
+<p>Regards</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2090_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2095_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="PB" src="http://2.gravatar.com/avatar/e10b15207dac0f4d68e2827e6ef9007e?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/e10b15207dac0f4d68e2827e6ef9007e?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2095" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.pricebonus.com/" rel="nofollow" target="_blank">PB</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=You+are+completely+right+about+only+needin...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2095" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2095" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>You are completely right about only needing an index on one of the fields. However, I don’t completely agree with your final query. Taking the original query and just tacking on the ORDER BY and LIMIT to it will get you the performance increase without decreasing readability of the query through hidden assumptions. (Non-hierarchical data is more a design decision.)</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2095_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2096_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Michael" src="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2096" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Michael</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hi%2C+My+solution+to+trying+to+speed+up+IP+l...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2096" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2096" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi, My solution to trying to speed up IP lookups was to group the start IP addresses into their Class B network group (i.e. the upper 16-bits) and using that value and the ip_start as a key pair. There’s 27K+ unique class B values which can be used to group the IP addreses effectively from an index-pair perspective. To construct the class B value: classb is declared as INTEGER NOT NULL The index is (classb, ip_start) UPDATE geo_ip_blocks SET classb = (ip_start >> 16) Here’s an example query to look up “157.166.226.26” (aka http://www.cnn.com): SELECT * FROM `geo_ip_blocks` WHERE classb=40358<span id="wpdiscuz-readmore-2096_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2096_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2097_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Michael" src="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2097" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Michael</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=FYI+%26%238211%3B+the+geo_ip_blocks+table+has+4M...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2097" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2097" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>FYI – the geo_ip_blocks table has 4M rows.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2097_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2098_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2098" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40PB+%26%238211%3B+%239%0Asuspiciously+identical+comm...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2098" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2098" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@PB – #9<br>
+suspiciously identical comment to Jason #3??<br>
+Anyway, see my comment, #4</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2098_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2099_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2099" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Michael%2C%0Avery+nice%21%0AOut+of+curiosity%3A+is+...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2099" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2099" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Michael,<br>
+very nice!<br>
+Out of curiosity: is there no way a range consists of more than one classB?</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2099_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2100_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Jason Stubbs" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/6c0309f2c24395e957c69c3d5aeafdec.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/6c0309f2c24395e957c69c3d5aeafdec.gif 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2100" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Jason Stubbs</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=I+didn%26%238217%3Bt+consider+the+case+of+a+no-m...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2100" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2100" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>I didn’t consider the case of a no-match when I attacked this problem myself way back when. Although the SQL starts to get a little ugly, using a sub-query should fix the performance hit there too.</p>
+<p>SELECT * FROM (<br>
+    SELECT * FROM regions_ip_range<br>
+    WHERE my_ip >= start_ip<br>
+    ORDER BY start_ip LIMIT 1<br>
+) AS t<br>
+WHERE my_ip <= end_ip;</p>
+<p>I haven’t tested this performance-wise but it seems right theoretically… Either way, your spot on both of your “wrong ways”. 🙂</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2100_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2101_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2101" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Jason%2C%0AThis+seems+right+to+me%2C+and+was+wh...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2101" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2101" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Jason,</p>
+<p>This seems right to me, and was what I meant… 🙂</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2101_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2108_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Michael" src="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2108" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Michael</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40jason+Unfortunately%2C+that+expression+is+w...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2108" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2108" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@jason Unfortunately, that expression is worse. The sub-select will grab ALL rows above the starting IP, create a derived table, and then scan through that derived table which *does not* have an index. The lower the IP number is, the more rows that will have been dumped into the derived table. Under MySQL, derived tables do not inherit any indexes from the original table, or tables, it was created from. It would be awesome if it did, but it doesn’t. The MySQL optimizer ain’t too happy about it: explain SELECT * FROM (select * from geo_ip_blocks WHERE 412306898 >= ip_begin<span id="wpdiscuz-readmore-2108_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2108_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2109_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2109" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Michael%2C+I+disagree.+The+%26%238216%3B229512%26%238...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2109" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2109" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Michael, I disagree. The ‘229512’ rows reported in first version’s subquery does not really hold. That’s what’s peculiar about EXPLAIN: it does not (maybe can not?) take the LIMIT into consideration. I assure you (by testing it and seeing the performance, that is) that the number reported is not actually the number of rows to be scanned in this plan. The real number is 1. Please notice that this is regardless of the subquery: see the EXPLAIN plan discussion within my post. The second step involved is really nothing, since it only needs to scan a table of a single<span id="wpdiscuz-readmore-2109_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2109_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2110_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Michael" src="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/9d37c4b201eea66e3eccfd884b6d942f?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2110" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Michael</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40shlomi%2C+D%26%238217%3Boh%21+Yes%2C+you%26%238217%3Bre+com...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2110" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2110" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@shlomi, D’oh! Yes, you’re completely right. I wasn’t reading sql statement correctly, and there was a typo in it (using >= instead of <=) in my test cases. (Note to self, do not comment until after coffee has been had.) I did do some benchmarking on some stuff here. The winner is definitely the “SELECT * (SELECT * .. WHERE my_ip <= ip_begin..) AS T …” at least on my box configuration. – approx 5K queries/sec (single client) The worse is of course, the “ip BETWEEN start and end” at a whole whopping 3 queries/sec, and that’s with the optimizer<span id="wpdiscuz-readmore-2110_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2110_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2113_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-2113" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Michael%2C%0AGreat%21+Thanks+for+the+benchmarks...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2113" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2113" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Michael,</p>
+<p>Great! Thanks for the benchmarks!</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>11 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2113_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-2948_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Joshua K Roberson" src="http://1.gravatar.com/avatar/1975a42f92eef09075288aa0f4deec30?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/1975a42f92eef09075288aa0f4deec30?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-2948" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://strictcoder.blogspot.com/" rel="nofollow" target="_blank">Joshua K Roberson</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Here+are+different+ways+to+store+an+IP+or+...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fsql-finding-a-users-countryregion-based-on-ip%23comment-2948" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/sql-finding-a-users-countryregion-based-on-ip#comment-2948" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Here are different ways to store an IP or an IP range as well as query for the IPs.<br>
+<a href="http://strictcoder.blogspot.com/2009/08/different-ways-to-query-for-ip-in-your.html" rel="nofollow">http://strictcoder.blogspot.com/2009/08/different-ways-to-query-for-ip-in-your.html</a></p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>10 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-2948_0" class="wpdiscuz_clear"></div></div>                
+                    <div class="wpdiscuz-comment-pagination">
+                                            </div>
+                </div>
+                <div class="wpdiscuz_clear"></div>
+                                                                                </div>
+        </div>
+        <div id="wpdiscuz-loading-bar" class="wpdiscuz-loading-bar wpdiscuz-loading-bar-unauth"></div>
+        
+	</main>
+
+
+	<footer id="colophon" class="site-footer">
+		<div class="site-info">
+			<a href="https://wordpress.org/">
+				Powered by WordPress			</a>
+			<span class="sep"> | </span>
+				Theme: <a href="http://openark.org">openark-primer</a> by <a href="http://underscores.me/">Underscores.me</a>.		</div>
+	</footer>
+</div>
+
+<a id="wpdUserContentInfoAnchor" style="display:none;" rel="#wpdUserContentInfo" data-wpd-lity>wpDiscuz</a><div id="wpdUserContentInfo" style="overflow:auto;background:#FDFDF6;padding:20px;width:600px;max-width:100%;border-radius:6px;" class="lity-hide"></div>	<div style="display:none">
+	<div class="grofile-hash-map-1975a42f92eef09075288aa0f4deec30">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	<div class="grofile-hash-map-9d37c4b201eea66e3eccfd884b6d942f">
+	</div>
+	<div class="grofile-hash-map-e10b15207dac0f4d68e2827e6ef9007e">
+	</div>
+	<div class="grofile-hash-map-37cd63a9fd0344804fd6a991a55c283a">
+	</div>
+	<div class="grofile-hash-map-9cc281288c9157297d0cfbf914c22f0b">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	<div class="grofile-hash-map-6c0309f2c24395e957c69c3d5aeafdec">
+	</div>
+	<div class="grofile-hash-map-dd15b79ca7ff13251eb6e49471498c48">
+	</div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/shlomi-noach.github.io\/blog\/mysql\/sql-finding-a-users-countryregion-based-on-ip":705};
+	</script>
+					<div id="sharing_email" style="display: none;">
+		<form action="/blog/mysql/sql-finding-a-users-countryregion-based-on-ip" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="">
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="">
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="">
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed">
+			
+			<img style="float: right; display: none" class="loading" src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/sharedaddy/images/loading.gif" alt="loading" width="16" height="16">
+			<input type="submit" value="Send Email" class="sharing_send">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<script>
+var pollsL10n = {"ajax_url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","text_wait":"Your last request is still being processed. Please wait a while ...","text_valid":"Please choose a valid poll answer.","text_multiple":"Maximum number of choices allowed: ","show_loading":"1","show_fading":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-js.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/wpdccjs/wpdcc.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/autogrow/jquery.autogrowtextarea.min.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.form.min.js"></script>
+<script>
+var wpdiscuzAjaxObj = {"url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","customAjaxUrl":"https:\/\/shlomi-noach.github.io\/blog\/wp-content\/plugins\/wpdiscuz\/utils\/ajax\/wpdiscuz-ajax.php","wpdiscuz_options":{"wc_hide_replies_text":"Hide Replies","wc_show_replies_text":"View Replies","wc_msg_required_fields":"Please fill out required fields","wc_invalid_field":"Some of field value is invalid","wc_error_empty_text":"please fill out this field to comment","wc_error_url_text":"url is invalid","wc_error_email_text":"email address is invalid","wc_invalid_captcha":"Invalid Captcha Code","wc_login_to_vote":"You Must Be Logged In To Vote","wc_deny_voting_from_same_ip":"You are not allowed to vote for this comment","wc_self_vote":"You cannot vote for your comment","wc_vote_only_one_time":"You've already voted for this comment","wc_voting_error":"Voting Error","wc_held_for_moderate":"Comment awaiting moderation","wc_comment_edit_not_possible":"Sorry, this comment no longer possible to edit","wc_comment_not_updated":"Sorry, the comment was not updated","wc_comment_not_edited":"You've not made any changes","wc_new_comment_button_text":"new comment","wc_new_comments_button_text":"new comments","wc_new_reply_button_text":"new reply on your comment","wc_new_replies_button_text":"new replies on your comments","wc_msg_input_min_length":"Input is too short","wc_msg_input_max_length":"Input is too long","wc_follow_user":"Follow this user","wc_unfollow_user":"Unfollow this user","wc_follow_success":"You started following this comment author","wc_follow_canceled":"You stopped following this comment author.","wc_follow_email_confirm":"Please check your email and confirm the user following request.","wc_follow_email_confirm_fail":"Sorry, we couldn't send confirmation email.","wc_follow_login_to_follow":"Please login to follow users.","wc_follow_impossible":"We are sorry, but you can't follow this user.","wc_follow_not_added":"Following failed. Please try again later.","is_user_logged_in":false,"commentListLoadType":"0","commentListUpdateType":"0","commentListUpdateTimer":"30","liveUpdateGuests":"1","wc_comment_bg_color":"#FEFEFE","wc_reply_bg_color":"#F8F8F8","wpdiscuzCommentsOrder":"asc","wpdiscuzCommentOrderBy":"comment_date_gmt","commentsVoteOrder":false,"wordpressThreadCommentsDepth":"5","wordpressIsPaginate":"1","commentTextMaxLength":null,"storeCommenterData":100000,"isCaptchaInSession":true,"isGoodbyeCaptchaActive":false,"socialLoginAgreementCheckbox":"1","enableFbLogin":"0","enableFbShare":"0","facebookAppID":"","facebookUseOAuth2":0,"enableGoogleLogin":"0","googleAppID":"","cookiehash":"c616fa5ebd4c9ddc6dc50cbf089ebb1d","isLoadOnlyParentComments":"0","ahk":"ef4t(c4n18s$wj!7(^b9x8#r5pax76x#","enableDropAnimation":1,"isNativeAjaxEnabled":1,"cookieCommentsSorting":"wpdiscuz_comments_sorting","enableLastVisitCookie":0,"version":"5.3.5","wc_post_id":705,"loadLastCommentId":0,"lastVisitKey":"wpdiscuz_last_visit","isCookiesEnabled":true,"wc_captcha_show_for_guest":"0","wc_captcha_show_for_members":"0","is_email_field_required":"1"}};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz.js"></script>
+<script>
+var wpdiscuzUCObj = {"msgConfirmDeleteComment":"Are you sure you want to delete this comment?","msgConfirmCancelSubscription":"Are you sure you want to cancel this subscription?","msgConfirmCancelFollow":"Are you sure you want to cancel this follow?"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz-user-content.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/lity/lity.js"></script>
+<script src="https://secure.gravatar.com/js/gprofiles.js?ver=2020Junaa"></script>
+<script>
+var WPGroHo = {"my_hash":""};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/wpgroho.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/navigation.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/skip-link-focus-fix.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/js/prettify.min.js"></script>
+<script>
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/build/sharedaddy/sharing.min.js"></script>
+<script>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+</script>
+<script type="text/javascript" src="https://stats.wp.com/e-202024.js" async="async" defer></script>
+<script type="text/javascript">
+	_stq = window._stq || [];
+	_stq.push([ 'view', {v:'ext',j:'1:8.2.1',blog:'32412571',post:'705',tz:'2',srv:'code.openark.org'} ]);
+	_stq.push([ 'clickTrackerInit', '32412571', '705' ]);
+</script>
+
+</body>
+</html>

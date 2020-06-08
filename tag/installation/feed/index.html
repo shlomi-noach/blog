@@ -1,0 +1,669 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Installation &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/installation/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 11 Sep 2012 06:49:01 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>How common_schema installs itself</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-installs-itself</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/how-common_schema-installs-itself#comments</comments>
+				<pubDate>Tue, 11 Sep 2012 06:48:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[QueryScript]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5033</guid>
+				<description><![CDATA[Up till common_schema version 1.1, the user would need to choose from distinct distribution files: an install compatible with MySQL 5.1, one compatible with InnoDB Plugin enabled servers, and one compatible with Percona Server. The difference between the three is the availability of certain INFORMATION_SCHEMA tables. With 1.1, this is no longer the case: common_schema [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Up till <a href="http://code.google.com/p/common-schema/">common_schema</a> version <strong>1.1</strong>, the user would need to choose from distinct distribution files: an install compatible with MySQL <strong>5.1</strong>, one compatible with InnoDB Plugin enabled servers, and one compatible with Percona Server. The difference between the three is the availability of certain <strong>INFORMATION_SCHEMA</strong> tables.</p>
+<p>With <strong>1.1</strong>, this is no longer the case: <em>common_schema</em> auto-detects the server and available feature set, and installs accordingly.</p>
+<h4>Wait, isn&#8217;t common_schema just a SQL file?</h4>
+<p>Yes. It&#8217;s not like there&#8217;s an installer like <em>InstallShield</em> or anything. Nevertheless, <em>common</em><em>_schema</em> offers a smart way of conditional handling, which is uses in itself. It&#8217;s called <a href="http://www.queryscript.com/">QueryScript</a>.</p>
+<p><em>common_schema</em> is installed by importing the SQL file (via <strong>SOURCE</strong> command; the <em>mysql</em> client; your favorite GUI). This creates your usual tables, views and routines. But some of these routines make for an interpreter for <em>QueryScript</em>. Somewhere along the installation process (remember &#8211; it&#8217;s just a SQL import), <em>common_schema</em> switches over to executing scripts to manage the installation. In particular, there are a few views which depend on optional tables, such as InnoDB Plugin&#8217;s tables for <strong>INFORMATION_SCHEMA</strong>.<span id="more-5033"></span></p>
+<p>Consider the following <strong>CREATE VIEW</strong> statement:</p>
+<blockquote>
+<pre>CREATE OR REPLACE
+ALGORITHM = UNDEFINED
+SQL SECURITY INVOKER
+VIEW innodb_transactions_summary AS
+  SELECT 
+    COUNT(*) AS count_transactions,
+    IFNULL(SUM(trx_state = 'RUNNING'), 0) AS running_transactions,
+    IFNULL(SUM(trx_requested_lock_id IS NOT NULL), 0) AS locked_transactions,
+    COUNT(DISTINCT trx_requested_lock_id) AS distinct_locks
+  FROM 
+    <strong>INFORMATION_SCHEMA.INNODB_TRX</strong>
+  WHERE 
+    trx_mysql_thread_id != CONNECTION_ID()
+;</pre>
+</blockquote>
+<p>Such a statement would fail the import if the underlying tables (<strong>INFORMATION_SCHEMA.INNODB_TRX</strong> in our example) do not actually exist. Which is why this <strong>CREATE</strong> statement is not invoked just like that. It is wrapped within a script:</p>
+<blockquote>
+<pre>set @script := "
+  set <strong>@common_schema_innodb_plugin_expected := 0</strong>;
+  <strong>try</strong> {
+    set <strong>@common_schema_innodb_plugin_expected</strong> := @common_schema_innodb_plugin_expected + 1; 
+
+    <strong>CREATE VIEW</strong> ... (as above)
+
+    set <strong>@common_schema_innodb_plugin_installed</strong> := @common_schema_innodb_plugin_installed + 1;
+  }
+  <strong>catch</strong> {
+  }
+";
+
+call run(@script);</pre>
+</blockquote>
+<p>I really want to stress this: this is a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_try_catch.html"><strong>try-catch</strong></a> statement running from within your MySQL server. <em>QueryScript</em> accepts this statement and behaves very similarly to the way you are used to with your favorite programming language.</p>
+<p>If the <strong>CREATE VIEW</strong> cannot be fulfilled, an error is generated. But instead of failing the entire script, it is caught by the <strong>catch</strong>clause; the &#8220;<strong>set @common_schema_innodb_plugin_installed :=</strong> &#8230;&#8221; line is never executed upon such error.</p>
+<p>Upon <strong>CREATE VIEW</strong> failure, <strong>@common_schema_innodb_plugin_installed</strong> falls short of <strong>@common_schema_innodb_plugin_expected</strong> and<strong> </strong>. By the end of installation process, the two are compared, so as to determine the install success:</p>
+<blockquote>
+<pre>+-----------------------------------------------------------+
+| complete                                                  |
++-----------------------------------------------------------+
+| - Base components: <strong>installed</strong>                              |
+| - InnoDB Plugin components: <strong>installed</strong>                     |
+| - Percona Server components: <strong>not installed</strong>                |
+|                                                           |
+| Installation complete. Thank you for using common_schema! |
++-----------------------------------------------------------+</pre>
+</blockquote>
+<h4>Can&#8217;t you just use &#8220;mysql &#8211;force&#8221;?</h4>
+<p>So, one can import a SQL file using <strong>mysql &#8211;force</strong>, which does nto break down on first sight of error, but continues to next statements.</p>
+<p>True, but:</p>
+<ul>
+<li>I don&#8217;t want to ask that of the user.</li>
+<li>It won&#8217;t give me a status on <em>what went wrong</em>.</li>
+</ul>
+<p>By using <em>QueryScript</em>&#8216;s <strong>try-catch</strong>:</p>
+<ul>
+<li>I can take alternate action on failure.</li>
+<li><em>common_schema</em> can (and does) inform the user at the end of installation process which components are installed and which are not.</li>
+<li>It can (and does) write this info down to a <em>metadata</em> table such that I can ask the user for that information when submitting a bug report.</li>
+</ul>
+<p><em>Eat your own dog food!</em></p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/how-common_schema-installs-itself/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5033</post-id>	</item>
+		<item>
+		<title>Installing MySQL from source/binary tarball as a Linux service</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/installing-mysql-from-sourcebinary-tarball-as-a-linux-service</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/installing-mysql-from-sourcebinary-tarball-as-a-linux-service#comments</comments>
+				<pubDate>Tue, 01 May 2012 08:10:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4858</guid>
+				<description><![CDATA[I&#8217;ve written before I prefer to do a manual install of MySQL over a repository one. I still do: I typically install from binary tarball or by compiling from source. I&#8217;d like to share my setup procedure for Linux installation and service setup. I&#8217;ve done this dozens of times, on different Linux flavors, and it [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;ve <a href="https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get">written before</a> I prefer to do a manual install of MySQL over a repository one. I still do: I typically install from binary tarball or by compiling from source.</p>
+<p>I&#8217;d like to share my setup procedure for Linux installation and service setup. I&#8217;ve done this dozens of times, on different Linux flavors, and it works well for me.</p>
+<h4>Installing from source</h4>
+<p>To get this straight: you sometimes have to compile the source files. I, for example, happen to use the Sphinx MySQLSE extension. You can only use it if compiled with MySQL. You had to compile a &#8220;vanilla&#8221; <strong>5.1</strong> version without query cache in order to completely remove the cache&#8217;s mutex contention.</p>
+<p>Anyway, I find the easiest way is to install onto a path associated with the server version. For example, I would install a <strong>5.5</strong> server onto <strong>/usr/local/mysql55</strong></p>
+<p>This way, a new version gets its own path, and no ambiguity.</p>
+<p>To do that, use the <strong>prefix</strong> option on configuration step:</p>
+<blockquote>
+<pre>cd /path/to/extracted/source/tarball
+sh BUILD/autorun.sh
+./configure --prefix=/usr/local/mysql55
+make
+sudo make install</pre>
+</blockquote>
+<p>Once this is complete, you have <em>everything</em> under <strong>/usr/local/mysql55</strong>. This means binaries, libraries, scripts, etc.</p>
+<p>To install the MySQL server as a service, copy the mysql.server script to <strong>/etc/init.d</strong>:</p>
+<blockquote>
+<pre>sudo cp /usr/local/mysql55/support-files/mysql.server /etc/init.d/mysql55</pre>
+</blockquote>
+<p>Again, I&#8217;m naming the script after the MySQL version. This avoids conflict with possible past or future installations of the MySQL server, which typically create a service named <strong>mysql</strong> or <strong>mysqld</strong>.<span id="more-4858"></span></p>
+<p>A thing to note about the mysql.server script is that it allows you (at around line <strong>#45</strong>) to set two variables:</p>
+<ul>
+<li><strong>basedir</strong>: path to your installation directory. When compiling from source this is already setup with the path provided to the <strong>configure</strong> script. Thus, in our example, you can expect this variable to read <strong>/usr/local/mysql55</strong>. So basically nothing to do here.</li>
+<li><strong>datadir</strong>: path to your data directory. If you&#8217;re putting your <strong>my.cnf</strong> file in <strong>/etc</strong> or <strong>/etc/mysql</strong>, then setting <strong>datadir</strong> in <strong>my.cnf</strong> suffices. However, if you&#8217;re going to put <strong>my.cnf</strong> itself on the data directory (e.g. so as to avoid collisions) then make sure to set the variable in the <strong>mysql.server</strong> init script.</li>
+</ul>
+<p>Depending on your <strong>$PATH</strong> configuration, it is also a good idea to specify <strong>basedir</strong> variable on your <strong>my.cnf</strong>&#8216;s <strong>[mysqld]</strong> section.</p>
+<p>Which leads us to <strong>$PATH</strong>: your linux system is still unaware of the many binaries you&#8217;ve got in there. I typically add the following line at the end of <strong>/etc/bash.bashrc</strong>:</p>
+<blockquote>
+<pre>export PATH=/usr/local/mysql55:${PATH}</pre>
+</blockquote>
+<p>This is the most global PATH settings one can do. Alternatively, use <strong>/etc/profile</strong>, <strong>~/.bashrc</strong> etc. (you may have noticed by now I&#8217;m working with <strong>bash</strong>).</p>
+<p>Finally, need to setup the init script to run at startup and stop at shutdown.</p>
+<ul>
+<li>On Debian/Ubuntu/related I use <strong>rcconf</strong> (I&#8217;m too lazy to remember the command line setup).</li>
+<li>On RedHat/CentOS/related I use <strong>chkconfig &#8211;add mysql55</strong>, or  <strong>linuxconf</strong> (since I&#8217;m lazy).</li>
+</ul>
+<h4>Installing from binary tarball</h4>
+<p>The only difference is that the <strong>mysql.server</strong> script is unaware of our deployment path. So the <strong>basedir</strong> variable must be set in that file. Other than that, follow same steps as for source installation (oh, of course no need to <strong>configure</strong> &amp; <strong>make</strong>&#8230;).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/installing-mysql-from-sourcebinary-tarball-as-a-linux-service/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4858</post-id>	</item>
+		<item>
+		<title>Guide to MySQL installation files</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/guide-to-mysql-installation-files</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/guide-to-mysql-installation-files#respond</comments>
+				<pubDate>Wed, 01 Dec 2010 10:27:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Installation]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3089</guid>
+				<description><![CDATA[Even for DBAs already familiar with MySQL, the choice of installation methods and the variety of install/package files is overwhelming and confusing. I&#8217;ll make a (very!) brief introduction to the various installation options, concentrating on the Linux operating system, and provide with a simple shopping list. For illustration, I&#8217;ll refer to the MySQL 5.1.52 community [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Even for DBAs already familiar with MySQL, the choice of installation methods and the variety of install/package files is overwhelming and confusing.</p>
+<p>I&#8217;ll make a (very!) brief introduction to the various installation options, concentrating on the Linux operating system, and provide with a simple shopping list.</p>
+<p>For illustration, I&#8217;ll refer to the MySQL <strong>5.1.52</strong> community edition, the latest at the time of this writing. Downloads are available at <a href="http://dev.mysql.com/downloads/mysql/5.1.html">http://dev.mysql.com/downloads/mysql/5.1.html</a>.</p>
+<p>I will then refer to alternate distributions.</p>
+<h4>A note for Windows users</h4>
+<p>You are lucky: your choice is very clear. Download the Windows MSI package. Choose <strong>32</strong> or <strong>64</strong> bit architecture according to your OS. If you know about the other ways to install and setup MySQL under Windows, you don&#8217;t need this post.</p>
+<h4>Linux: repositories</h4>
+<p>Easiest way to install MySQL on linux would be to use your distro&#8217;s repository. Just:</p>
+<blockquote>
+<pre>sudo apt-get install mysql-server-5.1</pre>
+</blockquote>
+<p>or</p>
+<blockquote>
+<pre>sudo yum install MySQL-Server-5.1</pre>
+</blockquote>
+<p>Your distro should resolve any package dependencies.</p>
+<p>I&#8217;m in the opinion that if MySQL is the main application to be used on a server, distribution&#8217;s default repositories are <em>not</em> the way to go. Reasons include MySQL outdated version, incapability of installing multiple instance, danger of automatic upgrades or downgrades. Read <a href="https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get">this post and discussion</a> that follows for more.</p>
+<h4>Linux: packages</h4>
+<p>If you&#8217;re a RedHat/CentOS/SuSE user, you&#8217;re in luck: MySQL provides pre-built RPM packages for your system. I vaguely remember MySQL announcing that Ubuntu is to be supported. That was a couple years ago; there is still no package for Debian/Ubuntu.</p>
+<p><span id="more-3089"></span>So, assuming you&#8217;re a RedHat/CentOs user, which packages should you download?</p>
+<p>There&#8217;s over <strong>60</strong> different RPMs available for download. I always need to stress my eyes to get it right. Here&#8217;s the simple answer (again, if you know better, you don&#8217;t need this post). Choose <strong>&#8220;RedHat &amp; Oracle Enterprise Linux&#8221;</strong>; download:</p>
+<ul>
+<li><strong>MySQL-client-community-5.1.52-1.rhel5.x86_64.rpm</strong></li>
+<li><strong>MySQL-server-community-5.1.52-1.rhel5.x86_64.rpm</strong></li>
+<li><strong>MySQL-shared-community-5.1.52-1.rhel5.x86_64.rpm</strong></li>
+<li><strong>MySQL-shared-compat-5.1.52-1.rhel5.x86_64.rpm</strong></li>
+</ul>
+<p>The above assumes a RedHat/CentOS 5.x and a 64 bit Intel/AMD processor.</p>
+<p>The aforementioned post relays my opinion of using RPMs; these are still susceptible to <strong>yum</strong>&#8216;s whims. Be careful.</p>
+<h4>Linux: binary</h4>
+<p>Not afraid to install by hand? Want to avoid limitations introduced by pre-built packages? Download a binary distribution:</p>
+<ul>
+<li>Choose <strong>&#8220;Linux &#8211; Generic&#8221;</strong>. Downlaod <strong>mysql-5.1.52-linux-x86_64-glibc23.tar.gz</strong></li>
+</ul>
+<p>This <em>tar.gz</em> distribution includes server &amp; client. It includes <em>glibc</em> so it does not depend on your OS installed <em>glibc</em> version (a pain to upgrade/downgrade as it is used by so many packages).</p>
+<p>You may still want to download and install the <em>shared-compat</em> RPM package (see previous section) to have all possible libmysqlclientX.X packages installed.</p>
+<h4>Linux: source</h4>
+<p>If you got here, then you either know your way around (why do you keep reading?) or you have a good reason to use a source distribution.</p>
+<p>What good reason could that be?</p>
+<p>A more and more common reason is that you want to add something to MySQL. Sphinx search storage engine is such a common addition.</p>
+<ul>
+<li>Choose <strong>&#8220;Source Code&#8221;</strong>: download <strong>mysql-5.1.52.tar.gz</strong> (Architecture Independent).</li>
+</ul>
+<h4>Non MySQL downloads</h4>
+<p>You don&#8217;t have to download the official MySQL distribution. Two good alternatives are:</p>
+<ul>
+<li>Percona Server; download from <a href="http://www.percona.com/software/percona-server/">http://www.percona.com/software/percona-server/</a>. The Percona Server (a MySQL fork by <a href="http://www.percona.com/">Percona</a>) is available in RPM, DEB, BSD, Binary, Source distributions. There are no Windows distributions.</li>
+<li>MariaDB, download from <a href="http://askmonty.org/wiki/MariaDB:Download">http://askmonty.org/wiki/MariaDB:Download</a>. MariaDB is a MySQL fork by <a href="http://mariadb.org/">Montry Program AB</a>, and is available for Windows, Linux, Solaris, in Source, Binary, RPM and DEB distributions.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/guide-to-mysql-installation-files/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3089</post-id>	</item>
+		<item>
+		<title>To not yum or to not apt-get?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get#comments</comments>
+				<pubDate>Tue, 16 Feb 2010 11:44:25 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1776</guid>
+				<description><![CDATA[I&#8217;ve written shortly on this before. I like yum; I love apt-get; I prefer not to use them for MySQL installations. I consider a binary tarball to be the best MySQL installation format (source installations being a different case altogether). Why? I use yum and apt-get whenever I can and for almost all needs (sometimes [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;ve <a href="https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto">written</a> shortly on this before. I like <strong>yum</strong>; I love <strong>apt-get</strong>; I prefer <em>not</em> to use them for MySQL installations. I consider a binary tarball to be the best MySQL installation format (source installations being a different case altogether).</p>
+<h4>Why?</h4>
+<p>I use <strong>yum</strong> and <strong>apt-get</strong> whenever I can and for almost all needs (sometimes preferring CPAN for Perl installations). But on a MySQL machine, I avoid doing so. The reason is either dependency hell or dependency mismatch.</p>
+<p>Package managers are supposed to solve the dependency hell issue. But package managers will rarely have an up to date MySQL version.</p>
+<p>I&#8217;ve had several experiences where a simple <strong>yum</strong> installation re-installed the MySQL version. I&#8217;ve had customers calling me up when, having installed something with <strong>yum</strong>, MySQL would not work anymore.<span id="more-1776"></span></p>
+<p><strong>yum install package-which-depends-on-mysql-server</strong> will install MySQL server on your system if it hasn&#8217;t been installed with <strong>yum</strong>. Are you on CentOS <strong>5.0</strong>? You&#8217;ll get MySQL <strong>5.0.22</strong>. Oh, did you already have a <strong>RPM</strong> installation for MySQL <strong>5.0.81</strong>? Sorry &#8211; it&#8217;s just been <em>downgraded</em>, plus <em>it won&#8217;t work</em> anymore since the error messages file has been changed since then.</p>
+<p>Don&#8217;t press &#8216;<strong>Y</strong>&#8216; too soon!</p>
+<p>Things are slightly better with <strong>apt-get</strong>. I&#8217;ve encountered less situations where <strong>mysql-server</strong> was on the dependency list. Many times it&#8217;s just the <strong>libmysqlclient</strong> package or the <strong>mysql-common</strong> one.</p>
+<p>But wait! Did you install <strong>mysql-common</strong>? Bonus! You get the elusive <strong>/etc/mysql/my.cnf</strong> file created, and there goes your server configuration. Future spawns of the MySQL server / clients will read from the wrong configuration file, and will probably fail to load.</p>
+<p>Not to mention neither will help you out with multiple instances installation.</p>
+<h4>My argument</h4>
+<p>A sys admin recently argued with me that it was wrong of me to have the entire machine set up with <strong>yum</strong>, but have MySQL installed with binary tarball. He argued that it broke the entire setup. I expressed my opinion: <em>on a MySQL dedicated server, MySQL gets to be prioritized. It&#8217;s special</em>. It is the reason for the existence of the machine. I would imagine that same would hold for Apache on an Apache dedicated machine, for Sendmail on a Sendmail dedicated machine, etc. As a DBA, I want to have best control of the MySQL installation; I want to be able to upgrade minor versions quickly: I often find newer versions to solve bugs I was concerned with; I want to be able to install multiple instances; I want to be able to downgrade without having to remove and uninstall the previous version.</p>
+<p>I want to have control. World domination aside, that is.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/to-not-yum-or-to-not-apt-get/feed</wfw:commentRss>
+		<slash:comments>26</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1776</post-id>	</item>
+		<item>
+		<title>SphinxSE 0.9.9-RC2 bug workaround</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sphinxse-0-9-9-rc2-bug-workaround</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sphinxse-0-9-9-rc2-bug-workaround#respond</comments>
+				<pubDate>Mon, 07 Sep 2009 08:23:21 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Sphinx]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1245</guid>
+				<description><![CDATA[There is a serious bug with the sphinx storage engine, introduced in 0.9.9-RC2 (and which has not been fixed in latest revisions, as yet &#8211; last checked with rev 2006). I would usually just revert to an older version (0.9.9-RC1 does not contain this bug), but for the reason that RC2 introduces an important feature: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There is a serious bug with the sphinx storage engine, introduced in 0.9.9-RC2 (and which has not been fixed in latest revisions, as yet &#8211; last checked with rev 2006).</p>
+<p>I would usually just revert to an older version (0.9.9-RC1 does not contain this bug), but for the reason that RC2 introduces an important feature: the <strong>sphinx_snippets()</strong> function, which allows for creation of snippets from within MySQL, and which makes the sphinx integration with MySQL complete, as far as the application is concerned.</p>
+<h4>The bug</h4>
+<p>The bug is described <a href="http://sphinxsearch.com/forum/view.html?id=3589">here</a> and <a href="http://sphinxsearch.com/forum/view.html?id=4081">here</a> (and see further discussions). Though it&#8217;s claimed to have been fixed, it&#8217;s been re-reported, and I&#8217;ve tried quite a few revisions and verified it has not been fixed (tested on Debian/Ubuntu x64).  <span>Essentially, the bug does not allow you to set filters on a query issued from within the SphinxSE. For example, the following queries fail:</span></p>
+<blockquote>
+<pre>SELECT ... FROM ... WHERE query='python;mode=any;sort=relevance;limit=200;range=myUnixTimestamp,1249506000,1252184400;'
+SELECT ... FROM ... WHERE query='python;mode=any;sort=relevance;limit=200;filter=my_field,1;'</pre>
+</blockquote>
+<p>While the following query succeeds:</p>
+<blockquote>
+<pre>SELECT ... FROM ... WHERE query='python;mode=any;sort=relevance;limit=200;'</pre>
+</blockquote>
+<p>The error message is this:</p>
+<blockquote>
+<pre><span>ERROR 1430 (HY000): There was a problem processing the query on the foreign data source. Data source error: searchd error: invalid or truncated request</span></pre>
+</blockquote>
+<p><span>I see this as a serious bug in the SphinxSE: it renders it useless; searching without the ability to filter is not something I can live with.<span id="more-1245"></span></span></p>
+<h4><span>The motivation</span></h4>
+<p><span>Sphinx does not store the actual text content. To get search results with snippets, you need to:</span></p>
+<ul>
+<li><span>Ask sphinx for the documents ids</span></li>
+<li><span>Get the content for those documents</span></li>
+<li><span>Ask sphinx for snippets based on the provided content and search phrase.</span></li>
+</ul>
+<p>With the introduction of the <strong>sphinx_snippets()</strong> function, this can all be done with a single query, like this:</p>
+<blockquote>
+<pre>SELECT my_docs.my_docs_id,  my_docs.publish_time,  CONVERT(sphinx_snippets(my_docs.id.content, 'my_docs_index', 'python') USING utf8) AS snippet  FROM tets.my_docs INNER JOIN test.my_docs_sphinx USING(my_docs_id) WHERE query='python;mode=any;sort=relevance;limit=200;range=publish_time_unix,1249506000,1252184400;';</pre>
+</blockquote>
+<p><span>This is really a life saver; without this function, you need to get the resutls back to your application, then send the data again to MySQL, in which case you might altogether discard the SphinxSE and talk to sphinx directly. But with a single query you get to ask the results just as if you were asking for any result set from your database (with extra syntax).</span></p>
+<h4><span>The workaround</span></h4>
+<p><span>My setup is Percona&#8217;s </span><strong>mysql-5.1.34-xtradb5</strong> source, on Ubuntu server <strong>8.04 amd64</strong>. The trick is to first compile MySQL with sphinx <strong>0.9.9-RC2</strong>, in order to produce the <strong>sphinx.so</strong> file (where the <strong>sphinx_snippets()</strong> function is found), backup the <strong>sphinx.so</strong> file, then recompile everything with <strong>sphinx 0.9.9-RC1</strong>. The steps being:</p>
+<p>Compile MySQL with sphinx <strong>0.9.9-Rc2</strong> (I choose to install MySQL on <strong>/usr/local/mysql51</strong>):</p>
+<blockquote>
+<pre>tar xzfv mysql-5.1.34-xtradb5.tar.gz
+cd mysql-5.1.34-xtradb5
+cp -R /tmp/resources/sphinx-0.9.9-rc2/mysqlse storage/sphinx
+sh BUILD/autorun.sh
+./configure --with-plugins=innobase,sphinx --prefix=/usr/local/mysql51
+make</pre>
+</blockquote>
+<p>This produces the <strong>sphinx.so</strong>, <strong>sphinx.so.0</strong>, <strong>sphinx.so.0.0.0</strong> files. Back them up!</p>
+<p>Next, recompile with sphinx <strong>0.9.9-RC1</strong>. I&#8217;ve found that simple copying and recompiling doesn&#8217;t work well. So just cleanup everything and start afresh:</p>
+<blockquote>
+<pre>cd ..
+rm -rf mysql-5.1.34-xtradb5
+tar xzfv mysql-5.1.34-xtradb5.tar.gz
+cd mysql-5.1.34-xtradb5
+cp -R /tmp/resources/sphinx-0.9.9-rc1/mysqlse storage/sphinx
+sh BUILD/autorun.sh
+./configure --with-plugins=innobase,sphinx --prefix=/usr/local/mysql51
+make
+sudo make install</pre>
+</blockquote>
+<p>Copy the <strong>sphinx.so</strong> files into the MySQL plugin directory (<strong>/usr/local/mysql51/lib/mysql/plugin</strong> in our case).</p>
+<p>Then build sphinx (you must have MySQL includes for sphinx to compile, so this must be the second step):</p>
+<blockquote>
+<pre>cd /tmp/resources/sphinx-0.9.9-rc1/
+./configure --prefix=/usr/local/sphinx --with-mysql=/usr/local/mysql51
+make
+sudo make install</pre>
+</blockquote>
+<p>Essentially, we&#8217;re working now with <strong>0.9.9-RC1</strong>, but the <strong>sphinx_snippets()</strong> function is from the <strong>0.9.9-RC2</strong> version, and happily no one bothers about this mix.</p>
+<p>I hope this helps.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sphinxse-0-9-9-rc2-bug-workaround/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1245</post-id>	</item>
+		<item>
+		<title>Manually installing multiple MySQL instances on Linux: HOWTO</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto#comments</comments>
+				<pubDate>Thu, 19 Feb 2009 06:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=531</guid>
+				<description><![CDATA[Installing a single MySQL instance on a linux machine is a very simple operation. It may be as simple as: apt-get install mysql-server But you cannot use this method to install another MySQL instance. Moreover, if you try to manually install another instance, you may find that some collisions occur. For example, when trying to [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Installing a single MySQL instance on a linux machine is a very simple operation. It may be as simple as:</p>
+<blockquote>
+<pre>apt-get install mysql-server</pre>
+</blockquote>
+<p>But you cannot use this method to install another MySQL instance. Moreover, if you try to manually install another instance, you may find that some collisions occur.</p>
+<p>For example, when trying to install two 5.0 servers, apt-get or yum will just tell me &#8220;package is already installed&#8221;.</p>
+<p>When trying to install a new 5.1 server along with 5.0, an implicit upgrade is performed.</p>
+<p>But even if we try forcing the installation, there are collisions:</p>
+<ul>
+<li>A dpkg or rpm will install my.cnf under <strong>/etc</strong>. Two installations will override one another. With RPM you may get a .rpmsave backup file, but that doesn&#8217;t help too much.</li>
+<li>The daemon file: <strong>/etc/init.d/mysql(d)</strong> is overwritten.</li>
+<li>The default data directory is used for both installations: <strong>/var/lib/mysql</strong></li>
+<li>The binaries are overwritten</li>
+<li>Both installations will use port 3306.</li>
+<li>In both installations, the same socket file (e.g. <strong>/var/run/mysql/mysql.sock</strong>) is used.</li>
+</ul>
+<p><span id="more-531"></span>Interestingly, on Windows, multiple MySQL installations are by far easier:</p>
+<ul>
+<li>Binaries are under <strong>Program Files\\MySQL\\MySQLX.X</strong>. With two installations, you specify different directories.</li>
+<li>Data files are by default directly under the installations paths (MySQL 5.0) or under &#8220;<strong>Documents And Settings&#8230;</strong>&#8221; (MySQL 5.1) with no collisions.</li>
+<li>The <strong>my.ini</strong> files are located directly under the installation paths.</li>
+<li>The installer asks you for a service name, and notifies you if that name is already in use.</li>
+<li>The installer let&#8217;s you know if port 3306 is already taken, and allows you to specify another one.</li>
+<li>Of course, there&#8217;s no unix socket file.</li>
+</ul>
+<p>I usually install MySQL on Linux using the binary tarball. When there&#8217;s only one instance expected, I go with the standards: my.cnf is in <strong>/etc</strong>, mysqld is under <strong>/etc/init.d</strong>, etc. (no pun intended)</p>
+<h4>Steps for multiple installation on Linux</h4>
+<p>When more than one installation is expected, here&#8217;s a safe way to ensure no collisions occur. We will assume a 5.0 and 5.1 installation (say we want to upgrade):</p>
+<h4>Install the MySQL binaries under /usr/local</h4>
+<p>Following the INSTALL document file, we make symbolic links to the full path in the names</p>
+<blockquote>
+<pre>ln -s /usr/local/your-mysql-5.0-full-installation-path /usr/local/mysql50
+ln -s /usr/local/your-mysql-5.1-full-installation-path /usr/local/mysql51</pre>
+</blockquote>
+<p><strong> </strong></p>
+<h4>Do not put my.cnf under /etc</h4>
+<p>Instead, put them directly in the installation path:</p>
+<blockquote>
+<pre>touch /usr/local/mysql50/my.cnf
+touch /usr/local/mysql51/my.cnf</pre>
+</blockquote>
+<h4>Setup different port numbers in the my.cnf files</h4>
+<p>For example, in /usr/local/mysql50/my.cnf, use port 3350:</p>
+<blockquote>
+<pre>[mysql]
+port=3350
+
+[mysqld]
+port=3350</pre>
+</blockquote>
+<p>Choose another port (e.g. 3351) for the 5.1 installation, then have it written as above in the 5.1 my.cnf file.</p>
+<h4>Choose distinct socket files</h4>
+<p>For example,  in /usr/local/mysql50/my.cnf, add:</p>
+<blockquote>
+<pre>[mysql]
+port=3350
+<strong>socket=/tmp/mysql50.sock</strong>
+
+[mysqld]
+port=3350
+<strong>socket=/tmp/mysql50.sock
+</strong></pre>
+</blockquote>
+<p>Choose another socket and set it up in the second my.cnf file. You may also choose to put the socket files under the data paths or installation paths.</p>
+<h4>Choose distinct data paths</h4>
+<p>Either do not specify them at all, in which case they will reside under the installation path, or, if you want to enjoy another partition, use:</p>
+<blockquote>
+<pre>[mysql]
+port=3350
+socket=/tmp/mysql50.sock
+
+[mysqld]
+port=3350
+socket=/tmp/mysql50.sock
+<strong>datadir=/my_raid_path/mysql50/</strong></pre>
+</blockquote>
+<h4>Create distinct daemons</h4>
+<p>Manually copy support_files/mysql.server to /etc/init.d under distinct names. For example:</p>
+<blockquote>
+<pre>cp /usr/local/mysql50/support_files/mysql.server /etc/init.d/mysqld50
+cp /usr/local/mysql51/support_files/mysql.server /etc/init.d/mysqld51</pre>
+</blockquote>
+<h4>Other settings</h4>
+<p>You may wish to set up a soft link for the client binaries, for example:</p>
+<blockquote>
+<pre>ln -s /usr/local/mysql50/bin/mysql /usr/bin/mysql50</pre>
+</blockquote>
+<p>chkconfig (RedHat and derived) can be used to start/stop daemon as service:</p>
+<blockquote>
+<pre>chkconfig --add mysqld50</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>I would prefer MySQL to come bundled in self-contained directory. The tarball is almost that, except it expects socket file to be on /tmp, and by default uses the 3306 port. I would further like to have a dpkg-reconfigure script to setup the above issues.</p>
+<p>Till then, it&#8217;s manual configuration.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/manually-installing-multiple-mysql-instances-on-linux-howto/feed</wfw:commentRss>
+		<slash:comments>28</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">531</post-id>	</item>
+		<item>
+		<title>Do we need sql_mode?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode#comments</comments>
+				<pubDate>Thu, 08 Jan 2009 06:14:38 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+		<category><![CDATA[sql_mode]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=462</guid>
+				<description><![CDATA[sql_mode must be one of the most elusive issues in setting up a MySQL database. It is also responsible for difficulties in migration, upgrading and securing of databases. MySQL usually has little issues with migrating database from one machine to another, one version to another, one OS to another, one architecture to another. If we&#8217;re [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>sql_mode must be one of the most elusive issues in setting up a MySQL database. It is also responsible for difficulties in migration, upgrading and securing of databases.</p>
+<p>MySQL usually has little issues with migrating database from one machine to another, one version to another, one OS to another, one architecture to another. If we&#8217;re not sure, we can always migrate using mysqldump&#8217;s logical dump, right?</p>
+<p>Not entirely right. The elusive sql_mode (empty by default) may affect out backup+restore, may affect our application behavior, may affect our data integrity.<span id="more-462"></span></p>
+<ul>
+<li>Did we remember to set NO_AUTO_CREATE_USER? Oh dear, we have some users without passwords.</li>
+<li>Did we remember to set NO_AUTO_VALUE_ON_ZERO? Oh dear, we&#8217;ve dumped our database for backup, restored, but AUTO_INCREMENT values <a title="Mind the SQL_MODE when running ALTER TABLE" href="http://www.pythian.com/blogs/1422/draft-mind-the-sql_mode-when-running-alter-table">have changed</a>!</li>
+<li>Did we set STRICT_ALL_TABLES? How do we know if the 255 value in our TINYINT really stands for 255 or if it was a truncated 299?</li>
+<li>Do we allow selecting non aggregated columns in GROUP BY? Did we set ONLY_FULL_GROUP_BY? Will our application crash now?</li>
+<li>Our old database has zero for empty date values (columns are NOT NULL). But what settings do we have for NO_ZERO_IN_DATE on our new installation? Will import fail?</li>
+<li>And how did the NULL get in? Was it because we divided by zero, and forgot to set ERROR_FOR_DIVISION_BY_ZERO? How can we tell?</li>
+</ul>
+<p>The fact is: two mysql instances, same version, same OS and architecture, with different sql modes &#8211; can be incompatible!</p>
+<p>As said, the sql_mode is empty by default. This is very non-strict. But more than that: it can be changed even while the database is running; even on a per connection basis.</p>
+<p>Setting sql_mode should be one of the first things to do after installation. The usual manuals talk about setting the innodb_buffer_pool_size and the query_cache_size, when sql_mode will dictate the nature of your database and application on an entirely grander scale.</p>
+<p>I think it would be best if MySQL chooses a desired set of sql modes (like &#8216;TRADITIONAL&#8217;), then make it the default. I further believe it would be best if MySQL would not allow changes to sql_mode. Not globally and certainly not per session. Choosing the stricter mode is better, I believe: errors such as overflow values should be reported to the application, not just swiped under the carpet.</p>
+<p>Backward compatibility? Indeed a problem (inherent to the very existence of sql_mode). Perhaps allow one setting per installation. Perhaps just <a title="My advice to MySQL" href="http://jpipes.com/index.php?/archives/276-My-advice-to-MySQL.html">go for it</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/do-we-need-sql_mode/feed</wfw:commentRss>
+		<slash:comments>17</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">462</post-id>	</item>
+		<item>
+		<title>MySQL parameters &#038; configuration sample file</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-parameters-configuration-sample-file</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-parameters-configuration-sample-file#comments</comments>
+				<pubDate>Fri, 17 Oct 2008 13:03:33 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Installation]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6</guid>
+				<description><![CDATA[The following is a sample my.cnf configuration file. It includes some common and uncommon parameters, along with occasional comments. You can use this file, and tune as appropriate for your machine, operating system, and application needs. In particular, note the high values set for the InnoDB related parameters, below, and change them to match your [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The following is a sample my.cnf configuration file. It includes some common and uncommon parameters, along with occasional comments.</p>
+<p>You can use this file, and tune as appropriate for your machine, operating system, and application needs.</p>
+<p>In particular, note the high values set for the InnoDB related parameters, below, and change them to match your system and application&#8217;s requirements. You have been warned.<span id="more-6"></span></p>
+<blockquote><p>[client]<br />
+<strong> #password       = [your_password]<br />
+port            = 3306</strong><br />
+# The following location is not the default location for many<br />
+# pre-packaged utilities. For example, mytop or mysqlreport<br />
+# (or any Perl or Python based client, for that matter), will<br />
+# NOT look in the /tmp path for the mysql.sock file.<br />
+# The value is set to common location by your RPM or DEB<br />
+# package on GNU/Linux, yet defaults to the following in the<br />
+# .tgz mysql-server downlaod files.<br />
+<strong> socket          = /tmp/mysql.sock</strong></p>
+<p><strong>default-character-set=utf8</strong></p>
+<p><strong>[mysqld]</strong></p>
+<p># For a new installation, best to use a strict sql_mode:</p>
+<p><strong>sql_mode=TRADITIONAL<br />
+datadir= [path to mysql data]<br />
+</strong># I prefer working case-sensitive. However, some 3rd party tools<br />
+# demand case insensitivity. If you&#8217;re working with such a tool,<br />
+# uncomment the following line.<br />
+<strong>#lower_case_table_names=1</strong></p>
+<p># 5-10 minutes timeout is usually more than required for idle<br />
+# connections. If a connection can be idle for so long, then<br />
+# creating a new connection is usually very cheap. This applies<br />
+# for many common web based applications. However, depending<br />
+# on your application, you may wish to set this parameter to a<br />
+# higher value.<br />
+<strong> wait_timeout=300</strong></p>
+<p># The following is unfortunately still used on many instances. If<br />
+# you need backwards compatability, you may need to uncomment<br />
+# the following line.<br />
+<strong> #old_passwords=1</strong></p>
+<p># generic configuration options<br />
+<strong> port            = 3306</strong><br />
+# Make sure this is the same location as in the [client] section<br />
+<strong> socket          = /tmp/mysql.sock</strong></p>
+<p><strong>back_log = 50<br />
+max_connect_errors = 10</strong></p>
+<p># Resources:<br />
+# The following values are liberal. You may reduce them<br />
+# according to your needs.<br />
+# NOTE: verify that your OS&#8217;s open files limit is at least as<br />
+# specified here.<br />
+# I usually set &#8216;ulimit -n&#8217; to allow for 8192 files to mysql.<br />
+<strong>open_files_limit = 8000<br />
+</strong># The following is usually cheap, so go ahead and set a high value.<br />
+<strong>table_cache = 2048<br />
+</strong># Connections take memory, so don;t be too liberal here. A common,<br />
+# well tuned application, using proper connection pools, shouldn&#8217;t<br />
+# require more than 1000 concurrent connections.<br />
+<strong>max_connections = 500</strong></p>
+<p># Memory:<br />
+# When required, the following parameters will be used to allocate<br />
+# more memory. The value specified is always the amount of memory<br />
+# allocated, regardless of the real need.<br />
+<strong>binlog_cache_size = 1M<br />
+max_heap_table_size = 64M<br />
+sort_buffer_size = 8M<br />
+join_buffer_size = 8M<br />
+</strong># The following value sets an upper limit only: MySQL will only<br />
+# allocate as much as required. Setting this parameters to a high<br />
+# value may be required if you&#8217;re handling very large statement,<br />
+# such as queries reading/writing BLOBs.<br />
+<strong>max_allowed_packet = 16M</strong></p>
+<p># Even on a very busy server, a thread cache of 32 threads is<br />
+# usually enough to make for good thread recycling. I rarely go<br />
+# above this number.<br />
+<strong>thread_cache_size = 32<br />
+thread_concurrency = 8</strong></p>
+<p># Query cache:<br />
+# Make sure you really need the query cache. I&#8217;ve seen many<br />
+# applications where the query cache almost utterly unused<br />
+# (due to frequent invalidation). Check for your hit:insert ratio.<br />
+# A query cache type of value &#8220;2&#8221; (DEMAND) is a more programmatic<br />
+# oriented setting, where most queries are not cached, but a few,<br />
+# recognized to benefit from the query cache, are executed with<br />
+# the SQL_CACHE flag.<br />
+<strong>query_cache_type = 1<br />
+query_cache_size = 32M<br />
+query_cache_limit = 2M</strong></p>
+<p><strong>ft_min_word_len = 4<br />
+</strong># I usually go with InnoDB, which is ACID compliant and crash-safe.<br />
+<strong>default_table_type = InnoDB</strong></p>
+<p><strong>thread_stack = 192K</strong></p>
+<p><strong>transaction_isolation = REPEATABLE-READ<br />
+tmp_table_size = 64M</strong></p>
+<p># Logs<br />
+# Having log-bin enabled allows for replication and for point in time<br />
+# recovery. It&#8217;s a good idea to always have binary logs at hand.<br />
+# binary logs can also be reviewed to see what kind of modifications<br />
+# are made on your database (the general query log also logs<br />
+# SELECTs and other queries, which do not appear in the binary log)<br />
+# I usually name the logs after my host name. When dealing with<br />
+# replication, having master and slave logs named after the machines<br />
+# on which they are running makes for clearer distinction between<br />
+# them.<br />
+<strong>log-bin=mymachine-bin<br />
+relay-log = mymachine-relay-bin<br />
+relay-log-index = mymachine-relay-bin.index<br />
+</strong># Since a slave can suddenly be promoted to Master&#8217;s role, I always<br />
+# take care that it also has the binary logs prepared.<br />
+<strong>log_slave_updates<br />
+log-error=mymachine-mysql-error.log<br />
+log_slow_queries<br />
+long_query_time = 2<br />
+log-queries-not-using-indexes<br />
+</strong># Automatically remove binary logs. Make sure this number is not too<br />
+# high and not too low for you, depending on your backups frequency<br />
+# and maximum slave lag.<br />
+<strong>expire_logs_days=7</strong></p>
+<p># Replication related settings:<br />
+# Unique server identification number between 1 and 2^32-1.<br />
+<strong>server-id = [a unique number]<br />
+</strong># Setting the report_host allows for SHOW SLAVE HOSTS on the master<br />
+# to see which slaves are connected.<br />
+<strong>report_host=[machine&#8217;s ip]<br />
+</strong># Limit the total size of the relay logs: set this value to a high enough<br />
+# value. When the slave can&#8217;t keep up with the master, the relay logs<br />
+# fill up. If no limit is set, all disk space can be consumed.<br />
+# If a value too low is set, the master&#8217;s binary logs cannot (shouldn&#8217;t)<br />
+# be purged, and so the master gets to have a disk space problem. So<br />
+# provide a high enough value, and monitor your disk space!<br />
+<strong>relay_log_space_limit=10G</strong></p>
+<p># MyISAM:<br />
+<strong>key_buffer_size = 32M<br />
+read_buffer_size = 2M<br />
+read_rnd_buffer_size = 16M<br />
+bulk_insert_buffer_size = 64M<br />
+myisam_sort_buffer_size = 128M<br />
+myisam_max_sort_file_size = 10G<br />
+myisam_max_extra_sort_file_size = 10G<br />
+myisam_repair_threads = 1<br />
+myisam_recover = force,backup</strong></p>
+<p><strong>concurrent_insert=2<br />
+</strong></p>
+<p># INNODB:</p>
+<p><strong>innodb_file_per_table<br />
+</strong># Your machine&#8217;s memory capacity dictates many of the following<br />
+# values. ***Do NOT take these values as they are. Change them***<br />
+<strong>innodb_buffer_pool_size = 10G<br />
+innodb_additional_mem_pool_size = 16M<br />
+innodb_data_file_path = ibdata1:50M:autoextend<br />
+innodb_file_io_threads = 4<br />
+</strong># Keep the following one commented, unless you need to recover<br />
+# from disaster.<br />
+<strong>#innodb_force_recovery=4<br />
+innodb_thread_concurrency = 8<br />
+</strong># Set &#8220;1&#8221; for full ACID compliance. Set &#8220;2&#8221; for IO performance gain<br />
+# (will only flush transaction log to disk once per second, instead<br />
+# of at each commit). If you have battery backed disk cache ,set<br />
+# to &#8220;1&#8221; and enjoy both worlds.<br />
+<strong>innodb_flush_log_at_trx_commit = 1<br />
+</strong># Keep the following one commented, unless you really have an<br />
+# emergency. Fast shutdown makes for slower start up time.<br />
+<strong>#innodb_fast_shutdown<br />
+innodb_log_buffer_size = 8M<br />
+</strong># The default here is 5M, which is really too low for our modern<br />
+# machines.<br />
+<strong>innodb_log_file_size = 128M<br />
+innodb_log_files_in_group = 2<br />
+innodb_max_dirty_pages_pct = 90<br />
+</strong># Consult The manual. The desired values for the following<br />
+# parameter change according to your OS type, OS version and<br />
+# hardware types. Benchmark after changing it!<br />
+<strong>#innodb_flush_method=O_DIRECT<br />
+innodb_lock_wait_timeout = 120</strong></p>
+<p><strong>[mysqldump]<br />
+quick<br />
+max_allowed_packet = 64M</strong></p>
+<p><strong>default-character-set=utf8</strong></p></blockquote>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-parameters-configuration-sample-file/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6</post-id>	</item>
+	</channel>
+</rss>

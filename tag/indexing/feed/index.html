@@ -1,0 +1,915 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Indexing &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/indexing/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 14 Nov 2012 09:20:08 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Purging old rows with QueryScript: three use cases</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/purging-old-rows-with-queryscript-three-use-cases</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/purging-old-rows-with-queryscript-three-use-cases#respond</comments>
+				<pubDate>Wed, 14 Nov 2012 09:15:35 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Bulk operations]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5157</guid>
+				<description><![CDATA[Problem: you need to purge old rows from a table. This may be your weekly/monthly cleanup task. The table is large, the amount of rows to be deleted is large, and doing so in one big DELETE is too heavy. You can use oak-chunk-update or pt-archiver to accomplish the task. You can also use server [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Problem: you need to purge old rows from a table. This may be your weekly/monthly cleanup task. The table is large, the amount of rows to be deleted is large, and doing so in one big <strong>DELETE</strong> is too heavy.</p>
+<p>You can use <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> or <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archiver</a> to accomplish the task. You can also use server side scripting with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a>, offering a very simple syntax with no external scripting, dependencies and command line options.</p>
+<p>I wish to present three cases of row deletion, with three different solutions. In all cases we assume some <strong>TIMESTAMP</strong> column exists in table, by which we choose to purge the row. In all cases we assume we wish to purge rows older than <strong>1</strong> month.</p>
+<p>We assume the naive query is this:</p>
+<blockquote>
+<pre>DELETE FROM my_schema.my_table WHERE row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH</pre>
+</blockquote>
+<h4>Case 1: TIMESTAMP column is indexed</h4>
+<p>I almost always index a timestamp column, if only for being able to quickly purge data (but usually also to slice data by date). In this case where the column is indexed, it&#8217;s very easy to figure out which rows are older than <strong>1</strong> month.</p>
+<p>We break the naive query into smaller parts, and execute these in sequence:<span id="more-5157"></span></p>
+<blockquote>
+<pre>while (<span style="color: #000080;"><strong>DELETE FROM</strong> my_schema.my_table <strong>WHERE</strong> row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH <strong>ORDER BY</strong> row_timestamp <strong>LIMIT</strong> 1000</span>)
+  throttle 1;</pre>
+</blockquote>
+<p>How does the above work?</p>
+<p>QueryScript accepts a <strong>DELETE</strong> statement as a conditional expression in a while loop. The expression evaluates to <strong>TRUE</strong> when the <strong>DELETE</strong> affects rows. Once the <strong>DELETE</strong> ceases to affect rows (when no more rows match the <strong>WHERE</strong> condition), the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_while.html"><strong>while</strong></a> loop terminates.</p>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_throttle.html"><strong>throttle</strong></a> command allows us to play <em>nice</em>: by throttling we increase the total runtime through sleeping in between loop iterations.</p>
+<h4>Case 2: TIMESTAMP column is not indexed, and there is no heuristic for matching rows</h4>
+<p>This case is hardest to tackle by means of optimization: there is no index, and we cannot assume or predict anything about the distribution of old rows. We must therefore scan the entire table so as to be able to purge old rows.</p>
+<p>This <em>does not</em> mean we have to do one huge full table scan. As long as we have some way to split the table, we are still good. We can utilize the <strong>PRIMARY KEY</strong> or another <strong>UNIQUE KEY</strong> so as to break the table into smaller, distinct parts, and work our way on these smaller chunks:</p>
+<blockquote>
+<pre><strong>split</strong> (<span style="color: #000080;">DELETE FROM my_schema.my_table WHERE row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH</span>)
+  throttle 1;</pre>
+</blockquote>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> statement will automagically calculate the chunks and inject filtering conditions onto the query, such that each execution of the query relates to a distinct set of rows.</p>
+<h4>Case 3: TIMESTAMP column not indexed, but known to be monotonic</h4>
+<p>This is true for many tables. Rows with <strong>AUTO_INCREMENT</strong> columns and <strong>TIMESTAMP</strong> columns are created with <strong>CURRENT_TIMESTAMP</strong> values. This makes for a monotonic function: as the <strong>AUTO_INCREMENT</strong> grows, so does the <strong>TIMESTAMP</strong>.</p>
+<p>This makes for the following observation: it we iterate the table row by row, and reach a point where the current row is not old, then we can stop looking. Timestamps will only increase by value, which means further rows only turn to be <em>newer</em>.</p>
+<p>With this special case at hand, we can:</p>
+<blockquote>
+<pre><strong>split</strong> (<span style="color: #000080;"><strong></strong>DELETE FROM my_schema.my_table WHERE row_timestamp &lt; CURDATE() - INTERVAL 1 MONTH</span>) {
+  if (<strong>$split_rowcount</strong> = 0)
+    break;
+  throttle 1;
+}</pre>
+</blockquote>
+<p><em>split</em> is a looping device, and a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_break.html"><strong>break</strong></a> statement works on <em>split</em> just as on a <strong>while</strong> statement.</p>
+<p><em>split</em> provides with magic variables which describe current chunk status. <strong>$split_rowcount</strong> relates to the number of rows affected by last chunk query. No more rows affected? This means we&#8217;ve hit recent rows, and we do not expect to find old rows any further. We can stop looking.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/purging-old-rows-with-queryscript-three-use-cases/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5157</post-id>	</item>
+		<item>
+		<title>How common_schema split()s tables &#8211; internals</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals#comments</comments>
+				<pubDate>Thu, 06 Sep 2012 05:25:07 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035</guid>
+				<description><![CDATA[This post exposes some of the internals, and the SQL behind QueryScript&#8217;s split. common_schema/QueryScript 1.1 introduces the split statement, which auto-breaks a &#8220;large&#8221; query (one which operates on large tables as a whole or without keys) into smaller queries, and executes them in sequence. This makes for easier transactions, less locks held, potentially (depending on [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post exposes some of the internals, and the SQL behind QueryScript&#8217;s <em>split</em>. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">common_schema/QueryScript</a> <strong>1.1</strong> introduces the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> statement, which auto-breaks a &#8220;large&#8221; query (one which operates on large tables as a whole or without keys) into smaller queries, and executes them in sequence.</p>
+<p>This makes for easier transactions, less locks held, potentially (depending on the user) more idle time released back to the database. <em>split<strong></strong></em> has similar concepts to <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> and <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archiver</a>, but works differently, and implemented entirely in SQL on server side.</p>
+<p>Take the following statement as example:</p>
+<blockquote>
+<pre><strong>split</strong> (<strong>UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR</strong>)
+  pass;</pre>
+</blockquote>
+<p>It yields with (roughly) the following statements:</p>
+<blockquote>
+<pre>UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '1')) OR ((`inventory`.`inventory_id` = '1'))) AND (((`inventory`.`inventory_id` &lt; '1000')) OR ((`inventory`.`inventory_id` = '1000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '1000'))) AND (((`inventory`.`inventory_id` &lt; '2000')) OR ((`inventory`.`inventory_id` = '2000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '2000'))) AND (((`inventory`.`inventory_id` &lt; '3000')) OR ((`inventory`.`inventory_id` = '3000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '3000'))) AND (((`inventory`.`inventory_id` &lt; '4000')) OR ((`inventory`.`inventory_id` = '4000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '4000'))) AND (((`inventory`.`inventory_id` &lt; '4581')) OR ((`inventory`.`inventory_id` = '4581'))));</pre>
+</blockquote>
+<p>(I say &#8220;roughly&#8221; because internally there are user defined variables at play, but for convenience, I verbose the actual values as constants.)</p>
+<h4>How does that work?</h4>
+<p><em>common_schema</em> works on server side. There is no Perl script or anything. It must therefore use server-side operations to:</p>
+<ul>
+<li>Identify table to be split</li>
+<li>Analyze the table in the first place, deciding how to split it</li>
+<li>Analyze the query, deciding on how to rewrite it</li>
+<li>Split the table (logically) into unique and distinct chunks</li>
+<li>Work out the query on each such chunk</li>
+</ul>
+<p>Following is an internal look at how <em>common_schema</em> does all the above.<span id="more-5035"></span></p>
+<h4>Identifying the table</h4>
+<p>When query operates on a single table, <em>split</em> is able to parse the query&#8217;s SQL and find out that table. When multiple tables are involved, <em>split</em> requires user instruction: which table is it that the query should be split by?</p>
+<h4>Analyzing the table</h4>
+<p>Table analysis is done via a <em>similar</em> method to <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/candidate_keys_recommended.html">candidate_keys_recommended</a>. It is almost identical, only it uses <a href="http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html">INFORMATION_SCHEMA optimizations</a> to make the query short and lightweight. Simulating the analysis using <strong>candidate_keys_recommended</strong>, we get:</p>
+<blockquote>
+<pre>mysql&gt; select * from candidate_keys_recommended where table_name='inventory' \G
+*************************** 1. row ***************************
+          table_schema: sakila
+            table_name: inventory
+recommended_index_name: PRIMARY
+          has_nullable: 0
+            is_primary: 1
+ count_column_in_index: 1
+          column_names: inventory_id</pre>
+</blockquote>
+<p>This is cool, simple and very easy to work with: we choose to split the table via the <strong>inventory_id</strong> column, which is conveniently an integer. We&#8217;ll soon see <em>split</em> can handle complex cases as well.</p>
+<h4>Analyzing the query</h4>
+<p>This is done in part via Roland&#8217;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_analysis_routines.html">query_analysis_routines</a>, and in part just parsing the query, looking for <strong>WHERE</strong>,<strong> GROUP BY</strong>, <strong>LIMIT</strong> etc. clauses.</p>
+<p>The nice part is injecting a <strong>WHERE</strong> condition, which didn&#8217;t appear in the original query. That <strong>WHERE</strong> condition is what limits the query to a distinct chunk of rows.</p>
+<h4>Splitting the table</h4>
+<p>With a single <strong>INTEGER PRIMARY KEY</strong> this sounds simple, right? Take rows <strong>1..1,000</strong>, then <strong>1,001..2,000</strong>, then <strong>2,001..3,000</strong> etc.</p>
+<p>Wrong: even with this simple scenario, things are much more complex. Are the numbers successive? What if there are holes? What if there is a <strong>1,000,000</strong> gap between every two numbers? What if there are multiple holes of differing size and frequency?</p>
+<p>And if we have two columns in our <strong>UNIQUE KEY</strong>? What if one of them is textual, not an <strong>INTEGER</strong>, the other a <strong>TIMESTAMP</strong>, not an <strong>INTEGER</strong> either?</p>
+<p><em>split</em> doesn&#8217;t work in that naive way. It makes no assumptions on the density of values. It only requires:</p>
+<ul>
+<li>some <strong>UNIQUE KEY</strong> to work with,</li>
+<li>which has no <strong>NULL</strong> values.</li>
+</ul>
+<p>Given the above, it uses <em>User Defined Variables</em> to setup the chunks. With our single <strong>INTEGER</strong> column, the minimum value is set like this:</p>
+<blockquote>
+<pre>select 
+  inventory_id 
+from 
+  `sakila`.`inventory` 
+order by 
+  inventory_id ASC 
+limit 1  
+into @_split_column_variable_min_1
+;</pre>
+</blockquote>
+<p>This sets the first value of the first chunk. What value terminates this chunk? It is calculated like this:</p>
+<blockquote>
+<pre>select 
+  inventory_id 
+from (
+  select 
+    inventory_id 
+  from 
+    `sakila`.`inventory` 
+  where 
+    (((`inventory`.`inventory_id` &gt; @_split_column_variable_range_start_1)) OR ((`inventory`.`inventory_id` = @_split_column_variable_range_start_1))) and (((`inventory`.`inventory_id` &lt; @_split_column_variable_max_1)) OR ((`inventory`.`inventory_id` = @_split_column_variable_max_1))) 
+  order by 
+    inventory_id ASC limit 1000 
+  ) sel_split_range  
+order by 
+  inventory_id DESC 
+limit 1  
+into @_split_column_variable_range_end_1
+;</pre>
+</blockquote>
+<p>Now there&#8217;s a query you wouldn&#8217;t want to work by hand, now would you?</p>
+<p>The cool part here is that the above works well for any type of column; this doesn&#8217;t have to be an <strong>INTEGER</strong>. Dates, strings etc. are all just fine.</p>
+<p>The above also works well for multiple columns, where the query gets more complicated (see following).</p>
+<h4>Working out the query per chunk</h4>
+<p>This part is the easy one, now that all the hard work is done. We know ho to manipulate the query, we know the lower and upper boundaries of the chunk, so we just fill in the values and execute.</p>
+<h4>Multi-columns keys</h4>
+<p>Consider a similar query on <strong>sakila.film_actor</strong>, where the <strong>PRIMARY KEY</strong> is a compound of two columns:</p>
+<blockquote>
+<pre>split (UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR)
+  throttle 2;</pre>
+</blockquote>
+<p>The chunked queries will look like this:</p>
+<blockquote>
+<pre>UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '1')) OR ((`film_actor`.`actor_id` = '1') AND (`film_actor`.`film_id` &gt; '1')) OR ((`film_actor`.`actor_id` = '1') AND (`film_actor`.`film_id` = '1'))) AND (((`film_actor`.`actor_id` &lt; '39')) OR ((`film_actor`.`actor_id` = '39') AND (`film_actor`.`film_id` &lt; '293')) OR ((`film_actor`.`actor_id` = '39') AND (`film_actor`.`film_id` = '293'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '39')) OR ((`film_actor`.`actor_id` = '39') AND (`film_actor`.`film_id` &gt; '293'))) AND (((`film_actor`.`actor_id` &lt; '76')) OR ((`film_actor`.`actor_id` = '76') AND (`film_actor`.`film_id` &lt; '234')) OR ((`film_actor`.`actor_id` = '76') AND (`film_actor`.`film_id` = '234'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '76')) OR ((`film_actor`.`actor_id` = '76') AND (`film_actor`.`film_id` &gt; '234'))) AND (((`film_actor`.`actor_id` &lt; '110')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` &lt; '513')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` = '513'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '110')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` &gt; '513'))) AND (((`film_actor`.`actor_id` &lt; '146')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` &lt; '278')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` = '278'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '146')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` &gt; '278'))) AND (((`film_actor`.`actor_id` &lt; '183')) OR ((`film_actor`.`actor_id` = '183') AND (`film_actor`.`film_id` &lt; '862')) OR ((`film_actor`.`actor_id` = '183') AND (`film_actor`.`film_id` = '862'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '183')) OR ((`film_actor`.`actor_id` = '183') AND (`film_actor`.`film_id` &gt; '862'))) AND (((`film_actor`.`actor_id` &lt; '200')) OR ((`film_actor`.`actor_id` = '200') AND (`film_actor`.`film_id` &lt; '993')) OR ((`film_actor`.`actor_id` = '200') AND (`film_actor`.`film_id` = '993'))));</pre>
+</blockquote>
+<p>View the complete command to realize just how much more complex each query is, and how much more complex the chunking becomes. Here&#8217;s how I evaluate the chunk&#8217;s &#8220;next range end&#8221; variables:</p>
+<blockquote>
+<pre>select 
+  actor_id, film_id 
+from (
+  select 
+    actor_id, film_id 
+  from 
+    `sakila`.`film_actor` 
+  where 
+    (((`film_actor`.`actor_id` &gt; @_split_column_variable_range_start_1)) OR ((`film_actor`.
+`actor_id` = @_split_column_variable_range_start_1) AND (`film_actor`.`film_id` &gt; @_split_column_variable_range_start_2))) and (((`film_actor`.`actor_id` &lt; @_split_column_variable_max_1)) OR ((`film_actor`.`actor_id` = @_split_column_variable_max_1) AND (`film_actor`.`film_id` &lt; @_split_column_variable_max_2)) OR ((`film_actor`.`actor_id` = @_split_column_variable_max_1) AND (`film_actor`.`film_id` = @_split_column_variable_max_2))) 
+  order by 
+    actor_id ASC, film_id ASC 
+  limit 1000 
+  ) sel_split_range  
+order by 
+  actor_id DESC, film_id DESC 
+limit 1  
+into @_split_column_variable_range_end_1, @_split_column_variable_range_end_2
+;</pre>
+</blockquote>
+<p>By the way, you may recall that everything is done server side. The <strong>WHERE</strong> condition for the chunked queries is in itself generated via SQL statement, and not too much by programmatic logic. Here&#8217;s <em>part</em> of the query which computes the limiting condition:</p>
+<blockquote>
+<pre>  select
+    group_concat('(', partial_comparison, ')' order by n separator ' OR ') as comparison
+  from (
+    select 
+      n,
+      group_concat('(', column_name, ' ', if(is_last, comparison_operator, '='), ' ', variable_name, ')' order by column_order separator ' AND ') as partial_comparison
+    from (
+      select 
+        n, CONCAT(mysql_qualify(split_table_name), '.', mysql_qualify(column_name)) AS column_name,
+        case split_variable_type
+          when 'range_start' then range_start_variable_name
+          when 'range_end' then range_end_variable_name
+          when 'max' then max_variable_name
+        end as variable_name,
+        _split_column_names_table.column_order, _split_column_names_table.column_order = n as is_last 
+      from 
+        numbers, _split_column_names_table 
+      where 
+        n between _split_column_names_table.column_order and num_split_columns 
+      order by n, _split_column_names_table.column_order
+    ) s1
+    group by n
+  ) s2
+  into return_value
+  ;</pre>
+</blockquote>
+<p>There is a lot of complexity to <em>split</em> to make it able to provide with as clean a syntax for the user as possible.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5035</post-id>	</item>
+		<item>
+		<title>Table split(&#8230;) for the masses</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/table-split-for-the-masses</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/table-split-for-the-masses#respond</comments>
+				<pubDate>Wed, 05 Sep 2012 05:04:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5034</guid>
+				<description><![CDATA[(pun intended) common_schema&#8216;s new split statement (see release announcement) auto-splits complex queries over large tables into smaller ones: instead of issuing one huge query, split breaks one&#8217;s query into smaller queries, each working on a different set of rows (a chunk). Thus, it is possible to avoid holding locks for long times, allowing for smaller [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>(pun intended)</p>
+<p><em>common_schema</em>&#8216;s new <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> statement (see <a href="https://shlomi-noach.github.io/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling">release announcement</a>) auto-splits complex queries over large tables into smaller ones: instead of issuing one huge query, <em>split</em> breaks one&#8217;s query into smaller queries, each working on a different set of rows (a chunk).</p>
+<p>Thus, it is possible to avoid holding locks for long times, allowing for smaller transactions. It also makes for breathing space for the RDBMS, at times boosting operation speed, and at times prolonging operation speed at will.</p>
+<p>In this post I show how <em>split</em> exposes itself to the user, should the user wish so.</p>
+<p><em>split</em> can manage queries of the following forms:</p>
+<ul>
+<li>DELETE FROM table_name [WHERE]&#8230;</li>
+<li>DELETE FROM table_name USING &lt;multi table syntax&gt; [WHERE]&#8230;</li>
+<li>UPDATE table_name SET &#8230; [WHERE]&#8230;</li>
+<li>UPDATE &lt;multiple tables&gt; SET &#8230; [WHERE]&#8230;</li>
+<li>INSERT INTO some_table SELECT &#8230; FROM &lt;single or multiple tables&gt; [WHERE]&#8230;</li>
+<li>REPLACE INTO some_table SELECT &#8230; FROM &lt;single or multiple tables&gt; [WHERE]&#8230;</li>
+<li>SELECT &#8230; FROM &lt;multiple tables&gt; [WHERE]&#8230;</li>
+</ul>
+<p>The latter being a non-obvious one at first sight.</p>
+<h4>Basically, it&#8217; automatic</h4>
+<p>You just say:</p>
+<blockquote>
+<pre><strong>split</strong> (UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR)
+  throttle 2;</pre>
+</blockquote>
+<p>And <em>split</em> identifies <strong>sakila.inventory</strong> as the table which needs to be split, and injects appropriate conditions so as to work on a subset of the rows, in multiple steps.</p>
+<p>By the way, here&#8217;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_execution.html">how to execute a QueryScript code</a> like the above.<span id="more-5034"></span></p>
+<h4>But you can drive in manual mode</h4>
+<p>You can use the following syntax:</p>
+<blockquote>
+<pre><strong>split</strong> (sakila.inventory)
+{
+  -- No action taken, but this block of code
+  -- is executed per chunk of the table.
+  -- I wonder what can be done here?
+}</pre>
+</blockquote>
+<p><em>split</em> provides with <em>magic variables</em>, which you can use in the action block. These are:</p>
+<ul>
+<li><strong>$split_step</strong>: <strong>1</strong>-based loop counter</li>
+<li><strong>$split_rowcount</strong>: number of rows affected in current chunk operation</li>
+<li><strong>$split_total_rowcount</strong>: total number of rows affected during this <em>split</em> statement</li>
+<li><strong>$split_total_elapsed_time</strong>: number of seconds elapsed since beginning of this <em>split</em> operation.</li>
+<li><strong>$split_clause</strong>: <em>the</em> magic variable: the filtering condition limiting rows to current chunk.</li>
+<li><strong>$split_table_schema</strong>: the explicit or inferred schema of split table</li>
+<li><strong>$split_table_name</strong>: the explicit or inferred table being split</li>
+</ul>
+<p>To illustrate, consider the following script:</p>
+<blockquote>
+<pre><strong>split</strong> (sakila.inventory)
+{
+  select <strong>$split_step</strong> as step, <strong>$split_clause</strong> as clause;
+}</pre>
+</blockquote>
+<p>The output is this:</p>
+<blockquote>
+<pre>+------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                                                                    |
++------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|    1 | ((((`inventory`.`inventory_id` &gt; '1')) OR ((`inventory`.`inventory_id` = '1'))) AND (((`inventory`.`inventory_id` &lt; '1000')) OR ((`inventory`.`inventory_id` = '1000')))) |
++------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    2 | ((((`inventory`.`inventory_id` &gt; '1000'))) AND (((`inventory`.`inventory_id` &lt; '2000')) OR ((`inventory`.`inventory_id` = '2000')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    3 | ((((`inventory`.`inventory_id` &gt; '2000'))) AND (((`inventory`.`inventory_id` &lt; '3000')) OR ((`inventory`.`inventory_id` = '3000')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    4 | ((((`inventory`.`inventory_id` &gt; '3000'))) AND (((`inventory`.`inventory_id` &lt; '4000')) OR ((`inventory`.`inventory_id` = '4000')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    5 | ((((`inventory`.`inventory_id` &gt; '4000'))) AND (((`inventory`.`inventory_id` &lt; '4581')) OR ((`inventory`.`inventory_id` = '4581')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>So you can get yourself a nice present: the SQL clause which filters the distinct chunks.</p>
+<h4>A simple demo: what can the user do with &#8220;manual mode&#8221;?</h4>
+<p>Normally, I would expect the user to use the automated version of <em>split</em>. Let it do the hard work! But sometimes, you may wish to take control into your hands.</p>
+<p>Consider an example: I wish to export a table into CSV file, but in chunks. <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archiver</a> does that. But it is also easily achievable with <em>split</em>:</p>
+<blockquote>
+<pre><strong>split</strong> (sakila.inventory) {
+  var <strong>$file_name</strong> := QUOTE(CONCAT('/tmp/inventory_chunk_', <strong>$split_step</strong>, '.csv'));
+  select * from sakila.inventory WHERE <strong>:${split_clause}</strong> INTO OUTFILE <strong>:${file_name}</strong>;
+}</pre>
+</blockquote>
+<p>This script uses the powerful <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_variables.html">variable expansion</a> feature of QueryScript: it extracts the text behind <strong></strong><strong>:${split_clause}</strong> and plants it as part of the query. It does the same for <strong></strong><strong>:${file_name}</strong>, making a variable possible where MySQL would normally disallow one (the <strong>INTO OUTFILE</strong> clause only accepts a constant string).</p>
+<p>What do we get as result?</p>
+<blockquote>
+<pre><strong>bash:/tmp$ ls -s1 inventory_chunk_*</strong>
+32 inventory_chunk_1.csv
+32 inventory_chunk_2.csv
+32 inventory_chunk_3.csv
+32 inventory_chunk_4.csv
+20 inventory_chunk_5.csv</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>During the past months, and even as I developed <em>split</em> for <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a>, I found myself using it more and more for my own purposes. As it evolved I realized how much more simple it makes these complex operations. Heck, it beats <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> in its ease of use. They both have their place, but <em>split</em> is so much more intuitive and easy to write. And, no external scripts, no package dependencies.</p>
+<p>I suggest that <em>split</em> is a major tool for server side scripting, server maintenance, developer operations. <a href="http://code.google.com/p/common-schema/">Check it out</a>!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/table-split-for-the-masses/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5034</post-id>	</item>
+		<item>
+		<title>common_schema rev. 68: eval(), processlist_grantees, candidate_keys, easter_day()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-68-eval-processlist_grantees-candidate_keys-easter_day</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-68-eval-processlist_grantees-candidate_keys-easter_day#respond</comments>
+				<pubDate>Tue, 06 Sep 2011 07:05:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3952</guid>
+				<description><![CDATA[Revision 68 of common_schema is out, and includes some interesting features: eval(): Evaluates the queries generated by a given query match_grantee(): Match an existing account based on user+host processlist_grantees: Assigning of GRANTEEs for connected processes candidate_keys: Listing of prioritized candidate keys: keys which are UNIQUE, by order of best-use. easter_day(): Returns DATE of easter day [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>68</strong> of <a rel="nofollow" href="http://code.google.com/p/common-schema/">common_schema</a> is out, and includes some interesting features:</p>
+<ul>
+<li><strong>eval()</strong>: Evaluates the queries generated by a given query</li>
+<li><strong>match_grantee()</strong>: Match an existing account based on user+host</li>
+<li><strong>processlist_grantees</strong>: Assigning of GRANTEEs for connected processes</li>
+<li><strong>candidate_keys</strong>: Listing of prioritized candidate keys: keys which are UNIQUE, by order of best-use.</li>
+<li><strong>easter_day()</strong>: Returns DATE of easter day in given DATETIME&#8217;s year.</li>
+</ul>
+<p>Let&#8217;s take a slightly closer look at these:</p>
+<h4>eval()</h4>
+<p>I&#8217;ve dedicated this blog post on <a href="https://shlomi-noach.github.io/blog/mysql/mysql-eval">MySQL eval()</a> to describe it. In simple summary: <strong>eval()</strong> takes a query which generates queries (most common use queries on <strong>INFORMATION_SCHEMA</strong>) and auto-evaluates (executes) those queries. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/general_procedures.html#eval">Read more</a></p>
+<h4>match_grantee()</h4>
+<p>As presented in <a title="Link to Finding CURRENT_USER for any user" rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/finding-current_user-for-any-user">Finding CURRENT_USER for any user</a>, I&#8217;ve developed the algorithm to match a connected user+host details (as presented with <strong>PROCESSLIST</strong>) with the grantee tables (i.e. the <strong>mysql.user</strong> table), in a manner which simulates the MySQL server account matching algorithm.</p>
+<p>This is now available as a stored function: given a user+host, the function returns with the best matched grantee. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/privileges_functions.html#match_grantee">Read more</a></p>
+<h4>processlist_grantees</h4>
+<p>This view relies on the above, and maps the entire <strong>PROCESSLIST</strong> onto GRANTEEs. The view maps each process onto the GRANTEE (MySQL account) which is the owner of that process. Surprisingly, MySQL does not provide one with such information.<span id="more-3952"></span></p>
+<p>The view also provides with the following useful metadata:</p>
+<ul>
+<li>Is said process executes under a SUPER privilege?</li>
+<li>Is this a replication thread, or serving a replicating client?</li>
+<li>Is this process the current connection (myself)?</li>
+</ul>
+<p>In the spirit of <strong>common_schema</strong>, it provides with the SQL commands necessary to <strong>KILL</strong> and <strong>KILL QUERY</strong> for each process. A sample output:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM common_schema.processlist_grantees;
++--------+------------+---------------------+------------------------+--------------+--------------+----------+---------+-------------------+---------------------+
+| ID     | USER       | HOST                | GRANTEE                | grantee_user | grantee_host | is_super | is_repl | sql_kill_query    | sql_kill_connection |
++--------+------------+---------------------+------------------------+--------------+--------------+----------+---------+-------------------+---------------------+
+| 650472 | replica    | jboss00.myweb:34266 | 'replica'@'%.myweb'    | replica      | %.myweb      |        0 |       1 | KILL QUERY 650472 | KILL 650472         |
+| 692346 | openarkkit | jboss02.myweb:43740 | 'openarkkit'@'%.myweb' | openarkkit   | %.myweb      |        0 |       0 | KILL QUERY 692346 | KILL 692346         |
+| 842853 | root       | localhost           | 'root'@'localhost'     | root         | localhost    |        1 |       0 | KILL QUERY 842853 | KILL 842853         |
+| 843443 | jboss      | jboss03.myweb:40007 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 843443 | KILL 843443         |
+| 843444 | jboss      | jboss03.myweb:40012 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 843444 | KILL 843444         |
+| 843510 | jboss      | jboss00.myweb:49850 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 843510 | KILL 843510         |
+| 844559 | jboss      | jboss01.myweb:37031 | 'jboss'@'%.myweb'      | jboss        | %.myweb      |        0 |       0 | KILL QUERY 844559 | KILL 844559         |
++--------+------------+---------------------+------------------------+--------------+--------------+----------+---------+-------------------+---------------------+</pre>
+</blockquote>
+<p>Finally, it is now possible to execute the following:  “Kill all slow queries which are not executed by users with the SUPER privilege or are replication threads”. To just generate the commands, execute:</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>sql_kill_connection</strong> FROM <strong>common_schema.processlist_grantees</strong> WHERE is_super = 0 AND is_repl = 0;</pre>
+</blockquote>
+<p>Sorry, did you only want to kill the queries? Those which are very slow? Do as follows:</p>
+<blockquote>
+<pre>mysql&gt; SELECT sql_kill_connection FROM common_schema.processlist_grantees JOIN INFORMATION_SCHEMA.PROCESSLIST <strong>USING(ID)</strong> WHERE <strong>TIME &gt; 10</strong> AND is_super = 0 AND is_repl = 0;</pre>
+</blockquote>
+<p>But, really, we don&#8217;t just want <em>commands</em>. We really want to execute this!</p>
+<p>Good! Step in <strong>eval()</strong>:</p>
+<blockquote>
+<pre>mysql&gt; CALL common_schema.<strong>eval</strong>('SELECT <strong>sql_kill_query</strong> FROM common_schema.processlist_grantees JOIN INFORMATION_SCHEMA.PROCESSLIST USING(id) WHERE TIME &gt; 10 AND is_super = 0 AND is_repl = 0');</pre>
+</blockquote>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_grantees.html">Read more</a></p>
+<h4>candidate_keys</h4>
+<p>A view which lists the candidate keys for tables and provides ranking for those keys, based on some simple heuristics.</p>
+<p>This view uses  the same algorithm as that used by <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> and <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a>, tools in the <a href="http://code.openark.org/forge/openark-kit">openark kit</a>. So it provides with a way to choose the best candidate key to walk through a table. At current, a table&#8217;s <strong>PRIMARY KEY</strong> is always considered to be best, because of InnoDB&#8217;s structure of clustered index. But I intend to change that as well and provide general recommendation about candidate keys (so for example, I would be able to recommend that the <strong>PRIMARY KEY</strong> is not optimal for some table).</p>
+<p>Actually, after a discussion initiated by Giuseppe and Roland, starting <a href="http://datacharmer.blogspot.com/2011/09/finding-tables-without-primary-keys.html">here</a> and continuing on mail, there are more checks to be made for candidate keys, and I suspect the next version of <em>candidate_keys</em> will be more informational.</p>
+<p><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/candidate_keys.html">Read more</a></p>
+<h4>easter_day()</h4>
+<p>Many thanks to <a href="http://rpbouman.blogspot.com/">Roland Bouman</a> who suggested his code for calculating easter day for a given year. <em>Weehee!</em> This is the first contribution to <em>common_schema</em>! <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/time_functions.html#easter_day">Read more</a></p>
+<h4>Get it</h4>
+<p><em>common_schema</em> is an open source project. It is released under the BSD license.</p>
+<p><a href="http://code.google.com/p/common-schema/">Find it here</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-rev-68-eval-processlist_grantees-candidate_keys-easter_day/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3952</post-id>	</item>
+		<item>
+		<title>Announcing common_schema: common views &#038; routines for MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql#comments</comments>
+				<pubDate>Wed, 13 Jul 2011 04:25:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3794</guid>
+				<description><![CDATA[Today I have released common_schema, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server. What does it do? There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &#38; transactions, security, internals&#8230; There are [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Today I have released <a title="common_schema" href="http://code.openark.org/forge/common_schema">common_schema</a>, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server.</p>
+<h4>What does it do?</h4>
+<p>There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &amp; transactions, security, internals&#8230; There are basic functions answering for common needs.</p>
+<p>Some of the views/routines simply formalize those queries we tend to write over and over again. Others take the place of external tools, answering complex questions via SQL and metadata. Still others help out with SQL generation.</p>
+<p>Here are a few highlights:</p>
+<ul>
+<li>Did you know you can work out <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/global_status_diff_nonzero.html">simple monitoring</a> of your server with a <em>query</em>?  There&#8217;s a view to do that for you.</li>
+<li>How about showing just <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_top.html">the good parts of the processlist</a>?</li>
+<li>Does your schema have <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">redundant keys</a>?</li>
+<li>Or InnoDB tables with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/no_pk_innodb_tables.html">no PRIMARY KEY</a>?</li>
+<li>Is AUTO_INCREMENT <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/auto_increment_columns.html">running out of space</a>?</li>
+<li>Can I get the SQL statements to <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">generate my FOREIGN KEYs</a>? To drop them?</li>
+<li>And can we finally get <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">SHOW GRANTS for all accounts</a>, and as an <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">SQL query</a>?</li>
+<li>Ever needed a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/general_functions.html#crc64">64 bit CRC function</a>?</li>
+<li>And aren&#8217;t you tired of writing the cumbersome SUBSTRING_INDEX(SUBSTRING_INDEX(str, &#8216;,&#8217;, 3), &#8216;,&#8217;, -1)? <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/string_functions.html#split_token">There&#8217;s an alternative</a>.</li>
+</ul>
+<p>There&#8217;s more. Take a look at the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html">common_schema documentation</a> for full listing. And it&#8217;s evolving: I&#8217;ve got quite a few ideas already for future components.</p>
+<p>Some of these views rely on heavyweight INFORMATION_SCHEMA tables. You should be aware of the impact and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/risks.html">risks</a>.</p>
+<h4>What do I need to install?</h4>
+<p>There&#8217;s no script or executable file. It&#8217;s just a schema. The distribution in an SQL file which generates <em>common_schema</em>. Much like a dump file.</p>
+<h4><span id="more-3794"></span>What are the system requirements?</h4>
+<p>It&#8217;s just between you and your MySQL. There are currently three distribution files, dedicated for different versions of MySQL (and allowing for increased functionality):</p>
+<ul>
+<li><strong>common_schema_mysql_51</strong>: fits all MySQL &gt;= 5.1 distributions</li>
+<li><strong>common_schema_innodb_plugin</strong>: fits MySQL &gt;= 5.1, with InnoDB plugin + INFORMATION_SCHEMA tables enabled</li>
+<li><strong>common_schema_percona_server</strong>: fits Percona Server &gt;= 5.1</li>
+</ul>
+<p>Refer to the <a rel="nofollow" href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/download.html">documentation</a> for more details.</p>
+<h4>What are the terms of use?</h4>
+<p><em>common_schema</em> is released under the <a href="http://www.opensource.org/licenses/bsd-license.php">BSD license</a>.</p>
+<h4>Where can I download it?</h4>
+<p>On the <a href="http://code.google.com/p/common-schema/">common_schema project page</a>. Enjoy it!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3794</post-id>	</item>
+		<item>
+		<title>Reasons to use AUTO_INCREMENT columns on InnoDB</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reasons-to-use-auto_increment-columns-on-innodb</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reasons-to-use-auto_increment-columns-on-innodb#comments</comments>
+				<pubDate>Tue, 22 Mar 2011 06:31:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Schema]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3196</guid>
+				<description><![CDATA[An InnoDB table must have a primary key (one is created if you don&#8217;t do it yourself). You may have a natural key at hand. Stop! Allow me to suggest an AUTO_INCREMENT may be better. Why should one add an AUTO_INCREMENT PRIMARY KEY on a table on which there&#8217;s a natural key? Isn&#8217;t an AUTO_INCREMENT [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>An InnoDB table must have a primary key (one is created if you don&#8217;t do it yourself). You may have a <a href="http://en.wikipedia.org/wiki/Natural_key">natural key</a> at hand. Stop! Allow me to suggest an AUTO_INCREMENT may be better.</p>
+<p>Why should one add an AUTO_INCREMENT PRIMARY KEY on a table on which there&#8217;s a natural key? Isn&#8217;t an AUTO_INCREMENT a pseudo key, meaning, it doesn&#8217;t have any explicit relation to the row data, other than it is a number and unique?</p>
+<p>Yes, indeed so. Nevertheless, consider:</p>
+<ul>
+<li>Natural keys are many times multi-columned.</li>
+<li>Multi column PRIMARY KEYs make for larger keys, and make for bloated secondary keys as well. You may be wasting space for storing the additional AUTO_INCREMENT column, but you may gain space back on secondary keys.</li>
+<li>Multi column PRIMARY KEYs make for more locks. See also <a href="https://shlomi-noach.github.io/blog/mysql/reducing-locks-by-narrowing-primary-key">this post</a>.</li>
+<li>InnoDB INSERTs work considerably faster when worked in ascending PRIMARY KEY order. Can you ensure your natural key is in such order?</li>
+<li>Even though an AUTO_INCREMENT makes for an INSERT bottleneck (values must be given serially), it is in particular helpful to InnoDB by ensuring PRIMARY KEY values are in ascending order.</li>
+<li>AUTO_INCEMENT makes for chronological resolution. You <em>know</em> what came first, and what came next.</li>
+<li>In many datasets, more recent entries are often being accessed more, and are therefore &#8220;hotter&#8221;. By using AUTO_INCREMENT, you&#8217;re ensuring that recent entries are grouped together within the B+ Tree. This means less random I/O when looking for recent data.</li>
+<li>A numerical key is in particular helpful in splitting your table (and tasks on your table) into smaller chunks. I write <a href="http://code.google.com/p/openarkkit/">tools</a> which can work out with any PRIMARY KEY combination, but it&#8217;s easier to work with numbers.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reasons-to-use-auto_increment-columns-on-innodb/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3196</post-id>	</item>
+		<item>
+		<title>Multi condition UPDATE query</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/multi-condition-update-query</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/multi-condition-update-query#comments</comments>
+				<pubDate>Thu, 27 Jan 2011 08:30:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2401</guid>
+				<description><![CDATA[A simple question I&#8217;ve been asked: Is it possible to merge two UPDATE queries, each on different WHERE conditions, into a single query? For example, is it possible to merge the following two UPDATE statements into one? mysql&#62; UPDATE film SET rental_duration=rental_duration+1 WHERE rating = 'G'; Query OK, 178 rows affected (0.01 sec) mysql&#62; UPDATE [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A simple question I&#8217;ve been asked:</p>
+<p>Is it possible to merge two <strong>UPDATE</strong> queries, each on different <strong>WHERE</strong> conditions, into a single query?</p>
+<p>For example, is it possible to merge the following two <strong>UPDATE</strong> statements into one?</p>
+<blockquote>
+<pre>mysql&gt; <strong>UPDATE</strong> film <strong>SET</strong> rental_duration=rental_duration+1 <strong>WHERE</strong> rating = 'G';
+Query OK, 178 rows affected (0.01 sec)
+
+mysql&gt; <strong>UPDATE</strong> film <strong>SET</strong> rental_rate=rental_rate-0.5 <strong>WHERE</strong> length &lt; 90;
+Query OK, 320 rows affected (0.01 sec)
+</pre>
+</blockquote>
+<p>To verify our tests, we take a checksum:</p>
+<blockquote>
+<pre>mysql&gt; pager md5sum
+PAGER set to 'md5sum'
+mysql&gt; <strong>SELECT</strong> film_id, title, rental_duration, rental_rate <strong>FROM</strong> film <strong>ORDER BY</strong> film_id;
+c2d253c3919efaa6d11487b1fd5061f3  -
+</pre>
+</blockquote>
+<p>Obviously, the following query is <strong>incorrect</strong>:<span id="more-2401"></span></p>
+<blockquote>
+<pre>mysql&gt; <strong>UPDATE</strong> film <strong>SET</strong> rental_duration=rental_duration+1, rental_rate=rental_rate-0.5  <strong>WHERE</strong> rating = 'G' <strong>OR</strong> length &lt; 90;
+Query OK, 431 rows affected (0.03 sec)
+
+mysql&gt; pager md5sum
+PAGER set to 'md5sum'
+mysql&gt; <strong>SELECT</strong> film_id, title, rental_duration, rental_rate <strong>FROM</strong> film <strong>ORDER BY</strong> film_id;
+09d450806e2cd7fa78a83ac5bef72d2b  -
+</pre>
+</blockquote>
+<h4>Motivation</h4>
+<p>Why would you want to do that?</p>
+<ul>
+<li>While it may seem strange, the merge can be logically (application-wise) perfectly reasonable.</li>
+<li>The <strong>UPDATE</strong> may be time consuming &#8211; perhaps it requires full table scan on a large table. Doing it with one scan is faster than two scans.</li>
+</ul>
+<h4>The solution</h4>
+<p>Use a condition for the <strong>SET</strong> clauses, optionally drop the <strong>WHERE</strong> conditions.</p>
+<blockquote>
+<pre><strong>UPDATE</strong>
+ film
+<strong>SET</strong>
+ rental_duration=<strong>IF</strong>(rating = 'G', rental_duration+1, rental_duration),
+ rental_rate=<strong>IF</strong>(length &lt; 90, rental_rate-0.5, rental_rate)
+;
+
+mysql&gt; pager md5sum
+PAGER set to 'md5sum'
+mysql&gt; <strong>SELECT</strong> film_id, title, rental_duration, rental_rate <strong>FROM</strong> film <strong>ORDER BY</strong> film_id;
+c2d253c3919efaa6d11487b1fd5061f3  -
+</pre>
+</blockquote>
+<p>The above query necessarily does a full table scan. If there&#8217;s a benefit to using indexes in the <strong>WHERE</strong> clause, it may still be applied, using an <strong>OR</strong> condition:</p>
+<blockquote>
+<pre><strong>UPDATE</strong>
+ film
+<strong>SET</strong>
+ rental_duration=<strong>IF</strong>(rating = 'G', rental_duration+1, rental_duration),
+ rental_rate=<strong>IF</strong>(length &lt; 90, rental_rate-0.5, rental_rate)
+<strong>WHERE</strong>
+ rating = 'G'
+ OR length &lt; 90
+;
+</pre>
+</blockquote>
+<p>If there is a computational overhead to the <strong>IF</strong> statement, I have not noticed it. This kind of solution plays well when each of the distinct queries requires a full scan, on large tables.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/multi-condition-update-query/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2401</post-id>	</item>
+		<item>
+		<title>Simple guideline for choosing appropriate InnoDB PRIMARY KEYs</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/simple-guideline-for-choosing-appropriate-innodb-primary-keys</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/simple-guideline-for-choosing-appropriate-innodb-primary-keys#comments</comments>
+				<pubDate>Thu, 21 Oct 2010 05:52:45 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[InnoDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2104</guid>
+				<description><![CDATA[Risking some flames, I&#8217;d like to suggest only two options for choosing PRIMARY KEYs for InnoDB tables. I suggest they should cover 99% (throwing numbers around) of cases. PRIMARY KEY cases An integer (SMALLINT / INT / BIGINT), possibly AUTO_INCREMENT column. The combination of two columns on a many-to-many connecting table (e.g. film_actor, which connects [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Risking some flames, I&#8217;d like to suggest only two options for choosing <strong>PRIMARY KEY</strong>s for InnoDB tables. I suggest they should cover 99% (throwing numbers around) of cases.</p>
+<h4>PRIMARY KEY cases</h4>
+<ol>
+<li>An integer (SMALLINT / INT / BIGINT), possibly <strong>AUTO_INCREMENT</strong> column.</li>
+<li>The combination of two columns on a many-to-many connecting table (e.g. <strong>film_actor</strong>, which connects <strong>film</strong>s to <strong>actor</strong>s), the two columns being the <strong>PRIMARY KEY</strong>s of respective data tables. This rule may be extended to 3-way relation tables.</li>
+</ol>
+<p>A short recap: an InnoDB must have a <strong>PRIMARY KEY</strong>. It will pick one if you don&#8217;t offer it. It can pick a really bad <strong>UNIQUE KEY</strong> (e.g. <strong>website_url(255)</strong>) or make one up using InnoDB internal row ids. If you don&#8217;t have a good candidate, an <strong>AUTO_INCREMENT PRIMARY KEY</strong> is probably the easiest way out.</p>
+<p>A 2-column combination for a many-to-many connection table is common and viable. The <strong>PRIMARY KEY</strong> will not only provide with good join access method, but will also provide with the required <strong>UNIQUE</strong> constraint.</p>
+<p>An integer-based <strong>PRIMARY KEY</strong> will make for more compact &amp; shallow index tree structures, which leads to less I/O and page reads.</p>
+<p>An <strong>AUTO_INCREMENT</strong> will allow for ascending <strong>PRIMARY KEY</strong> order of <strong>INSERT</strong>, which is InnoDB-friendly: index pages will be more utilized, less fragmented.<span id="more-2104"></span></p>
+<h4>Exceptions</h4>
+<ul>
+<li><strong>You have a partitioned table, e.g. on date range.</strong> With partitioned tables, every UNIQUE KEY, including the PRIMARY KEY, must include partitioning columns. In such case you will have to extend the PRIMARY KEY.</li>
+<li><strong>The only key on your table is a unique constraint on some column, e.g. UNIQUE KRY (url).</strong> On one hand, it seems wasteful to create <em>another</em> column (e.g. AUTO_INCREMENT) to use as PRIMARY KEY. On the other hand, I&#8217;ve seen many cases where this kind of PK didn&#8217;t hold up. At some point there was need for another index. Or some method had to be devised for chunking up table data (<a href="http://code.openark.org/forge/openark-kit/oak-chunk-update">oak-chunk-update</a> can do that even with non-integer PKs). I&#8217;m reluctant to use such keys as PRIMARY.</li>
+<li>I&#8217;m sure there are others.</li>
+</ul>
+<h4>Umm&#8230;</h4>
+<p>I wrote the draft for this post a while ago. And then came <a href="http://mituzas.lt/2010/07/30/on-primary-keys/">Domas</a> and ruined it. <a href="http://bugs.mysql.com/bug.php?id=55656">Wait for</a> <strong>5.1.52</strong>?</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/simple-guideline-for-choosing-appropriate-innodb-primary-keys/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2104</post-id>	</item>
+		<item>
+		<title>Thoughts and ideas for Online Schema Change</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change#comments</comments>
+				<pubDate>Thu, 07 Oct 2010 08:29:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Schema]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3005</guid>
+				<description><![CDATA[Here&#8217;s a few thoughts on current status and further possibilities for Facebook&#8217;s Online Schema Change (OSC) tool. I&#8217;ve had these thoughts for months now, pondering over improving oak-online-alter-table but haven&#8217;t got around to implement them nor even write them down. Better late than never. The tool has some limitations. Some cannot be lifted, some could. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here&#8217;s a few thoughts on current status and further possibilities for Facebook&#8217;s <a href="http://www.facebook.com/note.php?note_id=430801045932">Online Schema Change</a> (OSC) tool. I&#8217;ve had these thoughts for months now, pondering over improving <a href="../../forge/openark-kit/oak-online-alter-table">oak-online-alter-table</a> but haven&#8217;t got around to implement them nor even write them down. Better late than never.</p>
+<p>The tool has some limitations. Some cannot be lifted, some could. Quoting from the <a href="http://www.facebook.com/notes/mysql-at-facebook/online-schema-change-for-mysql/430801045932">announcement</a> and looking at the code, I add a few comments. I conclude with a general opinion on the tool&#8217;s abilities.</p>
+<h4>&#8220;The original table must have PK. Otherwise an error is returned.&#8221;</h4>
+<p>This restriction could be lifted: it&#8217;s enough that the table has a UNIQUE KEY. My original <em>oak-online-alter-table</em> handled that particular case. As far as I see from their code, the Facebook code would work just as well with any unique key.</p>
+<p>However, this restriction is of no real interest. As we&#8217;re mostly interested in InnoDB tables, and since any InnoDB table <em>should have</em> a PRIMARY KEY, we shouldn&#8217;t care too much.</p>
+<h4>&#8220;No foreign keys should exist. Otherwise an error is returned.&#8221;</h4>
+<p>Tricky stuff. With <em>oak-online-alter-table</em>, changes to the original table were immediately reflected in the <em>ghost</em> table. With InnoDB tables, that meant same transaction. And although I never got to update the text and code, there shouldn&#8217;t be a reason for not using child-side foreign keys (the child-side is the table on which the FK constraint is defined).</p>
+<p>The Facebook patch works differently: it captures changes and writes them to a <strong>delta</strong> table,  to be later (asynchronously) analyzed and make for a <em>replay</em> of actions on the <em>ghost</em> table.<span id="more-3005"></span></p>
+<p>So in the Facebook code, some cases will lead to undesired behavior. Consider two tables, <strong>country</strong> and <strong>city</strong>, with city holding a RESTRICT/NO ACTION foreign key on <strong>country</strong>&#8216;s id. Now consider the scenario:</p>
+<ol>
+<li>Rows from <strong>city</strong> are DELETEd, where the country Id is Spain&#8217;s.
+<ul>
+<li><strong>city</strong>&#8216;s ghost table is still unaffected, Spain&#8217;s cities are still there.</li>
+<li>A change is written to the delta table to mark these rows for deletion.</li>
+</ul>
+</li>
+<li>A DELETE is issued on <strong>country</strong>&#8216;s Spain record.
+<ul>
+<li>The DELETE should work, from the user&#8217;s perspective</li>
+<li>But it will fail: city&#8217;s ghost table has not received the changes yet. There&#8217;s still matching rows. The NO ACTION constraint will fail the DELETE statement.</li>
+</ul>
+</li>
+</ol>
+<p>Now, this does not lead to corruption, just to seemingly unreasonable behavior on the database part. This behavior is probably undesired. NO ACTION constraint won&#8217;t do.</p>
+<p>However, with CASCADE or SET NULL options, there is less of an issue: operations on the parent table (e.g. <strong>country</strong>) cannot fail. We must make sure operations on the ghost table make it consistent with the original table (e.g. <strong>city</strong>).</p>
+<p>Consider the following scenario:</p>
+<ol>
+<li>A new country is created, called &#8220;Sleepyland&#8221;. An INSERT is made to <strong>country</strong>.
+<ul>
+<li>Both <strong>city</strong> and <strong>city</strong>&#8216;s ghost are immediately aware of it.</li>
+</ul>
+</li>
+<li>A new town is created and INSERTed to <strong>city</strong>. The town is called &#8220;Naphaven&#8221;.
+<ul>
+<li>The change takes time to propagate to <strong>city</strong>&#8216;s ghost table.</li>
+</ul>
+</li>
+<li>Meanwhile, we realized we made a mistake. We&#8217;ve been had. There&#8217;s no such city nor country.
+<ol>
+<li>We DELETE &#8220;Naphaven&#8221; from <strong>city</strong>.</li>
+<li>We DELETE &#8220;Sleepyland&#8221; from <strong>country</strong>.</li>
+</ol>
+<ul>
+<li>Note that <strong>city</strong>&#8216;s ghost table still hasn&#8217;t caught up with the changes.</li>
+</ul>
+</li>
+<li>Eventually, the INSERT statement for &#8220;Naphaven&#8221; reaches <strong>city</strong>&#8216;s ghost table.
+<ul>
+<li>What should happen now? The INSERT cannot succeed.</li>
+<li>Will this fail the entire process?</li>
+</ul>
+</li>
+</ol>
+<p>Looking at the PHP code, I see that changes written on the <strong>delta</strong> table are blindly replayed on the ghost table.</p>
+<p>Since the process is asynchronous, this should not be the case. We can solve the above if we use INSERT IGNORE instead of INSERT. The statement will fail without failing anything else. The row cannot exist, and that&#8217;s because the original row does not exist anymore.</p>
+<p>Unlike a replication corruption, this does not lead to accumulation mistakes. The <strong>replay</strong> is static, somewhat like in <em>binary log format</em>. Changes are <em>just written</em>, regardless of existing data.</p>
+<p>I have given this considerable thought, and I can&#8217;t say I&#8217;ve covered all the possible scenario. However I believe that with proper use of INSERT IGNORE and REPLACE INTO (two statements I heavily relied on with <em>oak-online-alter-table</em>), correctness can be achieved.</p>
+<p>There&#8217;s the small pain of re-generating the foreign key definition on the &#8220;ghost&#8221; table (<strong>CREATE TABLE LIKE &#8230;</strong> does not copy FK definitions). And since foreign key names are unique, a new name must be picked up. Not pretty, but perfectly doable.</p>
+<h4>&#8220;No AFTER_{INSERT/UPDATE/DELETE} triggers must exist.&#8221;</h4>
+<p>It would be nicer if MySQL had an ALTER TRIGGER statement. There isn&#8217;t such statement. If there were such an atomic statement, then we would be able to rewrite the trigger, so as to add our own code to the <em>end of the trigger&#8217;s code</em>. Yuck. Would be even nicer if we were <a href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">allowed to have multiple triggers</a> of same event.</p>
+<p>So, we are left with DROP and CREATE triggers. Alas, this makes for a short period where the trigger does not exist. Bad. The easy solution would be to LOCK WRITE the table, but apparently you can&#8217;t DROP the trigger (*) when the table is locked. Sigh.</p>
+<p>(*) Happened to me, apparently to Facebook too; With latest 5.1 (5.1.51) version this actually works. With 5.0 it didn&#8217;t use to; this needs more checking.</p>
+<h4>Use of INFORMATION_SCHEMA</h4>
+<p>As with oak-online-alter-table, the OSC checks for triggers, indexes, column by searching on the INFORMATION_SCHEMA tables. This makes for nice SQL for getting the exact listing and types of PRIMARY KEY columns, whether or not AFTER triggers exist, and so on.</p>
+<p>I&#8217;ve always considered this to be the weak part of <a href="http://code.openark.org/forge/openark-kit">openark-kit</a>, that it relies on INFORMATION_SCHEMA so much. It&#8217;s easier, it&#8217;s cleaner, it&#8217;s even <em>more correct</em> to work that way &#8212; but it just puts too much locks. I think Baron Schwartz (and now Daniel Nichter) did amazing work on analyzing table schemata by parsing the SHOW CREATE TABLE and other SHOW commands regex-wise with <a href="http://www.maatkit.org/">Maatkit</a>. It&#8217;s a crazy work! Had I written <em>openark-kit</em> in Perl, I would have just import their code. But I&#8217;m too <span style="text-decoration: line-through;">lazy</span> busy to do the conversion from Perl to Python, and rewrite that code, what with all the debugging.</p>
+<p>OSC is written in PHP. Again, much conversion work. I think performance-wise this is an important step to make.</p>
+<h4>A word for the critics</h4>
+<p>Finally, a word for the critics. I&#8217;ve read some Facebook/MySQL bashing comments and wish to relate.</p>
+<p>In his <a href="http://www.theregister.co.uk/2010/09/21/facebook_online_schema_change_for_mysql/">interview to The Register</a>, Mark Callaghan gave the example that &#8220;Open Schema Change lets the company update indexes without user downtime, according to Callaghan&#8221;.</p>
+<p>PostgreSQL was mentioned for being able to add index with only read locks taken, or being able to do the work with no locks using CREATE INDEX CONCURRENTLY. I wish MySQL had that feature! Yes, MySQL has a lot to improve upon, and the latest PostgreSQL 9.0 brings valuable new features. (Did I make it clear I have no intention of bashing PostgreSQL? If not, please re-read this paragraph until convinced).</p>
+<p>Bashing related to the notion of MySQL being so poor that Facebook used an even poorer mechanism to work out the ALTER TABLE.</p>
+<p>Well, allow me to add a few words: the CREATE INDEX is by far not the only thing you can achieve with OSC (although it may be Facebook&#8217;s major concern). You should be able to:</p>
+<ul>
+<li>Add columns</li>
+<li>Drop columns</li>
+<li>Convert character sets</li>
+<li>Modify column types</li>
+<li>Add partitioning</li>
+<li>Reorganize partitioning</li>
+<li>Compress the table</li>
+<li>Otherwise changing table format</li>
+<li>Heck, you could even modify the storage engine! (To other transactional engine)</li>
+</ul>
+<p>These are giant steps. How easy would it be to write these down into the database? It only takes a few weeks time to work out a working solution with reasonable limitations, just using the resources the MySQL server provides you with. The <a href="http://www.facebook.com/MySQLatFacebook">MySQL@Facebook team</a> should be given credit for that.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-and-ideas-for-online-schema-change/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3005</post-id>	</item>
+		<item>
+		<title>How often should you use OPTIMIZE TABLE? &#8211; followup</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/how-often-should-you-use-optimize-table-followup</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/how-often-should-you-use-optimize-table-followup#comments</comments>
+				<pubDate>Mon, 04 Oct 2010 08:07:45 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Performance]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2882</guid>
+				<description><![CDATA[This post follows up on Baron&#8217;s How often should you use OPTIMIZE TABLE?. I had the opportunity of doing some massive purging of data from large tables, and was interested to see the impact of the OPTIMIZE operation on table&#8217;s indexes. I worked on some production data I was authorized to provide as example. The [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post follows up on Baron&#8217;s <a href="http://www.xaprb.com/blog/2010/02/07/how-often-should-you-use-optimize-table/">How often should you use OPTIMIZE TABLE?</a>. I had the opportunity of doing some massive purging of data from large tables, and was interested to see the impact of the <strong>OPTIMIZE</strong> operation on table&#8217;s indexes. I worked on some production data I was authorized to provide as example.</p>
+<h4>The use case</h4>
+<p>I&#8217;ll present a single use case here. The table at hand is a compressed InnoDB table used for logs. I&#8217;ve rewritten some column names for privacy:</p>
+<blockquote>
+<pre>mysql&gt; show create table logs \G
+
+Create Table: CREATE TABLE `logs` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `name` varchar(20) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ `ts` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `origin` varchar(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ `message` text NOT NULL,
+ `level` tinyint(11) NOT NULL DEFAULT '0',
+ `s` char(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',
+ PRIMARY KEY (`id`),
+ KEY `s` (`s`),
+ KEY `name` (`name`,`ts`),
+ KEY `origin` (`origin`,`ts`)
+) ENGINE=InnoDB AUTO_INCREMENT=186878729 DEFAULT CHARSET=utf8 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8</pre>
+</blockquote>
+<p>The table had log records starting <strong>2010-08-23</strong> and up till <strong>2010-09-02</strong> noon. Table status:<span id="more-2882"></span></p>
+<blockquote>
+<pre>mysql&gt; show table status like 'logs'\G
+*************************** 1. row ***************************
+           Name: logs
+         Engine: InnoDB
+        Version: 10
+     Row_format: Compressed
+           Rows: 22433048
+ Avg_row_length: 206
+    Data_length: 4625285120
+Max_data_length: 0
+   Index_length: 1437073408
+      Data_free: 4194304
+ Auto_increment: 186878920
+    Create_time: 2010-08-24 18:10:49
+    Update_time: NULL
+     Check_time: NULL
+      Collation: utf8_general_ci
+       Checksum: NULL
+ Create_options: row_format=COMPRESSED KEY_BLOCK_SIZE=8
+        Comment:</pre>
+</blockquote>
+<p>(A bit puzzled on the <strong>Create_time</strong>; the table was taken from an LVM snapshot of another server, so it existed for a very long time before. Not sure why the <strong>Create_time</strong> field is as it is here; I assume the MySQL upgrade marked it so, did not have the time nor need to look into it).</p>
+<p>I was using <a href="http://www.percona.com/downloads/Percona-Server-5.1/">Percona-Server-5.1.47-11.2</a>, and so was able to look at the index statistics for that table:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM information_schema.INNODB_INDEX_STATS WHERE table_name='logs';
++--------------+------------+--------------+--------+----------------+------------+------------+
+| table_schema | table_name | index_name   | fields | row_per_keys   | index_size | leaf_pages |
++--------------+------------+--------------+--------+----------------+------------+------------+
+| newsminer    | logs       | PRIMARY      |      1 | 1              |     282305 |     246856 |
+| newsminer    | logs       | s            |      2 | 17, 1          |      38944 |      33923 |
+| newsminer    | logs       | name         |      3 | 2492739, 10, 2 |      22432 |      19551 |
+| newsminer    | logs       | origin       |      3 | 1303, 4, 1     |      26336 |      22931 |
++--------------+------------+--------------+--------+----------------+------------+------------+</pre>
+</blockquote>
+<h4>Status after massive purge</h4>
+<p>My first requirement was to purge out all record up to <strong>2010-09-01 00:00:00</strong>. I did so in small chunks, using <a href="http://code.openark.org/forge/openark-kit">openark kit</a>&#8216;s oak-chunk-update (same can be achieved with <a href="http://www.maatkit.org/">maatkit</a>&#8216;s mk-archiver). The process purged <strong>1000</strong> rows at a time, with some sleep in between, and ran for about a couple of hours. It may be interesting to note that since ts is in <a href="https://shlomi-noach.github.io/blog/mysql/monotonic-functions-sql-and-mysql">monotonically ascending</a> values, purging of old rows also means purging of lower PKs, which means we&#8217;re trimming the PK tree from left.</p>
+<p>Even while purging took place, I could see the index_size/leaf_pages values dropping, until, finally:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM information_schema.INNODB_INDEX_STATS WHERE table_name='logs';
++--------------+------------+--------------+--------+--------------+------------+------------+
+| table_schema | table_name | index_name   | fields | row_per_keys | index_size | leaf_pages |
++--------------+------------+--------------+--------+--------------+------------+------------+
+| newsminer    | logs       | PRIMARY      |      1 | 1            |      40961 |      35262 |
+| newsminer    | logs       | s            |      2 | 26, 1        |      34440 |       3798 |
+| newsminer    | logs       | name         |      3 | 341011, 4, 1 |       4738 |       2774 |
+| newsminer    | logs       | origin       |      3 | 341011, 4, 2 |      10178 |       3281 |
++--------------+------------+--------------+--------+--------------+------------+------------+</pre>
+</blockquote>
+<p>The number of deleted rows was roughly <strong>85%</strong> of total rows, so down to <strong>15%</strong> number of rows.</p>
+<h4>Status after OPTIMIZE TABLE</h4>
+<p>Time to see whether <strong>OPTIMIZE</strong> really optimizes! Will it reduce number of leaf pages in PK? In secondary keys?</p>
+<blockquote>
+<pre>mysql&gt; OPTIMIZE TABLE logs;
+...
+mysql&gt; SELECT * FROM information_schema.INNODB_INDEX_STATS WHERE table_name='logs';
++--------------+------------+--------------+--------+--------------+------------+------------+
+| table_schema | table_name | index_name   | fields | row_per_keys | index_size | leaf_pages |
++--------------+------------+--------------+--------+--------------+------------+------------+
+| newsminer    | logs       | PRIMARY      |      1 | 1            |      40436 |      35323 |
+| newsminer    | logs       | s            |      2 | 16, 1        |       5489 |       4784 |
+| newsminer    | logs       | name         |      3 | 335813, 7, 1 |       3178 |       2749 |
+| newsminer    | logs       | origin       |      3 | 335813, 5, 2 |       3951 |       3446 |
++--------------+------------+--------------+--------+--------------+------------+------------+
+4 rows in set (0.00 sec)</pre>
+</blockquote>
+<p>The above shows no significant change in either of the indexes: not for <strong>index_size</strong>, not for <strong>leaf_pages</strong>, not for statistics (<strong>row_per_keys</strong>). The <strong>OPTIMIZE</strong> did not reduce index size. It did not reduce the number of index pages (<strong>leaf_pages</strong> are the major factor here). Some <strong>leaff_pages</strong> values have even increased, but in small enough margin to consider as equal.</p>
+<p>Index-wise, the above example does not show an advantage to using <strong>OPTIMIZE</strong>. I confess, I was surprised. And for the better. This indicates InnoDB makes good merging of index pages after massive purging.</p>
+<h4>So, no use for OPTIMIZE?</h4>
+<p>Think again: file system-wise, things look different.</p>
+<p>Before purging of data:</p>
+<blockquote>
+<pre>bash:~# ls -l logs.* -h
+-rw-r----- 1 mysql mysql 8.6K 2010-08-15 17:40 logs.frm
+-rw-r----- 1 mysql mysql 2.9G 2010-09-02 14:01 logs.ibd</pre>
+</blockquote>
+<p>After purging of data:</p>
+<blockquote>
+<pre>bash:~# ls -l logs.* -h
+-rw-r----- 1 mysql mysql 8.6K 2010-08-15 17:40 logs.frm
+-rw-r----- 1 mysql mysql 2.9G 2010-09-02 14:21 logs.ibd</pre>
+</blockquote>
+<p>Recall that InnoDB never releases table space back to file system!</p>
+<p>After <strong>OPTIMIZE</strong> on table:</p>
+<blockquote>
+<pre>bash:~# ls -l logs.* -h
+-rw-rw---- 1 mysql mysql 8.6K 2010-09-02 14:26 logs.frm
+-rw-rw---- 1 mysql mysql 428M 2010-09-02 14:43 logs.ibd</pre>
+</blockquote>
+<p>On <strong>innodb_file_per_table</strong> an <strong>OPTIMIZE</strong> creates a new table space, and the old one gets destroyed. Space goes back to file system. Don&#8217;t know about you; I like to have my file system with as much free space as possible.</p>
+<h4>Need to verify</h4>
+<p>I&#8217;ve tested Percona Server, since this is where I can find <strong>INNODB_INDEX_STATS</strong>. But this begs the following questions:</p>
+<ul>
+<li>Perhaps the results only apply for Percona Server? (I&#8217;m guessing not).</li>
+<li>Or only for InnoDB plugin? Does the same hold for &#8220;builtin&#8221; InnoDB? (dunno)</li>
+<li>Only on &gt;= 5.1? (Maybe; 5.0 is becoming rare now anyway)</li>
+<li>Only on InnoDB (Well, of course this test is storage engine dependent!)</li>
+</ul>
+<h4>Conclusion</h4>
+<p>The use case above is a particular example. Other use cases may include tables where deletions often occur in middle of table (remember we were trimming the tree from left side only). Other yet may need to handle <strong>UPDATE</strong>s to indexed columns. I have some more operations to do here, with larger tables (e.g. <strong>40GB</strong> compressed). If anything changes, I&#8217;ll drop a note.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/how-often-should-you-use-optimize-table-followup/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2882</post-id>	</item>
+	</channel>
+</rss>
