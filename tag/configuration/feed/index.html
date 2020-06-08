@@ -1,0 +1,808 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Configuration &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/configuration/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 19 Aug 2015 08:00:11 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path#comments</comments>
+				<pubDate>Fri, 07 Aug 2015 12:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[performance_schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7327</guid>
+				<description><![CDATA[MySQL 5.7 introduces a change in the way we query for global variables and status variables: the INFORMATION_SCHEMA.(GLOBAL&#124;SESSION)_(VARIABLES&#124;STATUS) tables are now deprecated and empty. Instead, we are to use the respective performance_schema.(global&#124;session)_(variables&#124;status) tables. But the change goes farther than that; there is also a security change. Oracle created a pitfall of 2 changes at the same time: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL <strong>5.7</strong> introduces a change in the way we query for global variables and status variables: the <strong>INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)</strong> tables are now deprecated and empty. Instead, we are to use the respective <strong>performance_schema.(global|session)_(variables|status)</strong> tables.</p>
+<p>But the change goes farther than that; there is also a security change. Oracle created a pitfall of <strong>2</strong> changes at the same time:</p>
+<ol>
+<li>Variables/status moved to a different table</li>
+<li>Privileges required on said table</li>
+</ol>
+<p>As an example, my non-root user gets:</p>
+<blockquote>
+<pre>mysql&gt; show session variables like 'tx_isolation';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'session_variables'</pre>
+</blockquote>
+<p>Who gets affected by this? Nearly <em>everyone and everything</em>.</p>
+<ul>
+<li>Your Nagios will not be able to read status variables</li>
+<li>Your ORM will not be able to determine session variables</li>
+<li>Your replication user will fail connecting (see <a href="http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html">this post by Giuseppe</a>)</li>
+<li>And most everyone else.</li>
+</ul>
+<p>The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:</p>
+<ol>
+<li>Change your app code to choose the correct schema (information_schema vs. performance_schema)</li>
+<li><strong>GRANT</strong> the permissions on your database</li>
+</ol>
+<p>Perhaps at this point you still do not consider this to be a problem. You may be thinking: <em>well, let&#8217;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code</em>.</p>
+<p>Not so fast. Can you really that simply create those GRANTs?<span id="more-7327"></span></p>
+<h3>Migration woes</h3>
+<p>How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.</p>
+<p>This should not be any different for <strong>5.7</strong>. We would like to provision a <strong>5.7</strong> slave in our topologies and just see that everything works. Well, we have, and things don&#8217;t just work. Our Nagios stops working for that <strong>5.7</strong> slave. <em>Orchestrator</em> started complaining (by this time I&#8217;ve <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.4.291">already fixed it</a> to be more tolerant for the <strong>5.7</strong> problems so no crashes here).</p>
+<p>I hope you see the problem by now.</p>
+<blockquote><p>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO &#8216;&#8230;&#8217;</strong> on your <strong>5.6</strong> master.</p></blockquote>
+<p>The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your <strong>5.7</strong> slave, which means you will not be able to <strong>SHOW GLOBAL VARIABLES</strong> on your slave, which means everything remains broken.</p>
+<p>Yes, you can issue this directly on your <strong>5.7</strong> slaves. It&#8217;s <em>doable</em>, but <em>undesired</em>. It&#8217;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#8217;s unfriendly to GTID (make sure to <strong>SET SQL_LOG_BIN=0</strong> before that).</p>
+<h3>WHY in the first place?</h3>
+<p>It seems like a security thing. I&#8217;m not sure whether this was intended. So you prevent a <strong>SHOW GLOBAL VARIABLES</strong> for a normal user. Makes sense. And yet:</p>
+<blockquote>
+<pre>mysql&gt; show global variables like 'hostname';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'global_variables'
+
+mysql&gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+</pre>
+</blockquote>
+<p>Seems like I&#8217;m allowed access to that info after all. So it&#8217;s not strictly a security design decision. For status variable, I admit, I don&#8217;t have a similar workaround.</p>
+<h3>Solutions?</h3>
+<p>The following are meant to be solutions, but do not really solve the problem:</p>
+<ul>
+<li><strong>SHOW</strong> commands. <strong>SHOW GLOBAL|SESSION VARIABLES|STATUS</strong> will work properly, and will implicitly know whether to provide the results via <strong>information_schema</strong> or <strong>performance_schema</strong> tables.
+<ul>
+<li>But, aren&#8217;t we meant to be happier with <strong>SELECT</strong> queries? So that I can really do stuff that is smarter than <strong>LIKE &#8216;variable_name%&#8217;</strong>?</li>
+<li>And of course you cannot use <strong>SHOW</strong> in server side cursors. Your stored routines are in a mess now.</li>
+<li>This does not solve the GRANTs problem.</li>
+</ul>
+</li>
+<li><strong><a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56">show_compatibility_56</a></strong>: an introduced variable in <strong>5.7</strong>, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+<ul>
+<li>Documentation introduces it, and says it is deprecated.
+<ul>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>But it actually works in <strong>5.7.8</strong> (latest)
+<ul>
+<li>time-travel-paradox plot thickens</li>
+</ul>
+</li>
+<li>Your automation scripts do not know in advance whether your MySQL has this variable
+<ul>
+<li>Hence <strong>SELECT @@global.show_compatibility_56</strong> will produce an error on <strong>5.6</strong></li>
+<li>But the &#8220;safe&#8221; way of <strong>SHOW GLOBAL VARIABLES LIKE &#8216;show_compatibility_56&#8217;</strong> will fail on a privilege error on <strong>5.7</strong></li>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>Actually advised by my colleague Simon J. Mudd, <strong>show_compatibility_56</strong> defaults to <strong>OFF</strong>. I <em>support</em> this line of thought. Or else it&#8217;s <strong>old_passwords=1</strong> all over again.</li>
+<li><strong>show_compatibility_56</strong> doesn&#8217;t solve the GRANTs problem.</li>
+<li>This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from <strong>&#8220;1&#8221;</strong> to <strong>&#8220;0&#8221;</strong>, I&#8217;m back at square one.</li>
+</ul>
+</li>
+</ul>
+<h3>Suggestion</h3>
+<p>I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in <strong>5.6</strong> if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:</p>
+<ol>
+<li><strong>Flow 1</strong>: keep <strong>information_schema</strong>, later migration into <strong>performance_schema</strong>
+<ul>
+<li>In <strong>5.7</strong>, <strong>information_schema</strong> tables should still produce the data.</li>
+<li>No security constraints on <strong>information_schema</strong></li>
+<li>Generate WARNINGs on reading from <strong>information_schema</strong> (&#8220;&#8230;this will be deprecated&#8230;&#8221;)</li>
+<li><strong>performance_schema </strong><em>also available</em>. With security constraints, whatever.</li>
+<li>In <strong>5.8</strong> remove <strong>information_schema</strong> tables; we are left with <strong>performance_schema</strong> only.</li>
+</ul>
+</li>
+<li><strong>Flow 2</strong>: easy migration into <strong>performance_schema</strong>:
+<ul>
+<li>In <strong>5.7</strong>, <strong>performance_schema</strong> tables should not require any special privileges. Any user can read from them.</li>
+<li>Keep <strong>show_compatibility_56 </strong>as it is.</li>
+<li><strong>SHOW</strong> commands choose between <strong>information_schema</strong> or <strong>performance_schema</strong> on their own &#8212; just as things are done now.</li>
+<li>In <strong>5.8</strong>, <strong>performance_schema</strong> tables will require <strong>SELECT</strong> privileges.</li>
+</ul>
+</li>
+</ol>
+<p>As always, I love the work done by the engineers; and I love how they listen to the community.</p>
+<p>Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?</p>
+<h3>[UPDATE 2015-08-19]</h3>
+<p>Please <a href="http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html">see this followup</a> by Morgan Tocker of Oracle.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7327</post-id>	</item>
+		<item>
+		<title>TokuDB configuration variables of interest</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/tokudb-configuration-variables-of-interest</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/tokudb-configuration-variables-of-interest#comments</comments>
+				<pubDate>Wed, 23 Oct 2013 17:42:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6613</guid>
+				<description><![CDATA[During our experiments I came upon a few TokuDB variables of interest; if you are using TokuDB you might want to look into these: tokudb_analyze_time This is a boundary on the number of seconds an ANALYZE TABLE will operate on each index on each partition on a TokuDB table. That is, if tokudb_analyze_time = 5, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>During our experiments I came upon a few TokuDB variables of interest; if you are using TokuDB you might want to look into these:</p>
+<ul>
+<li>
+<h4>tokudb_analyze_time</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">This is a boundary on the number of seconds an <strong>ANALYZE TABLE</strong> will operate on each index on each partition on a TokuDB table.</p>
+<p style="padding-left: 30px;">That is, if <strong>tokudb_analyze_time = 5</strong>, and your table has <strong>4</strong> indexes (including <strong>PRIMARY</strong>) and <strong>7</strong> partitions, then the total runtime is limited to <strong>5*4*7 = 140</strong> seconds.</p>
+<p style="padding-left: 30px;">Default in <strong>7.1.0</strong>: <strong>5</strong> seconds</p>
+<ul>
+<li>
+<h4>tokudb_cache_size</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">Similar to <strong>innodb_buffer_pool_size</strong>, this variable sets the amount of memory allocated by TokuDB for caching pages. Like InnoDB the table is clustered within the index, so the cache includes pages for both indexes and data.</p>
+<p style="padding-left: 30px;">Default: <strong>50%</strong> of total memory</p>
+<ul>
+<li>
+<h4>tokudb_directio</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">Boolean, values are <strong>0/1</strong>. Setting <strong>tokudb_directio = 1</strong> is like specifying <strong>innodb_flush_method = O_DIRECT</strong>. Which in turn means the OS should not cache pages requested by TokuDB. Default: <strong>0</strong>.</p>
+<p style="padding-left: 30px;">Now here&#8217;s the interesting part: we are used to tell InnoDB to get the most memory we can provide (because we want it to cache as much as it can) and to avoid OS caching (because that would mean a page would appear both in the buffer pool and in OS memory, which is a waste). So the following setup is common:<span id="more-6613"></span></p>
+<blockquote style="padding-left: 30px;">
+<pre style="padding-left: 30px;"><strong>innodb_buffer_pool_size</strong> = [as much as you can allocate while leaving room for connection memory]G
+<strong>innodb_flush_method</strong> = O_DIRECT</pre>
+</blockquote>
+<p style="padding-left: 30px;">And my first instinct was to do the same for TokuDB. But after speaking to Gerry Narvaja of Tokutek, I realized it was not that simple. The reason TokuDB&#8217;s default memory allocation is <strong>50%</strong> and not, say, <strong>90%</strong>, is that OS cache caches the data in compressed form, while TokuDB cache caches data in uncompressed form. Which means if you limit the TokuDB cache, you allow for more cache to the OS, that is used to cache compressed data, which means <em>more data</em> (hopefully, pending duplicates) in memory.</p>
+<p style="padding-left: 30px;">I did try both options and did not see an obvious difference, but did not test this thoroughly. My current setup is:</p>
+<blockquote style="padding-left: 30px;">
+<pre style="padding-left: 30px;"><strong>#No setup. just keep to the default for both:</strong>
+#tokudb_cache_size
+#tokudb_directio</pre>
+</blockquote>
+<ul>
+<li>
+<h4>tokudb_commit_sync</h4>
+</li>
+</ul>
+<ul>
+<li>
+<h4>tokudb_fsync_log_period</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">These two variable are similar in essence to <strong>innodb_flush_log_at_trx_commit</strong>, but allow for finer tuning. With <strong>innodb_flush_log_at_trx_commit</strong> you choose between syncing the transaction log to disk upon each commit and once per second. With <strong>tokudb_commit_sync = 1</strong> (which is default) you get transaction log sync to disk per commit. When <strong>tokudb_commit_sync = 0</strong>, then <strong>tokudb_fsync_log_period</strong> dictates the interval between flushes. So a value of <strong>tokudb_fsync_log_period = 1000</strong> means once per second.</p>
+<p style="padding-left: 30px;">Since our original InnoDB installation used <strong>innodb_flush_log_at_trx_commit = 2</strong>, our TokuDB setup is:</p>
+<blockquote style="padding-left: 30px;">
+<pre style="padding-left: 30px;"><strong>tokudb_commit_sync</strong> = 0
+<strong>tokudb_fsync_log_period</strong> = 1000</pre>
+</blockquote>
+<ul>
+<li>
+<h4>tokudb_load_save_space</h4>
+</li>
+</ul>
+<p style="padding-left: 30px;">Turned on (value <strong>1</strong>) by default as of TokuDB <strong>7.1.0</strong>, this parameter decides whether temporary file created on bulk load operations (e.g. ALTER TABLE) are compressed or uncompressed. Do yourself a big favour (why? <a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration">read here</a>) and keep it on. Our setup is:</p>
+<blockquote>
+<pre><strong>tokudb_load_save_space</strong> = 1</pre>
+</blockquote>
+<p>TokuDB&#8217;s general recommendation is: don&#8217;t change the variables; the engine should work well right out of the box. I like the approach (by MySQL <strong>5.5</strong> I already lost count of InnoDB variables that can have noticeable impact; with <strong>5.6</strong> I&#8217;m all but lost). The complete list of configuration variables is found in <a href="http://www.tokutek.com/wp-content/uploads/2013/10/mysql-5.5.30-tokudb-7.1.0-users-guide.pdf">TokuDB&#8217;s Users Guide</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/tokudb-configuration-variables-of-interest/feed</wfw:commentRss>
+		<slash:comments>14</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6613</post-id>	</item>
+		<item>
+		<title>On MySQL plugin configuration</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/on-mysql-plugin-configuration</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/on-mysql-plugin-configuration#comments</comments>
+				<pubDate>Tue, 01 Oct 2013 06:50:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[plugin]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6579</guid>
+				<description><![CDATA[MySQL offers plugin API, with which you can add different types of plugins to the server. The API is roughly the same for all plugin types: you implement an init() function, a deinit(); you declare status variables and global variables associated with your plugin, and of course you implement the particular implementation of plugin call. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL offers <a href="http://dev.mysql.com/doc/refman/5.5/en/plugin-api.html">plugin API</a>, with which you can add <a href="http://dev.mysql.com/doc/refman/5.5/en/plugin-types.html">different types</a> of plugins to the server. The API is roughly the same for all plugin types: you implement an init() function, a deinit(); you declare status variables and global variables associated with your plugin, and of course you implement the particular implementation of plugin call.</p>
+<p>I wish to discuss the creation and use of global variables for plugins.</p>
+<p>Consider the following declaration of a global variable in <a href="https://github.com/outbrain/audit_login">audit_login</a>:</p>
+<blockquote>
+<pre>static MYSQL_SYSVAR_BOOL(enabled, plugin_enabled, PLUGIN_VAR_NOCMDARG,
+"enable/disable the plugin's operation, namely writing to file", NULL, NULL, 1);
+
+static struct st_mysql_sys_var * audit_login_sysvars[] = {
+    MYSQL_SYSVAR(enabled),
+    NULL
+};</pre>
+</blockquote>
+<p>The above creates a new global variables called <strong>&#8220;simple_login_audit_enabled&#8221;</strong>: it is composed of the plugin name (known to be <strong>&#8220;simple_login_audit&#8221;</strong> in our example) and declared name (<strong>&#8220;enabled&#8221;</strong>). It is a boolean, defaults to <strong>1</strong>, and is associated with the internal <strong>plugin_enabled</strong> variable.</p>
+<p>Once this variable is declared, you can expect to be able to:<span id="more-6579"></span></p>
+<blockquote>
+<pre>mysql&gt; show global variables like '%audit%';
++----------------------------+-------+
+| Variable_name              | Value |
++----------------------------+-------+
+| simple_login_audit_enabled | ON    |
++----------------------------+-------+
+
+mysql&gt; set global simple_login_audit_enabled := 0;
+Query OK, 0 rows affected (0.00 sec)</pre>
+</blockquote>
+<p>and you can expect using the following in your <strong>my.cnf</strong> file:</p>
+<blockquote>
+<pre>[mysqld]
+...
+simple_login_audit_enabled=1</pre>
+</blockquote>
+<h4>Assuming your server agrees to start</h4>
+<p>Here&#8217;s the catch: the <strong>simple_login_audit_enabled</strong> variable is <em>only recognized as long as the plugin is installed</em>. As you may know, plugins can be loaded upon startup time using an explicit <strong>my.cnf</strong> entry such as:</p>
+<blockquote>
+<pre>plugin_load=audit_login.so</pre>
+</blockquote>
+<p>But you may also, at any given time, <a href="http://dev.mysql.com/doc/refman/5.5/en/install-plugin.html">INSTALL</a> or <a href="http://dev.mysql.com/doc/refman/5.5/en/uninstall-plugin.html">UNINSTALL</a> the plugin dynamically.</p>
+<blockquote>
+<pre>install plugin SIMPLE_LOGIN_AUDIT soname 'audit_login.so';
+uninstall plugin SIMPLE_LOGIN_AUDIT;<code>
+</code></pre>
+</blockquote>
+<p>In fact there are good reasons to do so: you may be upgrading your plugin. You can&#8217;t just throw in the new binary (it&#8217;s a guaranteed crash on next server shutdown). You need to first <strong>UNINSTALL</strong> it; you then put the new binary, and re-<strong>INSTALL</strong>. This works well, and the price is some downtime for your plugin.</p>
+<p>But what happens if you restart the server while your plugin is uninstalled? Yep: the global variable is unrecognised, and your MySQL server refuses to start:</p>
+<blockquote>
+<pre>130919  8:11:30 [ERROR] /usr/bin/mysqld: <strong>unknown variable 'simple_login_audit_enabled=1'</strong>
+130919  8:11:30 [ERROR] <strong>Aborting</strong>
+130919  8:11:30  InnoDB: Starting shutdown...
+130919  8:11:31  InnoDB: Shutdown completed; log sequence number 40185651
+130919  8:11:31 [Note] /usr/bin/mysqld: Shutdown complete</pre>
+</blockquote>
+<p>I did happen on this case a couple times; it is frustrating.</p>
+<h4>What are the alternatives?</h4>
+<p>So adding variables to my.cnf may prevent MySQL from starting. In my dictionary, this spells <strong>&#8220;NO GO&#8221;</strong>.</p>
+<p>With <strong>audit_login</strong> I chose to (additionally) support an external config file, <strong>audit_login.cnf</strong>, expected to be found in the <strong>@@datadir</strong>. It is similar in essence to the <strong>master.info</strong> file which is expected by replication. The plugin reads this file (if existing) upon init(), which makes it execute upon server startup or upon <strong>INSTALL PLUGIN</strong>. I can&#8217;t argue that this is the best solution, but it is a solution that does not interfere with anyone. The file is ignored by all and does not disturb the public peace. The plugin does not require it to exist.</p>
+<p>I was hoping to be able to directly read from <strong>my.cnf</strong>, but am unsure if there is a definitive way to do so from within the plugin. I did not go deep into this.</p>
+<h4>What would be best?</h4>
+<p>Hopefully I&#8217;m not missing on anything. But it would be nice to have plugin-dedicated variables in my.cnf which are ignored by the server. These could take the form of:</p>
+<blockquote>
+<pre>[mysql_plugin]
+simple_login_audit_enabled=0</pre>
+</blockquote>
+<p>or similar. It would be the server&#8217;s responsibility to pass these declarations to the plugins, but ignore them itself (or just pass warning).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/on-mysql-plugin-configuration/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6579</post-id>	</item>
+		<item>
+		<title>Thoughts on MySQL 5.6 new replication features</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features#comments</comments>
+				<pubDate>Mon, 15 Oct 2012 07:50:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5651</guid>
+				<description><![CDATA[After playing a little bit with MySQL 5.6 (RC), and following closely on Giuseppe&#8217;s MySQL 5.6 replication gotchas (and bugs), I was having some thoughts. These are shared for a few reasons: Maybe I didn&#8217;t understand it well, and someone could correct me Or I understood it well, and my input could be of service [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>After playing a little bit with MySQL <strong>5.6</strong> (RC), and following closely on Giuseppe&#8217;s <a href="http://datacharmer.blogspot.co.il/2012/08/mysql-56-replication-gotchas-and-bugs.html">MySQL 5.6 replication gotchas (and bugs)</a>, I was having some thoughts.</p>
+<p>These are shared for a few reasons:</p>
+<ul>
+<li>Maybe I didn&#8217;t understand it well, and someone could correct me</li>
+<li>Or I understood it well, and my input could be of service to the developers</li>
+<li>Or it could be of service to the users</li>
+</ul>
+<h4>InnoDB tables in mysql schema</h4>
+<p>The introduction of InnoDB tables in <strong>mysql</strong> makes for crash-safe replication information: the exact replication position (master log file+pos, relay log file+pos etc.) is updated on InnoDB tables; with <strong>innodb_flush_logs_at_trx_commit=1</strong> this means replication status is durable and consistent with server data. This is great news!</p>
+<p>However, the introduction of InnoDB tables to the mysql schema also breaks some common usage on installation and setup of MySQL servers. You can&#8217;t just drop your <strong>ib_data1</strong> file upon dump+restore, since it also contains internal data. Giuseppe outlines the workaround for that.</p>
+<p>I was thinking: would it be possible to have a completely different tablespace for MySQL&#8217;s internal InnoDB tables? That could be a single tablespace file (who cares about file-per-table on a few internal tables). And I&#8217;m throwing an idea without being intimate with the internals: you know how it is possible to span the shared tablespace across multiple files, as in:<span id="more-5651"></span></p>
+<blockquote>
+<pre>[mysqld]
+innodb_data_file_path=ibdata1:50M;ibdata2:50M:autoextend</pre>
+</blockquote>
+<p>Would it be possible to, for example, force the first file in this setup to be the internal database? It would look like:</p>
+<blockquote>
+<pre>[mysqld]
+innodb_data_file_path=<strong>ibdata_internal_do_not_touch</strong>:2M;<strong>ibdata1_this_one_is_yours</strong>:50M:autoextend</pre>
+</blockquote>
+<p>Only the user would not have to actually set this thing up: the internal tablespace would be there by default (and always first).</p>
+<p>Then we would be able to drop our own table space as much as we would like to, but never touch the internal tablespace. It would always extend into our own <strong>ibdata1</strong> file.</p>
+<p>I&#8217;m wondering if I&#8217;m making sense at all and if this is possible.</p>
+<h4>GTID and settings</h4>
+<p>The fact that you have to specify both <strong>gtid_mode=ON</strong> as well as <strong>disable-gtid-unsafe-statements</strong> is a bit of a bummer. I wouldn&#8217;t mind as much if error messages would be informative. But as it turned out, when I wanted to test GTID I did the following:</p>
+<blockquote>
+<pre>mysql&gt; STOP SLAVE;
+mysql&gt; change master to MASTER_AUTO_POSITION=1;
+ERROR 1777 (HY000): CHANGE MASTER TO MASTER_AUTO_POSITION = 1 can only be executed when GTID_MODE = ON.
+
+-- OK, setting <strong>gtid_mode=ON</strong> in config file, restarting server.
+--
+-- <strong>Oooops</strong>, server won't restart!
+-- Getting this error message in log: <strong>"--gtid-mode=UPGRADE_STEP_1 or --gtid-mode=UPGRADE_STEP_2 are not yet supported"</strong>
+-- What?</pre>
+</blockquote>
+<p>Checking up on Giuseppe&#8217;s post I realized I didn&#8217;t set the <strong>disable-gtid-unsafe-statements</strong> param. But this was not mentioned on the above <strong>ERROR 1777</strong>, and the log error was quite cryptic.</p>
+<p>TODO: just mention this <em>other</em> variable.</p>
+<h4>GTID, internal InnoDB tables &amp; wreckage</h4>
+<p>OK, I managed to completely crash my replication setup. I setup GTID, and then:</p>
+<blockquote>
+<pre>set global master_info_repository:='table';
+set global relay_log_info_repository='table';</pre>
+</blockquote>
+<p>Then shut down mysql; I wanted to see how reverting back to <strong>gtid_mode=OFF</strong> works. Oh, I didn&#8217;t set the two params in the config file, so their effect was lost.</p>
+<p>Starting mysql, I get:</p>
+<blockquote>
+<pre>ERROR 1794 (HY000) at line 1: Slave is not configured or failed to initialize properly. You must at least set --server-id to enable either a master or a slave. Additional error messages can be found in the MySQL error log.</pre>
+</blockquote>
+<p>The error log says:</p>
+<blockquote>
+<pre>121015  9:38:58 [ERROR] Error creating master info: Multiple replication metadata repository instances found with data in them. Unable to decide which is the correct one to choose.
+121015  9:38:58 [ERROR] Failed to create or recover replication info repository.
+121015  9:38:58 [Note] Check error log for additional messages. You will not be able to start replication until the issue is resolved and the server restarted.</pre>
+</blockquote>
+<p>What&#8217;s interesting is that the data is still in the tables:</p>
+<blockquote>
+<pre>mysql&gt; select * from mysql.slave_master_info\G
+*************************** 1. row ***************************
+       Number_of_lines: 23
+       Master_log_name: mysql-bin.000003
+        Master_log_pos: 2623
+                  Host: 127.0.0.1
+             User_name: rsandbox
+         User_password: rsandbox
+                  Port: 14701
+         Connect_retry: 60
+           Enabled_ssl: 0
+                Ssl_ca: 
+            Ssl_capath: 
+              Ssl_cert: 
+            Ssl_cipher: 
+               Ssl_key: 
+Ssl_verify_server_cert: 0
+             Heartbeat: 1800
+                  Bind: 
+    Ignored_server_ids: 0
+                  Uuid: 10fa73da-13ac-11e2-bdcd-0024e8cd3122
+           Retry_count: 86400
+               Ssl_crl: 
+           Ssl_crlpath: 
+ Enabled_auto_position: 1</pre>
+</blockquote>
+<p>I&#8217;ve tried restarting, setting variables in the config file, changing them dynamically. To no avail.</p>
+<p>No, I haven&#8217;t filed a bug report yet.</p>
+<p>These are still my first steps into 5.6 replication and my very first impressions.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-on-mysql-5-6-new-replication-features/feed</wfw:commentRss>
+		<slash:comments>12</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5651</post-id>	</item>
+		<item>
+		<title>Useful sed / awk liners for MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/useful-sed-awk-liners-for-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/useful-sed-awk-liners-for-mysql#comments</comments>
+				<pubDate>Wed, 06 Jul 2011 06:41:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3685</guid>
+				<description><![CDATA[Listing some useful sed / awk liners to use with MySQL. I use these on occasion. sed, awk &#38; grep have many overlapping features. Some simple tasks can be performed by either. For example, stripping empty lines can be performed by either: grep '.' awk '/./' sed '/./!d' grep -v '^$' awk '!/^$/' sed '/^$/d' [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Listing some useful <strong>sed</strong> / <strong>awk</strong> liners to use with MySQL. I use these on occasion.</p>
+<p><strong>sed</strong>, <strong>awk</strong> &amp; <strong>grep</strong> have many overlapping features. Some simple tasks can be performed by either. For example, stripping empty lines can be performed by either:</p>
+<blockquote>
+<pre><strong>grep</strong> '.'
+<strong>awk</strong> '/./'
+<strong>sed</strong> '/./!d'
+<strong>grep</strong> -v '^$'
+<strong>awk</strong> '!/^$/'
+<strong>sed</strong> '/^$/d'</pre>
+</blockquote>
+<p>It&#8217;s a matter of taste &amp; convention which tool and variation to use. So for any script I suggest, there may be many variations, possibly cleaner, shorter; feel free to comment.</p>
+<h4>mysqldump</h4>
+<p>The output of <em>mysqldump</em> is in particular useful when one wishes to make transformation on data or metadata.<span id="more-3685"></span></p>
+<ul>
+<li>Convert MyISAM tables to InnoDB:</li>
+</ul>
+<blockquote>
+<pre>mysqldump | sed -e 's/^) ENGINE=MyISAM/) ENGINE=InnoDB/'</pre>
+</blockquote>
+<p>I&#8217;ve had several occasion when people said this type of conversion assumes no <strong>&#8216;ENGINE=MyISAM&#8217;</strong> snippet exists within row data. This is not so. The <strong>&#8216;^) ENGINE=MyISAM/&#8217;</strong> pattern strictly requires that this text is outside row data. No row data begins with a <strong>&#8216;)&#8217;</strong>. This is a safe conversion.</p>
+<ul>
+<li>Convert InnoDB to InnoDB plugin, compressed tables:</li>
+</ul>
+<blockquote>
+<pre>mysqldump | sed -e 's/^) ENGINE=InnoDB/) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8/'</pre>
+</blockquote>
+<ul>
+<li>Slice out a specific database (assumes existence of the <strong>USE</strong> statement):</li>
+</ul>
+<blockquote>
+<pre>sed -n "/^USE \`employees\`/,/^USE \`/p"</pre>
+</blockquote>
+<ul>
+<li>Slice out a specific table:</li>
+</ul>
+<blockquote>
+<pre>sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p"</pre>
+</blockquote>
+<ul>
+<li>Combine the above two statements to slice a specific table from a specific database:</li>
+</ul>
+<blockquote>
+<pre>sed -n "/^USE \`employees\`/,/^USE \`/p" | sed -n "/^-- Table structure for table \`departments\`/,/^-- Table structure for table/p"</pre>
+</blockquote>
+<p>See also <a rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/on-restoring-a-single-table-from-mysqldump">On restoring a single table from mysqldump</a>.</p>
+<h4>my.cnf</h4>
+<p>Some <em>my.cnf</em> files are just a mess to read. Here&#8217;s some normalizing scripts:</p>
+<ul>
+<li>Strip a <em>my.cnf</em> file from comments, remove blank lines, normalize spaces:</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | sed '/^#/d' | sed '/^$/d' | sed -e 's/[ \t]\+//g'</pre>
+</blockquote>
+<ul>
+<li>Same, but only present <strong>[mysqld]</strong> section parameters:</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | sed -n '/^\[mysqld\]/,/^\[/p' | sed '/^\[/d' | sed '/^#/d' | sed '/^$/d' | sed -e 's/[ \t]\+//g'</pre>
+</blockquote>
+<ul>
+<li>Only present <strong>[mysqld]</strong> section parameters, tab delimited (this is useful in exporting and comparing instance parameters):</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | sed -n '/^\[mysqld\]/,/^\[/p' | sed '/^\[/d' | sed '/^#/d' | sed '/^$/d' | sed -e 's/[ \t]\+//g' | sed -e 's/=/\t/'</pre>
+</blockquote>
+<ul>
+<li>Multi-word parameters in <em>my.cnf</em> can be written with either hyphens or underscores. <strong>innodb_file_per_</strong>table is the same as <strong>innodb-file-per-table</strong>, as well as <strong>innodb_file-per_table</strong>. The following normalizes the parameter names to using underscores only, keeping from changing values (e.g. <strong>&#8216;mysql-bin&#8217; </strong>parameter value should not change). It isn&#8217;t pretty!</li>
+</ul>
+<blockquote>
+<pre>cat my.sandbox.cnf | awk -F "=" 'NF &lt; 2 {print} sub("=", "=~placeholder~=") {print}' | awk -F "=~placeholder~=" 'NF &lt; 2 {gsub("-", "_", $0); print} NF==2 {gsub("-", "_", $1); print $1 "=" $2}'</pre>
+</blockquote>
+<div id="_mcePaste" class="mcePaste" style="position: absolute; left: -10000px; top: 0px; width: 1px; height: 1px; overflow: hidden;">grep &#8220;.&#8221;<br />
+awk &#8216;/./&#8217;<br />
+sed &#8216;/./!d&#8217;<br />
+grep -v &#8216;^$&#8217;<br />
+awk &#8216;!/^$/&#8217;<br />
+sed &#8216;/^$/d&#8217;</div>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/useful-sed-awk-liners-for-mysql/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3685</post-id>	</item>
+		<item>
+		<title>Recovering a MySQL `root` password: the fourth solution</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/recovering-a-mysql-root-password-the-fourth-solution</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/recovering-a-mysql-root-password-the-fourth-solution#comments</comments>
+				<pubDate>Tue, 22 Mar 2011 07:47:46 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3412</guid>
+				<description><![CDATA[Have just read Darren Cassar&#8217;s Recovering a MySQL `root` password – Three solutions. There&#8217;s a fourth solution: using an init-file, which leads to just one restart of the database instead of two. It also avoids the security issue involved with using skip-grant-tables. I&#8217;ve written all about it before on Dangers of skip-grant-tables. Darren&#8217;s 1st advice [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Have just read Darren Cassar&#8217;s <a title="Permanent Link to Recovering a MySQL `root` password – Three solutions" rel="bookmark" href="http://mysqlpreacher.com/wordpress/2011/03/recovering-a-mysql-root-password-three-solutions/">Recovering a MySQL `root` password – Three solutions</a>. There&#8217;s a fourth solution: using an <strong>init-file</strong>, which leads to just one restart of the database instead of two. It also avoids the security issue involved with using <strong>skip-grant-tables</strong>.</p>
+<p>I&#8217;ve written all about it before on <a title="Permanent Link to Dangers of skip-grant-tables" rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/dangers-of-skip-grant-tables">Dangers of skip-grant-tables</a>.</p>
+<p>Darren&#8217;s 1st advice (look for password ini files, scripts, etc.) is a very good one. One password that can always be looked up in files is the replication&#8217;s password.</p>
+<p>Replication&#8217;s password is easily forgotten: you only set it once and never use it again; never script it nor manually login with. When setting up new slaves, though, you suddenly need it.</p>
+<p>Apparently not many realize that the replication password is written in plaintext in the <strong>master.info</strong> file. This file tells the slave all about it&#8217;s master connection: host, port, user &amp; password are all there for you to read.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/recovering-a-mysql-root-password-the-fourth-solution/feed</wfw:commentRss>
+		<slash:comments>13</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3412</post-id>	</item>
+		<item>
+		<title>Upgrading passwords from old_passwords to &#8220;new passwords&#8221;</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/upgrading-passwords-from-old_passwords-to-new-passwords</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/upgrading-passwords-from-old_passwords-to-new-passwords#comments</comments>
+				<pubDate>Mon, 28 Feb 2011 13:50:52 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3297</guid>
+				<description><![CDATA[You have old_passwords=1 in your my.cnf. I&#8217;m guessing this is because you used one of the my-small.cnf, my-large.cnf etc. templates provided with your MySQL distribution. These files can easily win the &#8220;most outdated sample configuration file contest&#8221;. Usually it&#8217;s no big deal: if some parameter isn&#8217;t right, you just go and change it. Some variables, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>You have <strong>old_passwords=1</strong> in your <strong>my.cnf</strong>. I&#8217;m guessing this is because you used one of the <strong>my-small.cnf</strong>, <strong>my-large.cnf</strong> etc. templates provided with your MySQL distribution.</p>
+<p>These files can easily win the &#8220;most outdated sample configuration file contest&#8221;.</p>
+<p>Usually it&#8217;s no big deal: if some parameter isn&#8217;t right, you just go and change it. Some variables, though, have a long-lasting effect, and are not easily reversed.</p>
+<h4>What&#8217;s the deal with old_passwords?</h4>
+<p>No one should be using these anymore. This variable makes the password hashing algorithm compatible with that of MySQL <strong>4.0</strong>. I&#8217;m pretty sure <strong>4.0</strong> was released <strong>9</strong> years ago. I don&#8217;t know of anyone still using it (or <strong>4.0</strong> client libraries).</p>
+<p>The deal is this: with old_passwords you get a <strong>16</strong> hexadecimal digits (<strong>64</strong> bit) hashing of your passwords. With so called <em>&#8220;new passwords&#8221;</em> you get <strong>40</strong> hexadecimal digits (plus extra &#8220;<strong>*</strong>&#8220;). So this is about better encryption of your password. Read more on the <a href="http://dev.mysql.com/doc/refman/5.1/en/password-hashing.html">manual</a>.</p>
+<h4>How do I upgrade to new password format?</h4>
+<p>You can&#8217;t just put a comment on the &#8220;<strong>old_passwords=1</strong>&#8221; entry in the configuration file. If you do so, the next client to connect will attempt to match a <strong>41</strong> characters hashed password to your existing <strong>16</strong> characters entry in the <strong>mysql.users</strong> table. So you need to make a simultaneous change: both remove the <strong>old_passwords</strong> entry and set a new password. You must know all accounts&#8217; passwords before you begin.</p>
+<p><span id="more-3297"></span>Interestingly, <strong>old_passwords</strong> is both a global and a session variable. To work out an example, let&#8217;s assume the account <strong>&#8216;webuser&#8217;@&#8217;localhost&#8217;</strong> enters with &#8216;123456&#8217;. Take a look at the following:</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SET SESSION old_passwords=0;
+Query OK, 0 rows affected (0.00 sec)
+
+root@mysql-5.1.51&gt; SELECT PASSWORD('123456');
++-------------------------------------------+
+| PASSWORD('123456')                        |
++-------------------------------------------+
+| *6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9 |
++-------------------------------------------+
+1 row in set (0.00 sec)
+
+root@mysql-5.1.51&gt; SET SESSION old_passwords=1;
+Query OK, 0 rows affected (0.00 sec)
+
+root@mysql-5.1.51&gt; SELECT PASSWORD('123456');
++--------------------+
+| PASSWORD('123456') |
++--------------------+
+| 565491d704013245   |
++--------------------+
+1 row in set (0.00 sec</pre>
+</blockquote>
+<p>So, the <strong>PASSWORD()</strong> function consults the <strong>old_passwords</strong> session variable.</p>
+<p>To upgrade <strong>&#8216;webuser&#8217;@&#8217;localhost&#8217;</strong>&#8216;s password we do:</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SET SESSION old_passwords=0;
+Query OK, 0 rows affected (0.00 sec)
+
+root@mysql-5.1.51&gt; SET PASSWORD FOR 'webuser'@'localhost' = PASSWORD('123456')</pre>
+</blockquote>
+<p>Go ahead and see the <strong>password</strong> entry on the <strong>mysql.users</strong> table.</p>
+<p>What we&#8217;ve just done is to set a <strong>41</strong> characters password hash for that account. Now, the next time the client wishes to connect, it must know in advance it is to expect a new password, otherwise it will encode a <strong>16</strong> characters hash, and try to match it with our new <strong>41</strong> characters hash. It is now time to perform:</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SET GLOBAL old_passwords=0;
+Query OK, 0 rows affected (0.00 sec</pre>
+</blockquote>
+<p>This will apply to all new connections made from that moment on (not affecting any existing connections). So, make sure you have updated passwords for all accounts.</p>
+<p>To wrap it up, don&#8217;t forget to set <strong>old_passwords=0</strong> in the <strong>my.cnf</strong> file, or, better yet, completely remove the entry.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/upgrading-passwords-from-old_passwords-to-new-passwords/feed</wfw:commentRss>
+		<slash:comments>26</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3297</post-id>	</item>
+		<item>
+		<title>Upgrading to Barracuda &#038; getting rid of huge ibdata1 file</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file#comments</comments>
+				<pubDate>Tue, 15 Feb 2011 08:01:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[mysqldump]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3304</guid>
+				<description><![CDATA[Some of this is old stuff, but more people are now converting to InnoDB plugin, so as to enjoy table compression, performance boosts. Same holds for people converting to Percona&#8217;s XtraDB. InnoDB plugin requires innodb_file_per_table. No more shared tablespace file. So your ibdata1 file is some 150GB, and it won&#8217;t reduce. Really, it won&#8217;t reduce. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Some of this is old stuff, but more people are now converting to InnoDB plugin, so as to enjoy table compression, performance boosts. Same holds for people converting to Percona&#8217;s XtraDB. InnoDB plugin requires <strong>innodb_file_per_table</strong>. No more shared tablespace file.</p>
+<p>So your <strong>ibdata1</strong> file is some <strong>150GB</strong>, and it won&#8217;t reduce. Really, it won&#8217;t reduce. You set <strong>innodb_file_per_table=1</strong>, do <strong>ALTER TABLE t ENGINE=InnoDB</strong> (optionally <strong>ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8</strong>), and you get all your tables in file-per-table <strong>.ibd</strong> files.</p>
+<p>But the original <strong>ibdata1</strong> file is still there. It has to be there, don&#8217;t delete it! It contains more than your old data.</p>
+<p>InnoDB tablespace files never reduce in size, it&#8217;s an old-time annoyance. The only way to go round it, if you need the space, is to completely drop them and start afresh. That&#8217;s one of the things so nice about file-per-table: an <strong>ALTER TABLE</strong> actually creates a new tablespace file and drops the original one.</p>
+<h4>The procedure</h4>
+<p>The procedure is somewhat painful:</p>
+<ul>
+<li>Dump everything logically (either use <em>mysqldump</em>, <a href="http://www.maatkit.org/doc/mk-parallel-dump.html">mk-parallel-dump</a>, or do it your own way)</li>
+<li>Erase your data (literally, delete everything under your <strong>datadir</strong>)</li>
+<li>Generate a new empty database</li>
+<li>Load your dumped data.<span id="more-3304"></span></li>
+</ul>
+<h4>Using replication</h4>
+<p>Replication makes this less painful. Set up a slave, have it follow up on the master.</p>
+<ul>
+<li>Stop your slave.</li>
+<li>Make sure to backup the replication position (e.g. write <strong>SHOW SLAVE STATUS</strong> on a safe location, or copy <strong>master.info</strong> file).</li>
+<li>Work out the dump-erase-generate-load steps on the slave.</li>
+<li>Reattach the slave to the master using saved data.</li>
+</ul>
+<p>For this to succeed you must keep enough binary logs on the master for the entire dump-load period, which could be lengthy.</p>
+<h4>Upgrading to barracuda</h4>
+<p>If you wish to upgrade your InnoDB tables to <em>Barracuda</em> format, my advice is this:</p>
+<ol>
+<li>Follow the steps above to generate a file-per-table working slave</li>
+<li>Stop the slave</li>
+<li>Configure <strong>skip_slave_start</strong></li>
+<li>Restart MySQL</li>
+<li>One by one do the <strong>ALTER TABLE</strong> into <em>Barracuda</em> format (<strong>ROW_FORMAT=COMPACT</strong> or <strong>ROW_FORMAT=COMPRESSED</strong>)</li>
+</ol>
+<p>Note that if you&#8217;re about to do table compression, the <strong>ALTER</strong> statements become <em>considerably</em> slower the better the compression is.</p>
+<p>If your dataset is very large, and you can&#8217;t keep so many binary logs, you may wish to break step <strong>5</strong> above into:</p>
+<ul>
+<li>ALTER a large table</li>
+<li>Restart MySQL</li>
+<li>Start slave, wait for it to catch up</li>
+<li>Restart MySQL again</li>
+</ul>
+<p>and do the same for all large tables.</p>
+<h4>Why all these restarts?</h4>
+<p>I&#8217;ve been upgrading to Barracuda for a long time now. I have clearly noticed that <strong>ALTER</strong> into a <strong>COMPRESSED</strong> format works considerably slower after the slave has done some &#8220;real work&#8221;. This in particular relates to the last &#8220;renaming table&#8221; stage. There was a bug with earlier InnoDB plugin versions which made this stage hang. It was solved. But it still takes some time for this last, weird stage, where the new replacement table is complete, and it&#8217;s actually been renamed in place of the old table, and the old table renamed into something like &#8220;#sql-12345.ibd&#8221;, and all that needs to be done is have it dropped, and&#8230; Well, it takes time.</p>
+<p>My observation is it works faster on a freshly started server. Which is why I take the bother to restart MySQL before each large table conversion.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file/feed</wfw:commentRss>
+		<slash:comments>16</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3304</post-id>	</item>
+		<item>
+		<title>Where&#8217;s my cnf file?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/wheres-my-cnf-file</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/wheres-my-cnf-file#comments</comments>
+				<pubDate>Tue, 07 Dec 2010 10:24:44 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Linux]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2981</guid>
+				<description><![CDATA[So you have a running MySQL server, it&#8217;s working well and everyone&#8217;s happy. You want to make a minor change to the configuration file, so you edit the file, restart MySQL &#8211; but the change doesn&#8217;t catch! Or maybe you want to check that some global variable has not been dynamically changed without an update [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>So you have a running MySQL server, it&#8217;s working well and everyone&#8217;s happy. You want to make a minor change to the configuration file, so you edit the file, restart MySQL &#8211; but the change doesn&#8217;t catch!</p>
+<p>Or maybe you want to check that some global variable has not been dynamically changed without an update to the configuration file. But the configuration file doesn&#8217;t make any sense &#8212; it looks like nothing is common between the file and the server.</p>
+<p>Wait, which <strong>my.cnf</strong> file does MySQL read? Rather, which <strong>my.cnf</strong> <em>files</em>?</p>
+<p>Ever happened to you? If you&#8217;re well organized, and only keep a single <strong>/etc/my.cnf</strong> file, you know exactly where everything is. But some systems are messier, with <em>lots</em> of configuration files hanging around. Which ones apply?</p>
+<p>Let&#8217;s find out which configuration files apply.</p>
+<h4>No direct information</h4>
+<p>It would all be easier if we could just <strong>SHOW GLOBAL VARIABLES LIKE &#8216;configuration_files_that_this_server_has_read_list&#8217;</strong>. There isn&#8217;t such an option.</p>
+<p><span id="more-2981"></span>The MySQL documentation <a href="http://dev.mysql.com/doc/refman/5.1/en/option-files.html">explains</a> about the configuration files search path, and that&#8217;s one path you can follow. Also, you can detect another estimated search path by invoking:</p>
+<blockquote>
+<pre><strong>root@myhost:~# mysqld --verbose --help | head -n 20
+</strong>100927 19:53:06 [ERROR] Fatal error: Please read "Security" section of the manual to find out how to run mysqld as root!
+
+mysqld  Ver 5.1.41 for unknown-linux-gnu on x86_64 (MySQL Community Server (GPL))
+Copyright (C) 2000-2008 MySQL AB, by Monty and others
+Copyright (C) 2008 Sun Microsystems, Inc.
+This software comes with ABSOLUTELY NO WARRANTY. This is free software,
+and you are welcome to modify and redistribute it under the GPL license
+
+Starts the MySQL database server
+
+Usage: mysqld [OPTIONS]
+
+Default options are read from the following files in the given order:
+<strong>/etc/my.cnf /etc/mysql/my.cnf /usr/local/mysql/etc/my.cnf ~/.my.cnf</strong>
+The following groups are read: mysqld server mysqld-5.1
+The following options may be given as the first argument:
+...</pre>
+</blockquote>
+<p>Easy enough, right? Just walk through that search path and you&#8217;ve covered it all. Better yet, see which of these even exist!</p>
+<blockquote>
+<pre><strong>root@myhost:~# ls -l /etc/my.cnf /etc/mysql/my.cnf /usr/local/mysql/etc/my.cnf ~/.my.cnf</strong>
+ls: cannot access /etc/my.cnf: No such file or directory
+ls: cannot access /etc/mysql/my.cnf: No such file or directory
+ls: cannot access /usr/local/mysql/etc/my.cnf: No such file or directory
+-rw-r--r-- 1 shlomi shlomi 32 2010-03-03 15:21 <strong>/home/shlomi/.my.cnf</strong></pre>
+</blockquote>
+<p>Seems like we got it. The <strong>mysqld</strong> process only reads <strong>/home/shlomi/.my.cnf</strong>. Right?</p>
+<h4>Wrong!</h4>
+<p>There are two running instances of MySQL running on my machine. Neither of the primary <strong>my.cnf</strong> files used by these instances is listed above.</p>
+<blockquote>
+<pre><strong>root@myhost:~# ps aux | grep mysqld
+</strong>shlomi   12092  0.0  0.0   4096   352 pts/1    S    Sep26   0:00 /bin/sh /home/shlomi/sandboxes/5.1/5.1.50/bin/mysqld_safe <strong>--defaults-file=/home/shlomi/sandboxes/msb_5_1_50/my.sandbox.cnf</strong>
+shlomi   12167  0.0 14.5 765520 587924 pts/1   Sl   Sep26   1:12 /home/shlomi/sandboxes/5.1/5.1.50/bin/mysqld <strong>--defaults-file=/home/shlomi/sandboxes/msb_5_1_50/my.sandbox.cnf</strong> --basedir=/home/shlomi/sandboxes/5.1/5.1.50 --datadir=/home/shlomi/sandboxes/msb_5_1_50/data --log-error=/home/shlomi/sandboxes/msb_5_1_50/data/msandbox.err --pid-file=/home/shlomi/sandboxes/msb_5_1_50/data/mysql_sandbox5150.pid --socket=/tmp/mysql_sandbox5150.sock --port=5150
+root     22827  0.0  0.0   4096   668 pts/3    S    16:50   0:00 /bin/sh /usr/local/mysql/bin/mysqld_safe --datadir=/usr/local/mysql/data --pid-file=/usr/local/mysql/data/eeyore.pid
+mysql    22960  0.1  2.2 274584 90188 pts/3    Sl   16:50   0:18 /usr/local/mysql/bin/mysqld <strong>--defaults-extra-file=/usr/local/mysql/data/my.cnf</strong> --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data --user=mysql --log-error=/usr/local/mysql/data/eeyore.err --pid-file=/usr/local/mysql/data/eeyore.pid --socket=/tmp/mysql.sock --port=3306</pre>
+</blockquote>
+<p>Can you see the mess above?</p>
+<p>The first two lines refer to a MySQL instance running under <a href="http://mysqlsandbox.net/">mysqlsandbox</a>. The <em>mysqld_safe</em> script is passed the defaults-file parameter, and passes it on to the <em>mysqld</em> service.</p>
+<p>However the next couple of lines refer to a MySQL server installed as a service; installed from a binary tarball, this instance reads configuration from the <strong>datadir</strong>. This time the <em>mysqld_safe</em> instance is passed nothing, but invokes <em>mysqld</em> with <strong>default-extra-file</strong>.</p>
+<p>To be fair, I wasn&#8217;t expecting the <strong>&#8220;mysqld &#8211;verbose &#8211;help&#8221;</strong> invocation to find the <em>mysqlsandbox</em> configuration files. I did expect it to find the <strong>/usr/local/mysql/data/my.cnf</strong> file which it eventually used.</p>
+<p>That&#8217;s nice &amp; ugly. I can see the <strong>my.cnf</strong> file used by peeking at <em>ps</em>. A bit overkill.</p>
+<h4>Not quite there yet&#8230;</h4>
+<p>Because there&#8217;s still my private configuration file (resides on <strong>/home/shlomi/.my.cnf</strong> on my account). Now I do not expect this file to be read by my standard MySQL server, since it does not run as user &#8220;shlomi&#8221;. However my command line clients do actually read this file, and so I am affected by its settings.</p>
+<p>I can verify whether such files have been used on a file system which is configured to support the <strong>atime</strong> option:</p>
+<blockquote>
+<pre><strong>root@myhost:~# ls -lt --time=atime $(locate *my.cnf)
+</strong></pre>
+</blockquote>
+<p>I usually keep the <strong>atime</strong> option enabled for my <em>&#8220;/&#8221;</em> and <em>&#8220;/home&#8221;</em> partitions, but disable it on data partitions.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/wheres-my-cnf-file/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2981</post-id>	</item>
+		<item>
+		<title>MySQL terminology: processes, threads &#038; connections</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-terminology-processes-threads-connections</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-terminology-processes-threads-connections#comments</comments>
+				<pubDate>Wed, 03 Nov 2010 06:38:03 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2465</guid>
+				<description><![CDATA[There&#8217;s some confusion in the MySQL terminology for processes, threads &#38; connections, which I will try to resolve. I can&#8217;t explain the full nature of what processes and threads are; please see Wikipedia [1] [2] for that. But here&#8217;s some basics with regard to MySQL: MySQL server is a single process application. It is multithreaded. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s some confusion in the MySQL terminology for processes, threads &amp; connections, which I will try to resolve. I can&#8217;t explain the full nature of what processes and threads are; please see Wikipedia <a href="http://en.wikipedia.org/wiki/Process_%28computing%29">[1]</a> <a href="http://en.wikipedia.org/wiki/Thread_%28computer_science%29">[2]</a> for that. But here&#8217;s some basics with regard to MySQL:</p>
+<ul>
+<li>MySQL server is a single process application.</li>
+<li>It is multithreaded.</li>
+<li>It (usually) acts as a TCP/IP server, accepting connections.</li>
+<li>Each connection gets a dedicated thread.</li>
+<li>These threads are sometimes named processes, and sometimes they&#8217;re referred to as connections.</li>
+</ul>
+<p>The last part is where confusion arises, so let me discuss again the use of threads and connections in MySQL.</p>
+<p><span id="more-2465"></span>MySQL truly is a single process server. It is multi threaded, in that there are many obvious and less obvious threads comprising the server. Such threads are the InnoDB I/O threads, the DELAYED INSERT thread, etc. Oh, and of course: the connection threads. More on this in a short while.</p>
+<p>On older Linux versions or on glibc-static versions, one may view MySQL as a multi-process server. This is not so: it is merely because threads are mapped to OS processes. For the sake of this discussion this is irrelevant. mysqld is a single process.</p>
+<p>So, every new connection gets its own thread. Assuming no thread pool is in use, every new connection makes for the creation of a new thread, and a disconnect causes for that thread&#8217;s destruction. Hence, there is a 1-1 mapping between connections and active threads. But then, there <em>is</em> a thread pool, which means there can be threads which are not associated with any connection. So, the number of threads is greater than or equal to the number of connections.</p>
+<p>Here&#8217;s where terminology gets confusing. When you want to see what&#8217;s executing on the server, you issue <strong>SHOW PROCESSLIST</strong>:</p>
+<blockquote>
+<pre>mysql&gt; SHOW PROCESSLIST\G
+*************************** 1. row ***************************
+     Id: 4
+   User: root
+   Host: localhost
+     db: mycheckpoint
+Command: Query
+   Time: 0
+  State: NULL
+   Info: SHOW PROCESSLIST
+1 row in set (0.02 sec)</pre>
+</blockquote>
+<p>Perhaps this should have been called SHOW THREADLIST; the acting queries are not really processes.</p>
+<p>OK, so there&#8217;s process #4 which is executing a query. What&#8217;s <em>my</em> process id? Turns out I don&#8217;t have a process id. I do get to have a <strong>CONNECTION_ID()</strong>:</p>
+<blockquote>
+<pre>mysql&gt; SELECT CONNECTION_ID();
++-----------------+
+| CONNECTION_ID() |
++-----------------+
+|               4 |
++-----------------+</pre>
+</blockquote>
+<p>So how many processes or connections are now actually doing anything? We now must check for <strong>&#8216;Threads_running&#8217;</strong>.</p>
+<blockquote>
+<pre>mysql&gt; SHOW GLOBAL STATUS LIKE 'Threads_running';
++-----------------+-------+
+| Variable_name   | Value |
++-----------------+-------+
+| Threads_running | 1     |
++-----------------+-------+</pre>
+</blockquote>
+<p>And so we have <strong>&#8216;Threads_cached&#8217;</strong>, <strong>&#8216;Threads_connected&#8217;</strong> &amp; <strong>&#8216;Max_used_connections&#8217;</strong>.</p>
+<p>Confusing?</p>
+<p>Most of the time one can simply think of processes, threads and connections as 1-1-1 mapped, and not bother with it.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-terminology-processes-threads-connections/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2465</post-id>	</item>
+	</channel>
+</rss>

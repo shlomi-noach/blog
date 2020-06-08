@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>docker &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/docker/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 12 May 2020 07:13:37 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>orchestrator: what&#8217;s new in CI, testing &#038; development</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development#respond</comments>
+				<pubDate>Mon, 11 May 2020 08:01:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[dbdeployer]]></category>
+		<category><![CDATA[docker]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[testing]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=8077</guid>
+				<description><![CDATA[Recent focus on development &#38; testing yielded with new orchestrator environments and offerings for developers and with increased reliability and trust. This post illustrates the new changes, and see Developers section on the official documentation for more details. Testing In the past four years orchestrator was developed at GitHub, and using GitHub&#8217;s environments for testing. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Recent focus on development &amp; testing yielded with new <a href="https://github.com/openark/orchestrator">orchestrator</a> environments and offerings for developers and with increased reliability and trust. This post illustrates the new changes, and see <a href="https://github.com/openark/orchestrator/tree/master/docs#developers">Developers</a> section on the official documentation for more details.</p>
+<h2>Testing</h2>
+<p>In the past four years <code>orchestrator</code> was <a href="https://github.blog/2016-12-08-orchestrator-github/">developed at GitHub</a>, and using GitHub&#8217;s environments for <a href="https://github.blog/2017-07-06-mysql-testing-automation-at-github/">testing</a>. This is very useful for testing <code>orchestrator</code>&#8216;s behavior within GitHub, interacting with its internal infrastructure, and validating failover behavior in a production environment. These tests and their results are not visible to the public, though.</p>
+<p>Now that <code>orchestrator</code> is developed <a href="https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy">outside GitHub</a> (that is, outside GitHub the <em>company</em>, not GitHub the <em>platform</em>) I wanted to improve on the testing framework, making it visible, accessible and contribute-able to the community. Thankfully, the GitHub platform has much to offer on that front and <code>orchestrator</code> now uses <a href="https://github.com/features/actions">GitHub Actions</a> more heavily for testing.</p>
+<p>GitHub Actions provide a way to run code in a container in the context of the repository. The most common use case is to run CI tests on receiving a Pull Request. Indeed, when GitHub Actions became available, we switched out of Travis CI and into Actions for <code>orchestrator</code>&#8216;s CI.</p>
+<p>Today, <code>orchestrator</code> runs three different tests:</p>
+<ul>
+<li>Build, unit testing, integration testing, code &amp; doc validation</li>
+<li>Upgrade testing</li>
+<li>System testing</li>
+</ul>
+<p>To highlight what each does:<span id="more-8077"></span></p>
+<h3>Build, unit testing, integration testing</h3>
+<p>Based on the original CI (and possibly will split into distinct tests), this CI Action compiles the code, runs unit tests, runs the suite of <a href="https://github.com/openark/orchestrator/tree/master/tests/integration">integration tests</a> (spins up both <code>MySQL</code> and <code>SQLite</code> databases and runs a series of tests on each backend), this CI job is the &#8220;basic&#8221; test to see that the contributed code even makes sense.</p>
+<p>What&#8217;s new in this test is that it now produces an <em>artifact</em>: an <code>orchestrator</code> binary for Linux/amd64. This is again a feature for GitHub Actions; the artifact is kept for a couple months or so per Actions retention policy. <a href="https://github.com/openark/orchestrator/actions/runs/94337568">Here</a>&#8216;s an example; by the time you read this the binary artifact may or may not still be there.</p>
+<p>This means you don&#8217;t actually need a development environment on your laptop to be able to build and <code>orchestrator</code> binary. More on this later.</p>
+<h3>Upgrade testing</h3>
+<p>Until recently not formalized; I&#8217;d test upgrades by deploying them internally at GitHub onto a staging environment. Now upgrades are tested per Pull Request: we spin up a container, deploy <code>orchestrator</code> from <code>master</code> branch using both <code>MySQL</code> and <code>SQLite</code> backends, then checkout the PR branch, and redeploy <code>orchestrator</code> using the existing backends &#8212; this verifies that at least backend-database wise, there&#8217;s not upgrade errors.</p>
+<p>At this time the test only validates the database changes are applicable; in the future this may expand onto more elaborate tests.</p>
+<h3>System testing</h3>
+<p>I&#8217;m most excited about this one. Taking ideas from our approach to <a href="https://shlomi-noach.github.io/blog/mysql/using-dbdeployer-in-ci-tests">testing gh-ost with dbdeployer</a>, I created <a href="https://github.com/openark/orchestrator-ci-env">https://github.com/openark/orchestrator-ci-env</a>, which offers a full blown testing enviroment for <code>orchestrator</code>, including a MySQL replication topology (courtesy <a href="https://www.dbdeployer.com/">dbdeployer</a>), Consul, HAProxy and more.</p>
+<p>This CI testing environment can also serve as a playground in your local docker setup, see shortly.</p>
+<p>The <a href="https://github.com/openark/orchestrator/tree/master/tests/system">system tests suite</a> offers full blown cluster-wide operations such as graceful takeovers, master failovers, errant GTID transaction analysis and recovery and more. The suite utilizes the CI testing environment, breaks it, rebuilds it, validates it&#8230; Expects specific output, expects specific failure messages, specific analysis, specific outcomes.</p>
+<p>As example, with the system tests suite, we can test the behavior of a master failover in a multi-DC, multi-region (obviously simulated) environment, where a server marked as &#8220;candidate&#8221; is lagging behind all others, with strict rules for cross-site/cross-region failovers, and still we wish to see that particular replica get promoted as master. We can test not only the topology aspect of the failover, but also the failover hooks, Consul integration and its effects, etc.</p>
+<h2>Development</h2>
+<p>There&#8217;s now multiple options for developers/contributors to build or just try out <code>orchestrator</code>.</p>
+<h3>Build on GitHub</h3>
+<p>As mentioned earlier, you actually don&#8217;t need a development environment. You can use <code>orchestrator</code> CI to build and generate a Linux/amd64 <code>orchestrator</code> binary, which you can download &amp; deploy as you see fit.</p>
+<p>I&#8217;ve signed up for the GitHub Codespaces beta program, and hope to make that available for <code>orchestrator</code>, as well.</p>
+<h3>Build via Docker</h3>
+<p><code>orchestrator</code> offers various Docker build/run environments, accessible via the <code>script/dock</code> script:</p>
+<ul>
+<li>`script/dock alpine` will build and spawn `orchestrator` on a minimal <code>alpine</code> linux</li>
+<li>`script/dock test` will build and run the same CI tests (unit, integration) as mentioned earlier, but on your own docker environemtn</li>
+<li>`script/dock pkg` will build and generate `.rpm` and `.deb` packages</li>
+</ul>
+<h3>CI environment: the &#8220;full orchestrator experience&#8221;</h3>
+<p>This is the <code>orchestrator</code> amusement park. Run <code>script/dock system</code> to spawn the aforementioned CI environment used in system tests, and on top of that, an <code>orchestrator</code> setup fully integrated with that system.</p>
+<p>So that&#8217;s an <code>orchestrator</code>-MySQL topology-Consul-HAProxy setup, where <code>orchestrator</code> already has the credentials for, and pre-loads the MySQL topology, pre-configured to update Consul upon failover, HAProxy config populated by <code>consul-template</code>, heartbeat injection, and more. It resembles the <a href="https://github.blog/2018-06-20-mysql-high-availability-at-github/">HA setup at GitHub</a>, and in the future I expect to provide alternate setups (on top).</p>
+<p>Once in that docker environment, one can try running relocations, failovers, test <code>orchestrator</code>&#8216;s behavior, etc.</p>
+<h2>Community</h2>
+<p>GitHub recently announced <a href="https://github.blog/2020-05-06-new-from-satellite-2020-github-codespaces-github-discussions-securing-code-in-private-repositories-and-more/#discussions">GitHub Discussions</a> ; think a stackoverflow like place within one&#8217;s repo to ask questions, discuss, vote on answers. It&#8217;s expected to be available this summer. When it does, I&#8217;ll encourage the community to use it instead of today&#8217;s <a href="https://groups.google.com/forum/#!forum/orchestrator-mysql">orchestrator-mysql</a> Google Group and of course the many questions posted as Issues.</p>
+<p>There&#8217;s been a bunch of PRs merged recently, with more to come later on. I&#8217;m grateful for all contributions. Please understand if I&#8217;m still slow to respond.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">8077</post-id>	</item>
+	</channel>
+</rss>

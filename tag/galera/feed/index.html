@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Galera &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/galera/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 17 Dec 2012 11:03:48 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Notes on &#8220;5 Tips for migrating your MySQL server to a Galera Cluster&#8221;</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster#comments</comments>
+				<pubDate>Mon, 17 Dec 2012 07:00:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Galera]]></category>
+		<category><![CDATA[Opinions]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5874</guid>
+				<description><![CDATA[This post comes as response to 5 Tips for migrating your MySQL server to a Galera Cluster by Henrik Ingo (Galera), which is a good read. This post is a bit lengthy which is one of the reasons why I didn&#8217;t just comment on said post. The Galera talk in London was indeed well crowded, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post comes as response to <a href="http://www.codership.com/content/5-tips-migrating-your-mysql-server-galera-cluster">5 Tips for migrating your MySQL server to a Galera Cluster</a> by Henrik Ingo (Galera), which is a good read. This post is a bit lengthy which is one of the reasons why I didn&#8217;t just comment on said post.</p>
+<p>The Galera talk in London was indeed well crowded, judging from my own chair. I think there is an obvious interest in Galera, as well as a general thirst for information from real-life experience. I am personally very interested in production stories; either &#8220;war stories&#8221; or &#8220;peace stories&#8221; &#8211; anything to shed more light on the adoption of this technology.</p>
+<p>For disclosure, I have not tried Galera myself as yet. Not on production nor on staging machines. But here&#8217;s a couple thoughts on Henrik&#8217;s post:<span id="more-5874"></span></p>
+<h4>Primary keys</h4>
+<p>I think this is a classic &#8220;emerging technology&#8221; issue. The technology is designed to work with a specific configuration. In our case: InnoDB tables that all have a PRIMARY KEY. And it makes sense, and it&#8217;s good practice anyway, but as it happens people <em>do</em> forget or neglect to create PRIMARY KEYs on their tables.</p>
+<p>An emerging technology would want to avoid poor experience (modified values for PK, replication failure) by avoiding the problem in the first place. In my view, Galera should simply refuse to work with InnoDB tables that do not have a PRIMARY KEY. This could work out in several ways:</p>
+<ol>
+<li>Live: cease to replicate (better than replicate wrong info)</li>
+<li>Better yet: refuse to start the server (much as InnoDB will refuse to start if the transaction log size differs from the size indicated in the config file)</li>
+<li>Live &amp; better: refuse to create an InnoDB table without a PRIMARY KEY, or refuse INSERTs into such tables</li>
+<li>Offline: provide with an initial &#8220;review_my_database_and_see_if_it_will_work_just_fine_with_galera&#8221; shell/Perl/install script.</li>
+</ol>
+<p>Number 4 is easiest to begin with, I suppose; is OK for many people to run once, and could detect a variety of problems.</p>
+<h4>Events and Triggers</h4>
+<p>I reject the notion of not using triggers because you don&#8217;t know how they will behave. Either Galera supports triggers &#8211; in which case you should loudly acknowledge that triggers are <em>just fine</em>, or it does not, in which case you should loudly exclaim <em>&#8220;this won&#8217;t work&#8221;</em>.</p>
+<p>Triggers have many downsides, performance impact is, for me, the worst of them. However, I don&#8217;t understand the question <em>&#8220;do you actually know what they will do when you run them in a multi-master cluster? For that matter, do you know what they do on a master-slave cluster?&#8221;</em>. Does the question refer to Galera cluster? Well, I don&#8217;t really know the math behind Galera, either. Does that mean I should not use Galera? Or does the question relate to standard MySQL replication? In which case &#8211; yes, it&#8217;s in the docs.</p>
+<p>Instructing the users to avoid certain features because &#8220;it&#8217;s dark out there&#8221; is not the right way. <em>[UPDATE: please see Henrik&#8217;s comment]</em></p>
+<h4>Also</h4>
+<p>I should also note the very good post by Marco Tusa: <a href="http://www.tusacentral.net/joomla/index.php/mysql-blogs/146-mysql-ndb-a-mysql-with-galera-why-we-should-not-compare-them">MySQL Ndb &amp; MySQL with Galera why we should not compare them.</a> Marco rejects the comparison between NDB Cluster and Galera for many technical reasons. However there is one level of comparison that is not technical: the desire to be able to query any server out of N servers in a group, and to have consistent results, as well as the desire to allow for one server to crash without worrying about immediate actions like failovers, decision making, lost data etc. This level of comparison should not be taken lightly; this is the <em>&#8220;what people actually want, without the gory details&#8221;</em>.</p>
+<p>I&#8217;m looking forward to learning more about Galera. While schedule is not completely finalized yet, I think it&#8217;s safe to slip the word that you can find some informative talks in the <a href="http://www.percona.com/live/mysql-conference-2013/">next Percona Live</a> conference in Santa Clara, April (no plug intended though happy to plug).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/notes-on-5-tips-for-migrating-your-mysql-server-to-a-galera-cluster/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5874</post-id>	</item>
+	</channel>
+</rss>

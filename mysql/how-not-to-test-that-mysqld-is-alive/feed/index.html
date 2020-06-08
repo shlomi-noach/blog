@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: How NOT to test that mysqld is alive	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 13 Apr 2011 01:07:01 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Ariel				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-36793</link>
+		<dc:creator><![CDATA[Ariel]]></dc:creator>
+		<pubDate>Wed, 13 Apr 2011 01:07:01 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-36793</guid>
+					<description><![CDATA[Thanks, Shlomi.  I&#039;m just concerned that if MySQL is truly stuck, the query won&#039;t exit or timeout soon enough before the next time it&#039;s supposed to run, causing a cascading effect. 
+
+Worse yet, I&#039;m concerned about generating a false positive that would trigger a needless failover.  I&#039;m working on a monit-based solution that would hopefully avoid those situations.  
+
+Again, thanks for you suggestion.]]></description>
+		<content:encoded><![CDATA[<p>Thanks, Shlomi.  I&#8217;m just concerned that if MySQL is truly stuck, the query won&#8217;t exit or timeout soon enough before the next time it&#8217;s supposed to run, causing a cascading effect. </p>
+<p>Worse yet, I&#8217;m concerned about generating a false positive that would trigger a needless failover.  I&#8217;m working on a monit-based solution that would hopefully avoid those situations.  </p>
+<p>Again, thanks for you suggestion.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-36787</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Wed, 13 Apr 2011 00:15:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-36787</guid>
+					<description><![CDATA[@Ariel,
+
+A possible heuristic would be to connect and issue a SHOW PROCESSLIST (this does not make for an overhead). By the number of running threads and the time they are waiting ; or if InnoDB Plugin is enabled, by the number of running transactions / locked transactions, you may deduce that things are not going well.
+You may choose to monitor the above for 5 seconds, and detect that no thread/transaction has completed since previous sample; this may indicate a &quot;stuck mysql&quot;.
+
+This is just off the top of my head; haven&#039;t put serious thought yet.]]></description>
+		<content:encoded><![CDATA[<p>@Ariel,</p>
+<p>A possible heuristic would be to connect and issue a SHOW PROCESSLIST (this does not make for an overhead). By the number of running threads and the time they are waiting ; or if InnoDB Plugin is enabled, by the number of running transactions / locked transactions, you may deduce that things are not going well.<br />
+You may choose to monitor the above for 5 seconds, and detect that no thread/transaction has completed since previous sample; this may indicate a &#8220;stuck mysql&#8221;.</p>
+<p>This is just off the top of my head; haven&#8217;t put serious thought yet.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Ariel				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-36785</link>
+		<dc:creator><![CDATA[Ariel]]></dc:creator>
+		<pubDate>Tue, 12 Apr 2011 23:33:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-36785</guid>
+					<description><![CDATA[Suppose someone is interested in monitoring (the unlikely event of) whether MySQL is frozen, overloaded, unresponsive, etc., but it hasn&#039;t crashed -- i.e., the pid and sock files exist and the mysql process is listed by ps.  In this scenario, whatever method determines the database to be frozen will trigger a DRBD or cluster failover script, which this scenario assumes is already in place.    (And the reason that, btw, Nagios can&#039;t help here.)
+
+Now, how would you handle that? 
+
+It seems to me that logging in, querying, or doing anything in the database risks complicating things further.  What if the query/check doesn&#039;t complete in time?  I define &quot;in time&quot; here to mean before the next check, since I assume this check will be running on a cron or monit job at a fairly short interval to justify the failover, but you can choose any definition. 
+
+My contention here is that there really is no way to meaningfully check on the internal status of MySQL from the host it&#039;s running on when an automated failover event depends on the outcome.  Leaving aside the question of why would anyone would want to be in this scenario (believe me, I already asked the question, and the answer is self-evident), I&#039;d like to know of any possible solutions.  All the comments I&#039;ve read here and elsewhere lead me to believe there isn&#039;t.]]></description>
+		<content:encoded><![CDATA[<p>Suppose someone is interested in monitoring (the unlikely event of) whether MySQL is frozen, overloaded, unresponsive, etc., but it hasn&#8217;t crashed &#8212; i.e., the pid and sock files exist and the mysql process is listed by ps.  In this scenario, whatever method determines the database to be frozen will trigger a DRBD or cluster failover script, which this scenario assumes is already in place.    (And the reason that, btw, Nagios can&#8217;t help here.)</p>
+<p>Now, how would you handle that? </p>
+<p>It seems to me that logging in, querying, or doing anything in the database risks complicating things further.  What if the query/check doesn&#8217;t complete in time?  I define &#8220;in time&#8221; here to mean before the next check, since I assume this check will be running on a cron or monit job at a fairly short interval to justify the failover, but you can choose any definition. </p>
+<p>My contention here is that there really is no way to meaningfully check on the internal status of MySQL from the host it&#8217;s running on when an automated failover event depends on the outcome.  Leaving aside the question of why would anyone would want to be in this scenario (believe me, I already asked the question, and the answer is self-evident), I&#8217;d like to know of any possible solutions.  All the comments I&#8217;ve read here and elsewhere lead me to believe there isn&#8217;t.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Vitlalie Cherpec				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-9064</link>
+		<dc:creator><![CDATA[Vitlalie Cherpec]]></dc:creator>
+		<pubDate>Wed, 06 Jan 2010 11:43:37 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-9064</guid>
+					<description><![CDATA[I&#039;m using Nagios (http://www.nagios.org/) to monitor mysql servers. Reinventing the wheel is too error prone, just stick with stable and tested solutions. If Nagios itself is too complex, Nagios plugins can be used from scripts. :
+
+Usage help for check_mysql plugin:
+
+[vitalie@shark ~]$ /usr/lib64/nagios/plugins/check_mysql --help
+
+check_mysql v2034 (nagios-plugins 1.4.13)
+Copyright (c) 1999-2007 Nagios Plugin Development Team
+        
+
+This program tests connections to a mysql server
+
+
+Usage: check_mysql [-d database] [-H host] [-P port] [-s socket]
+       [-u user] [-p password] [-S]
+
+[...]]]></description>
+		<content:encoded><![CDATA[<p>I&#8217;m using Nagios (<a href="http://www.nagios.org/" rel="nofollow ugc">http://www.nagios.org/</a>) to monitor mysql servers. Reinventing the wheel is too error prone, just stick with stable and tested solutions. If Nagios itself is too complex, Nagios plugins can be used from scripts. :</p>
+<p>Usage help for check_mysql plugin:</p>
+<p>[vitalie@shark ~]$ /usr/lib64/nagios/plugins/check_mysql &#8211;help</p>
+<p>check_mysql v2034 (nagios-plugins 1.4.13)<br />
+Copyright (c) 1999-2007 Nagios Plugin Development Team</p>
+<p>This program tests connections to a mysql server</p>
+<p>Usage: check_mysql [-d database] [-H host] [-P port] [-s socket]<br />
+       [-u user] [-p password] [-S]</p>
+<p>[&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: ajd4096				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-4664</link>
+		<dc:creator><![CDATA[ajd4096]]></dc:creator>
+		<pubDate>Thu, 08 Oct 2009 06:23:44 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-4664</guid>
+					<description><![CDATA[/proc is not deprecated (nor depreciated) on HP-UX, it never had it, AFAIK.
+
+FreeBSD/OpenBSD/NetBSD have a procfs, but it is not mounted by default.
+
+(The main reason for avoiding procfs is that reading from /proc in user-space suffers from TOCTOU, whereas a system call does not. This issue was raised yet again on the OpenBSD misc@ mailing list only a few weeks ago.)
+
+There is a procfs for OSX, it&#039;s MacFUSE-based, not from Apple, and not even installed by default.
+
+Obviously there is a sizeable percentage of unix systems where a script referring to /proc will not work.
+
+Now, about the ubiquity of that &quot;bash&quot; shell....]]></description>
+		<content:encoded><![CDATA[<p>/proc is not deprecated (nor depreciated) on HP-UX, it never had it, AFAIK.</p>
+<p>FreeBSD/OpenBSD/NetBSD have a procfs, but it is not mounted by default.</p>
+<p>(The main reason for avoiding procfs is that reading from /proc in user-space suffers from TOCTOU, whereas a system call does not. This issue was raised yet again on the OpenBSD misc@ mailing list only a few weeks ago.)</p>
+<p>There is a procfs for OSX, it&#8217;s MacFUSE-based, not from Apple, and not even installed by default.</p>
+<p>Obviously there is a sizeable percentage of unix systems where a script referring to /proc will not work.</p>
+<p>Now, about the ubiquity of that &#8220;bash&#8221; shell&#8230;.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Zach				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-4646</link>
+		<dc:creator><![CDATA[Zach]]></dc:creator>
+		<pubDate>Wed, 07 Oct 2009 13:33:21 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-4646</guid>
+					<description><![CDATA[@FredV
+
+you are totally incorrect, /proc is not in every Unix... /proc has been depreciated in older SysV style OS&#039;es... like ..wait for it... HPUX!]]></description>
+		<content:encoded><![CDATA[<p>@FredV</p>
+<p>you are totally incorrect, /proc is not in every Unix&#8230; /proc has been depreciated in older SysV style OS&#8217;es&#8230; like ..wait for it&#8230; HPUX!</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: FredV				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-4637</link>
+		<dc:creator><![CDATA[FredV]]></dc:creator>
+		<pubDate>Wed, 07 Oct 2009 07:29:07 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-4637</guid>
+					<description><![CDATA[&quot;/proc is not a standard Unix feature, nor is bash.&quot;
+
+that&#039;s why every unix has it?]]></description>
+		<content:encoded><![CDATA[<p>&#8220;/proc is not a standard Unix feature, nor is bash.&#8221;</p>
+<p>that&#8217;s why every unix has it?</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: ajd4096				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-4633</link>
+		<dc:creator><![CDATA[ajd4096]]></dc:creator>
+		<pubDate>Wed, 07 Oct 2009 03:46:32 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-4633</guid>
+					<description><![CDATA[@FredV
+/proc is not a standard Unix feature, nor is bash.
+
+There is more to unix than the linux distro du-jour.]]></description>
+		<content:encoded><![CDATA[<p>@FredV<br />
+/proc is not a standard Unix feature, nor is bash.</p>
+<p>There is more to unix than the linux distro du-jour.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: FredV				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-4615</link>
+		<dc:creator><![CDATA[FredV]]></dc:creator>
+		<pubDate>Tue, 06 Oct 2009 18:57:14 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-4615</guid>
+					<description><![CDATA[Adam: using /proc (a standard Unix feature) and bash-compatible shell script is not portable and brittle? i disagree. asfor extensible: who on earth would want to build something on top and exapand on this? It&#039;s a quick hack anyway, normally you shouldn&#039;t have to do stuff like this.
+
+btw. using /proc, which is *not* as stupid as grepping ps output without even using awk to split into columns. a process can change how it&#039;s displayed in ps by changing argv[0], so the /proc solution I gave is actually the only one that will always work and not brittle as you say]]></description>
+		<content:encoded><![CDATA[<p>Adam: using /proc (a standard Unix feature) and bash-compatible shell script is not portable and brittle? i disagree. asfor extensible: who on earth would want to build something on top and exapand on this? It&#8217;s a quick hack anyway, normally you shouldn&#8217;t have to do stuff like this.</p>
+<p>btw. using /proc, which is *not* as stupid as grepping ps output without even using awk to split into columns. a process can change how it&#8217;s displayed in ps by changing argv[0], so the /proc solution I gave is actually the only one that will always work and not brittle as you say</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Adam Nelson				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-not-to-test-that-mysqld-is-alive/comment-page-2#comment-4607</link>
+		<dc:creator><![CDATA[Adam Nelson]]></dc:creator>
+		<pubDate>Tue, 06 Oct 2009 15:48:42 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1355#comment-4607</guid>
+					<description><![CDATA[I&#039;m a little disturbed by all the people still posting ps and proc options.
+
+It&#039;s fun that these tricks can be done, but any of that type of custom scripting is not extensible, rarely portable, and highly brittle under a panoply of eventualities.
+
+I know there are systems that have been up for 10 years on this kind of stuff, but it&#039;s not responsible for such band-aids to be allowed to be permanent (or for SysAdmins to think that those are real, proper solutions).]]></description>
+		<content:encoded><![CDATA[<p>I&#8217;m a little disturbed by all the people still posting ps and proc options.</p>
+<p>It&#8217;s fun that these tricks can be done, but any of that type of custom scripting is not extensible, rarely portable, and highly brittle under a panoply of eventualities.</p>
+<p>I know there are systems that have been up for 10 years on this kind of stuff, but it&#8217;s not responsible for such band-aids to be allowed to be permanent (or for SysAdmins to think that those are real, proper solutions).</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

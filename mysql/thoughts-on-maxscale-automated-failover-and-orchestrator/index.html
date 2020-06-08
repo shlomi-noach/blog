@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+
+	<title>Thoughts on MaxScale automated failover (and Orchestrator) – code.openark.org</title>
+<link rel="dns-prefetch" href="//secure.gravatar.com">
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="https://shlomi-noach.github.io/blog/wp-includes/css/dist/block-library/style.min.css" media="all">
+<style id="wp-block-library-inline-css">
+.has-text-align-justify{text-align:justify;}
+</style>
+<link rel="stylesheet" id="wp-polls-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-css.css" media="all">
+<style id="wp-polls-inline-css">
+.wp-polls .pollbar {
+	margin: 1px;
+	font-size: 6px;
+	line-height: 8px;
+	height: 8px;
+	background-image: url('https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/images/default/pollbg.gif');
+	border: 1px solid #c8c8c8;
+}
+
+</style>
+<link rel="stylesheet" id="wpdiscuz-font-awesome-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/font-awesome-5.0.6/css/fontawesome-all.min.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-frontend-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-user-content-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz-user-content.css" media="all">
+<link rel="stylesheet" id="openark-primer-style-css" href="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/style.css" media="all">
+<link rel="stylesheet" id="wp-markdown-prettify-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/css/prettify.css" media="all">
+<link rel="stylesheet" id="social-logos-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/social-logos/social-logos.min.css" media="all">
+<link rel="stylesheet" id="jetpack_css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/css/jetpack.css" media="all">
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery-migrate.min.js"></script>
+
+
+
+
+
+
+
+
+
+            <style>
+                #wpcomm .wc_new_comment{background:#00B38F;}
+                #wpcomm .wc_new_reply{background:#00B38F;}
+                #wpcomm .wc-form-wrapper{ background:none; } /* ->formBGColor */
+                #wpcomm .wpdiscuz-front-actions{background:#F9F9F9;}
+                #wpcomm .wpdiscuz-subscribe-bar{background:#F9F9F9;}
+                #wpcomm select,
+                #wpcomm input[type="text"],
+                #wpcomm input[type="email"],
+                #wpcomm input[type="url"],
+                #wpcomm input[type="date"],
+                #wpcomm input[type="color"]{border:#D9D9D9 1px solid;}
+                #wpcomm .wc-comment .wc-comment-right{background:#FEFEFE;}
+                #wpcomm .wc-reply .wc-comment-right{background:#F8F8F8;}
+                #wpcomm .wc-comment-right .wc-comment-text, 
+                #wpcomm .wc-comment-right .wc-comment-text *{
+                    font-size:14px;
+                }
+                #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-administrator > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-editor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-contributor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-subscriber > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_admin > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_check > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_helper > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-post_author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-guest > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }                #wpcomm .wc-comment .wc-comment-left .wc-comment-label{ background: #ffffff;}
+                #wpcomm .wc-comment-left .wc-follow-user{color:#00B38F;}
+                #wpcomm .wc-load-more-submit{border:1px solid #D9D9D9;}
+                #wpcomm .wc-new-loaded-comment > .wc-comment-right{background:#FFFAD6;}
+                #wpcomm .wpdiscuz-subscribe-bar{color:#777;}
+                #wpcomm .wpdiscuz-front-actions .wpdiscuz-sbs-wrap span{color: #777;}
+                #wpcomm .page-numbers{color:#555;border:#555 1px solid;}
+                #wpcomm span.current{background:#555;}
+                #wpcomm .wpdiscuz-readmore{cursor:pointer;color:#00B38F;}
+                #wpcomm .wpdiscuz-textarea-wrap{border:#D9D9D9 1px solid;} .wpd-custom-field .wcf-pasiv-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label {color: #DDDDDD;}
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating:not(:checked) > label:hover,.wpdiscuz-rating:not(:checked) > label:hover ~ label {   }#wpcomm .wpdiscuz-item .wpdiscuz-rating > input ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label{color: #FFED85;} 
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label:hover ~ input:checked ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked + label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover ~ label, .wpd-custom-field .wcf-active-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label{ color:#FFD700;}
+                #wpcomm .wc-comment-header{border-top: 1px solid #dedede;}
+                #wpcomm .wc-reply .wc-comment-header{border-top: 1px solid #dedede;}
+                /* Buttons */
+                #wpcomm button, 
+                #wpcomm input[type="button"], 
+                #wpcomm input[type="reset"], 
+                #wpcomm input[type="submit"]{ border: 1px solid #555555; color: #FFFFFF; background-color: #555555; }
+                #wpcomm button:hover, 
+                #wpcomm button:focus,
+                #wpcomm input[type="button"]:hover, 
+                #wpcomm input[type="button"]:focus, 
+                #wpcomm input[type="reset"]:hover, 
+                #wpcomm input[type="reset"]:focus, 
+                #wpcomm input[type="submit"]:hover, 
+                #wpcomm input[type="submit"]:focus{ border: 1px solid #333333; background-color: #333333;  }
+                #wpcomm .wpdiscuz-sort-buttons{color:#777777;}
+                #wpcomm .wpdiscuz-sort-button{color:#777777; cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button:hover{color:#00B38F!important;cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button-active{color:#00B38F!important;cursor:default!important;}
+                #wpcomm .wc-cta-button, 
+                #wpcomm .wc-cta-button-x{color:#777777; }
+                #wpcomm .wc-vote-link.wc-up{color:#999999;}
+                #wpcomm .wc-vote-link.wc-down{color:#999999;}
+                #wpcomm .wc-vote-result{color:#999999;}
+                #wpcomm .wpf-cta{color:#999999; }
+                #wpcomm .wc-comment-link .wc-share-link .wpf-cta{color:#eeeeee;}
+                #wpcomm .wc-footer-left .wc-reply-button{border:1px solid #00B38F!important; color: #00B38F;}
+                #wpcomm .wpf-cta:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-left .wc-reply-button.wc-cta-active, #wpcomm .wc-cta-active{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-cta-button:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-right .wc-toggle,
+                #wpcomm .wc-footer-right .wc-toggle a,
+                #wpcomm .wc-footer-right .wc-toggle i{color:#00B38F;}
+                /* STICKY COMMENT HEADER */
+                #wpcomm .wc-sticky-comment.wc-comment .wc-comment-header .wpd-sticky{background: #1ecea8; color: #ffffff; }
+                #wpcomm .wc-closed-comment.wc-comment .wc-comment-header .wpd-closed{background: #aaaaaa; color: #ffffff;}
+                /* PRIVATE COMMENT HEADER */
+                #wpcomm .wc-private-comment.wc-comment .wc-comment-header .wpd-private{background: #999999; color: #ffffff;}
+                /* FOLLOW LINK */
+
+                #wpcomm .wc-follow{color:#777777;}
+                #wpcomm .wc-follow-active{color:#ff7a00;}
+                #wpcomm .wc-follow:hover i,
+                #wpcomm .wc-unfollow:hover i,
+                #wpcomm .wc-follow-active:hover i{color:#00B38F;}
+                                .wpd-wrapper .wpd-list-item.wpd-active{border-top: 3px solid #00B38F;}
+                                .comments-area{width:auto;}
+            </style>
+            <style data-context="foundation-flickity-css">/*! Flickity v2.0.2
+http://flickity.metafizzy.co
+---------------------------------------------- */.flickity-enabled{position:relative}.flickity-enabled:focus{outline:0}.flickity-viewport{overflow:hidden;position:relative;height:100%}.flickity-slider{position:absolute;width:100%;height:100%}.flickity-enabled.is-draggable{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.flickity-enabled.is-draggable .flickity-viewport{cursor:move;cursor:-webkit-grab;cursor:grab}.flickity-enabled.is-draggable .flickity-viewport.is-pointer-down{cursor:-webkit-grabbing;cursor:grabbing}.flickity-prev-next-button{position:absolute;top:50%;width:44px;height:44px;border:none;border-radius:50%;background:#fff;background:hsla(0,0%,100%,.75);cursor:pointer;-webkit-transform:translateY(-50%);transform:translateY(-50%)}.flickity-prev-next-button:hover{background:#fff}.flickity-prev-next-button:focus{outline:0;box-shadow:0 0 0 5px #09f}.flickity-prev-next-button:active{opacity:.6}.flickity-prev-next-button.previous{left:10px}.flickity-prev-next-button.next{right:10px}.flickity-rtl .flickity-prev-next-button.previous{left:auto;right:10px}.flickity-rtl .flickity-prev-next-button.next{right:auto;left:10px}.flickity-prev-next-button:disabled{opacity:.3;cursor:auto}.flickity-prev-next-button svg{position:absolute;left:20%;top:20%;width:60%;height:60%}.flickity-prev-next-button .arrow{fill:#333}.flickity-page-dots{position:absolute;width:100%;bottom:-25px;padding:0;margin:0;list-style:none;text-align:center;line-height:1}.flickity-rtl .flickity-page-dots{direction:rtl}.flickity-page-dots .dot{display:inline-block;width:10px;height:10px;margin:0 8px;background:#333;border-radius:50%;opacity:.25;cursor:pointer}.flickity-page-dots .dot.is-selected{opacity:1}</style><style data-context="foundation-slideout-css">.slideout-menu{position:fixed;left:0;top:0;bottom:0;right:auto;z-index:0;width:256px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}.slideout-menu.pushit-right{left:auto;right:0}.slideout-panel{position:relative;z-index:1;will-change:transform}.slideout-open,.slideout-open .slideout-panel,.slideout-open body{overflow:hidden}.slideout-open .slideout-menu{display:block}.pushit{display:none}</style>
+<link rel="dns-prefetch" href="//v0.wordpress.com">
+
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Thoughts on MaxScale automated failover (and Orchestrator)">
+<meta property="og:url" content="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator">
+<meta property="og:description" content="Having attended a talk (as part of the MariaDB Developer Meeting in Amsterdam) about recent developments of MaxScale in executing automated failovers, here are some (late) observations of mine. I w…">
+<meta property="article:published_time" content="2015-11-18T09:17:48+00:00">
+<meta property="article:modified_time" content="2015-11-18T19:31:36+00:00">
+<meta property="og:site_name" content="code.openark.org">
+<meta property="og:image" content="https://s0.wp.com/i/blank.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:text:title" content="Thoughts on MaxScale automated failover (and Orchestrator)">
+<meta name="twitter:card" content="summary">
+
+
+<style>.ios7.web-app-mode.has-fixed header{ background-color: rgba(242,101,34,.88);}</style></head>
+
+<body class="post-template-default single single-post postid-7439 single-format-standard no-sidebar">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#primary">Skip to content</a>
+
+	<header id="masthead" class="site-header">
+		<div class="site-branding">
+							<p class="site-title"><a href="https://shlomi-noach.github.io/blog/" rel="home">code.openark.org</a></p>
+								<p class="site-description">Blog by Shlomi Noach</p>
+			
+			<nav id="site-navigation" class="main-navigation">
+				<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false">primary-menu</button>
+				<div class="menu-primary-menu-container"><ul id="menu-primary-menu" class="menu"><li id="menu-item-8109" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8109"><a href="https://shlomi-noach.github.io/blog/archives">archives</a></li>
+<li id="menu-item-8050" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8050"><a href="https://shlomi-noach.github.io/blog/presentations">presentations</a></li>
+<li id="menu-item-8055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8055"><a href="https://shlomi-noach.github.io/blog/about">about</a></li>
+<li id="menu-item-8071" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8071"><a href="https://github.com/shlomi-noach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a></li>
+<li id="menu-item-8074" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8074"><a href="https://www.linkedin.com/in/shlominoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg></a></li>
+<li id="menu-item-8072" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8072"><a href="https://twitter.com/ShlomiNoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"></path></svg></a></li>
+<li id="menu-item-8073" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8073"><a href="https://shlomi-noach.github.io/blog/feed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-12.832 20c-1.197 0-2.168-.969-2.168-2.165s.971-2.165 2.168-2.165 2.167.969 2.167 2.165-.97 2.165-2.167 2.165zm5.18 0c-.041-4.029-3.314-7.298-7.348-7.339v-3.207c5.814.041 10.518 4.739 10.561 10.546h-3.213zm5.441 0c-.021-7.063-5.736-12.761-12.789-12.792v-3.208c8.83.031 15.98 7.179 16 16h-3.211z"></path></svg></a></li>
+</ul></div>			</nav>
+		</div>
+	</header>
+
+	<main id="primary" class="site-main">
+
+		
+<article id="post-7439" class="post-7439 post type-post status-publish format-standard hentry category-mysql tag-failover tag-high-availability tag-maxscale tag-opinions tag-orchestrator">
+	<header class="entry-header">
+		<h1 class="entry-title">Thoughts on MaxScale automated failover (and Orchestrator)</h1>			<div class="entry-meta">
+				<span class="cat-links"><a href="https://shlomi-noach.github.io/blog/category/mysql" rel="category tag">MySQL</a></span><span class="tags-links"><a href="https://shlomi-noach.github.io/blog/tag/failover" rel="tag">Failover</a><a href="https://shlomi-noach.github.io/blog/tag/high-availability" rel="tag">High availability</a><a href="https://shlomi-noach.github.io/blog/tag/maxscale" rel="tag">MaxScale</a><a href="https://shlomi-noach.github.io/blog/tag/opinions" rel="tag">Opinions</a><a href="https://shlomi-noach.github.io/blog/tag/orchestrator" rel="tag">orchestrator</a></span><span class="posted-on alignright"><a href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" rel="bookmark"><time class="entry-date published" datetime="2015-11-18T11:17:48+02:00">November 18, 2015</time><time class="updated" datetime="2015-11-18T21:31:36+02:00">November 18, 2015</time></a></span>			</div>
+			</header>
+
+	
+	<div class="entry-content">
+		<p>Having attended a talk (as part of the <a href="https://blog.mariadb.org/2015-developers-meeting-amsterdam/">MariaDB Developer Meeting in Amsterdam</a>) about recent developments of <a href="https://mariadb.com/products/mariadb-maxscale">MaxScale</a> in executing automated failovers, here are some (late) observations of mine.</p>
+<p>I will begin by noting that the project is stated to be pre-production, and so of course none of the below are complaints, but rather food for thought, points for action and otherwise recommendations.</p>
+<p>Some functionality of the MaxScale failover is also implemented by <strong><a href="https://github.com/outbrain/orchestrator">orchestrator</a></strong>, which I author. <em>Orchestrator</em> was built in production environments by and for operational people. In this respect it has gained many insights and had to cope with many real-world cases, special cases & Murphy’s law cases. This post compares logic, feature set and capabilities of the two where relevant. To some extent the below will read as “hey, I’ve already implemented this; shame to re-implement the same”, and indeed I think that way; but it wouldn’t be the first time a code of mine would just be re-implemented by someone else and I’ve done the same, myself.</p>
+<p>I’m describing the solution the way I understood it from the talk. If I’m wrong on any account I’m happy to be corrected via comments below. <strong>Edit:</strong> <em>please see comment by</em> <a class="url" href="http://www.mariadb.com/" rel="external nofollow">Dipti Joshi</a></p>
+<h3>General overview</h3>
+<p>The idea is that MaxScale operates as a proxy to your topology. You do not connect to your master directly, but rather through MaxScale. Thus, MaxScale acts as a proxy to your master.</p>
+<p>The next phase is that MaxScale would also auto-detect master failure, fix the topology for you, promote a new master, and will have your application unaware of all the complexity and without the app having to change setup/DNS/whatever. Of course some write downtime is implied.</p>
+<p>Now for some breakdown.</p>
+<h3>Detection</h3>
+<p>The detection of a dead master, the check by which a failover is initiated, is based on MaxScale not being able to query the master. This calls for some points for consideration:</p>
+<ul>
+<li>Typically, I would see “I can’t connect to the master therefore failover” as too hysterical, and the basis for a lot of false positives.</li>
+<li>However, since in the discussed configuration MaxScale is <em>the only access point</em> to the master, the fact MaxScale cannot connect to the master means the master is inaccessible <em>de-facto</em>.</li>
+<li>In light of the above, the decision makes sense – but I still hold that it would make false positives.</li>
+<li>I’m unsure (I <em>think</em> not; can anyone comment?) if MaxScale would make multiple attempts over time and only reach the conclusion after X successive failures. This would reduce the false positives.</li>
+<li>I’m having a growing dislike to a “check for 4 successive times then alert/failover” Nagios-style behavior. <em>Orchestrator</em> takes a different approach where it recognizes a master’s death by not being able to connect to the master <em>as well as</em> being able to connect to 1st tier slaves, check their status and observe that <em>they’re unable to connect to the master as well</em>. See <a title="Permanent Link to What makes a MySQL server failure/recovery case?" href="https://shlomi-noach.github.io/blog/mysql/what-makes-a-mysql-server-failurerecovery-case" rel="bookmark">What makes a MySQL server failure/recovery case?</a>. This approach still calls for further refinement (what if the master is temporarily deadlocked? Is this a failover or not?).</li>
+</ul>
+<p><span id="more-7439"></span></p>
+<h3>Assumed topology</h3>
+<p>MaxScale assumes the topology is all MariaDB, and all slaves are using (MariaDB) GTID replication. Well, MaxScale does not actually assumes that. It is assumed so by the <a href="https://github.com/mariadb-corporation/replication-manager">MariaDB Replication Manager</a> which MaxScale invokes. But I’m getting ahead of myself here.</p>
+<h3>Topology detection</h3>
+<p>MaxScale does not recognize the master by configuration but rather by state. It observes the servers it should observe, and concludes which is the master.</p>
+<p>I’m using similar approach in <em>orchestrator</em>. I maintain that this approach works well and opens the Chakras for complex recovery options.</p>
+<h3>Upon failure detection</h3>
+<p>When MaxScale detects failure, it invokes external scripts to fix the problem. There are some similar and different particulars here as compared to <em>orchestrator</em>, and I will explain what’s wrong with the MaxScale approach:</p>
+<ul>
+<li>Although MaxScale observes the topology and understands who is the master and who isn’t, the executed scripts do not. They need to re-discover everything by themselves.</li>
+<li>This implies the scripts start without memory of “what was last observed”. This is one of the greatest strengths of <em>orchestrator</em>: it knows what the state was just before the failure, and, having the bigger picture, can make informed decisions.
+<ul>
+<li>As a nasty example, what do you do when some the first tier slaves also happen to be inaccessible at that time? What if one of those happens to further have slaves of its own?</li>
+</ul>
+</li>
+<li>The MariaDB Replication Manager script (to be referenced as <em>repmgr</em>) assumes all instances to be MariaDB with GTID.
+<ul>
+<li>It is also implied that all my slaves are configured with binary logs & log-slave-updates</li>
+<li>That’s <strong>way too restrictive</strong>.
+<ul>
+<li><em>Orchestrator</em> handles all following topologies: Oracle MySQL with/out GTID, MariaDB with/out GTID, MariaDB hybrid GTID & non-GTID replication, Pseudo-GTID (MySQL and/or MariaDB), hybrid normal & binlog servers topologies, slaves with/out log-slave-updates, hybrid Oracle & MariaDB & Binlog Servers & Pseudo-GTID.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><em>repmgr</em> is unaware of data centers & physical environments. You want failover to be as local to your datacenters as possible. Avoid too many cross-DC replication streams.</li>
+</ul>
+<h3>Failover invocation</h3>
+<p>MaxScale invokes the failover scripts <em>asynchronously</em>. This is a major flaw imho, as the decoupling between the monitoring and acting processes leads to further problems, see further.</p>
+<h3>After failover</h3>
+<p>MaxScale continuously scans the topology and observes that some other server has been promoted. This behavior is similar to <em>orchestrator’s</em>. But the following differences are noteworthy:</p>
+<ul>
+<li>Because of both the decoupling as well as the asynchronous invocation by MaxScale, it doesn’t really have any idea if and how the promotion resolved.</li>
+<li>I don’t know that there’s any anti-flapping mechanism, nor that there could be. If MaxScale doesn’t care what happened to the failover script, it shouldn’t be able to keep up with flapping scenarios.</li>
+<li>Nor is there a minimal suspend period between any two failure recoveries, that I know of. MaxScale can actually have easier life than <em>orchestrator</em> in this regard as it is (I suspect) strictly associated with <em>a topology</em>. Not like there’s a single MaxScale handling multiple topologies. So it should be very easy to keep track of failures.</li>
+<li>Or, if there is a minimal period and I’m just uninformed — what makes sure it is not smaller than the time it takes for the failover?</li>
+</ul>
+<h3>Further on failover</h3>
+<p>I wish to point out that one component of the system analyses a failure scenario, and another one fixes it. I suggest this is an undesired design. The “fixer” must have its own ability to diagnose problems as it makes progress (or else it is naive and would fail in many production cases). And the “analyzer” part must have some wisdom of its own so as to suggest course of action; or understand the consequences of the recovery done by the “fixer”.</p>
+<h3>Use of shell scripts</h3>
+<p>Generally speaking, the use of shell scripts as external hooks is evil:</p>
+<ul>
+<li>Shell scripts tend to be poorly audited</li>
+<li>With poor clarity as for what went wrong</li>
+<li>Killing them has operational difficulty (detect the shell script, find possible children, detached children)</li>
+<li>The approach of “if you want something else, just write a shell script for it” is nice for some things, but as the problem turns complex, you turn out to just write big parts of the solution in shell. This decouples your code to unwanted degree.</li>
+</ul>
+<p>At this time, <em>orchestrator</em> also uses external hooks. However:</p>
+<ul>
+<li>Fixing the topology happens within <em>orchestrator</em>, not by external scripts. There is an elaborate, auditable, visible decision making.
+<ul>
+<li>Decision making includes data center considerations, different configuration of servers involved, servers hinted as candidates, servers configured to be ignored, servers known to be downtimed.</li>
+</ul>
+</li>
+<li>Leaving the external scripts with the task of managing DNS changes or what have you.
+<ul>
+<li>Today, at Booking.com, we have a special operational tool (called the dba tool) which does that, manages rosters, issues puppet etc. This tool is itself well audited. Granted, there is still decoupling, but information does not just get lost.</li>
+<li>Sometime in the future I suspect I will extend <strong><a href="https://github.com/outbrain/orchestrator-agent">orchestrator-agent</a></strong> to participate in failovers, which means the entire flow is within <em>orchestrator’s</em> scope.</li>
+</ul>
+</li>
+</ul>
+<h3>High availability</h3>
+<p>All the above is only available via a single MaxScale server. What happens if it dies?</p>
+<p>There is a MaxScale/pacemaker setup I’m aware of. If one MaxScale dies, pacemaker takes charge and starts another on another box.</p>
+<ul>
+<li>But this means real downtime</li>
+<li>There are no multiple-MaxScale servers to load-balance on</li>
+<li>The MaxScale started by pacemaker is newly born, and does not have the big picture of the topology. It needs to go through a “peaceful time” to understand what’s going on.</li>
+</ul>
+<h3>More High Availability</h3>
+<p>At a time where MaxScale will be able to load-balance and run on multiple nodes, MariaDB will have to further tackle:</p>
+<ul>
+<li>Leader election</li>
+<li>Avoiding concurrent initiation of failovers
+<ul>
+<li>Either via group communication</li>
+<li>Or via shared datastore</li>
+</ul>
+</li>
+<li>Taking off from a failed/crashed MaxScale server’s work
+<ul>
+<li>Or rolling it back</li>
+<li>Or just cleaning it up</li>
+</ul>
+</li>
+<li>And generally share all those little pieces of information, such as “Hey, now this server is the master” (are all MaxScales in complete agreement on the topology?) or “I have failed over this topology, we should avoid failing it over again for the next 10 minutes” and more.</li>
+</ul>
+<p>The above are supported by <em>orchestrator</em>. It provides leader election, automated leader promotion, fair recognition of various failure scenarios, picking up a failed recovery from a failed <em>orchestrator</em>. Data is shared by a backend MySQL datastore, and before you shout <em>SPOF</em>, make it Galera/NDB.</p>
+<h3>Further little things that can ruin your day</h3>
+<h4>How about having a delayed replica?</h4>
+<p>Here’s an operational use case we had to tackle.</p>
+<ul>
+<li>You have a slave configured to lag by <strong>24</strong> hours. You know the drill: hackers / accidental <strong>DROP TABLE</strong>…</li>
+<li>How much time will an automated tool spend on reconnecting this slave to the topology?
+<ul>
+<li>This could take long minutes</li>
+<li>Will your recovery hang till this is resolved?</li>
+</ul>
+</li>
+<li>Since <em>orchestrator</em> heals the topology in-house, it knows how to push certain operations till after specific other operations took place. For example, <em>orchestrator</em> wants to heal the entire topology, but pushes the delayed replicas aside, under the assumption that it will be able to fix them later (fair assumption, because they are known to be behind our promoted master); it will proceed to fix everything else, execute external hooks (change DNS etc.) and only then come back to the delayed replica. All the while, the process is audited.</li>
+</ul>
+<h4>Flapping ruins your day</h4>
+<ul>
+<li>Not only do you want some stall period between two failovers, you also want your team to respond to a failover and acknowledge it. Or clear up the stall period having verified the source of the problem. Or force the next failover even if it comes sooner than the stall period termination.</li>
+</ul>
+<h4>Binlog formats</h4>
+<p>It is still not uncommon to have Statement Based Replication running. And then it is also not uncommon to have one or two slaves translating to Row Based Replication because of:</p>
+<ul>
+<li>Some app that has to read ROW based format</li>
+<li>Experimenting with RBR for purposes of upgrade</li>
+</ul>
+<p>You just can’t promote such a RBR slave on top of SBR slaves; it wouldn’t work. <em>Orchestrator</em> is aware of such rules. I still need to integrate this particular consideration into the promotion algorithm.</p>
+<h4>Versions</h4>
+<p>Likewise, not all your slaves are of same version. You should not promote a newer version slave on top of an older version slave. Again, <em>orchestrator</em> will not allow putting such a topology, and again, I still need to integrate this consideration into the promotion algorithm.</p>
+<h3>In summary</h3>
+<p>There is a long way for MaxScale failover to go. When you consider the simplest, all-MariaDB-GTID-equal-slaves small topology case, things are kept simple and probably sustainable. But issues like complex topologies, flapping, special slaves, different configuration, high availability, leadership, acknowledgements, and more, call for a more advanced solution.</p>
+<div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><div class="sd-content"><ul><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-7439" class="share-twitter sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-7439" class="share-linkedin sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-jetpack-whatsapp"><a rel="nofollow noopener noreferrer" data-shared="" class="share-jetpack-whatsapp sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" target="_blank" title="Click to share on WhatsApp"><span>WhatsApp</span></a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-7439" class="share-facebook sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>	</div>
+
+	<footer class="entry-footer">
+			</footer>
+</article>
+
+	<nav class="navigation post-navigation" role="navigation" aria-label="Posts">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://shlomi-noach.github.io/blog/mysql/sql-mini-hack-of-the-day-inverted-in-clause" rel="prev"><span class="nav-subtitle">Previous:</span> <span class="nav-title">SQL mini hack of the day, inverted IN clause</span></a></div><div class="nav-next"><a href="https://shlomi-noach.github.io/blog/mysql/orchestrator-pseudo-gtid-for-binlog-reader-failover" rel="next"><span class="nav-subtitle">Next:</span> <span class="nav-title">Orchestrator & Pseudo-GTID for binlog reader failover</span></a></div></div>
+	</nav>    <div class="wpdiscuz_top_clearing"></div>
+    <div id="comments" class="comments-area"><div id="respond" style="width: 0;height: 0;clear: both;margin: 0;padding: 0;"></div>            <h3 id="wc-comment-header">
+                                    <div class="wpdiscuz-comment-count">
+                        <div class="wpd-cc-value">6</div>
+                        <div class="wpd-cc-arrow"></div>
+                    </div>
+                                Leave a Reply            </h3>
+                    <div id="wpcomm" class="wpdiscuz_unauth wpd-default">
+            <div class="wpdiscuz-form-top-bar">
+                <div class="wpdiscuz-ftb-left">
+                                                            <div id="wc_show_hide_loggedin_username">
+                                            </div>
+                </div>
+                                <div class="wpd-clear"></div>
+            </div>
+
+
+                        <div class="wc_social_plugin_wrapper">
+                            </div>
+                    <div class="wc-form-wrapper wc-main-form-wrapper" id="wc-main-form-wrapper-0_0">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                                        <form class="wc_comm_form wc_main_comm_form" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=40&d=mm&r=g" srcset="http://2.gravatar.com/avatar/?s=80&d=mm&r=g 2x" class="avatar avatar-40 photo avatar-default" height="40" width="40">                                    </div>
+                                
+                                <textarea id="wc-textarea-0_0" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="0_0" name="wpdiscuz_unique_id">
+                </form>
+                    <div class="wpdiscuz-form-bottom-bar">
+                    <div class="wpdiscuz-fbb-left">
+                                                                        <div class="wpdiscuz-stat wpd-stat-threads wpd-tooltip-left">
+                        <i class="fas fa-align-left fa-rotate-180" data-fa-transform="rotate-180"></i><span class="wpd-stat-threads-count">6</span>
+                        <wpdtip>Comment threads</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-replies wpd-tooltip-left">
+                        <i class="far fa-comments"></i><span class="wpd-stat-replies-count">0</span>
+                        <wpdtip>Thread replies</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-subscribers wpd-tooltip-left">
+                        <i class="fas fa-rss"></i><span>0</span>
+                        <wpdtip>Followers</wpdtip>
+                    </div> 
+                                                                    
+                    <div class="wpdiscuz-stat wpd-stat-reacted wpd-tooltip">
+                        <i class="fas fa-bolt"></i>
+                        <wpdtip>Most reacted comment</wpdtip>
+                    </div>
+                                                                    <div class="wpdiscuz-stat wpd-stat-hot wpd-tooltip">
+                        <i class="fab fa-hotjar"></i>
+                        <wpdtip>Hottest comment thread</wpdtip>
+                    </div>
+                            </div>
+                                        <div class="wpdiscuz-fbb-right">
+                                                        <div class="wpdiscuz-stat wpd-stat-users wpd-tooltip">
+                        <i class="fas fa-user-circle"></i> <span class="wpd-stat-authors-count">4</span>
+                        <wpdtip>Comment authors</wpdtip>
+                    </div>
+                                                                                                            <div class="wpdiscuz-users wpd-tooltip-right">
+                        <img alt="Prakash" src="http://0.gravatar.com/avatar/f0af787085ce30911d400e6848fad93d?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/f0af787085ce30911d400e6848fad93d?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Prakash"><img alt="shlomi" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="shlomi"><img alt="Dipti Joshi" src="http://2.gravatar.com/avatar/851e92db740506b439a73fe2e13eb667?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/851e92db740506b439a73fe2e13eb667?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Dipti Joshi"><img alt="Guillaume Lefranc" src="http://1.gravatar.com/avatar/7eeb6872b2150b93ba505aeb2833cf9c?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/7eeb6872b2150b93ba505aeb2833cf9c?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Guillaume Lefranc">                        <wpdtip>Recent comment authors</wpdtip>
+                    </div>
+                            </div>
+                <div class="wpd-clear"></div>
+    </div>
+            </div>
+                <div id="wpdiscuz_hidden_secondary_form" style="display: none;">
+                    <div class="wc-form-wrapper wc-secondary-form-wrapper" id="wc-secondary-form-wrapper-wpdiscuzuniqueid" style="display: none;">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                            <div class="wc-secondary-forms-social-content"></div><div class="clearfix"></div>
+                                        <form class="wc_comm_form wc-secondary-form-wrapper" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=48&d=mm&r=g" srcset="http://0.gravatar.com/avatar/?s=96&d=mm&r=g 2x" class="avatar avatar-48 photo avatar-default" height="48" width="48">                                    </div>
+                                
+                                <textarea id="wc-textarea-wpdiscuzuniqueid" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="wpdiscuzuniqueid" name="wpdiscuz_unique_id">
+                </form>
+                        </div>
+                </div>
+        <p class="akismet_comment_form_privacy_notice">This site uses Akismet to reduce spam. <a href="https://akismet.com/privacy/" target="_blank" rel="nofollow noopener">Learn how your comment data is processed</a>.</p>                                   
+
+                                    <div class="wpdiscuz-front-actions">
+                                                    <div class="wpdiscuz-sbs-wrap">
+                                <span><i class="far fa-envelope" aria-hidden="true"></i>  Subscribe  <i class="fas fa-caret-down" aria-hidden="true"></i></span>
+                            </div>
+                                                                        <div class="clearfix"></div>
+                    </div>
+                                                    <div class="wpdiscuz-subscribe-bar wpdiscuz-hidden">
+                                                    <form action="https://shlomi-noach.github.io/blog/wp-admin/admin-ajax.php?action=addSubscription" method="post" id="wpdiscuz-subscribe-form">
+                                <div class="wpdiscuz-subscribe-form-intro">Notify of </div>
+                                <div class="wpdiscuz-subscribe-form-option" style="width:40%;">
+                                    <select class="wpdiscuz_select" name="wpdiscuzSubscriptionType">
+                                                                                    <option value="post">new follow-up comments</option>
+                                                                                                                            <option value="all_comment" disabled>new replies to my comments</option>
+                                                                            </select>
+                                </div>
+                                                                    <div class="wpdiscuz-item wpdiscuz-subscribe-form-email">
+                                        <input class="email" type="email" name="wpdiscuzSubscriptionEmail" required="required" value="" placeholder="Email">
+                                    </div>
+                                                                <div class="wpdiscuz-subscribe-form-button">
+                                    <input id="wpdiscuz_subscription_button" type="submit" value="›" name="wpdiscuz_subscription_button">
+                                </div> 
+                                                                <input type="hidden" id="wpdiscuz_subscribe_form_nonce" name="wpdiscuz_subscribe_form_nonce" value="12fac97726"><input type="hidden" name="_wp_http_referer" value="/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator">                                                                <input type="hidden" value="7439" name="wpdiscuzSubscriptionPostId">
+                            </form>
+                                                <div class="wpdiscuz_clear"></div>
+                                            </div>
+                    
+                                <div id="wcThreadWrapper" class="wc-thread-wrapper">
+                    <div id="wc-comm-334836_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Guillaume Lefranc" src="http://1.gravatar.com/avatar/7eeb6872b2150b93ba505aeb2833cf9c?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/7eeb6872b2150b93ba505aeb2833cf9c?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-334836" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Guillaume Lefranc</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Hi+Shlomi%2C%0Avery+interesting+p...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fthoughts-on-maxscale-automated-failover-and-orchestrator%23comment-334836" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comment-334836" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi Shlomi,</p>
+<p>very interesting presentation, thank you. I’ll make sure to try Orchestrator in the near future!</p>
+<p>However, something that puts me off is the reliance on a mysql datastore. I understand the temptation to use mysql for everything, but wouldn’t a distributed datastore such as consul or etcd be more simple and efficient? I just don’t want to setup a galera cluster for that. Plus consul/etcd also have leader election, so you might find that interesting.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>4 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-334836_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-334839_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-334839" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Guillaume%2C%0AThank+you.+Indeed...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fthoughts-on-maxscale-automated-failover-and-orchestrator%23comment-334839" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comment-334839" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Guillaume,</p>
+<p>Thank you. Indeed you are not the first to raise this point, and I understand it. At this time I don’t just rely on MySQL at the backend, I rely on the relational model (so sometimes complex GROUP BY queries etc.). So migration to etcd will be non-trivial.</p>
+<p>But there are thoughts in that direction; I don’t expect this to come up in the near future unless someone else steps up to do it.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>4 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-334839_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-334911_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Dipti Joshi" src="http://2.gravatar.com/avatar/851e92db740506b439a73fe2e13eb667?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/851e92db740506b439a73fe2e13eb667?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-334911" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.mariadb.com" rel="nofollow" target="_blank">Dipti Joshi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=Shlomi%3A+Thanks+for+the+write+...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fthoughts-on-maxscale-automated-failover-and-orchestrator%23comment-334911" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comment-334911" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Shlomi: Thanks for the write up and suggestions. Few clarification and few comments on failover (1) MaxScale does not trigger failover it self , but has mechanism to invoke the failover script based on configured events (2) MaxScale differentiates between having lost communication with master (lost_master event) and having communication with master but the database being down on master (master_down event). (3) MaxScale can be configured to trigger the external script only on master_down event and not lost_master event. (4) MaxScale does not automatically invoke MariaDB Replication Manager – MaxScale can be configured to invoke any other external script –<span id="wpdiscuz-readmore-334911_0"><span class="wpdiscuz-hellip">… </span><span class="wpdiscuz-readmore" title="Read more »">Read more »</span></span></p></div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>4 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-334911_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-334919_0" class="wc-comment wc-blog-user wc-blog-post_author wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><a href="https://shlomi-noach.github.io/blog/author/shlomi" target="_blank"><img alt="shlomi" src="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/wpdiscuz/cache/gravatars/c81e728d9d4c2f636f067f89cc14862c.gif 2x" class="avatar avatar-64 photo" height="64" width="64"></a><div class="wc-blog-user wc-blog-post_author wc-comment-label"><span>Author</span></div></div><div id="comment-334919" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://openark.org" rel="nofollow" target="_blank">shlomi</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Dipti%2C%0AThank+you+for+further...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fthoughts-on-maxscale-automated-failover-and-orchestrator%23comment-334919" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comment-334919" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Dipti,<br>
+Thank you for further clarifying the internals of MaxScale</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>4 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-334919_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-355888_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Prakash" src="http://0.gravatar.com/avatar/f0af787085ce30911d400e6848fad93d?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/f0af787085ce30911d400e6848fad93d?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-355888" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Prakash</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%40Dipti+%2F+%40Shlomi%2C%0AVery+intere...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fthoughts-on-maxscale-automated-failover-and-orchestrator%23comment-355888" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comment-355888" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>@Dipti / @Shlomi,</p>
+<p>Very interesting and nice presentation. Thank you for the detailed explanation.</p>
+<p>Would like to know, when can we expect Multiple-Maxscale servers for deployment? Having single MaxScale is a single point of failure for critical applications. Similar to master-slave for MariaDB database, it’s better to have the same concept for MaxScale as well. </p>
+<p>If MaxScale server is down, then there is no point of having master with many slaves. It will defeat the purpose.</p>
+<p>If you recommend any work-around for this? Your suggestion is greatly appreciated. Thank you very much in advance.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>4 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-355888_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-385629_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-385629" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="http://www.dataarchitect.cloud/replication-manager-is-ready-for-flashback-and-much-more/" rel="nofollow" target="_blank">Replication Manager is Ready for Flashback and Much More! – Cloud Data Architect</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=%5B%26%238230%3B%5D+in+the+roadmap.+I+g...+&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fthoughts-on-maxscale-automated-failover-and-orchestrator%23comment-385629" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator#comment-385629" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] in the roadmap. I guess this task is addressing some of our fellow ace director musings found here.  Also, Etcd is already in the roadmap and will be worked on in the future and receive […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>3 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-385629_0" class="wpdiscuz_clear"></div></div>                
+                    <div class="wpdiscuz-comment-pagination">
+                                            </div>
+                </div>
+                <div class="wpdiscuz_clear"></div>
+                                                                                </div>
+        </div>
+        <div id="wpdiscuz-loading-bar" class="wpdiscuz-loading-bar wpdiscuz-loading-bar-unauth"></div>
+        
+	</main>
+
+
+	<footer id="colophon" class="site-footer">
+		<div class="site-info">
+			<a href="https://wordpress.org/">
+				Powered by WordPress			</a>
+			<span class="sep"> | </span>
+				Theme: <a href="http://openark.org">openark-primer</a> by <a href="http://underscores.me/">Underscores.me</a>.		</div>
+	</footer>
+</div>
+
+<a id="wpdUserContentInfoAnchor" style="display:none;" rel="#wpdUserContentInfo" data-wpd-lity>wpDiscuz</a><div id="wpdUserContentInfo" style="overflow:auto;background:#FDFDF6;padding:20px;width:600px;max-width:100%;border-radius:6px;" class="lity-hide"></div>	<div style="display:none">
+	<div class="grofile-hash-map-f0af787085ce30911d400e6848fad93d">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	<div class="grofile-hash-map-851e92db740506b439a73fe2e13eb667">
+	</div>
+	<div class="grofile-hash-map-7eeb6872b2150b93ba505aeb2833cf9c">
+	</div>
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/shlomi-noach.github.io\/blog\/mysql\/thoughts-on-maxscale-automated-failover-and-orchestrator":7439};
+	</script>
+					<div id="sharing_email" style="display: none;">
+		<form action="/blog/mysql/thoughts-on-maxscale-automated-failover-and-orchestrator" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="">
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="">
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="">
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed">
+			
+			<img style="float: right; display: none" class="loading" src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/sharedaddy/images/loading.gif" alt="loading" width="16" height="16">
+			<input type="submit" value="Send Email" class="sharing_send">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<script>
+var pollsL10n = {"ajax_url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","text_wait":"Your last request is still being processed. Please wait a while ...","text_valid":"Please choose a valid poll answer.","text_multiple":"Maximum number of choices allowed: ","show_loading":"1","show_fading":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-js.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/wpdccjs/wpdcc.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/autogrow/jquery.autogrowtextarea.min.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.form.min.js"></script>
+<script>
+var wpdiscuzAjaxObj = {"url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","customAjaxUrl":"https:\/\/shlomi-noach.github.io\/blog\/wp-content\/plugins\/wpdiscuz\/utils\/ajax\/wpdiscuz-ajax.php","wpdiscuz_options":{"wc_hide_replies_text":"Hide Replies","wc_show_replies_text":"View Replies","wc_msg_required_fields":"Please fill out required fields","wc_invalid_field":"Some of field value is invalid","wc_error_empty_text":"please fill out this field to comment","wc_error_url_text":"url is invalid","wc_error_email_text":"email address is invalid","wc_invalid_captcha":"Invalid Captcha Code","wc_login_to_vote":"You Must Be Logged In To Vote","wc_deny_voting_from_same_ip":"You are not allowed to vote for this comment","wc_self_vote":"You cannot vote for your comment","wc_vote_only_one_time":"You've already voted for this comment","wc_voting_error":"Voting Error","wc_held_for_moderate":"Comment awaiting moderation","wc_comment_edit_not_possible":"Sorry, this comment no longer possible to edit","wc_comment_not_updated":"Sorry, the comment was not updated","wc_comment_not_edited":"You've not made any changes","wc_new_comment_button_text":"new comment","wc_new_comments_button_text":"new comments","wc_new_reply_button_text":"new reply on your comment","wc_new_replies_button_text":"new replies on your comments","wc_msg_input_min_length":"Input is too short","wc_msg_input_max_length":"Input is too long","wc_follow_user":"Follow this user","wc_unfollow_user":"Unfollow this user","wc_follow_success":"You started following this comment author","wc_follow_canceled":"You stopped following this comment author.","wc_follow_email_confirm":"Please check your email and confirm the user following request.","wc_follow_email_confirm_fail":"Sorry, we couldn't send confirmation email.","wc_follow_login_to_follow":"Please login to follow users.","wc_follow_impossible":"We are sorry, but you can't follow this user.","wc_follow_not_added":"Following failed. Please try again later.","is_user_logged_in":false,"commentListLoadType":"0","commentListUpdateType":"0","commentListUpdateTimer":"30","liveUpdateGuests":"1","wc_comment_bg_color":"#FEFEFE","wc_reply_bg_color":"#F8F8F8","wpdiscuzCommentsOrder":"asc","wpdiscuzCommentOrderBy":"comment_date_gmt","commentsVoteOrder":false,"wordpressThreadCommentsDepth":"5","wordpressIsPaginate":"1","commentTextMaxLength":null,"storeCommenterData":100000,"isCaptchaInSession":true,"isGoodbyeCaptchaActive":false,"socialLoginAgreementCheckbox":"1","enableFbLogin":"0","enableFbShare":"0","facebookAppID":"","facebookUseOAuth2":0,"enableGoogleLogin":"0","googleAppID":"","cookiehash":"c616fa5ebd4c9ddc6dc50cbf089ebb1d","isLoadOnlyParentComments":"0","ahk":"ef4t(c4n18s$wj!7(^b9x8#r5pax76x#","enableDropAnimation":1,"isNativeAjaxEnabled":1,"cookieCommentsSorting":"wpdiscuz_comments_sorting","enableLastVisitCookie":0,"version":"5.3.5","wc_post_id":7439,"loadLastCommentId":0,"lastVisitKey":"wpdiscuz_last_visit","isCookiesEnabled":true,"wc_captcha_show_for_guest":"0","wc_captcha_show_for_members":"0","is_email_field_required":"1"}};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz.js"></script>
+<script>
+var wpdiscuzUCObj = {"msgConfirmDeleteComment":"Are you sure you want to delete this comment?","msgConfirmCancelSubscription":"Are you sure you want to cancel this subscription?","msgConfirmCancelFollow":"Are you sure you want to cancel this follow?"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz-user-content.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/lity/lity.js"></script>
+<script src="https://secure.gravatar.com/js/gprofiles.js?ver=2020Junaa"></script>
+<script>
+var WPGroHo = {"my_hash":""};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/wpgroho.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/navigation.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/skip-link-focus-fix.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/js/prettify.min.js"></script>
+<script>
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/build/sharedaddy/sharing.min.js"></script>
+<script>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+</script>
+<script type="text/javascript" src="https://stats.wp.com/e-202024.js" async="async" defer></script>
+<script type="text/javascript">
+	_stq = window._stq || [];
+	_stq.push([ 'view', {v:'ext',j:'1:8.2.1',blog:'32412571',post:'7439',tz:'2',srv:'code.openark.org'} ]);
+	_stq.push([ 'clickTrackerInit', '32412571', '7439' ]);
+</script>
+
+</body>
+</html>

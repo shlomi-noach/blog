@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Triggers Use Case Compilation, Part III	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 03 Feb 2009 06:27:39 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii/comment-page-1#comment-514</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 03 Feb 2009 06:27:39 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=412#comment-514</guid>
+					<description><![CDATA[#2: Yikes!
+
+I&#039;m going to pretend I never saw this hack. As usual, you are full of surprises!
+
+Thanks,
+Shlomi]]></description>
+		<content:encoded><![CDATA[<p>#2: Yikes!</p>
+<p>I&#8217;m going to pretend I never saw this hack. As usual, you are full of surprises!</p>
+<p>Thanks,<br />
+Shlomi</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Roland Bouman				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-iii/comment-page-1#comment-508</link>
+		<dc:creator><![CDATA[Roland Bouman]]></dc:creator>
+		<pubDate>Mon, 02 Feb 2009 18:52:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=412#comment-508</guid>
+					<description><![CDATA[Hi Shlomi!
+
+&quot;Triggers cannot act on the same table which activated them.&quot;
+
+Well -they can. Using the NEW and OLD pseudo records. But of course you meant: &quot;you cannot use the triggered table in the FROM clause of a statement contained in the trigger&quot;. Slightly different wording, big difference in effect.
+
+&quot;It can’t be hacked by calling on another table, then doing a circular trigger trick. &quot;
+
+Actually, it can, just not in the way you think.
+
+try this:
+
+CREATE TABLE tgr_tab1 (
+  id int DEFAULT NULL,
+  name char(10) DEFAULT NULL
+) 
+ENGINE=InnoDB;
+
+CREATE TABLE tgr_tab2 (
+  id int DEFAULT NULL,
+  name char(10) DEFAULT NULL
+) 
+ENGINE=FEDERATED 
+CONNECTION=&#039;mysql://user:password@host:port/schema/tgr_tab1&#039;;
+
+CREATE TRIGGER air_tgr_tab1 
+AFTER INSERT 
+ON tgr_tab1 
+FOR EACH ROW 
+DELETE FROM tgr_tab2 
+WHERE id = new.id - 2
+;
+
+mysql&#062; insert into tgr_tab1 values (1,&#039;1&#039;);
+Query OK, 1 row affected (0.03 sec)
+
+mysql&#062; select * from tgr_tab1;
++------+------+
+&#124; id   &#124; name &#124;
++------+------+
+&#124;    1 &#124; 1    &#124;
++------+------+
+1 row in set (0.00 sec)
+
+mysql&#062; insert into tgr_tab1 values (2,&#039;2&#039;);
+Query OK, 1 row affected (0.03 sec)
+
+mysql&#062; select * from tgr_tab1;
++------+------+
+&#124; id   &#124; name &#124;
++------+------+
+&#124;    1 &#124; 1    &#124;
+&#124;    2 &#124; 2    &#124;
++------+------+
+2 rows in set (0.00 sec)
+
+mysql&#062; insert into tgr_tab1 values (3,&#039;3&#039;);
+Query OK, 1 row affected (0.05 sec)
+
+mysql&#062; select * from tgr_tab1;
++------+------+
+&#124; id   &#124; name &#124;
++------+------+
+&#124;    2 &#124; 2    &#124;
+&#124;    3 &#124; 3    &#124;
++------+------+
+2 rows in set (0.00 sec)
+
+mysql&#062; insert into tgr_tab1 values (4,&#039;4&#039;);
+Query OK, 1 row affected (0.06 sec)
+
+mysql&#062; select * from tgr_tab1;
++------+------+
+&#124; id   &#124; name &#124;
++------+------+
+&#124;    3 &#124; 3    &#124;
+&#124;    4 &#124; 4    &#124;
++------+------+
+2 rows in set (0.00 sec)
+
+(Don&#039;t tell the MySQL devs, they&#039;ll probably rip it out if they find out.... ;-)]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi!</p>
+<p>&#8220;Triggers cannot act on the same table which activated them.&#8221;</p>
+<p>Well -they can. Using the NEW and OLD pseudo records. But of course you meant: &#8220;you cannot use the triggered table in the FROM clause of a statement contained in the trigger&#8221;. Slightly different wording, big difference in effect.</p>
+<p>&#8220;It can’t be hacked by calling on another table, then doing a circular trigger trick. &#8221;</p>
+<p>Actually, it can, just not in the way you think.</p>
+<p>try this:</p>
+<p>CREATE TABLE tgr_tab1 (<br />
+  id int DEFAULT NULL,<br />
+  name char(10) DEFAULT NULL<br />
+)<br />
+ENGINE=InnoDB;</p>
+<p>CREATE TABLE tgr_tab2 (<br />
+  id int DEFAULT NULL,<br />
+  name char(10) DEFAULT NULL<br />
+)<br />
+ENGINE=FEDERATED<br />
+CONNECTION=&#8217;mysql://user:password@host:port/schema/tgr_tab1&#8242;;</p>
+<p>CREATE TRIGGER air_tgr_tab1<br />
+AFTER INSERT<br />
+ON tgr_tab1<br />
+FOR EACH ROW<br />
+DELETE FROM tgr_tab2<br />
+WHERE id = new.id &#8211; 2<br />
+;</p>
+<p>mysql&gt; insert into tgr_tab1 values (1,&#8217;1&#8242;);<br />
+Query OK, 1 row affected (0.03 sec)</p>
+<p>mysql&gt; select * from tgr_tab1;<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+| id   | name |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+|    1 | 1    |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+1 row in set (0.00 sec)</p>
+<p>mysql&gt; insert into tgr_tab1 values (2,&#8217;2&#8242;);<br />
+Query OK, 1 row affected (0.03 sec)</p>
+<p>mysql&gt; select * from tgr_tab1;<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+| id   | name |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+|    1 | 1    |<br />
+|    2 | 2    |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+2 rows in set (0.00 sec)</p>
+<p>mysql&gt; insert into tgr_tab1 values (3,&#8217;3&#8242;);<br />
+Query OK, 1 row affected (0.05 sec)</p>
+<p>mysql&gt; select * from tgr_tab1;<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+| id   | name |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+|    2 | 2    |<br />
+|    3 | 3    |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+2 rows in set (0.00 sec)</p>
+<p>mysql&gt; insert into tgr_tab1 values (4,&#8217;4&#8242;);<br />
+Query OK, 1 row affected (0.06 sec)</p>
+<p>mysql&gt; select * from tgr_tab1;<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+| id   | name |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+|    3 | 3    |<br />
+|    4 | 4    |<br />
++&#8212;&#8212;+&#8212;&#8212;+<br />
+2 rows in set (0.00 sec)</p>
+<p>(Don&#8217;t tell the MySQL devs, they&#8217;ll probably rip it out if they find out&#8230;. 😉</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

@@ -1,0 +1,2139 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Graphs &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/graphs/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 03 Mar 2011 07:41:27 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Generating Google line charts with SQL, part II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-ii#comments</comments>
+				<pubDate>Thu, 03 Mar 2011 07:38:10 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3337</guid>
+				<description><![CDATA[This post continues Generating Google line charts with SQL, part I, in pursue of generating time series based image charts. We ended last post with the following chart: http://chart.apis.google.com/chart?cht=lc&#038;chs=400x200&#038;chtt=SQL%20chart&#038;chxt=x,y&#038;chxr=1,-4716.6,5340.0&#038;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL which has a nice curve, and a proper y-legend, but incorrect x-legend and no ticks nor grids. To date, Google Image Charts do not support time-series [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post continues <a href="https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-i">Generating Google line charts with SQL, part I</a>, in pursue of generating time series based image charts.</p>
+<p>We ended last post with the following chart:</p>
+<blockquote>
+<pre><img class="alignnone" title="Sample SQL Google Chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0&amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL" alt="" width="400" height="200" />
+http://chart.apis.google.com/chart?cht=lc&chs=400x200&chtt=SQL%20chart&chxt=x,y&chxr=1,-4716.6,5340.0&chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL
+</pre>
+</blockquote>
+<p>which has a nice curve, and a proper y-legend, but incorrect x-legend and no ticks nor grids.</p>
+<p>To date, Google Image Charts do not support time-series charts. We can&#8217;t just throw timestamp values and expect the chart to properly position them. We need to work these by hand.</p>
+<p>This is not easily done; if our input consists of evenly spread timestamp values, we are in a reasonable position. If not, what do we do?</p>
+<p>There are several solutions to this:</p>
+<ul>
+<li>We can present whatever points we have on the chart, making sure to position them properly. This makes for an uneven distribution of ticks on the x-axis, and is not pleasant to watch.</li>
+<li>We can extrapolate values for round hours (or otherwise round timestamp resolutions), and so show evenly spread timestamps. I don&#8217;t like this solution one bit, since we&#8217;re essentially inventing values here. Extrapolation is nice when you know you have nice curves, but not when you&#8217;re doing database monitoring, for example. You must have the precise values.</li>
+<li>We can do <a href="http://en.wikipedia.org/wiki/Oversampling">oversampling</a>, then group together several measurements within round timestamp resolutions. For example, we can make a measurement every <strong>2</strong> minutes, yet present only <strong>6</strong> measurements per hour, each averaging up <strong>10</strong> round minutes. This is the approach I take with <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>.</li>
+</ul>
+<p>The latest approach goes even beyond that: what if we missed 30 minutes of sampling? Say the server was down. We then need to &#8220;invent&#8221; the missing timestamps. Note that we invent the timestamps, we do not invent values. We must present the chart with missing values on our invented timestamps.</p>
+<p>I may show how to do this in a future post. Meanwhile, let&#8217;s simplify and assume our values <em>are</em> evenly spread.<span id="more-3337"></span></p>
+<h4>Sample data</h4>
+<p>We use <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/03/google_charts.sql_.txt">google_charts.sql</a>. Note that the timestamp values provided in Part I of this post is skewed, so make sure to use this file.</p>
+<h4>x-axis values</h4>
+<p>We use <strong>chxl</strong> to present with x-axis values. We may be tempted to just list all values. Would that work?</p>
+<p>Sadly, no, for two reasons:</p>
+<ol>
+<li>Google is not smart enough; whatever we throw at it, it will try to present. So, if we have <strong>288</strong> rows, that&#8217;s <strong>288</strong> x-axis values. Not enough room, to be sure! Smarter implementations would automatically hide some values, so as only to present with non-overlapping values.</li>
+<li>Our URL will turn out to be too long. Remember: <strong>2048</strong> characters is our maximum limit for GET request!</li>
+</ol>
+<p>Also, we must format our timestamp to be of minimal width. In our example, we have a <strong>24</strong> hour range. We therefore present timestamps in hh:MM format. So, a naive approach would be to:</p>
+<blockquote>
+<pre>SELECT
+  CONCAT(
+    'http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,',
+    ROUND(min_value, 1), ',',
+    ROUND(max_value, 1),
+    '&amp;chd=s:',
+    GROUP_CONCAT(
+      IF(
+        data IS NULL,
+        '_',
+        SUBSTRING(
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+          1+61*(data - min_value)/(max_value - min_value),
+          1
+        )
+      )
+      SEPARATOR ''
+    ),
+   '&amp;chxl=0:|',
+    <strong>GROUP_CONCAT(</strong>
+<strong>      DATE_FORMAT(ts, '%H:%i')</strong>
+<strong>      SEPARATOR '|'</strong>
+<strong>    )</strong>
+  ) FROM chart_data, chart_data_minmax</pre>
+</blockquote>
+<p>The resulting URL is just too long.</p>
+<p>Solution? Let&#8217;s only consider round hour timestamps! Our next attempt looks like this (we also throw in <strong>chxs</strong>, to show ticks):</p>
+<blockquote>
+<pre>SELECT
+  CONCAT(
+    'http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,',
+    ROUND(min_value, 1), ',',
+    ROUND(max_value, 1),
+    '&amp;chd=s:',
+    GROUP_CONCAT(
+      IF(
+        data IS NULL,
+        '_',
+        SUBSTRING(
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+          1+61*(data - min_value)/(max_value - min_value),
+          1
+        )
+      )
+      SEPARATOR ''
+    ),
+   <strong>'&amp;chxs=0,505050,10,0,lt',</strong>
+<strong>   '&amp;chxl=0:|',</strong>
+<strong>    GROUP_CONCAT(</strong>
+<strong>      IF(</strong>
+<strong>        MINUTE(ts) = 0,</strong>
+<strong>        DATE_FORMAT(ts, '%H:%i'),</strong>
+<strong>        NULL</strong>
+<strong>      )</strong>
+<strong>      SEPARATOR '|'</strong>
+<strong>    )</strong>
+  ) FROM chart_data, chart_data_minmax
+</pre>
+</blockquote>
+<p>and results with:</p>
+<blockquote>
+<pre><img class="alignnone" title="SQL line chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0&amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|00:00|01:00|02:00|03:00|04:00|05:00|06:00|07:00|08:00|09:00|10:00|11:00|12:00|13:00|14:00|15:00|16:00|17:00|18:00|19:00|20:00|21:00|22:00|23:00" alt="" width="400" height="200" />
+http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0&amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|00:00|01:00|02:00|03:00|04:00|05:00|06:00|07:00|08:00|09:00|10:00|11:00|12:00|13:00|14:00|15:00|16:00|17:00|18:00|19:00|20:00|21:00|22:00|23:00</pre>
+</blockquote>
+<p>Too messy, isn&#8217;t it?</p>
+<h4>A word about ticks</h4>
+<p>You would think: OK, then, let&#8217;s just present every <strong>4</strong> round hours timestamps. But there&#8217;s a catch: a tick will show only when there&#8217;s an x-axis value. It&#8217;s nice to have a tick for every hour, but we only want to present values every <strong>4</strong> hours.</p>
+<p>Fortunately, we can provide with an unseen value: a space (URL encoded as &#8216;<strong>+</strong>&#8216;). So we complicate things up a bit on the <strong>chxl</strong> to read:</p>
+<blockquote>
+<pre>SELECT
+  CONCAT(
+    'http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,',
+    ROUND(min_value, 1), ',',
+    ROUND(max_value, 1),
+    '&amp;chd=s:',
+    GROUP_CONCAT(
+      IF(
+        data IS NULL,
+        '_',
+        SUBSTRING(
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+          1+61*(data - min_value)/(max_value - min_value),
+          1
+        )
+      )
+      SEPARATOR ''
+    ),
+   '&amp;chxs=0,505050,10,0,lt',
+   '&amp;chxl=0:|',
+    <strong>GROUP_CONCAT(</strong>
+<strong>      IF(</strong>
+<strong>        MINUTE(ts) = 0,</strong>
+<strong>        IF(</strong>
+<strong>          HOUR(ts) MOD 4 = 0,</strong>
+<strong>          DATE_FORMAT(ts, '%H:%i'),</strong>
+<strong>          '+'</strong>
+<strong>        ),</strong>
+<strong>        NULL</strong>
+<strong>      )</strong>
+<strong>      SEPARATOR '|'</strong>
+<strong>    )</strong>
+  ) FROM chart_data, chart_data_minmax</pre>
+</blockquote>
+<p>and get:</p>
+<blockquote>
+<pre><img class="alignnone" title="SQL line chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0&amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|00:00|+|+|+|04:00|+|+|+|08:00|+|+|+|12:00|+|+|+|16:00|+|+|+|20:00|+|+|+" alt="" width="400" height="200" />
+http://chart.apis.google.com/chart?cht=lc&chs=400x200&chtt=SQL%20chart&chxt=x,y&chxr=1,-4716.6,5340.0&chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL&chxs=0,505050,10,0,lt&chxl=0:|00:00|+|+|+|04:00|+|+|+|08:00|+|+|+|12:00|+|+|+|16:00|+|+|+|20:00|+|+|+
+</pre>
+</blockquote>
+<h4>OK, I cheated</h4>
+<p>Who says sample data starts with a round hour? We have that hidden assumption here, since the first tick is necessarily a round hour in our code. Yet our data may start at <strong>12:35</strong>, for example. Sorry, you&#8217;ll have to dig into <a href="http://code.google.com/p/mycheckpoint/source/browse/trunk/src/mycheckpoint.py">mycheckpoint&#8217;s source code</a> to see a thorough solution. It&#8217;s just too much for this post.</p>
+<h4>Grids</h4>
+<p>Let&#8217;s wrap this up with grids. Grids work by specifying the step size (in percent of overall height/width) and initial offset (again, in percent).</p>
+<p>Wouldn&#8217;t it be nicer if grids were automatically attached to ticks? I mean, REALLY! What were those guys thinking? (I know, they&#8217;re doing great work. Keep it up!)</p>
+<p>Problem is, I have no idea how Google chooses to distribute values on the y-axis. I don&#8217;t know where y-axis ticks will be placed. So on y-axis, I just choose to split charts to <strong>4</strong> even parts, and draw horizontal grids between them. Percent is <strong>25</strong> (<strong>100/4</strong>), offset is <strong>0</strong>.</p>
+<p>But I do have control over the x-axis. In our case, I know how many ticks we&#8217;ll be having. Plus, I made life easier by assuming we start with a round hour, so no offset is required.</p>
+<p>Umm&#8230; How many ticks do we have? Easy: the number of round hours. This can be calculated by: <strong>SUM(MINUTE(ts) = 0</strong>. Actually, we need to take <strong>1</strong> off.</p>
+<p>We now build the <a href="http://code.google.com/apis/chart/docs/chart_params.html#gcharts_grid_lines"><strong>chg</strong></a> parameter:</p>
+<blockquote>
+<pre>SELECT
+  CONCAT(
+    'http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,',
+    ROUND(min_value, 1), ',',
+    ROUND(max_value, 1),
+    '&amp;chd=s:',
+    GROUP_CONCAT(
+      IF(
+        data IS NULL,
+        '_',
+        SUBSTRING(
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+          1+61*(data - min_value)/(max_value - min_value),
+          1
+        )
+      )
+      SEPARATOR ''
+    ),
+   '&amp;chxs=0,505050,10,0,lt',
+   '&amp;chxl=0:|',
+    GROUP_CONCAT(
+      IF(
+        MINUTE(ts) = 0,
+        IF(
+          HOUR(ts) MOD 4 = 0,
+          DATE_FORMAT(ts, '%H:%i'),
+          '+'
+        ),
+        NULL
+      )
+      SEPARATOR '|'
+    ),
+   <strong>'&amp;chg=', ROUND(100.0/((SUM(MINUTE(ts) = 0) -1)), 2), ',25,1,2,0,0'</strong>
+  ) FROM chart_data, chart_data_minmax
+</pre>
+</blockquote>
+<p>and get:</p>
+<blockquote>
+<pre><img class="alignnone" title="SQL line chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0&amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|00:00|+|+|+|04:00|+|+|+|08:00|+|+|+|12:00|+|+|+|16:00|+|+|+|20:00|+|+|+&amp;chg=4.35,25,1,2,0,0" alt="" width="400" height="200" />
+http://chart.apis.google.com/chart?cht=lc&chs=400x200&chtt=SQL%20chart&chxt=x,y&chxr=1,-4716.6,5340.0&chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL&chxs=0,505050,10,0,lt&chxl=0:|00:00|+|+|+|04:00|+|+|+|08:00|+|+|+|12:00|+|+|+|16:00|+|+|+|20:00|+|+|+&chg=4.35,25,1,2,0,0
+</pre>
+</blockquote>
+<p>Phew!</p>
+<h4>Conclusion</h4>
+<p>So we haven&#8217;t worked on offsets. And, this is a single line chart. What about multiple lines? Legend? The following chart:</p>
+<blockquote>
+<pre><img class="alignnone" title="SQL multi line chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=370x180&amp;chts=303030,12&amp;chtt=Latest+24+hours:+Nov+9,+05:50++-++Nov+10,+05:50&amp;chf=c,s,ffffff&amp;chdl=com_select_psec|com_insert_psec|com_delete_psec|com_update_psec|com_replace_psec&amp;chdlp=b&amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;chd=s:RTOSRORPNSSORROQTNQQMQRPQSOMUMPQOQUNRUQPUPSRQPUPSTRPQPPQQQQPPURPSQKUQPUQPUTPUQRUTRSRRWTRURRUPQUQSWTSUSOUURTRUTSPSRPPRMRRPRROQSNPQNPPSSRMQPQPQNRQV,MMMRQMPMNPOLOLLORLPOLQSLPRNNUNNQOPSNOQMNRNNPNMRMOQNNNOMNNLOPLPNNOOJPMMOOKRTMPONQNNQOLOMLOMLOKPXNMPMOOMKNNMPNMY976eMMRNQOOMKLOMKLKMMNKMOIPRJPMJMNK,EEDEEDEEDEFEEEDEFEEEDEFEEFEDEEEFEEEEEFEEEFEFEEFEEFEDEEEFEEEEEFEEEEEEFFEFFFEEEFFFFEEEFFFEEEEFDEEEEFFEEEEEFEEFFPx0xXFEEDEFEEEDEFEEEDEFEEEDEEDEEDEFF,FFEFFEFEEFFEFEEFFEFFEFGDEFDEFDEFEEGEEFEEFEEFEEFEEFEEEEEFEEFFDFEEFFDFEEFFEFEEFEEFEEFFDFEEFEDFEEFEEFDEFEDFEEFFENGDFEEFEEFEEFEEFFEFEEEFEFEEEFDFEEFGE,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&amp;chxt=x,y&amp;chxr=1,0,356.830000&amp;chxl=0:|+||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,0.69,0&amp;chxp=0,0.69,4.86,9.03,13.20,17.37,21.54,25.71,29.88,34.05,38.22,42.39,46.56,50.73,54.90,59.07,63.24,67.41,71.58,75.75,79.92,84.09,88.26,92.43,96.60&amp;tsstart=2010-11-09+05:50:00&amp;tsstep=600" alt="" width="370" height="180" />
+</pre>
+</blockquote>
+<p>is harder to achieve. I&#8217;m leaving this up to you!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-ii/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3337</post-id>	</item>
+		<item>
+		<title>Generating Google line charts with SQL, part I</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-i</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-i#comments</comments>
+				<pubDate>Tue, 01 Feb 2011 08:29:31 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1468</guid>
+				<description><![CDATA[In this series of posts I wish to show how Google Charts can be generated via SQL. We discuss the Google Charts limitations which must be challenged, and work towards a simple chart. I&#8217;m going to present the algorithm I use in mycheckpoint, a MySQL monitoring utility, which generates Google charts by raw data using [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In this series of posts I wish to show how <a href="http://code.google.com/apis/chart/image_charts.html">Google Charts</a> can be generated via SQL. We discuss the Google Charts limitations which must be challenged, and work towards a simple chart.</p>
+<p>I&#8217;m going to present the algorithm I use in <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>, a MySQL monitoring utility, which generates Google charts by raw data using views. An example of such chart follows:</p>
+<blockquote>
+<pre><img class="alignnone" title="Sample Google Chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=370x180&amp;chts=303030,12&amp;chtt=Latest+24+hours:+Nov+9,+05:50++-++Nov+10,+05:50&amp;chf=c,s,ffffff&amp;chdl=Rentals+rate:+custom_1_psec&amp;chdlp=b&amp;chco=ff8c00&amp;chd=s:GDGKGFLFGMJHRLMPPNULJRPLTOPRUMYPPVRNbQUSUSbSNWUOfSWTObVSUVWSVYVPbTPjfTbRTdXReUWhcTQRQZbTWYVYPaVZXdYYWPTabYUTbW99QLgLNIOIRNNMIKRJEHGFHGJGGFIFDFGDK&amp;chxt=x,y&amp;chxr=1,0,8.720000&amp;chxl=0:|+||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,0.69,0&amp;chxp=0,0.69,4.86,9.03,13.20,17.37,21.54,25.71,29.88,34.05,38.22,42.39,46.56,50.73,54.90,59.07,63.24,67.41,71.58,75.75,79.92,84.09,88.26,92.43,96.60&amp;tsstart=2010-11-09+05:50:00&amp;tsstep=600" alt="" width="370" height="180" />
+http://chart.apis.google.com/chart?cht=lc&amp;chs=370x180&amp;chts=303030,12&amp;chtt=Latest+24+hours:+Nov+9,+05:50++-++Nov+10,+05:50&amp;chf=c,s,ffffff&amp;chdl=Rentals+rate:+custom_1_psec&amp;chdlp=b&amp;chco=ff8c00&amp;chd=s:GDGKGFLFGMJHRLMPPNULJRPLTOPRUMYPPVRNbQUSUSbSNWUOfSWTObVSUVWSVYVPbTPjfTbRTdXReUWhcTQRQZbTWYVYPaVZXdYYWPTabYUTbW99QLgLNIOIRNNMIKRJEHGFHGJGGFIFDFGDK&amp;chxt=x,y&amp;chxr=1,0,8.720000&amp;chxl=0:|+||08:00||+||12:00||+||16:00||+||20:00||+||00:00||+||04:00||&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,0.69,0&amp;chxp=0,0.69,4.86,9.03,13.20,17.37,21.54,25.71,29.88,34.05,38.22,42.39,46.56,50.73,54.90,59.07,63.24,67.41,71.58,75.75,79.92,84.09,88.26,92.43,96.60&amp;tsstart=2010-11-09+05:50:00&amp;tsstep=600</pre>
+</blockquote>
+<p><em>mycheckpoint</em> does not actually call on Google to do the chart rendering, but invokes its own JavaScript code to visualize the URL locally.</p>
+<p>Here are some downsides for using Google charts:</p>
+<ul>
+<li>The URL cannot be as long as you like. 2048 characters is an upper bound you&#8217;ll want to keep behind. <em>[Google charts POST method calls are available, which leads to 16K equivalent of URL length &#8212; this is still not too helpful due to the nature of POST calls]</em></li>
+<li>Features are inconsistent. To specify label or tick positions, one must specify exact positions. To specify grid positions, one must supply with step, offset, etc. There are more such inconsistencies.</li>
+<li>Google charts are not too friendly. Taking the ticks and grids example from above, there really shouldn&#8217;t be a reason why grids would not be automatically generated according to ticks definitions. But we are required to specify positions for the ticks as well as for the grids.</li>
+<li>There is no support for time-series. One must translate time as x-axis values.</li>
+<li>Perhaps most intimidating to many people: to generate a Google chart, once must send data to Google. Which is the main reason I used local JavaScript rendering.</li>
+</ul>
+<p>Anyway, let&#8217;s build a very simple chart. Since I will not cover everything in this post, we make for some relaxed conditions.<span id="more-1468"></span></p>
+<h4>Sample data</h4>
+<p>Consider the chart_data table, below:</p>
+<blockquote>
+<pre>SELECT * FROM chart_data;
++-----+---------------------+-------------------+
+| id  | ts                  | data              |
++-----+---------------------+-------------------+
+|   1 | 2011-02-01 09:59:15 |  1.99666833293656 |
+|   2 | 2011-02-01 09:59:15 |  7.94677323180245 |
+|   3 | 2011-02-01 09:59:15 |  17.7312123996804 |
+|   4 | 2011-02-01 09:59:15 |   31.153467384692 |
+|   5 | 2011-02-01 09:59:15 |  47.9425538604203 |
+|   6 | 2011-02-01 09:59:15 |  67.7570968074042 |
+|   7 | 2011-02-01 09:59:15 |  90.1904762132767 |
+|   8 | 2011-02-01 09:59:15 |  114.776974543924 |
+|   9 | 2011-02-01 09:59:15 |  140.998843732947 |
+|  10 | 2011-02-01 09:59:15 |  168.294196961579 |
+|  11 | 2011-02-01 09:59:15 |  196.065619213516 |
+|  12 | 2011-02-01 09:59:15 |  223.689380632134 |
+|  13 | 2011-02-01 09:59:15 |   250.52512820847 |
+...</pre>
+</blockquote>
+<p>Find complete SQL script in <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/02/google_charts.sql_.txt">google_charts.sql</a></p>
+<p>In the above table we assume the timestamp values are evenly distributed. This is because of the aforementioned fact that Google Charts do not support time-series. So, if the given timnestamps are not evenly distributed, or maybe some values are skipped, we must manually compensate for that. In <em>mycheckpoint</em> I do that. In this blog post, we skip it.</p>
+<h4>Axis boundaries</h4>
+<p>By default, Google Charts expect data to lie within the range 0..100. We need to reset the scale to match our minimum/maximum values, and lay out our values within that range.</p>
+<p>We will be using views in this solution, and here is the first view:</p>
+<blockquote>
+<pre>CREATE OR REPLACE VIEW
+ chart_data_minmax
+AS
+ SELECT MIN(data) AS min_value, MAX(data) AS max_value
+FROM
+ chart_data
+;</pre>
+</blockquote>
+<p>In our example we will just settle with the min/max values. In real worlds we may:</p>
+<ul>
+<li>Choose <strong>0</strong> to be the lower value, even if the minimal value is positive</li>
+<li>Choose to round min-max values to a nearest power of <strong>10</strong>.</li>
+</ul>
+<p>The axis boundaries go under the following parameters:</p>
+<ul>
+<li><strong>chxt=x,y</strong> (we hard code bottom axis, left axis)</li>
+<li><strong>chxr=1,<em>min</em>,<em>max</em></strong> (with min, max as computed by the above)</li>
+</ul>
+<p>The following query produces these params:</p>
+<blockquote>
+<pre>SELECT CONCAT('&amp;chxt=x,y&amp;chxr=1,', ROUND(min_value, 1), ',', ROUND(max_value, 1)) AS minmax FROM chart_data_minmax;
++---------------------------------+
+| minmax                          |
++---------------------------------+
+| &amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0 |
++---------------------------------+
+</pre>
+</blockquote>
+<h3>Data values</h3>
+<p>Next, we have some <strong>244</strong> rows of data. Data is double. Can we be certain this all fits within <strong>2048</strong> characters? What if we had more rows?</p>
+<p>Alas, we must make a trade-off. We will sacrifice accuracy in favor of a short URL. We will use <a href="http://code.google.com/apis/chart/docs/data_formats.html#simple">simple encoding</a> for our data. This means just one character per value, encoded <strong>A-Za-z0-9</strong>. This means just <strong>62</strong> distinct values.</p>
+<p>So we must translate each data value into the range 0..61, and then into a character. First step is:</p>
+<blockquote>
+<pre>SELECT (data - min_value)/(max_value - min_value) AS range_01 FROM chart_data, chart_data_minmax;
++---------------------+
+| range_01            |
++---------------------+
+|   0.469204617275163 |
+|   0.469796281944551 |
+|   0.470769223945374 |
+|   0.472103901937297 |
+|   0.473773369865649 |
+|   0.475743682188048 |
+|   0.477974405550919 |
+...
+</pre>
+</blockquote>
+<p>The above translates the data into the 0..1 range. Next is to simply multiply by 61:</p>
+<blockquote>
+<pre>SELECT 61*(data - min_value)/(max_value - min_value) AS range_0_61 FROM chart_data, chart_data_minmax;
++-------------------+
+| range_0_61        |
++-------------------+
+|  28.6214816537849 |
+|  28.6575731986176 |
+|  28.7169226606678 |
+|  28.7983380181751 |
+|  28.9001755618046 |
+|  29.0203646134709 |
+|  29.1564387386061 |
+|  29.3055730348683 |
+|  29.4646269983728 |
+|  29.6301923928522 |
+...</pre>
+</blockquote>
+<p>To translate into a <em>simple format</em> character we parse a constant string:</p>
+<blockquote>
+<pre>SELECT
+  SUBSTRING(
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+    1+61*(data - min_value)/(max_value - min_value),
+    1
+  ) AS c FROM chart_data, chart_data_minmax;
++------+
+| c    |
++------+
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| e    |
+| e    |
+...</pre>
+</blockquote>
+<p>Oh, and we should handle NULLs, as well, so:</p>
+<blockquote>
+<pre>SELECT
+  IF(
+    data IS NULL,
+    '_',
+    SUBSTRING(
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+      1+61*(data - min_value)/(max_value - min_value),
+      1
+    )
+  ) AS c FROM chart_data, chart_data_minmax;
+</pre>
+<pre>+------+
+| c    |
++------+
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| d    |
+| e    |
+| e    |
+...</pre>
+</blockquote>
+<p>And, to present it as a char sequence, we use the <strong>chd</strong> parameter and call <strong>GROUP_CONCAT</strong> to the rescue:</p>
+<blockquote>
+<pre>SELECT
+  CONCAT('&amp;chd=s:',
+    GROUP_CONCAT(
+      IF(
+        data IS NULL,
+        '_',
+        SUBSTRING(
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+          1+61*(data - min_value)/(max_value - min_value),
+          1
+        )
+      )
+      SEPARATOR ''
+    )
+  ) AS c FROM chart_data, chart_data_minmax
+\G
+*************************** 1. row ***************************
+c: &amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL</pre>
+</blockquote>
+<h4>Wrap up</h4>
+<p>Combining the above two queries, with some URL necessities, we get:</p>
+<blockquote>
+<pre>SELECT
+  CONCAT(
+    'http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,',
+    ROUND(min_value, 1), ',',
+    ROUND(max_value, 1),
+    '&amp;chd=s:',
+    GROUP_CONCAT(
+      IF(
+        data IS NULL,
+        '_',
+        SUBSTRING(
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+          1+61*(data - min_value)/(max_value - min_value),
+          1
+        )
+      )
+      SEPARATOR ''
+    )
+  ) FROM chart_data, chart_data_minmax
+;
+</pre>
+</blockquote>
+<p>And get:</p>
+<blockquote>
+<pre><img class="alignnone" title="Sample SQL Google Chart" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chtt=SQL%20chart&amp;chxt=x,y&amp;chxr=1,-4716.6,5340.0&amp;chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL" alt="" width="400" height="200" />
+http://chart.apis.google.com/chart?cht=lc&chs=400x200&chtt=SQL%20chart&chxt=x,y&chxr=1,-4716.6,5340.0&chd=s:dddddddddeeeeeefffffffffeeeedddcccbbaaZZZYYYXXXXXXXXXYYYZZabbcdeefghhijkkllmmmmmmmmllkkjihgfedcbZYXWVUTSRRQQPPPPQQQRSTUVWXZacdfgijlmnpqrssttuuuttssrqonmkigfdbZXVTSQONMLKJIIIIIIJKLMOPRTVXZbegilnprtvwyz01111110zyxvtrpnkifcaXUSPNLJHFECBBAAABBCEFHJLNQTWZcfilortwy1346789999876420yvspmjfcYVSOL
+</pre>
+</blockquote>
+<p>The above chart depicts our visualized data. Alas, x-axis ranges are wrong; no ticks nor grids are yet presented.</p>
+<p>Granularity is not the best, either: the different <strong>62</strong> values are spread across a <strong>200</strong> pixel high chart, making for a <strong>3</strong> pixel distinction between two values, evident on the left area of the chart.</p>
+<p>Continues on <a href="https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-ii">Generating Google line charts with SQL, part II</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/generating-google-line-charts-with-sql-part-i/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1468</post-id>	</item>
+		<item>
+		<title>mycheckpoint (rev. 170): improved custom queries; local charting; page/swap I/O monitoring; improved HTML reports</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports#comments</comments>
+				<pubDate>Fri, 16 Jul 2010 08:58:40 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[Open Source]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2650</guid>
+				<description><![CDATA[Revision 170 of mycheckpoint, a MySQL monitoring solution, has been released. New and updated in this revision: Improved custom queries: lifting of limitations from previous, introductory revision; better HTML presentation Local, inline charting: no rendering of Google Charts, unless explicitly requested. All charts are now rendered locally using JavaScript. No data is now sent over [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>170</strong> of <a href="../../forge/mycheckpoint">mycheckpoint</a>, a MySQL monitoring solution, has  been released. New and updated in this revision:</p>
+<ul>
+<li><strong>Improved custom queries</strong>: lifting of limitations from previous, introductory revision; better HTML presentation</li>
+<li><strong>Local, inline charting</strong>: no rendering of Google Charts, unless explicitly requested. All charts are now rendered locally using JavaScript. No data is now sent over the network.</li>
+<li><strong>Page/Swap I/O monitoring</strong>: now monitoring for page ins and outs, swap ins and outs (Linux only).</li>
+<li><strong>Improved HTML reports</strong>: several improvements on presentation (see <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-brief-169.html">sample</a>, more follow).</li>
+</ul>
+<h4>Improved custom queries</h4>
+<p>Some limitations, introduced in revision <strong>132</strong>, are now lifted. New features are introduced.</p>
+<ul>
+<li>There is now no limit to the number of custom queries (well, an INT limit).</li>
+<li>In fact, the data tables adjust themselves to the existing custom queries in the form of auto-deploy: once a new <a href="http://code.openark.org/forge/mycheckpoint/documentation/custom-monitoring">custom query is added</a> or an old one removed, mycheckpoint will add or remove the relevant columns from the data tables.</li>
+<li>The <strong>chart_order</strong> column is now utilized: HTML reports which include custom query charts now order those charts according to <strong>chart_order</strong> values. This makes for nicer reports.</li>
+<li>The standard <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-brief-169.html">HTML brief report</a> (<strong>SELECT html FROM sv_report_html_brief</strong>) now automatically includes all custom charts. The HTML brief report is the report one usually wants to look at: it provides with the latest 24 hours metrics for selected values. It now becomes a centralized place for all that is interesting in the past 24 hours.</li>
+<li>Custom queries are now allowed to return <strong>NULL</strong>, treated as a missing value. This is a bugfix from previous revisions.</li>
+</ul>
+<h4>Local charting</h4>
+<p>Motivation for local charting is clear: no one likes having their data being sent over the network. And no one likes Google to know about their DML values.</p>
+<p>I&#8217;ve been playing around with quite a few charting solutions, and have gone into depths with two of them, adding and rewriting quite a lot of code. Eventually, I settled on my very own rendering. Here&#8217;s what I&#8217;ve seen &amp; tested:<span id="more-2650"></span></p>
+<ul>
+<li><a href="http://danvk.org/dygraphs/">dygraphs</a>: a very nice time series charting library. I&#8217;ve presented a use case on <a href="https://shlomi-noach.github.io/blog/mysql/static-charts-vs-interactive-charts">a previous post</a>.
+<ul>
+<li>Pros: slick, easy to work with.</li>
+<li>Cons: uses HTML Canvas for rendering. This is fine on Firefox, Chrome, Safari, you name it. This isn&#8217;t fine on IE, which does not support Canvas. There&#8217;s <a href="http://excanvas.sourceforge.net/">ExplorerCanvas</a>, a hack tool which converts canvas to IE&#8217;s VML, but it is far from being satisfactory: it is <em>sloooow</em>. Very, very slow. It is slow with one chart; but loading of 21 charts, as I do in some of <em>mycheckpoint</em>&#8216;s reports can take <em>long minutes</em> on Internet explorer.</li>
+<li>Cons: Only provides with a time series chart. No scatter plots.</li>
+</ul>
+</li>
+<li>Because they&#8217;re using ExplorerCanvas for IE, <a href="http://code.google.com/p/flot/">flot</a>, <a href="http://www.jqplot.com/">jqPlot</a> etc., are all unacceptable.</li>
+<li><a href="http://g.raphaeljs.com/">gRaphael</a>: very slick charts based on Raphael. The original line charts are very basic, and I have invested a lot of time rewriting a great deal (you can find it all <a href="http://code.google.com/p/mycheckpoint/source/browse/#svn/trunk/graphael">here</a>). Raphael uses VML on IE, and SVG for all other browsers.
+<ul>
+<li>Pros: very slick. Supports various chart types, including line (though not time-series) and scatter.</li>
+<li>Cons: <em>slooooooooow</em> when instantiating multiple charts. Unbearably slow, both on Firefox and IE. Slow as in minutes of waiting.</li>
+</ul>
+</li>
+</ul>
+<p>In addition, all of the above solutions were quite heavyweight: at about 45KB to start with, then add ExplorerCanvas or jQuery, or Raphael as supporting libraries, these became a real burden.</p>
+<p>So, I had some time to spare (business is fine, thank you. I was a bit Ill. I&#8217;m feeling well now, thank you), and was upset what with all the time I invested in the above coding. And I decided to invest even more time, and build <em>my own</em> charts.</p>
+<p>Enter <em>openark-charts</em>.</p>
+<blockquote>
+<pre><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot.png"><img class="alignnone size-full wp-image-2662" title="mycheckpoint-report-html-screenshot" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot.png" alt="" width="808" height="307" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot.png 808w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-report-html-screenshot-300x113.png 300w" sizes="(max-width: 808px) 100vw, 808px" /></a>
+
+<a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot.png"><img class="alignnone size-full wp-image-2663" title="mycheckpoint-24-7-report-html-screenshot" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot.png" alt="" width="808" height="267" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot.png 808w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/07/mycheckpoint-24-7-report-html-screenshot-300x99.png 300w" sizes="(max-width: 808px) 100vw, 808px" /></a></pre>
+</blockquote>
+<p>Currently, these line charts and scatter charts know how to parse a Google Image chart URL (only some features supported &#8212; only those I&#8217;m actually using with <em>mycheckpoint</em>). These are not full blown solutions: they come to serve mycheckpoint. And they do so nicely, if I may say so. Using Canvas for most browsers, or VML for IE, these very small pieces of code (10K for line chart, 6K for scatter chart, minified) load fast, use very little memory, and do their work well.</p>
+<p>Granted, neither provides with interactive features: this is planned for the future.</p>
+<h4>Page/swap I/O monitoring</h4>
+<p>(Linux only) <em>mycheckpoint</em> now reads <strong>/proc/vmstat</strong> to get the <em>pageins</em>, <em>pageouts</em>, <em>swapins</em> and <em>swapouts</em> (since last reboot). I was actually looking at completely different places on the <strong>/proc</strong> file system to get swap info, and was frustrated with the complexity involved, till I bumped on <strong>/proc/vmstat</strong>&#8230; New tricks every day!</p>
+<h4>Improved HTML reports</h4>
+<p>This is mostly HTML make-up. Some minimal design, some more details thrown into the HTML pages (name of DB, MySQL version, <em>mycheckpoint</em> version). A little more verbosity; all sorts of stuff which was neglected so far.</p>
+<p>Here are some <span style="text-decoration: line-through;"><strong>show off</strong></span> examples of the new HTML views: <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-full-169.html">[full report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-brief-169.html">[brief report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-24-7-169.html">[24/7 report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-custom-full-169.html">[custom full report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-report-custom-brief-169.html">[custom brief report]</a>, <a href="http://code.openark.org/forge/wp-content/uploads/2010/07/mycheckpoint-alert-pending-169.html">[alert pending report]</a>.</p>
+<p>All HTML views now utilize the new <em>openark-charts</em>, and none renders charts with Google charts. This means when you <a href="http://code.openark.org/forge/mycheckpoint/documentation/generating-html-reports">use your HTML view</a>, your data is safe. No data is sent over the net. All charts are rendered using Javascript, which is loaded and executed locally.</p>
+<p>But if you like, there&#8217;s a [url] link next to each chart, which leads to a (online) Google chart image. Why? Because neither HTML Canvas nor VML allow for a complete rendering of the charts to an image. So this is a way for one to retrieve &amp; store a chart&#8217;s image. Don&#8217;t use it if you see no reason for it; it&#8217;s just there.</p>
+<p>And I even threw in rounded corners (IE users: only as of Windows 7).</p>
+<h4>Future plans</h4>
+<p>Work is going on. These are the non-scheduled future tasks I see:</p>
+<ul>
+<li>Monitoring InnoDB Plugin &amp; XtraDB status.</li>
+<li>Interactive charts. See my <a href="../mysql/static-charts-vs-interactive-charts">earlier  post</a>.</li>
+<li>A proper <em>man</em> page.</li>
+<li>Anything else that interests me.</li>
+</ul>
+<h4>Try it out</h4>
+<p>Try out <em>mycheckpoint</em>. It’s a different kind of monitoring  solution. You will need basic SQL skills, and in return you’ll get a lot  of power under your hands.</p>
+<ul>
+<li>Download mycheckpoint <a href="https://code.google.com/p/mycheckpoint/">here</a></li>
+<li>Visit the project’s <a href="../../forge/mycheckpoint">homepage</a></li>
+<li>Browse the <a href="../../forge/mycheckpoint/documentation">documentation</a></li>
+<li>Report <a href="https://code.google.com/p/mycheckpoint/issues/list">bugs</a></li>
+</ul>
+<p><em>mycheckpoint</em> is released under the <a href="http://www.opensource.org/licenses/bsd-license.php">New BSD  License</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-170-improved-custom-queries-local-charting-pageswap-io-monitoring-improved-html-reports/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2650</post-id>	</item>
+		<item>
+		<title>mycheckpoint (rev. 132): custom monitoring, custom charts, process list dump</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump#comments</comments>
+				<pubDate>Fri, 04 Jun 2010 09:17:27 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2463</guid>
+				<description><![CDATA[Revision 132 of mycheckpoint has been released. New and updated in this revision: Custom monitoring: monitoring &#38; charting for user defined queries HTML reports for custom monitoring Process list dump upon alert notifications Custom monitoring &#38; charts Custom monitoring allows the user to supply with a query, the results of which will be monitored. That [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>132</strong> of <a href="../../forge/mycheckpoint">mycheckpoint</a> has been released. New and updated in this revision:</p>
+<ul>
+<li>Custom monitoring: monitoring &amp; charting for user defined queries</li>
+<li>HTML reports for custom monitoring</li>
+<li>Process list dump upon alert notifications</li>
+</ul>
+<h4>Custom monitoring &amp; charts</h4>
+<p>Custom monitoring allows the user to supply with a query, the results of which will be monitored.</p>
+<p>That is, <em>mycheckpoint</em> monitors the status variables, replication status, OS metrics. But it cannot by itself monitor one&#8217;s <em>application</em>. Which is why a user may supply with such query as:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+SELECT COUNT(*) FROM shopping_cart WHERE is_pending=1
+</pre>
+</blockquote>
+<p>Such a query will tell an online store how many customers are in the midst of shopping. There is no argument that this number is worth monitoring for. Given the above query, <em>mycheckpoint</em> will execute it per sample, and store the query&#8217;s result along with all sampled data, to be then aggregated by complex views to answer for:</p>
+<ul>
+<li>What was the value per given sample?</li>
+<li>What is the value difference for each sample?</li>
+<li>What is the change per second, i.e. the rate?</li>
+</ul>
+<p>mycheckpoint goes one step forward, and explicity records another metric:</p>
+<ul>
+<li>How much time did it take to take that sample?</li>
+</ul>
+<p><span id="more-2463"></span>As another example, a query worth testing for rate:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+SELECT MAX(shopping_cart_id) FROM shopping_cart
+</pre>
+</blockquote>
+<p>The above will provide with the last id. Assuming this is <strong>AUTO_INCREMENT</strong>, and assuming we&#8217;re on <strong>auto_increment_increment=1</strong>, two samples will allow us to get the number of created carts between those samples. Now, here&#8217;s a metric I&#8217;d like to read:</p>
+<ul>
+<li>How many carts are created per second, for each hour of the day?</li>
+</ul>
+<p>We get all these for free with mycheckpoint, which already does this analysis. All we need to provide is the query, and how we would like it to be visualized (visualization is optional, it is not the only way to diagnose monitored data) graphically:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+INSERT INTO
+ custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)
+ VALUES (0, 1, 'SELECT COUNT(*) FROM store.shopping_cart WHERE is_pending=1', 'Number of pending carts', 'value', 0);
+
+INSERT INTO
+ custom_query (custom_query_id, enabled, query_eval, description, chart_type, chart_order)
+ VALUES (1, 1, 'SELECT MAX(shopping_cart_id) FROM store.shopping_cart', 'Created carts rate', 'value_psec', 0);
+</pre>
+</blockquote>
+<p>We can later query for these values, just like we do for normal monitored values:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+mysql&gt; SELECT id, ts, created_tmp_tables_psec, custom_0, custom_1_psec FROM sv_sample WHERE ts &gt;= NOW() - INTERVAL 1 HOUR;
++-------+---------------------+-------------------------+----------+---------------+
+| id    | ts                  | created_tmp_tables_psec | custom_0 | custom_1_psec |
++-------+---------------------+-------------------------+----------+---------------+
+| 50730 | 2010-05-21 19:05:01 |                   16.64 |      448 |          3.02 |
+| 50731 | 2010-05-21 19:10:02 |                   20.97 |       89 |          1.73 |
+| 50732 | 2010-05-21 19:15:01 |                   15.70 |      367 |          3.56 |
+| 50733 | 2010-05-21 19:20:01 |                   18.32 |       54 |          1.43 |
+| 50734 | 2010-05-21 19:25:01 |                   16.42 |       91 |          1.96 |
+| 50735 | 2010-05-21 19:30:02 |                   21.93 |      233 |          2.11 |
+| 50736 | 2010-05-21 19:35:02 |                   14.58 |      176 |          1.91 |
+| 50737 | 2010-05-21 19:40:01 |                   21.61 |      168 |          1.93 |
+| 50738 | 2010-05-21 19:45:01 |                   16.05 |      241 |          2.44 |
+| 50739 | 2010-05-21 19:50:01 |                   19.70 |       46 |          1.19 |
+| 50740 | 2010-05-21 19:55:01 |                   15.85 |      177 |          2.28 |
+| 50741 | 2010-05-21 20:00:01 |                   19.04 |        8 |          0.82 |
++-------+---------------------+-------------------------+----------+---------------+
+</pre>
+</blockquote>
+<p>Of course, it is also possible to harness <em>mycheckpoint</em>&#8216;s views power to generate charts:</p>
+<blockquote>
+<pre>mysql&gt; SELECT custom_1_psec FROM sv_report_chart_sample\G
+<img class="alignnone" title="custom_1_psec" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chts=303030,12&amp;chtt=Latest+24+hours:+May+19,+20:10++-++May+20,+20:10&amp;chf=c,s,ffffff&amp;chdl=custom_1_psec&amp;chdlp=b&amp;chco=ff8c00&amp;chd=s:QfXQmZQhXTmWVkWRobPpWUtQPVROaOOUMJPOKdJHQJFJEDJJEGCAIEFJHFFEGGDQHGJGMJPPMNZNRWR_ZUWfR_nSjuUcaXa3OgxRl4UivWZ5UhtWX4VgnUTYktiVW9WanUVxVYlgXwVdicXpb&amp;chxt=x,y&amp;chxr=1,0,5.120000&amp;chxl=0:||+||00:00||+||04:00||+||08:00||+||12:00||+||16:00||+||20:00|&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,3.47,0&amp;chxp=0,3.47,7.64,11.81,15.98,20.15,24.32,28.49,32.66,36.83,41.00,45.17,49.34,53.51,57.68,61.85,66.02,70.19,74.36,78.53,82.70,86.87,91.04,95.21,99.38" alt="" width="400" height="200" />
+</pre>
+</blockquote>
+<p>The rules are:</p>
+<ul>
+<li>There can (currently) only be 18 custom queries.</li>
+<li>The <strong>custom_query_id</strong> must range 0-17 (to be lifted soon).</li>
+<li>A custom query must return with <em>exactly</em> one row, with <em>exactly</em> one column, which is a kind of <em>integer</em>.</li>
+</ul>
+<p>Please read <a href="https://shlomi-noach.github.io/blog/mysql/things-to-monitor-on-mysql-the-users-perspective">my earlier post</a> on custom monitoring to get more background.</p>
+<h4>Custom monitoring HTML reports</h4>
+<p>Custom monitoring comes with a HTML reports, featuring requested charts. See a <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/05/mcp_custom_report-128.html">sample custom report</a>.</p>
+<p>In this sample report, a few queries are monitored for value (pending rentals, pending downloads) and a few for rates (downloads per second, emails per second etc.).</p>
+<p>Custom HTML reports come in two flavors:</p>
+<ul>
+<li>Brief reports, featuring last 24 hours, as in the example above. These are handled by the <strong>sv_custom_html_brief</strong> view.</li>
+<li>Full reports, featuring last 24 hours, last 10 days, known history. These take longer to generate, and are handled by the <strong>sv_custom_html</strong> view.</li>
+</ul>
+<p>The sample report was generated by issuing:</p>
+<blockquote>
+<pre>SELECT html FROM sv_custom_html_brief;</pre>
+</blockquote>
+<p>I won&#8217;t go into details here as for how this view generates the HTML code. There is a myriad of view dependencies, with many interesting tricks on the way. But do remember it&#8217;s <em>just a view</em>. You don&#8217;t need an application (not even <em>mycheckpoint</em> itself) to generate the report. All it takes is a query.</p>
+<h4>Processlist dump</h4>
+<p>When an alert notification fires (an email is prepared to inform on some alert condition), a processlist dump summary is taken and included in email report. It may be useful to understand why the slave is lagging, or exactly why there are so many active threads.</p>
+<p>The dump summary presents the processlist much as you would see it on SHOW PROCESSLIST, but only lists the active threads, noting down how many sleeping processes there are (PS, thread &amp; process are the same in the terminology of MySQL connections). An example dump looks like this:</p>
+<blockquote>
+<pre>PROCESSLIST summary:
+
+     Id: 3
+   User: system user
+   Host:
+     db: NULL
+Command: Connect
+   Time: 3168098
+  State: Waiting for master to send event
+   Info: NULL
+-------
+
+     Id: 4
+   User: system user
+   Host:
+     db: prod_db
+Command: Connect
+   Time: 612
+  State: Updating
+   Info: UPDATE user SET is_offline = 1 WHERE id IN (50440010,50440011)
+-------
+
+     Id: 8916579
+   User: prod_user
+   Host: localhost
+     db: prod_db
+Command: Query
+   Time: 1
+  State: Sending data
+   Info: INSERT IGNORE INTO archive.stat_archive (id, origin, path, ts, content
+-------
+
+     Id: 8916629
+   User: mycheckpoint
+   Host: localhost
+     db: NULL
+Command: Query
+   Time: 0
+  State: NULL
+   Info: SHOW PROCESSLIST
+-------
+Sleeping: 3 processes
+</pre>
+</blockquote>
+<h4>Future plans</h4>
+<p>Work is going on. These are the non-scheduled future tasks I see:</p>
+<ul>
+<li>Monitoring InnoDB Plugin &amp; XtraDB status.</li>
+<li>Interactive charts. See my <a href="https://shlomi-noach.github.io/blog/mysql/static-charts-vs-interactive-charts">earlier post</a>.</li>
+<li>Monitoring for swap activity (Linux only).</li>
+<li>Enhanced custom queries handling, including auto-deploy upon change of custom queries.</li>
+<li>A proper <em>man</em> page.</li>
+<li>Anything else that interests me.</li>
+</ul>
+<h4>Try it out</h4>
+<p>Try out <em>mycheckpoint</em>. It’s a different kind of monitoring solution. You will need basic SQL skills, and in return you&#8217;ll get a lot of power under your hands.</p>
+<ul>
+<li>Download mycheckpoint <a href="https://code.google.com/p/mycheckpoint/">here</a></li>
+<li>Visit the project’s <a href="../../forge/mycheckpoint">homepage</a></li>
+<li>Browse the <a href="../../forge/mycheckpoint/documentation">documentation</a></li>
+<li>Report <a href="https://code.google.com/p/mycheckpoint/issues/list">bugs</a></li>
+</ul>
+<p><em>mycheckpoint</em> is released under the <a href="http://www.opensource.org/licenses/bsd-license.php">New BSD License</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-132-custom-monitoring-custom-charts-process-list-dump/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2463</post-id>	</item>
+		<item>
+		<title>Static charts vs. interactive charts</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/static-charts-vs-interactive-charts</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/static-charts-vs-interactive-charts#comments</comments>
+				<pubDate>Tue, 02 Mar 2010 13:28:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[Web]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2027</guid>
+				<description><![CDATA[I&#8217;m having my usual fun with charts. Working on mycheckpoint, I&#8217;ve generated monitoring charts using the Google Chars API. But I&#8217;ve also had chance to experiment and deploy interactive charts, JavaScript based. In particular, I used and tweaked dygraphs. I&#8217;d like to note some differences in using charts of both kinds. And I think it [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m having my usual fun with charts. Working on <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a>, I&#8217;ve generated monitoring charts using the <a href="http://code.google.com/apis/chart/image_charts.html">Google Chars API</a>. But I&#8217;ve also had chance to experiment and deploy interactive charts, JavaScript based. In particular, I used and tweaked <a href="http://www.danvk.org/dygraphs/">dygraphs</a>.</p>
+<p>I&#8217;d like to note some differences in using charts of both kinds. And I think it makes a very big difference.</p>
+<h4>Static charts</h4>
+<p>I&#8217;ll call any image-based chart by &#8220;static chart&#8221;. It&#8217;s just a static image. Example of such charts are those generated by Google Image Charts (they now also have new, interactive charts), or <a href="http://oss.oetiker.ch/rrdtool/index.en.html">RRDtool</a>. Show below is an example of a static chart; in this example, generated by Google:<span id="more-2027"></span></p>
+<blockquote>
+<pre><img class="alignnone" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chts=808080,12&amp;chtt=Dec+4,+15:00++-++Dec+5,+15:00&amp;chf=c,s,ffffff&amp;chdl=com_select_psec|com_insert_psec|com_delete_psec|com_update_psec|com_replace_psec&amp;chdlp=b&amp;chco=ff8c00,4682b4,9acd32,dc143c,9932cc&amp;chd=s:zpvxszxsxur11p1xt10wyxzuyv6xw4yx3x041x2zz6zvz7y91x23z4niqkkmojllkhknhlgnmimohilkkqgkkmnmhlljinjmnhmo________________imlnpmkukopmnpjsojnrrlrqnpprs,iZagVcgWXaZdjVbgSbhYdXZXZcbcXZbcadabccabbZaaZeabdYbbZXceWUXaXYXSXVXaSSZUUXWYUUXbTYUUVabWWVZZVYaWZZYa________________ZYbVcXWdYWZcXaYaYWXYfZcdaVZaZ,MNNNNNONLKOMPNNMNNOPMNNLMQNOMMMNMNNNNRONNOPMNQMPONPOLMTNKJKMKKJILKILJJJLIIKUMHJJIIHHHKJIIHIIIHJHIIJM________________NOMLMMLOPOPKLKKNPKMMNMOPQNNOL,NIIMHKOIHKIKOHKMGKNJKIJIKMKLJJMKIKJKLLJLLJLLKMLJLJKKKIIVIIJLJKJHJIKLIHMIIKIKIIKLHKIIJLKIJJKKIJKIKKJK________________IIKILJJLKIKKHJJJJIJJMIKLKGJKK,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA________________AAAAAAAAAAAAAAAAAAAAAAAAAAAAA&amp;chxt=x,y&amp;chxr=1,0,136.620000&amp;chxl=0:||16:00||+||20:00||+||00:00||+||04:00||+||08:00||+||12:00||+||&amp;chxs=0,505050,10,0,lt&amp;chg=4.17,25,1,2,0.00,0&amp;chxp=0,0.00,4.17,8.34,12.51,16.68,20.85,25.02,29.19,33.36,37.53,41.70,45.87,50.04,54.21,58.38,62.55,66.72,70.89,75.06,79.23,83.40,87.57,91.74,95.91,100.08" alt="" width="400" height="200" /></pre>
+</blockquote>
+<h4>Pros and cons of static charts</h4>
+<p>Pros</p>
+<ul>
+<li>Images can be viewed on any graphical platform. Browsers, email clients, cell phones, whatever.</li>
+<li>Self contained: chart image, legend, scales: all in one image.</li>
+<li>As such, easy to move around.</li>
+<li>Are safe to use.</li>
+</ul>
+<p>Cons</p>
+<ul>
+<li>Images are fuzzy. Is the <strong>com_replace_psec</strong> really 0? Maybe it&#8217;s 0.1? A larger value can make lower values hard to tell.</li>
+<li>Images are inaccurate: the colors can lie. The red and green lines showing are hard to tell apart. The red is painted above the green. Data gets &#8220;lost&#8221;.</li>
+<li>They do not zoom (one needs to regenerate larger image)</li>
+<li>Unless encoded with base64, HTML pages which include images need to link outside.</li>
+<li>In the particular case of Google Charts, one is limited to 2K length URL. Trust me, it&#8217;s a big limitation! (PS, Google now support POST method to allow for up to 16K. But&#8230; it&#8217;s a POST method&#8230;)</li>
+<li>In the particular case of Google Charts, one must have an internet connection.</li>
+<li>In the particular case of Google Charts, one must submit data to Google.</li>
+</ul>
+<h4>Interactive charts</h4>
+<p>Interactive charts are those which react to your commands. These are either JavaScript or Flash based, mostly. They allow for really nice features. Take the following chart as an example: try and <strong>move over with your mouse</strong>; or <strong>select sections to zoom in</strong>.</p>
+<p><script src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/03/dygraph-combined.js" type="text/javascript"></script><br />
+<!--[if IE]><script src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/03/excanvas-min.js"></script>< ![endif]--></p>
+<blockquote>
+<pre>
+<h4>DML</h4>
+
+
+<div id="graphDiv_DML" class="graphdiv" style="width: 400px; height: 160px;">[graphDiv]</div>
+
+
+<div id="labelsDiv_DML" class="legend">[labelsDiv]</div>
+
+</pre>
+</blockquote>
+<p><script type="text/javascript">// < ![CDATA[
+// < ![CDATA[
+ g_DML = new Dygraph( document.getElementById("graphDiv_DML"),                         "Date,com_select_psec,com_insert_psec,com_delete_psec,com_update_psec,com_replace_psec\n2009-12-04 15:00:00,113.28,76.54,26.14,29.54,0.00\n2009-12-04 15:10:00,91.51,55.74,30.07,18.13,0.00\n2009-12-04 15:20:00,104.98,57.75,28.26,18.24,0.00\n2009-12-04 15:30:00,110.64,72.17,30.17,27.58,0.00\n2009-12-04 15:40:00,97.79,46.27,29.27,15.91,0.00\n2009-12-04 15:50:00,114.35,61.85,29.55,22.45,0.00\n2009-12-04 16:00:00,110.82,72.38,30.67,30.70,0.00\n2009-12-04 16:10:00,99.05,49.70,29.35,18.56,0.00\n2009-12-04 16:20:00,109.68,50.87,25.74,16.55,0.00\n2009-12-04 16:30:00,103.92,58.70,22.09,22.58,0.00\n2009-12-04 16:40:00,97.24,56.29,31.71,18.78,0.00\n2009-12-04 16:50:00,119.25,65.72,27.80,22.56,0.00\n2009-12-04 17:00:00,118.31,78.34,34.18,30.43,0.00\n2009-12-04 17:10:00,91.06,47.59,29.66,16.60,0.00\n2009-12-04 17:20:00,117.81,59.82,28.94,21.40,0.00\n2009-12-04 17:30:00,109.79,71.37,27.62,27.64,0.00\n2009-12-04 17:40:00,101.07,40.51,29.57,14.18,0.00\n2009-12-04 17:50:00,117.66,61.18,28.31,22.44,0.00\n2009-12-04 18:00:00,115.48,72.82,32.12,28.74,0.00\n2009-12-04 18:10:00,106.51,54.34,32.96,20.37,0.00\n2009-12-04 18:20:00,111.34,65.11,27.60,22.60,0.00\n2009-12-04 18:30:00,109.66,52.25,29.47,18.47,0.00\n2009-12-04 18:40:00,113.63,55.16,28.67,19.98,0.00\n2009-12-04 18:50:00,103.72,51.86,24.67,18.08,0.00\n2009-12-04 19:00:00,111.27,55.78,26.66,22.62,0.00\n2009-12-04 19:10:00,105.73,63.16,35.37,25.88,0.00\n2009-12-04 19:20:00,130.50,60.07,29.82,22.99,0.00\n2009-12-04 19:30:00,110.41,62.64,30.35,24.46,0.00\n2009-12-04 19:40:00,107.05,52.04,27.15,19.22,0.00\n2009-12-04 19:50:00,126.11,57.06,27.12,19.34,0.00\n2009-12-04 20:00:00,111.36,61.40,26.13,25.96,0.00\n2009-12-04 20:10:00,108.82,61.97,29.52,23.49,0.00\n2009-12-04 20:20:00,122.57,59.28,26.03,18.48,0.00\n2009-12-04 20:30:00,109.35,65.42,29.21,23.13,0.00\n2009-12-04 20:40:00,117.19,57.69,28.01,19.24,0.00\n2009-12-04 20:50:00,125.03,61.15,28.95,21.74,0.00\n2009-12-04 21:00:00,118.31,63.11,29.66,23.99,0.00\n2009-12-04 21:10:00,109.98,62.24,38.77,24.02,0.00\n2009-12-04 21:20:00,121.28,57.78,30.48,20.26,0.00\n2009-12-04 21:30:00,113.89,59.62,29.77,23.72,0.00\n2009-12-04 21:40:00,113.93,60.42,29.35,24.71,0.00\n2009-12-04 21:50:00,130.36,55.68,31.94,21.16,0.00\n2009-12-04 22:00:00,114.11,58.93,32.62,24.41,0.00\n2009-12-04 22:10:00,105.52,58.58,26.04,24.47,0.00\n2009-12-04 22:20:00,113.52,57.04,29.26,22.28,0.00\n2009-12-04 22:30:00,132.64,66.22,34.87,26.82,0.00\n2009-12-04 22:40:00,112.08,59.19,27.16,23.73,0.00\n2009-12-04 22:50:00,136.62,59.74,33.41,20.04,0.00\n2009-12-04 23:00:00,119.58,65.67,31.40,24.40,0.00\n2009-12-04 23:10:00,109.12,53.74,28.38,19.60,0.00\n2009-12-04 23:20:00,121.52,60.03,33.16,22.38,0.00\n2009-12-04 23:30:00,123.33,59.59,31.09,22.51,0.00\n2009-12-04 23:40:00,114.75,56.82,25.53,23.43,0.00\n2009-12-04 23:50:00,124.92,51.26,27.86,19.03,0.00\n2009-12-05 00:00:00,88.23,63.21,41.50,18.59,0.00\n2009-12-05 00:10:00,75.10,66.62,29.94,48.01,0.00\n2009-12-05 00:20:00,94.85,49.27,22.05,18.66,0.00\n2009-12-05 00:30:00,80.27,45.21,20.56,17.55,0.00\n2009-12-05 00:40:00,80.96,52.03,21.66,21.14,0.00\n2009-12-05 00:50:00,85.21,57.68,26.57,23.58,0.00\n2009-12-05 01:00:00,88.66,52.56,21.75,20.94,0.00\n2009-12-05 01:10:00,78.66,53.26,22.89,22.36,0.00\n2009-12-05 01:20:00,83.80,50.74,20.65,19.49,0.00\n2009-12-05 01:30:00,82.70,39.99,17.23,15.86,0.00\n2009-12-05 01:40:00,79.66,52.35,23.55,20.94,0.00\n2009-12-05 01:50:00,74.56,47.64,23.05,18.97,0.00\n2009-12-05 02:00:00,81.25,51.35,17.94,21.61,0.00\n2009-12-05 02:10:00,86.83,58.48,25.03,24.95,0.00\n2009-12-05 02:20:00,73.31,41.39,21.09,17.56,0.00\n2009-12-05 02:30:00,82.31,39.70,19.84,16.74,0.00\n2009-12-05 02:40:00,71.19,55.84,19.05,25.97,0.00\n2009-12-05 02:50:00,88.00,44.13,25.32,17.74,0.00\n2009-12-05 03:00:00,84.54,44.78,18.42,18.78,0.00\n2009-12-05 03:10:00,76.92,50.57,17.91,21.81,0.00\n2009-12-05 03:20:00,84.45,49.12,21.54,18.58,0.00\n2009-12-05 03:30:00,89.52,54.20,45.41,22.39,0.00\n2009-12-05 03:40:00,74.15,44.67,26.54,18.04,0.00\n2009-12-05 03:50:00,76.32,44.36,15.02,18.39,0.00\n2009-12-05 04:00:00,83.90,52.30,19.50,22.39,0.00\n2009-12-05 04:10:00,80.26,61.12,20.66,25.68,0.00\n2009-12-05 04:20:00,80.95,42.11,16.95,14.84,0.00\n2009-12-05 04:30:00,93.01,53.36,17.91,21.94,0.00\n2009-12-05 04:40:00,72.70,45.22,16.63,18.16,0.00\n2009-12-05 04:50:00,81.22,44.73,15.41,18.54,0.00\n2009-12-05 05:00:00,80.02,46.60,16.07,21.04,0.00\n2009-12-05 05:10:00,84.33,57.86,21.77,24.71,0.00\n2009-12-05 05:20:00,87.48,60.54,19.66,22.95,0.00\n2009-12-05 05:30:00,86.19,48.62,18.47,17.51,0.00\n2009-12-05 05:40:00,72.92,50.10,18.46,21.00,0.00\n2009-12-05 05:50:00,81.79,48.14,15.75,19.36,0.00\n2009-12-05 06:00:00,83.11,55.70,17.15,23.02,0.00\n2009-12-05 06:10:00,77.98,55.89,18.36,23.16,0.00\n2009-12-05 06:20:00,77.05,45.96,18.06,17.27,0.00\n2009-12-05 06:30:00,87.58,53.76,15.56,20.79,0.00\n2009-12-05 06:40:00,79.33,58.86,21.02,22.84,0.00\n2009-12-05 06:50:00,85.33,49.99,16.23,18.82,0.00\n2009-12-05 07:00:00,87.54,56.70,17.96,23.31,0.00\n2009-12-05 07:10:00,73.33,56.51,17.57,21.74,0.00\n2009-12-05 07:20:00,84.02,52.77,21.21,20.80,0.00\n2009-12-05 07:30:00,88.86,58.34,27.45,23.10,0.00\n2009-12-05 07:40:00,,,,,\n2009-12-05 07:50:00,,,,,\n2009-12-05 08:00:00,,,,,\n2009-12-05 08:10:00,,,,,\n2009-12-05 08:20:00,,,,,\n2009-12-05 08:30:00,,,,,\n2009-12-05 08:40:00,,,,,\n2009-12-05 08:50:00,,,,,\n2009-12-05 09:00:00,,,,,\n2009-12-05 09:10:00,,,,,\n2009-12-05 09:20:00,,,,,\n2009-12-05 09:30:00,,,,,\n2009-12-05 09:40:00,,,,,\n2009-12-05 09:50:00,,,,,\n2009-12-05 10:00:00,,,,,\n2009-12-05 10:10:00,,,,,\n2009-12-05 10:20:00,77.11,55.87,29.31,18.09,0.00\n2009-12-05 10:30:00,85.31,53.70,31.03,18.46,0.00\n2009-12-05 10:40:00,82.72,61.32,26.30,22.98,0.00\n2009-12-05 10:50:00,87.28,46.53,25.04,18.04,0.00\n2009-12-05 11:00:00,92.07,62.62,27.09,25.14,0.00\n2009-12-05 11:10:00,84.59,50.42,25.97,19.96,0.00\n2009-12-05 11:20:00,80.34,49.64,25.75,20.31,0.00\n2009-12-05 11:30:00,103.61,64.36,31.79,24.71,0.00\n2009-12-05 11:40:00,80.03,54.33,33.83,22.37,0.00\n2009-12-05 11:50:00,90.42,48.24,31.26,18.43,0.00\n2009-12-05 12:00:00,92.51,56.34,33.53,22.45,0.00\n2009-12-05 12:10:00,84.34,62.26,22.66,23.31,0.00\n2009-12-05 12:20:00,86.24,51.96,25.69,16.02,0.00\n2009-12-05 12:30:00,92.08,58.61,23.16,19.34,0.00\n2009-12-05 12:40:00,78.48,53.33,22.72,19.51,0.00\n2009-12-05 12:50:00,97.85,57.71,29.80,20.19,0.00\n2009-12-05 13:00:00,89.23,54.84,34.62,20.93,0.00\n2009-12-05 13:10:00,78.92,50.02,22.47,18.19,0.00\n2009-12-05 13:20:00,87.24,50.92,26.37,19.38,0.00\n2009-12-05 13:30:00,96.29,54.78,27.13,20.04,0.00\n2009-12-05 13:40:00,96.39,69.48,30.21,27.19,0.00\n2009-12-05 13:50:00,83.21,55.13,26.48,18.00,0.00\n2009-12-05 14:00:00,97.00,63.61,30.89,22.23,0.00\n2009-12-05 14:10:00,94.65,65.33,33.51,25.04,0.00\n2009-12-05 14:20:00,86.94,58.14,36.10,22.07,0.00\n2009-12-05 14:30:00,91.91,47.25,28.41,14.45,0.00\n2009-12-05 14:40:00,92.55,55.73,29.59,20.69,0.00\n2009-12-05 14:50:00,97.35,58.90,31.63,22.22,0.00\n2009-12-05 15:00:00,97.91,56.09,23.80,21.68,0.00\n",                         { chartDiv:  document.getElementById("chartDiv_DML"), labelsDiv: document.getElementById("labelsDiv_DML") } ); g_DML.resize(400,160);
+// ]]&gt;</script></p>
+<p>The above chart is generated with <em>dygraphs</em>. Since it is embedded within my WordPress page, the layout is affected by that of my theme. Take a look at this <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/03/mycheckpoint_interactive_demo.html"><strong>example page</strong></a> to see similar charts outside this blog site (Internet Explorer users: Maxmimize/minimize button will not work well for now. And, may I suggest <a href="http://www.mozilla.com/en-US/firefox">Mozilla Firefox</a>?)<a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/03/mycheckpoint_interactive_demo.html"></a></p>
+<h4>Pros and cons of interactive charts</h4>
+<p>Pros</p>
+<ul>
+<li>Can present you with exact values. No more doubt about the <strong>com_replace_psec</strong> values.</li>
+<li>Can allow for zoom in, zoom out.</li>
+</ul>
+<p>Cons</p>
+<ul>
+<li>Need supporting platform. The above cannot be viewed by non-JavaScript browsers (cell phones, etc.)</li>
+<li>Browser support is also an issue with JavaScript.</li>
+<li>Emailing such report will result in mail blocking in many companies: mail filters will not allow for JavaScript code to pass.</li>
+<li>Charts are not necessarily self-contained, in terms of the chart entity With Flash charts (e.g. Fusion Charts) this works. But in the above, the legend and scales are outside the image. As such, they cannot be just moved around.</li>
+<li>HTML pages which include such charts <em>can be</em> self contained. The HTML page can include all the JavaScript dependencies, in addition to the chart generating code. Flash based charts cannot be self contained.</li>
+</ul>
+<h4>Summary</h4>
+<p>Interactive charts are cool!</p>
+<p>I&#8217;m now integrating <a href="http://www.danvk.org/dygraphs/">dygraphs</a> into <em>mycheckpoint</em> (How nice it is to work with BSD &amp; MIT licenses!). Though I may later switch to <a href="http://code.google.com/p/flot/">flot</a>, interactive charts will be the next standard charting way in <em>mycheckpoint</em>. I will continue supporting static Google Charts, as follows from the above pros and cons list.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/static-charts-vs-interactive-charts/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2027</post-id>	</item>
+		<item>
+		<title>mycheckpoint (rev. 88): mount points monitoring, improved charting, enhanced auto-deploy</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy#respond</comments>
+				<pubDate>Wed, 10 Feb 2010 06:29:47 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1904</guid>
+				<description><![CDATA[Revision #88 of mycheckpoint is released. In this revision: Disk space monitoring Improved charting Enhanced auto-deploy And more&#8230; Disk space monitoring mycheckpoint now monitors (on Linux only) three mount points: The &#8220;/&#8221; (root) mount point The datadir mount point The tmpdir mount point It may well be the case that two of the above (or [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <a href="http://code.google.com/p/mycheckpoint/">#88</a> of <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> is released. In this revision:</p>
+<ul>
+<li>Disk space monitoring</li>
+<li>Improved charting</li>
+<li>Enhanced auto-deploy</li>
+<li>And more&#8230;</li>
+</ul>
+<h4>Disk space monitoring</h4>
+<p><em>mycheckpoint</em> now monitors (on Linux only) three mount points:</p>
+<ol>
+<li>The &#8220;<strong>/</strong>&#8221; (root) mount point</li>
+<li>The <strong>datadir</strong> mount point</li>
+<li>The <strong>tmpdir</strong> mount point</li>
+</ol>
+<p>It may well be the case that two of the above (or perhaps all three of them) share the same mount point. For example, if there isn&#8217;t any particular partition for &#8220;<strong>/tmp</strong>&#8220;, it is possible that the <strong>tmpdir</strong> (by default &#8220;<strong>/tmp</strong>&#8220;) is on the same mount point as &#8220;<strong>/</strong>&#8220;. <em>mycheckpoint</em> does not care.</p>
+<p><em>mycheckpoint</em> monitors and reports the mount point&#8217;s used percent, in a similar algorithm <strong>df</strong> uses.</p>
+<p>Disk space monitoring is only possible when monitoring the local machine (i.e. <em>mycheckpoint</em> runs on the same machine as the monitored MySQL server). In the future <em>mycheckpoint</em> may also monitor additional mount points, such as the various logs mount points.</p>
+<h4><span id="more-1904"></span>Improved charting</h4>
+<p>There has been some extensive work to turn the charts into real time-series based. <a href="http://code.google.com/apis/chart/">Google charts</a> does not support time series charts; when it will, the required URL length would probably be too long to be used. Some SQL tweaks made it possible to display the charts in correct time-scale even if sampling is taken on non constant interval (or fail to be taken for long periods).</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/02/mycheckpoint-dml-chart-sample-88.png"><img class="alignnone size-full wp-image-1951" title="mycheckpoint-dml-chart-sample-88" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/02/mycheckpoint-dml-chart-sample-88.png" alt="" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/02/mycheckpoint-dml-chart-sample-88.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/02/mycheckpoint-dml-chart-sample-88-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /></a></p></blockquote>
+<p>For more examples see the link for <em>HTML brief reports</em> sample, below.</p>
+<p>I will write more on SQL Google charts generation in the future.</p>
+<h4>Enhanced auto-deploy</h4>
+<p><em>mycheckpoint</em> will now detect changes to the MySQL version, in addition to changes in <em>mycheckpoint</em>&#8216;s version itself. This means there&#8217;s no need in ever worrying about upgrades to either one of these components. Just use mycheckpoint to take another sample; it will auto-detect if the MySQL version is different, and start sampling all those new variables introduced in the new version (or stop sampling variables no longer used). It works both for MySQL upgrades and downgrades.</p>
+<h4>Enhanced localhost detection</h4>
+<p>To determine whether it is monitoring the local host, <em>mycheckpoint</em> now considers the hostname for the monitored server, and sees if it is either <strong>&#8216;127.0.0.1&#8217;</strong>, <strong>&#8216;localhost&#8217;</strong>, or the machine&#8217;s <em>hostname</em> or fully qualified <em>hostname.domainname</em> (these last two additions apply for Unix based machines, and have only been tested on Linux so far).</p>
+<h4>HTML brief reports</h4>
+<p>Getting a full HTML report is time consuming. I&#8217;ve had requests (though not officially submitted through the Issues mechanism) to make it shorter. This is as yet a difficult job. There&#8217;s just too much data to aggregate (up to ~180 days of every-5-minute-samples, in a common scenario).</p>
+<p>HTML <em>brief reports</em> were introduced in previous versions, and have now been enhanced to include more data. These only present last 24 hours data, and load fast. See <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/02/mycheckpoint-brief-report-sample-88.html">HTML brief report sample</a>.</p>
+<h4>Get it</h4>
+<p>Downloads are available on Google code&#8217;s <a href="http://code.google.com/p/mycheckpoint/">mycheckpoint</a> page. Documentation can be found on the <a href="http://code.openark.org/forge/mycheckpoint/">mycheckpoint home page</a>.</p>
+<h4>On the press</h4>
+<p>Not so new by now (it&#8217;s two months old), I&#8217;m very happy that mycheckpoint has been noted by <a href="http://jeremy.zawodny.com/blog/"><strong>Jeremy Zawodny</strong></a> in his &#8220;<a href="http://www.linux-mag.com/cache/7639/1.html">My Top Resources of 2009</a>&#8221; column on Linux Magazine.</p>
+<h4>Future plans</h4>
+<p>Immediate plans for mycheckpoint are:</p>
+<ul>
+<li>Email alerts notifications; this will allow <em>mycheckpoint</em> to become a real monitoring solution. Following the concept of &#8220;<em>SQL oritented monitoring</em>&#8220;, these will be SQL based as well.</li>
+<li>Custom monitoring: allowing user defined queries to be recorded by <em>mycheckpoint</em>; these can then participate in alerts monitoring. This will allow for easy email notifications on program-level errors.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-88-mount-points-monitoring-improved-charting-enhanced-auto-deploy/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1904</post-id>	</item>
+		<item>
+		<title>mycheckpoint rev. 76: OS monitoring, auto deploy, brief HTML and 24/7 reports</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports#comments</comments>
+				<pubDate>Tue, 05 Jan 2010 08:55:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Linux]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1784</guid>
+				<description><![CDATA[Revision 76 of mycheckpoint comes with quite a few improvements, including: OS monitoring (CPU, load average, memory) Auto-deploy Improved charting Brief HTML reports 24/7 charts OS Monitoring When monitoring the local machine, mycheckpoint now monitors CPU utilization, load average, memory and swap space. This only applies to the Linux operating system; there is currently no [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Revision <strong>76</strong> of <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> comes with quite a few improvements, including:</p>
+<ul>
+<li>OS monitoring (CPU, load average, memory)</li>
+<li>Auto-deploy</li>
+<li>Improved charting</li>
+<li>Brief HTML reports</li>
+<li>24/7 charts</li>
+</ul>
+<h4>OS Monitoring</h4>
+<p>When monitoring the local machine, <em>mycheckpoint</em> now monitors CPU utilization, load average, memory and swap space.</p>
+<p>This only applies to the Linux operating system; there is currently no plan to work this out for other operating systems.</p>
+<p>Examples:</p>
+<blockquote>
+<pre>mysql&gt; SELECT <strong>os_cpu_utilization_percent</strong> FROM sv_report_chart_sample;
+
+<img class="size-full wp-image-1794 alignnone" title="mycheckpoint-chart-cpu-sample" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-cpu-sample.png" alt="mycheckpoint-chart-cpu-sample" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-cpu-sample.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-cpu-sample-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /></pre>
+</blockquote>
+<blockquote>
+<pre>mysql&gt; SELECT ts, <strong>os_loadavg</strong> FROM mycheckpoint.sv_report_sample;
++---------------------+------------+
+| 2009-12-27 11:45:01 |       1.78 |
+| 2009-12-27 11:50:01 |       2.48 |
+| 2009-12-27 11:55:01 |       2.35 |
+...
++---------------------+------------+</pre>
+</blockquote>
+<blockquote>
+<pre>mysql&gt; SELECT report FROM mycheckpoint.sv_report_human_sample ORDER BY id DESC LIMIT 1 \G
+*************************** 1. row ***************************
+report:
+Report period: 2009-12-27 13:20:01 to 2009-12-27 13:25:01. Period is 5 minutes (0.08 hours)
+Uptime: 100.0% (Up: 334 days, 06:37:28 hours)
+
+<strong>OS:
+ Load average: 1.67
+ CPU utilization: 25.2%
+ Memory: 7486.4MB used out of 7985.6484MB (Active: 6685.8906MB)
+ Swap: 3835.2MB used out of 8189.3750MB</strong>
+...</pre>
+</blockquote>
+<h4>Auto-deploy</h4>
+<p><em>mycheckpoint</em> now has a version recognition mechanism. There is no need to call <em>mycheckpoint</em> with the &#8220;<strong>deploy</strong>&#8221; argument on first install or after upgrade. <em>mycheckpoint</em> will recognize a change of version and will auto-deploy before moving on to monitoring your system.</p>
+<p><span id="more-1784"></span>It is still possible, though, to use &#8220;<strong>deploy</strong>&#8220;, in case you just want to make sure an upgrade takes place, without issuing a monitoring action.</p>
+<h4>Improved charting</h4>
+<p>Further improvements and bug fixes made to the Google charts, including the implementation of missing values charting.</p>
+<h4>Brief HTML report</h4>
+<p>In contrast with the full blown HTML report (see <a href="http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint_report-72.html">sample</a>), which presents hourly/daily/weekly reports for the many metrics, the new brief report only presents with a few hourly based charts. These include InnoDB performance, DML, OS metrics, and replication status.</p>
+<p>To get a brief HTML report, issue:</p>
+<blockquote>
+<pre>mysql&gt; SELECT html FROM sv_report_html_brief;
+
+<a href="http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint-brief-report.html"><img class="alignnone size-full wp-image-1839" title="mycehckpoint-report-html-brief-screenshot-small" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycehckpoint-report-html-brief-screenshot-small2.png" alt="" width="611" height="409" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycehckpoint-report-html-brief-screenshot-small2.png 611w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycehckpoint-report-html-brief-screenshot-small2-300x200.png 300w" sizes="(max-width: 611px) 100vw, 611px" /></a>
+</pre>
+</blockquote>
+<p>See <a href="http://code.openark.org/forge/wp-content/uploads/2009/12/mycheckpoint-brief-report.html">sample brief HTML report</a>.</p>
+<h4>24/7 charts</h4>
+<p>24/7 charts present the various metrics on a 24&#215;7 matrix, which allows for diagnostics of usage throughout the day and week. For example, it makes it easier to see how things slow down on Saturday/Sunday; how load increases on 10:00am every day, etc.</p>
+<p>24/7 charts are provided by the <strong>sv_report_chart_24_7</strong> view.</p>
+<blockquote>
+<pre>DESC sv_report_chart_24_7;
++---------------------------------------+----------+------+-----+---------+-------+
+| Field                                 | Type     | Null | Key | Default | Extra |
++---------------------------------------+----------+------+-----+---------+-------+
+| innodb_read_hit_percent               | longblob | YES  |     | NULL    |       |
+| innodb_buffer_pool_reads_psec         | longblob | YES  |     | NULL    |       |
+| innodb_buffer_pool_pages_flushed_psec | longblob | YES  |     | NULL    |       |
+| innodb_os_log_written_psec            | longblob | YES  |     | NULL    |       |
+| innodb_row_lock_waits_psec            | longblob | YES  |     | NULL    |       |
+| mega_bytes_sent_psec                  | longblob | YES  |     | NULL    |       |
+| mega_bytes_received_psec              | longblob | YES  |     | NULL    |       |
+| key_read_hit_percent                  | longblob | YES  |     | NULL    |       |
+| key_write_hit_percent                 | longblob | YES  |     | NULL    |       |
+| com_select_psec                       | longblob | YES  |     | NULL    |       |
+| com_insert_psec                       | longblob | YES  |     | NULL    |       |
+| com_delete_psec                       | longblob | YES  |     | NULL    |       |
+| com_update_psec                       | longblob | YES  |     | NULL    |       |
+| com_replace_psec                      | longblob | YES  |     | NULL    |       |
+| com_set_option_percent                | longblob | YES  |     | NULL    |       |
+| com_commit_percent                    | longblob | YES  |     | NULL    |       |
+| slow_queries_percent                  | longblob | YES  |     | NULL    |       |
+| select_scan_psec                      | longblob | YES  |     | NULL    |       |
+| select_full_join_psec                 | longblob | YES  |     | NULL    |       |
+| select_range_psec                     | longblob | YES  |     | NULL    |       |
+| table_locks_waited_psec               | longblob | YES  |     | NULL    |       |
+| opened_tables_psec                    | longblob | YES  |     | NULL    |       |
+| created_tmp_tables_psec               | longblob | YES  |     | NULL    |       |
+| created_tmp_disk_tables_psec          | longblob | YES  |     | NULL    |       |
+| connections_psec                      | longblob | YES  |     | NULL    |       |
+| aborted_connects_psec                 | longblob | YES  |     | NULL    |       |
+| threads_created_psec                  | longblob | YES  |     | NULL    |       |
+| seconds_behind_master                 | longblob | YES  |     | NULL    |       |
+| os_loadavg                            | longblob | YES  |     | NULL    |       |
+| os_cpu_utilization_percent            | longblob | YES  |     | NULL    |       |
+| os_mem_used_mb                        | longblob | YES  |     | NULL    |       |
+| os_mem_active_mb                      | longblob | YES  |     | NULL    |       |
+| os_swap_used_mb                       | longblob | YES  |     | NULL    |       |
++---------------------------------------+----------+------+-----+---------+-------</pre>
+</blockquote>
+<p>Example:</p>
+<blockquote>
+<pre>mysql&gt; SELECT com_select_psec, innodb_buffer_pool_pages_flushed_psec FROM mycheckpoint.<strong>sv_report_chart_24_7</strong> \G
+<img class="alignnone size-full wp-image-1798" title="mycheckpoint-chart-247-sample" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-247-sample1.png" alt="mycheckpoint-chart-247-sample" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-247-sample1.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/mycheckpoint-chart-247-sample1-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" />
+<img class="alignnone size-full wp-image-1830" title="mycheckpoint-24-7-chart-sample2" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycheckpoint-24-7-chart-sample2.png" alt="" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycheckpoint-24-7-chart-sample2.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2010/01/mycheckpoint-24-7-chart-sample2-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" />
+</pre>
+</blockquote>
+<h4>Trying mycheckpoint</h4>
+<ul>
+<li>Get <em>mycheckpoint</em> from the <a href="https://code.google.com/p/mycheckpoint/">mycheckpoint Google Code project page</a>.</li>
+<li>Read the <a href="http://code.openark.org/forge/mycheckpoint/documentation">documentation</a>.</li>
+<li>Report <a href="https://code.google.com/p/mycheckpoint/issues/list">issues</a>!</li>
+</ul>
+<h4>Future plans</h4>
+<p>I haven&#8217;t got any major immediate issues; planning on user customization of charts and HTML reports. Considering thresholds and alerting for the future.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mycheckpoint-rev-76-os-monitoring-auto-deploy-brief-html-and-247-reports/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1784</post-id>	</item>
+		<item>
+		<title>New and noteworthy in mycheckpoint (rev. 57)</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/new-and-noteworthy-in-mycheckpoint-rev-57</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/new-and-noteworthy-in-mycheckpoint-rev-57#comments</comments>
+				<pubDate>Wed, 16 Dec 2009 19:12:07 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[mycheckpoint]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1695</guid>
+				<description><![CDATA[Rev. 57 of mycheckpoint has been released and is available for download. New and updated in this revision: Remote host monitoring Improved charting Flexible charting Fix to questions vs. queries issues Remote host monitoring It is now possible to monitor one host, while writing into another. Either or both could be remote hosts: mycheckpoint --host=localhost [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Rev. 57 of <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> has been released and is available for <a href="http://code.google.com/p/mycheckpoint/">download</a>.</p>
+<p>New and updated in this revision:</p>
+<ul>
+<li><a href="#Remote host monitoring">Remote host monitoring</a></li>
+<li><a href="#Improved charting">Improved charting</a></li>
+<li><a href="#Flexible charting">Flexible charting</a></li>
+<li><a href="#Fix to questions vs. queries issues">Fix to questions vs. queries issues</a></li>
+</ul>
+<p><a name="Remote host monitoring"></a></p>
+<h4>Remote host monitoring</h4>
+<p>It is now possible to monitor one host, while writing into another. Either or both could be remote hosts:</p>
+<blockquote>
+<pre>mycheckpoint --host=localhost --monitored-host=192.168.10.178</pre>
+</blockquote>
+<p>The above monitors the MySQL server on 192.168.10.178, and writes down to localhost (to be queried later)</p>
+<blockquote>
+<pre>mycheckpoint --monitored-host=127.0.0.1 --host=192.168.10.178</pre>
+</blockquote>
+<p>The above monitors the MySQL server on 127.0.0.1, and writes down to 192.168.10.178.</p>
+<p><span id="more-1695"></span>As result of the above addition, binary logging for monitoring statements are now enabled by default. The previous solution, in which binary logging were disabled by default and the same schema was utilized by different servers was far from being a clean solution. <em>[Read more on <a href="http://code.openark.org/forge/mycheckpoint/documentation/remote-multiple-hosts">Remote &amp; multiple hosts</a> monitoring]</em></p>
+<p><a name="Improved charting"></a></p>
+<h4>Improved charting</h4>
+<p>The google charts reports have been improved significantly. Here&#8217;s how:</p>
+<blockquote><p><img class="size-full wp-image-1702" title="Before" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-old-sample11.png" alt="Before" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-old-sample11.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-old-sample11-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /><img class="size-full wp-image-1703" title="After" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-new-sample1.png" alt="After" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-new-sample1.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-new-sample1-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /><br />
+<strong>Before</strong> on left (or above), <strong>After</strong> on right (or below)</p></blockquote>
+<p>And</p>
+<blockquote><p><img class="size-full wp-image-1708" title="Before" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-old-sample2.png" alt="Before" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-old-sample2.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-old-sample2-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /><img class="size-full wp-image-1709" title="After" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-new-sample2.png" alt="After" width="400" height="200" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-new-sample2.png 400w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/12/chart-new-sample2-300x150.png 300w" sizes="(max-width: 400px) 100vw, 400px" /><br />
+<strong>Before</strong> on left (or above), <strong>After</strong> on right (or below)</p></blockquote>
+<p><em>Recap</em>: the charts are not stored anywhere; they are being calculated and generated by SQL queries &amp; views, based on the raw data. For example, to generate the above, I do:</p>
+<blockquote>
+<pre>SELECT innodb_estimated_log_mb_written_per_hour FROM sv_report_chart_sample\G
+*************************** 1. row ***************************
+innodb_estimated_log_mb_written_per_hour: http://chart.apis.google.com/chart?cht=lc&amp;chs=400x200&amp;chts=303030,12&amp;chtt=Latest+24+hours:+Dec+8,+08:20++-++Dec+9,+08:20&amp;chdl=innodb_estimated_log_mb_written_per_hour&amp;chdlp=b&amp;chco=ff8c00&amp;chd=s:OQOTSPPQPSROUQMTRSQTPSURQTQQPSOSRTRRUTRRTSRRRSRSTRRQSURSUVRRXQTVRUTTVUTOYTXSYTTSYUSUTWUPRRPQSQRQTPPSPQMPPQOQMQPMOMOLQORNNPNRNNOPQOOMQQPNRNMNORQMSTQQPTPRUQVQTTVSURUVVVSSSVWQVUSTVSWSSUURWRVRTWdotpQNROPQRPQQMPLRO9PWNRPNNNPXUMLNNPQQPSONPLLNWXZTQROSQMOONQPLJNOOQQKMPSMMPLfPSSSRTUQSORSSRSPNRSQSQ&amp;chxt=x,y&amp;chxr=1,0,2708.0&amp;chxl=0:|09:00||||13:00||||17:00||||21:00||||01:00||||05:00||||&amp;chxs=0,505050,10&amp;chg=4.17,25,1,3,2.78,0&amp;chxp=0,2.78,6.95,11.12,15.29,19.46,23.63,27.80,31.97,36.14,40.31,44.48,48.65,52.82,56.99,61.16,65.33,69.50,73.67,77.84,82.01,86.18,90.35,94.52,98.69</pre>
+</blockquote>
+<p>If you thought I was going over the edge in <a href="https://shlomi-noach.github.io/blog/mysql/auto-scaling-scaled-sql-graphs-concluded">Auto scaling, scaled SQL graphs concluded</a> or <a href="https://shlomi-noach.github.io/blog/mysql/sql-pie-chart">SQL pie chart</a>, allow me to assure you: generation of the above charts using SQL &amp; views is <em>SQL blasphemy</em>. While cool, the Google Charts API does not do too much on its own, and expects the caller to do the math for putting in the grids, scales and labels (and though all of them are tightly related, they must all be explicitly specified). I&#8217;ll write a later post on this.</p>
+<p><a name="Flexible charting"></a></p>
+<h4>Flexible charting</h4>
+<p>A new table, called <strong>charts_api</strong>, is introduced. It contains one row, which lists charting configuration.</p>
+<blockquote>
+<pre>SELECT * FROM charts_api;
++-------------+--------------+----------------------------------------------------------------+------------------------------------+
+| chart_width | chart_height | simple_encoding                                                | service_url                        |
++-------------+--------------+----------------------------------------------------------------+------------------------------------+
+|         400 |          200 | ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 | http://chart.apis.google.com/chart |
++-------------+--------------+----------------------------------------------------------------+------------------------------------+</pre>
+</blockquote>
+<p>To change generated charts dimensions, simply update <strong>chart_width</strong> or <strong>chart_height</strong>.</p>
+<p>To use other chart APIs, update <strong>service_url</strong>. I&#8217;ve tried out <a href="http://www.jfree.org/eastwood/">Eastwood Charts</a>, a Java-based service, which implements the Google Charts API. There&#8217;s still some stuff missing, such as the positioning of labels and grids; and it&#8217;s slightly less polished (but configurable). But if you&#8217;re concerned about sending requests to Google, it&#8217;s a viable alternative.</p>
+<p>So, drop the WAR file into your <a href="http://tomcat.apache.org/">Tomcat</a> / <a href="http://www.jboss.org/">JBoss</a> / other j2ee server, then follow <strong>http://127.0.0.1/eastwood/chart?</strong>&#8230;</p>
+<p><a name="Fix to questions vs. queries issues"></a></p>
+<h4>Fix to questions vs. queries issues</h4>
+<p><em>mycheckpoint</em> now correctly identifies whether to use <a href="https://shlomi-noach.github.io/blog/mysql/questions-or-queries">questions or queries</a> when analyzing DML queries. If you got some <strong>570%</strong> for <strong>com_update</strong> out of total queries and wondered about it, it should now be resolved to normal values.</p>
+<h4>On upgrading your current installation</h4>
+<ol>
+<li>Download &amp; install via debian or python installers</li>
+<li>Issue <em>mycheckpoint</em> once with &#8220;deploy&#8221; as argument</li>
+<li>Done</li>
+</ol>
+<h4>Future plans</h4>
+<p>I&#8217;m working on 24&#215;7 charting; minimal operating system monitoring; auto-detection and auto-deploy on version upgrade; and more.</p>
+<p>Stay tuned!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/new-and-noteworthy-in-mycheckpoint-rev-57/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1695</post-id>	</item>
+		<item>
+		<title>SQL multi line chart</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql-multi-line-chart</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql-multi-line-chart#comments</comments>
+				<pubDate>Tue, 03 Nov 2009 10:44:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1400</guid>
+				<description><![CDATA[Time for another charting SQL query. I wish to present a single-query generated multi-line/area chart. I&#8217;ll walk through some of the steps towards making this happen. By the end of this post I&#8217;ll present some real-data charts, area charts and colored charts. +---------+-----------------------------------------------------------------------------------+ &#124; y_scale &#124; chart                                                                             &#124; +---------+-----------------------------------------------------------------------------------+ &#124; 1       &#124; ****---------#######----------------------------------------*******--------###### &#124; &#124; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Time for another charting SQL query. I wish to present a single-query generated multi-line/area chart. I&#8217;ll walk through some of the steps towards making this happen. By the end of this post I&#8217;ll present some real-data charts, area charts and colored charts.</p>
+<blockquote>
+<pre>+---------+-----------------------------------------------------------------------------------+
+| y_scale | chart                                                                             |
++---------+-----------------------------------------------------------------------------------+
+| 1       | ****---------#######----------------------------------------*******--------###### |
+| 0.88    | ----***---###-------##-----------------------------------***-------***---##------ |
+| 0.75    | -------**#------------##-------------------------------**-------------*##-------- |
+| 0.63    | ------##-*--------------##----------------------------*--------------##**-------- |
+| 0.5     | -@@@@@@@@@@@@@@@----------#-----@@@@@@@@@@@@@@@@----**---------@@@@@@@@@@@@@@@@-- |
+| 0.38    | ----#-------*--------------##----------------------*---------------#-------*----- |
+| 0.25    | --##---------*---------------#--------------------*--------------##---------*---- |
+| 0.13    | -#------------**--------------#-----------------**--------------#------------*--- |
+| 0       | @---------------*--------------##--------------*---------------#--------------**- |
+| -0.12   | -----------------*---------------#------------*--------------##-----------------* |
+| -0.25   | ------------------*---------------#---------**--------------#-------------------- |
+| -0.37   | -------------------**--------------#-------*---------------#--------------------- |
+| -0.5    | ----------------@@@@@@@@@@@@@@@@----##----*-----@@@@@@@@@@@@@@@----------------@@ |
+| -0.62   | ----------------------**--------------#-**--------------#------------------------ |
+| -0.75   | ------------------------**------------**#-------------##------------------------- |
+| -0.87   | --------------------------**-------***---###-------###--------------------------- |
+| -1      | ----------------------------*******---------#######------------------------------ |
+|         | v:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::v |
+|         | 0                                                                               8 |
+|         |     # sin(x)                                                                      |
+|         |     * cos(x)                                                                      |
+|         |     @ sign(tan(x))/2                                                              |
++---------+-----------------------------------------------------------------------------------+</pre>
+</blockquote>
+<h4><span id="more-1400"></span>Requirements</h4>
+<p>We need a generic query, which returns at least these two columns: <strong>ordering_column</strong> and <strong>row_values</strong>, The latter being a comma-delimited list of values. For example, the following query will do:</p>
+<blockquote>
+<pre>SELECT
+ value/10 AS ordering_column,
+ CONCAT(SIN(value/10), ',', COS(value/10), ',', SIGN(TAN(value/10))/2) AS row_values,
+ @multi_line_chart_values_legend := 'sin(x),cos(x),sign(tan(x))/2' AS legend
+FROM tinyint_asc
+LIMIT 81;
++-----------------+---------------------------------------------+------------------------------+
+| ordering_column | row_values                                  | legend                       |
++-----------------+---------------------------------------------+------------------------------+
+|          0.0000 | 0,1,0.0000                                  | sin(x),cos(x),sign(tan(x))/2 |
+|          0.1000 | 0.099833416646828,0.99500416527803,0.5000   | sin(x),cos(x),sign(tan(x))/2 |
+|          0.2000 | 0.19866933079506,0.98006657784124,0.5000    | sin(x),cos(x),sign(tan(x))/2 |
+|          0.3000 | 0.29552020666134,0.95533648912561,0.5000    | sin(x),cos(x),sign(tan(x))/2 |
+|          0.4000 | 0.38941834230865,0.92106099400289,0.5000    | sin(x),cos(x),sign(tan(x))/2 |
+|          0.5000 | 0.4794255386042,0.87758256189037,0.5000     | sin(x),cos(x),sign(tan(x))/2 |
+|          0.6000 | 0.56464247339504,0.82533561490968,0.5000    | sin(x),cos(x),sign(tan(x))/2 |
+...</pre>
+</blockquote>
+<p>Don&#8217;t worry about the <strong>@multi_line_chart_values_legend</strong> variable; it will be used later on for presenting chart legend.</p>
+<p>Since I&#8217;ve already presented with how to create line charts in <a href="https://shlomi-noach.github.io/blog/mysql/auto-scaling-scaled-sql-graphs-concluded">Auto scaling, scaled SQL graphs concluded</a>, we will concentrate on how to present a single chart column, which includes multiple values.</p>
+<h4>Step 1</h4>
+<p>Let&#8217;s say we wish to present the values 12,5,16. We wish to eventually generate something like:</p>
+<blockquote>
+<pre>+------------------+
+| unwalked_bar     |
++------------------+
+| ----Y------X---Z |
++------------------+</pre>
+</blockquote>
+<p>Where <strong>X</strong> is in position 12, <strong>Y</strong> in position 5, and <strong>Z</strong> in position 16.</p>
+<p>We begin with having these values concatenated into one string:</p>
+<blockquote>
+<pre>SET @values := '12,5,16';
+SET @num_values := CHAR_LENGTH(@values)-CHAR_LENGTH(REPLACE(@values,',',''))+1;
+SELECT @num_values;
++-------------+
+| @num_values |
++-------------+
+| 3           |
++-------------+</pre>
+</blockquote>
+<p>The query above parses the string and correctly identified there are three tokens.</p>
+<h4>Step 2</h4>
+<p>We now move on to tokenizing the text:</p>
+<blockquote>
+<pre>SELECT
+ *,
+ SUBSTRING_INDEX(SUBSTRING_INDEX(@row_values, ',', tinyint_asc.value), ',', -1) AS row_value
+FROM
+ tinyint_asc,
+ (SELECT @row_values := '12,5,16' AS row_values) AS sel_values,
+ (SELECT @num_values := CHAR_LENGTH(@row_values)-CHAR_LENGTH(REPLACE(@row_values,',',''))+1 AS num_values) AS sel_num_values
+WHERE
+ tinyint_asc.value BETWEEN 1 AND @num_values
+;
++-------+------------+------------+-----------+
+| value | row_values | num_values | row_value |
++-------+------------+------------+-----------+
+|     1 | 12,5,16    |          3 | 12        |
+|     2 | 12,5,16    |          3 | 5         |
+|     3 | 12,5,16    |          3 | 16        |
++-------+------------+------------+-----------+</pre>
+</blockquote>
+<p>Using a numbers table (<a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/08/tinyint_asc.sql">tinyint_asc</a>), we walk the string and tokenize it. We also maintain an indicator per value.</p>
+<h4>Step 3</h4>
+<p>We need to recognize the minimum and maximum values:</p>
+<blockquote>
+<pre>SELECT
+  value AS row_value_indicator,
+  row_value,
+  @min_row_value := LEAST(IFNULL(@min_row_value, row_value), row_value) AS min_row_value,
+  @max_row_value := GREATEST(IFNULL(@max_row_value, row_value), row_value) AS max_row_value
+FROM (
+  SELECT
+  *,
+  SUBSTRING_INDEX(SUBSTRING_INDEX(@row_values, ',', tinyint_asc.value), ',', -1)+0 AS row_value
+    FROM
+      tinyint_asc,
+      (SELECT @row_values := '12,5,16' AS row_values) AS sel_values,
+      (SELECT @num_values := CHAR_LENGTH(@row_values)-CHAR_LENGTH(REPLACE(@row_values,',',''))+1 AS num_values) AS sel_num_values,
+      (SELECT @min_row_value := NULL) AS sel_min_row_value,
+      (SELECT @max_row_value := NULL) AS sel_max_row_value
+    WHERE
+      tinyint_asc.value BETWEEN 1 AND @num_values
+  ) sel_row_values
+;
++---------------------+-----------+---------------+---------------+
+| row_value_indicator | row_value | min_row_value | max_row_value |
++---------------------+-----------+---------------+---------------+
+|                   1 |        12 |            12 |            12 |
+|                   2 |         5 |             5 |            12 |
+|                   3 |        16 |             5 |            16 |
++---------------------+-----------+---------------+---------------+</pre>
+</blockquote>
+<p>The last line presents the correct values: 5 and 16 being min, max values respectively.</p>
+<h4>Step 4</h4>
+<p>We now iterate from min value to max value, this being the graph range, and, per row value (token in <strong>row_values</strong> column), we indicate whether there&#8217;s a pixel on the graph.</p>
+<blockquote>
+<pre>SELECT
+  * ,
+  IF(tinyint_asc.value = row_value, row_value_indicator, '-') AS display_val
+FROM
+  tinyint_asc,
+  (SELECT
+    value AS row_value_indicator,
+    row_value,
+    @min_row_value := LEAST(IFNULL(@min_row_value, row_value), row_value) AS min_row_value,
+    @max_row_value := GREATEST(IFNULL(@max_row_value, row_value), row_value) AS max_row_value
+    FROM (
+    SELECT
+      *,
+      SUBSTRING_INDEX(SUBSTRING_INDEX(@row_values, ',', tinyint_asc.value), ',', -1)+0 AS row_value
+    FROM
+      tinyint_asc,
+      (SELECT @row_values := '12,5,16' AS row_values) AS sel_values,
+      (SELECT @num_values := CHAR_LENGTH(@row_values)-CHAR_LENGTH(REPLACE(@row_values,',',''))+1 AS num_values) AS sel_num_values,
+      (SELECT @min_row_value := NULL) AS sel_min_row_value,
+      (SELECT @max_row_value := NULL) AS sel_max_row_value
+    WHERE
+      tinyint_asc.value BETWEEN 1 AND @num_values
+    ) sel_row_values
+  ) AS sel_row_values_indicators
+WHERE
+  tinyint_asc.value BETWEEN 1 AND @max_row_value
+;
++-------+---------------------+-----------+---------------+---------------+-------------+
+| value | row_value_indicator | row_value | min_row_value | max_row_value | display_val |
++-------+---------------------+-----------+---------------+---------------+-------------+
+|     1 |                   1 |        12 |            12 |            12 | -           |
+|     1 |                   2 |         5 |             5 |            12 | -           |
+|     1 |                   3 |        16 |             5 |            16 | -           |
+|     2 |                   1 |        12 |            12 |            12 | -           |
+|     2 |                   2 |         5 |             5 |            12 | -           |
+|     2 |                   3 |        16 |             5 |            16 | -           |
+|     3 |                   1 |        12 |            12 |            12 | -           |
+|     3 |                   2 |         5 |             5 |            12 | -           |
+|     3 |                   3 |        16 |             5 |            16 | -           |
+|     4 |                   1 |        12 |            12 |            12 | -           |
+|     4 |                   2 |         5 |             5 |            12 | -           |
+|     4 |                   3 |        16 |             5 |            16 | -           |
+|     5 |                   1 |        12 |            12 |            12 | -           |
+|     5 |                   2 |         5 |             5 |            12 | 2           |
+|     5 |                   3 |        16 |             5 |            16 | -           |
+|     6 |                   1 |        12 |            12 |            12 | -           |
+|     6 |                   2 |         5 |             5 |            12 | -           |
+|     6 |                   3 |        16 |             5 |            16 | -           |</pre>
+</blockquote>
+<p>This table can get very long.</p>
+<h4>Step 5</h4>
+<p>We now group the marks per graph-row value. If there&#8217;s no mark, we present with an empty space. If only one mark is present, we display that mark. If two lines collide on that point, we need to decide which mark to use. In the following example, we choose by order of appearance in the <strong>row_values</strong> column. Another way (used later on) is to choose the higher value.</p>
+<blockquote>
+<pre>SELECT
+  string_position,
+  LEFT(GROUP_CONCAT(bar_string_token ORDER BY bar_string_token DESC separator ''), 1) AS chosen_mark
+FROM
+  (SELECT
+    value AS string_position,
+    IF(tinyint_asc.value = row_value, row_value_indicator, ' ') AS bar_string_token
+  FROM
+    tinyint_asc,
+    (SELECT
+      value AS row_value_indicator,
+      row_value,
+      @min_row_value := LEAST(IFNULL(@min_row_value, row_value), row_value) AS min_row_value,
+      @max_row_value := GREATEST(IFNULL(@max_row_value, row_value), row_value) AS max_row_value
+      FROM (
+      SELECT
+        *,
+        SUBSTRING_INDEX(SUBSTRING_INDEX(@row_values, ',', tinyint_asc.value), ',', -1)+0 AS row_value
+      FROM
+        tinyint_asc,
+        (SELECT @row_values := '12,5,16' AS row_values) AS sel_values,
+        (SELECT @num_values := CHAR_LENGTH(@row_values)-CHAR_LENGTH(REPLACE(@row_values,',',''))+1 AS num_values) AS sel_num_values,
+        (SELECT @min_row_value := NULL) AS sel_min_row_value,
+        (SELECT @max_row_value := NULL) AS sel_max_row_value
+      WHERE
+        tinyint_asc.value BETWEEN 1 AND @num_values
+      ) sel_row_values
+    ) AS sel_row_values_indicators
+  WHERE
+    tinyint_asc.value BETWEEN 1 AND @max_row_value
+  ) AS sel_marked_row_values
+GROUP BY
+  string_position
+;
++-----------------+-------------+
+| string_position | chosen_mark |
++-----------------+-------------+
+|               1 |             |
+|               2 |             |
+|               3 |             |
+|               4 |             |
+|               5 | 2           |
+|               6 |             |
+|               7 |             |
+|               8 |             |
+|               9 |             |
+|              10 |             |
+|              11 |             |
+|              12 | 1           |
+|              13 |             |
+|              14 |             |
+|              15 |             |
+|              16 | 3           |
++-----------------+-------------+</pre>
+</blockquote>
+<h4>Step 6</h4>
+<p>It&#8217;s now just a matter of using GROUP_CONCAT to turn this into the following horizontal bar:</p>
+<blockquote>
+<pre>+------------------+
+| unwalked_bar     |
++------------------+
+| ----2------1---3 |
++------------------+</pre>
+</blockquote>
+<p>(I know I&#8217;m mixing spaces and dashes, it&#8217;s just for display purposes).</p>
+<h4>Putting it all together</h4>
+<p>From this point on, we use the techniques shown on <a href="../mysql/auto-scaling-scaled-sql-graphs-concluded">Auto scaling, scaled SQL graphs concluded</a> to generate the complete chart. For the curious, here&#8217;s what the complete query looks like. The text in <strong>bold</strong> is the only thing that needs to change; replace this with your own query.</p>
+<blockquote>
+<pre>SELECT
+  y_scale,
+  horizontal_bar as chart
+  FROM
+  (
+  SELECT
+    @multi_line_chart_row_number := @multi_line_chart_row_number+1,
+    CASE @multi_line_chart_row_number
+      WHEN 1 THEN ROUND(@multi_line_chart_max_value, @multi_line_chart_value_precision)
+      WHEN @multi_line_chart_graph_rows THEN ROUND(@multi_line_chart_min_value, @multi_line_chart_value_precision)
+      ELSE ROUND(@multi_line_chart_max_value-(@multi_line_chart_max_value-@multi_line_chart_min_value)*(@multi_line_chart_row_number-1)/(@multi_line_chart_graph_rows-1), @multi_line_chart_value_precision)
+    END AS y_scale,
+    horizontal_bar,
+    @multi_line_chart_bar_length := IFNULL(@multi_line_chart_bar_length, CHAR_LENGTH(horizontal_bar))
+  FROM
+    (SELECT @multi_line_chart_row_number := 0) AS select_row
+    INNER JOIN
+    (
+    SELECT
+      GROUP_CONCAT(SUBSTRING(unwalked_bar, tinyint_asc.value, 1) ORDER BY ordering_column SEPARATOR '') AS horizontal_bar
+    FROM
+      tinyint_asc
+    INNER JOIN (
+      SELECT
+        ordering_column,
+        GROUP_CONCAT(bar_string_token ORDER BY string_position SEPARATOR '') AS unwalked_bar
+      FROM
+        (SELECT
+          ordering_column,
+          string_position,
+          scaled_string_position,
+          REPLACE(LEFT(GROUP_CONCAT(bar_string_token ORDER BY bar_string_token DESC SEPARATOR ''), 1), ' ', '-') AS bar_string_token
+        FROM
+          (SELECT
+            ordering_column,
+            @multi_line_chart_scaled_string_position := CONVERT((row_value-@multi_line_chart_min_value)*(@multi_line_chart_graph_rows-1)/(@multi_line_chart_max_value-@multi_line_chart_min_value), UNSIGNED) AS scaled_string_position,
+            value AS string_position,
+            IF(tinyint_asc.value = @multi_line_chart_scaled_string_position+1, SUBSTRING(IF(@multi_line_chart_values_legend IS NULL, @multi_line_chart_graph_fallback_colors, @multi_line_chart_graph_colors), row_value_indicator, 1), ' ') AS bar_string_token
+          FROM
+            tinyint_asc,
+            (SELECT
+              ordering_column,
+              value AS row_value_indicator,
+              row_value
+            FROM (
+              SELECT
+                *,
+                @multi_line_chart_min_value := LEAST(IFNULL(@multi_line_chart_min_value, row_value), row_value) AS min_value,
+                @multi_line_chart_max_value := GREATEST(IFNULL(@multi_line_chart_max_value, row_value), row_value) AS max_value,
+                @multi_line_chart_min_range := LEAST(IFNULL(@multi_line_chart_min_range, ordering_column), ordering_column) AS min_range,
+                @multi_line_chart_max_range := GREATEST(IFNULL(@multi_line_chart_max_range, ordering_column), ordering_column) AS max_range
+              FROM
+                (SELECT
+                  *,
+                  SUBSTRING_INDEX(SUBSTRING_INDEX(row_values, ',', tinyint_asc.value), ',', -1)+0 AS row_value,
+                  @multi_line_chart_num_values := CHAR_LENGTH(row_values)-CHAR_LENGTH(REPLACE(row_values,',',''))+1 AS num_values
+                FROM
+                  (SELECT @multi_line_chart_values_legend := NULL) AS select_nullify_values_legend,
+                  (SELECT @multi_line_chart_bar_length := NULL) AS select_nullify_bar_length,
+                  tinyint_asc,
+                  (
+                    <strong>SELECT
+                      value/10 AS ordering_column,
+                      CONCAT(SIN(value/10), ',', COS(value/10), ',', SIGN(TAN(value/10))/2) AS row_values,
+                      @multi_line_chart_values_legend := 'sin(x),cos(x),sign(tan(x))/2'
+                    FROM tinyint_asc LIMIT 81</strong>
+                  ) AS sel_main_values,
+                  (SELECT @multi_line_chart_min_value := NULL) AS select_min,
+                  (SELECT @multi_line_chart_max_value := NULL) AS select_max,
+                  (SELECT @multi_line_chart_min_range := NULL) AS select_min_range,
+                  (SELECT @multi_line_chart_max_range := NULL) AS select_max_range,
+                  (SELECT @multi_line_chart_graph_colors := '#*@%o+x;m:') AS select_graph_colors,
+                  (SELECT @multi_line_chart_graph_fallback_colors := 'abcdefghij') AS select_graph_fallback_colors,
+                  (SELECT @multi_line_chart_value_precision := 2) AS select_value_precision,
+                  (SELECT @multi_line_chart_graph_rows := 17) AS select_graph_rows
+                ) sel_counted_values_main_values
+              WHERE
+                value BETWEEN 1 AND @multi_line_chart_num_values
+              ) sel_row_values
+            ) AS sel_row_values_indicators
+          WHERE
+            tinyint_asc.value BETWEEN 1 AND @multi_line_chart_graph_rows
+          ) AS sel_marked_row_values
+        GROUP BY
+          ordering_column, string_position
+        ) AS sel_walked_bar
+      GROUP BY
+        ordering_column
+    ) AS select_vertical
+    WHERE
+      tinyint_asc.value BETWEEN 1 AND CHAR_LENGTH(unwalked_bar)
+    GROUP BY
+      tinyint_asc.value
+    ORDER BY
+      tinyint_asc.value DESC
+    ) AS select_horizontal
+  ) AS select_horizontal_untitled
+UNION ALL
+SELECT '', CONCAT('v', REPEAT(':', @multi_line_chart_bar_length-2), 'v')
+UNION ALL
+SELECT '', CONCAT(@multi_line_chart_min_range, REPEAT(' ', @multi_line_chart_bar_length-CHAR_LENGTH(@multi_line_chart_min_range)-CHAR_LENGTH(@multi_line_chart_max_range)), @multi_line_chart_max_range)
+UNION ALL
+SELECT
+  '', CONCAT('    ', SUBSTRING(@multi_line_chart_graph_colors, value, 1), ' ', SUBSTRING_INDEX(SUBSTRING_INDEX(@multi_line_chart_values_legend, ',', value), ',', -1))
+FROM
+  tinyint_asc
+WHERE
+  value BETWEEN 1 AND @multi_line_chart_num_values
+  AND @multi_line_chart_values_legend IS NOT NULL
+;</pre>
+</blockquote>
+<h4>Area charts</h4>
+<p>Sinus functions curves go nicely with ASCII art. But your everyday chart won&#8217;t have such nice curves. There is some erratic behavior to, say, your number of queries per hour. It doesn&#8217;t display well in the above graph.</p>
+<p>Which is why we can choose to present area graphs: not only display the <em>line</em>, but also the <em>area</em> beneath it.</p>
+<p>This leads to the problem of hiding: higher values can hide the lower values display. So we need to adjust the above logic and make sure we always bring to front the lower values.</p>
+<p>The following example shows the relation between the percentage of slow queries (per hour) and the percentage of full table scans (of total queries, per hour). It&#8217;s really fun to see the unmistakeable connection!</p>
+<blockquote>
+<pre>+---------+---------------------------------------------------------------+
+| y_scale | chart                                                         |
++---------+---------------------------------------------------------------+
+| 4       | --------------------------------*--*------------------------- |
+| 3       | -----------------------------****-*****------------------*--- |
+| 3       | -----------------------------**********-----------------**-*- |
+| 3       | ----------*------------------**********--------------*****-** |
+| 3       | ------*--**-----------------************-*-----------******** |
+| 3       | ------*******---------------****************--------********* |
+| 3       | ------*******---------------******************------********* |
+| 3       | ------*********-------------******************------********* |
+| 3       | -----************--------*-*******************------********* |
+| 2       | *----*****************--************************-**-********* |
+| 2       | *----******************************************************** |
+| 2       | *----******************************************************** |
+| 2       | **--********************************************************* |
+| 2       | ************************************************************* |
+| 2       | ************************************************************* |
+| 2       | ************************************************************* |
+| 2       | *****************************#******************************* |
+| 1       | *****************************##########*****************##*#* |
+| 1       | ******#***#*****************###########**************######## |
+| 1       | ******#######***************###############*********######### |
+| 1       | #*****########**************##################******######### |
+| 1       | #****##########*#*******##*###################******######### |
+| 1       | #***######################################################### |
+| 1       | #***######################################################### |
+| 1       | ############################################################# |
+|         | v:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::v |
+|         | 2009-10-22 20:00:00                       2009-10-25 08:00:00 |
+|         |     # slow queries percent                                    |
+|         |     * select scan percent                                     |
++---------+---------------------------------------------------------------</pre>
+</blockquote>
+<p>Next we look at the number of <strong>SELECT</strong>, <strong>INSERT</strong>, <strong>UPDATE</strong>, <strong>DELETE</strong> queries per sec &#8211; on a per hour basis.</p>
+<blockquote>
+<pre>+---------+---------------------------------------------------------------+
+| y_scale | chart                                                         |
++---------+---------------------------------------------------------------+
+| 135     | --##--------------------------------------------------------- |
+| 130     | -###--------------------------------------------------------- |
+| 125     | -###----------------------##--------------------------------- |
+| 120     | -###-------------------#####--------------------------------- |
+| 115     | -###-----------------#######--------------------------------- |
+| 110     | -###----------------########----------------------##--------- |
+| 104     | -###--------------##########--------------------####--------- |
+| 99      | ####*--------#--############------------------######--------- |
+| 94      | ####*--------#-#############---------------#########--------- |
+| 89      | #####-----##################------------############--------# |
+| 84      | ############################-----------#############--------# |
+| 79      | ####%########################---####################---###### |
+| 74      | ####%######################################################## |
+| 69      | ####%*####################################################### |
+| 64      | ####%*####################################################### |
+| 59      | ##*#%*###############*####################################### |
+| 54      | #**#%*#####*#*****###*****##*###########*#####*#####*#####*## |
+| 49      | #***%%*#*********************##########****#*********#**##*** |
+| 44      | #***%%*************************##**************************** |
+| 39      | ****%%******************************************************* |
+| 33      | ****%%**********************************************%******** |
+| 28      | *%%*%%**********%******%%*%*%*******%***************%******** |
+| 23      | %%%%o%**%**%%o%%%%%%%%%%%%%%o******%%*%%%%%%%%%%%%%%%%*****%% |
+| 18      | %oooooooo%%oooooooooooooooooo%%oo%oooooooooooooooooooo%o%%ooo |
+| 13      | ooooooooo%%oooooooooooooooooo%%%%%%ooooooooooooooooooo%o%%ooo |
+|         | v:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::v |
+|         | 2009-10-22 20:00:00                       2009-10-25 08:00:00 |
+|         |     # com_select per second                                   |
+|         |     * com_insert per second                                   |
+|         |     o com_update per second                                   |
+|         |     % com_delete per second                                   |
++---------+---------------------------------------------------------------+</pre>
+</blockquote>
+<p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/sql_multi_line_graph2.txt">Here&#8217;s the code</a> to do that.</p>
+<h4>Colored charts</h4>
+<p>Time to add colors! The previous charts can be easily improved by sending the terminal escape characters to instruct initiating color display (thanks to <strong>TheVoo</strong> for providing the idea and implementation for that on <a href="../mysql/sql-pie-chart">SQL pie chart</a>).</p>
+<p>I recommend using the following <strong>pager</strong> if you&#8217;re on unix-like OS:</p>
+<blockquote>
+<pre>pager awk '{sub(/..$/, "")} {sub(/[ ]+$/, "")} !/^[+][-]/ &amp;&amp; NR &gt; 3 { print }'</pre>
+</blockquote>
+<p>The following chart is similar to the above, but now utilizes colors. It presents the number of popular DML queries per second, on an hourly basis.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-multi-area-chart-1.png"><img class="size-full wp-image-1411 alignnone" title="Colored multi area chart" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-multi-area-chart-1.png" alt="Colored multi area chart" width="525" height="507" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-multi-area-chart-1.png 525w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-multi-area-chart-1-300x289.png 300w" sizes="(max-width: 525px) 100vw, 525px" /></a></p></blockquote>
+<p>Again, comparing slow queries with full table scans:</p>
+<blockquote>
+<figure id="attachment_1444" aria-describedby="caption-attachment-1444" style="width: 548px" class="wp-caption alignnone"><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-slow-and-scan-queries.png"><img class="size-full wp-image-1444" title="colored-slow-and-scan-queries" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-slow-and-scan-queries.png" alt="Slow queries and full scans overlay" width="548" height="319" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-slow-and-scan-queries.png 548w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/colored-slow-and-scan-queries-300x174.png 300w" sizes="(max-width: 548px) 100vw, 548px" /></a><figcaption id="caption-attachment-1444" class="wp-caption-text">Slow queries and full scans overlay</figcaption></figure></blockquote>
+<p>Comparing number of created temporary tables with number of created disk temporary tables:</p>
+<blockquote>
+<figure id="attachment_1446" aria-describedby="caption-attachment-1446" style="width: 549px" class="wp-caption alignnone"><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_tmp_tables.png"><img class="size-full wp-image-1446" title="color_multi_line_chart_tmp_tables" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_tmp_tables.png" alt="temp tables vs disk temp tables" width="549" height="485" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_tmp_tables.png 549w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_tmp_tables-300x265.png 300w" sizes="(max-width: 549px) 100vw, 549px" /></a><figcaption id="caption-attachment-1446" class="wp-caption-text">temp tables vs disk temp tables</figcaption></figure></blockquote>
+<p>And, once again, the number of popular DML statements, zoomed in.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_dml.png"><img class="alignnone size-full wp-image-1451" title="color_multi_line_chart_dml" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_dml.png" alt="color_multi_line_chart_dml" width="552" height="517" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_dml.png 552w, https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/color_multi_line_chart_dml-300x280.png 300w" sizes="(max-width: 552px) 100vw, 552px" /></a></p></blockquote>
+<p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/10/sql_multi_line_graph3.txt">Here&#8217;s the code</a> for colored charts.</p>
+<p>Some of the techinuqes used in my <a href="https://shlomi-noach.github.io/blog/tag/graphs">charting series</a> of blogs can be used, pretty much in the same way, in order to generate <a href="http://code.google.com/apis/chart/">Google charts</a>. But other techniques can be used, as well.</p>
+<p>More on this in future posts.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql-multi-line-chart/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1400</post-id>	</item>
+		<item>
+		<title>SQL pie chart</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql-pie-chart</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql-pie-chart#comments</comments>
+				<pubDate>Wed, 12 Aug 2009 10:49:41 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Graphs]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1093</guid>
+				<description><![CDATA[My other half says I&#8217;m losing it. But I think that as an enthusiast kernel developer she doesn&#8217;t have the right to criticize people. (&#8220;I like user space better!&#8221; &#8211; she exclaims upon reading this). Shown below is a (single query) SQL-generated pie chart. I will walk through the steps towards making this happen, and [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>My other half says I&#8217;m losing it. But I think that as an enthusiast kernel developer she doesn&#8217;t have the right to criticize people. (&#8220;I like user space better!&#8221; &#8211; she exclaims upon reading this).</p>
+<p>Shown below is a (single query) SQL-generated pie chart. I will walk through the steps towards making this happen, and conclude with what, I hope you&#8217;ll agree, are real-world, useful usage samples.</p>
+<blockquote>
+<pre>+----------------------------------------------------------------------+
+| pie_chart                                                            |
++----------------------------------------------------------------------+
+|                                                                      |
+|                         ;;;;;;;;;;;;;;;;;;;;;                        |
+|                  oooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;                 |
+|             oooooooooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;            |
+|          ooooooooooooooooo                 ;;;;;;;;;;;;#####         |
+|        oooooooooooooo                           ;#############       |
+|       oooooooooooo                                 ############      |
+|      oooooooooooo                                   ############     |
+|      ooooooooooo                                     ###########     |
+|      oooooooooooo                                   ::::::::::::     |
+|       oooooooooooo                                 ::::::::::::      |
+|        ooooooooo:::::                           ::::::::::::::       |
+|          o::::::::::::::::                 :::::::::::::::::         |
+|             :::::::::::::::::::::::::::::::::::::::::::::            |
+|                  :::::::::::::::::::::::::::::::::::                 |
+|                         :::::::::::::::::::::                        |
+|                                                                      |
+| ##  red: 1 (10%)                                                     |
+| ;;  blue: 2 (20%)                                                    |
+| oo  orange: 3 (30%)                                                  |
+| ::  white: 4 (40%)                                                   |
++----------------------------------------------------------------------+</pre>
+</blockquote>
+<h4>Requirements</h4>
+<p>We need a generic query, which returns at least these two columns: <strong>name_column</strong> and <strong>value_column</strong>. For example, the following query will do:<span id="more-1093"></span></p>
+<blockquote>
+<pre>SELECT name AS name_column, value AS value_column FROM sample_values2;
++-------------+--------------+
+| name_column | value_column |
++-------------+--------------+
+| red         |            1 |
+| blue        |            2 |
+| orange      |            3 |
+| white       |            4 |
++-------------+--------------+</pre>
+</blockquote>
+<p>Find sample data in <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/08/pie_data.sql">pie_data.sql</a>.</p>
+<h4>Part 1: expanding the original query</h4>
+<p>We&#8217;re going to need to take the above query&#8217;s results and expand them: how much is the ratio from total, per value? As first step, accumulate values:</p>
+<blockquote>
+<pre>SELECT
+  name_column,
+  value_column,
+  @accumulating_value := @accumulating_value+value_column AS accumulating_value
+FROM (
+  SELECT name AS name_column, value AS value_column FROM sample_values2
+  ) select_values,
+  (SELECT @accumulating_value := 0) select_accumulating_value
+;
++-------------+--------------+--------------------+
+| name_column | value_column | accumulating_value |
++-------------+--------------+--------------------+
+| red         |            1 |                  1 |
+| blue        |            2 |                  3 |
+| orange      |            3 |                  6 |
+| white       |            4 |                 10 |
++-------------+--------------+--------------------+</pre>
+</blockquote>
+<p>Next, we calculate ratio of accumulating value, and present it both in [0..1] range, as well as in [0..2*PI] (radians):</p>
+<blockquote>
+<pre>SELECT
+  name_order,
+  name_column,
+  value_column,
+  accumulating_value,
+  accumulating_value/@accumulating_value AS accumulating_value_ratio,
+  2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+FROM (
+  SELECT
+    name_column,
+    value_column,
+    @name_order := @name_order+1 AS name_order,
+    @accumulating_value := @accumulating_value+value_column AS accumulating_value,
+    @aggregated_name_column := CONCAT(@aggregated_name_column, name_column, ',') AS aggregated_name_column
+  FROM (
+    SELECT name AS name_column, value AS value_column FROM sample_values2
+    ) select_values,
+    (SELECT @name_order := 0) select_name_order,
+    (SELECT @accumulating_value := 0) select_accumulating_value,
+    (SELECT @aggregated_name_column := '') select_aggregated_name_column
+  ) select_accumulating_values
+;
++------------+-------------+--------------+--------------------+--------------------------+----------------------------+
+| name_order | name_column | value_column | accumulating_value | accumulating_value_ratio | accumulating_value_radians |
++------------+-------------+--------------+--------------------+--------------------------+----------------------------+
+|          1 | red         |            1 |                  1 |                      0.1 |           0.62831853071796 |
+|          2 | blue        |            2 |                  3 |                      0.3 |            1.8849555921539 |
+|          3 | orange      |            3 |                  6 |                      0.6 |            3.7699111843078 |
+|          4 | white       |            4 |                 10 |                        1 |            6.2831853071796 |
++------------+-------------+--------------+--------------------+--------------------------+----------------------------+</pre>
+</blockquote>
+<p>The radians value will help us decide where in the pie chart lies each value.</p>
+<h4>Part 2: behind the scenes of the pie chart</h4>
+<p>We now explain how the pie chart works. Later on we combine with <strong>Part 1</strong>, to produce the complete chart.</p>
+<p>We first generate a coordinates system (see <a href="https://shlomi-noach.github.io/blog/mysql/sql-graphics">SQL graphics</a>):</p>
+<blockquote>
+<pre>SELECT
+  GROUP_CONCAT(CONCAT(t2.value,'.',t1.value) order by t1.value separator ' ') as circle
+FROM
+  tinyint_asc t1,
+  tinyint_asc t2,
+  (select @size := 10) sel_size,
+  (select @radius := (@size/2 - 1)) sel_radius
+WHERE
+  t1.value &lt; @size
+  AND t2.value &lt; @size
+GROUP BY t2.value
+;
++-----------------------------------------+
+| circle                                  |
++-----------------------------------------+
+| 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 |
+| 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 |
+| 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 |
+| 3.0 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8 3.9 |
+| 4.0 4.1 4.2 4.3 4.4 4.5 4.6 4.7 4.8 4.9 |
+| 5.0 5.1 5.2 5.3 5.4 5.5 5.6 5.7 5.8 5.9 |
+| 6.0 6.1 6.2 6.3 6.4 6.5 6.6 6.7 6.8 6.9 |
+| 7.0 7.1 7.2 7.3 7.4 7.5 7.6 7.7 7.8 7.9 |
+| 8.0 8.1 8.2 8.3 8.4 8.5 8.6 8.7 8.8 8.9 |
+| 9.0 9.1 9.2 9.3 9.4 9.5 9.6 9.7 9.8 9.9 |
++-----------------------------------------+</pre>
+</blockquote>
+<p>Taking a slightly big step further, we calculate the angle per coordinate, in relation to center of coordinate system. Calculation is in radians, but presented in degrees, since it&#8217;s more readable. Also, we note in which quarter of the graph each point lies.</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    round(radians*180/PI())
+    order by col_number separator ' ') as circle
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &gt;= 0 THEN @abs_radians
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &gt;= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 15) sel_size,
+    (select @radius := (@size/2 - 1)) sel_radius
+  WHERE
+    t1.value &lt; @size
+    AND t2.value &lt; @size) select_combinations
+  GROUP BY row_number
+;
++-------------------------------------------------------------+
+| circle                                                      |
++-------------------------------------------------------------+
+| 135 131 126 120 113 106 98 90 82 74 67 60 54 49 45          |
+| 139 135 130 124 117 108 99 90 81 72 63 56 50 45 41          |
+| 144 140 135 129 121 112 101 90 79 68 59 51 45 40 36         |
+| 150 146 141 135 127 117 104 90 76 63 53 45 39 34 30         |
+| 157 153 149 143 135 124 108 90 72 56 45 37 31 27 23         |
+| 164 162 158 153 146 135 117 90 63 45 34 27 22 18 16         |
+| 172 171 169 166 162 153 135 90 45 27 18 14 11 9 8           |
+| 180 180 180 180 180 180 180 90 0 0 0 0 0 0 0                |
+| 188 189 191 194 198 207 225 270 315 333 342 346 349 351 352 |
+| 196 198 202 207 214 225 243 270 297 315 326 333 338 342 344 |
+| 203 207 211 217 225 236 252 270 288 304 315 323 329 333 337 |
+| 210 214 219 225 233 243 256 270 284 297 307 315 321 326 330 |
+| 216 220 225 231 239 248 259 270 281 292 301 309 315 320 324 |
+| 221 225 230 236 243 252 261 270 279 288 297 304 310 315 319 |
+| 225 229 234 240 247 254 262 270 278 286 293 300 306 311 315 |
++-------------------------------------------------------------+</pre>
+</blockquote>
+<p>The above needs some formattign to present well, but that&#8217;s not the purpose; I&#8217;m only showing the above to explain the steps taken.</p>
+<h4>Part 3: combining the two</h4>
+<p>Next step is probably the most significant one: we&#8217;re going to present a rough, square, weird looking pie chart using the original values:</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    (SELECT name_order FROM
+      (
+      SELECT
+        name_order,
+        name_column,
+        value_column,
+        accumulating_value,
+        accumulating_value/@accumulating_value AS accumulating_value_ratio,
+        2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+      FROM (
+        SELECT
+          name_column,
+          value_column,
+          @name_order := @name_order+1 AS name_order,
+          @accumulating_value := @accumulating_value+value_column AS accumulating_value,
+          @aggregated_name_column := CONCAT(@aggregated_name_column, name_column, ',') AS aggregated_name_column
+        FROM (
+          SELECT name AS name_column, value AS value_column FROM sample_values2
+          ) select_values,
+          (SELECT @name_order := 0) select_name_order,
+          (SELECT @accumulating_value := 0) select_accumulating_value,
+          (SELECT @aggregated_name_column := '') select_aggregated_name_column
+        ) select_accumulating_values
+      ) select_for_radians
+    WHERE accumulating_value_radians &gt;= radians LIMIT 1
+    )
+    order by col_number separator ' ') as circle
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &gt;= 0 THEN @abs_radians
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &gt;= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 21) sel_size,
+    (select @radius := (@size/2 - 1)) sel_radius
+  WHERE
+    t1.value &lt; @size
+    AND t2.value &lt; @size) select_combinations
+  GROUP BY row_number
+;
++-------------------------------------------+
+| circle                                    |
++-------------------------------------------+
+| 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 |
+| 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 |
+| 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 2 |
+| 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 2 2 1 |
+| 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 2 2 1 1 |
+| 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 2 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 2 2 2 2 2 2 2 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 2 2 2 2 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 2 2 1 1 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 2 1 1 1 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 3 2 1 1 1 1 1 1 1 1 1 1 |
+| 3 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
+| 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 |
++-------------------------------------------+</pre>
+</blockquote>
+<p>The interesting SQL trick is that <em>everything goes within the GROUP_CONCAT clause</em>. Instead of presenting the coordinate, we check on the enhanced values table, looking for the first row which has a greater angle (in radians) than the current pixel has. We then display <strong>1</strong>, <strong>2</strong>, etc. to denote the value.</p>
+<p>The next step is actually very simple: instead of drawing the full square, limit to a circle!</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    IF(round(sqrt(pow(col_number-(@size-1)/2, 2) + pow(row_number-(@size-1)/2, 2))) BETWEEN @radius/2 AND @radius,
+    (SELECT name_order FROM
+      (
+      SELECT
+        name_order,
+        name_column,
+        value_column,
+        accumulating_value,
+        accumulating_value/@accumulating_value AS accumulating_value_ratio,
+        2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+      FROM (
+        SELECT
+          name_column,
+          value_column,
+          @name_order := @name_order+1 AS name_order,
+          @accumulating_value := @accumulating_value+value_column AS accumulating_value,
+          @aggregated_name_column := CONCAT(@aggregated_name_column, name_column, ',') AS aggregated_name_column
+        FROM (
+          SELECT name AS name_column, value AS value_column FROM sample_values2
+          ) select_values,
+          (SELECT @name_order := 0) select_name_order,
+          (SELECT @accumulating_value := 0) select_accumulating_value,
+          (SELECT @aggregated_name_column := '') select_aggregated_name_column
+        ) select_accumulating_values
+      ) select_for_radians
+    WHERE accumulating_value_radians &gt;= radians LIMIT 1
+    ), '-')
+    order by col_number separator ' ') as circle
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &gt;= 0 THEN @abs_radians
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &gt;= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 21) sel_size,
+    (select @radius := 7) sel_radius
+  WHERE
+    t1.value &lt; @size
+    AND t2.value &lt; @size) select_combinations
+  GROUP BY row_number
+;
++-------------------------------------------+
+| circle                                    |
++-------------------------------------------+
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - 2 2 2 2 2 - - - - - - - - |
+| - - - - - - 3 3 3 2 2 2 2 2 2 - - - - - - |
+| - - - - - 3 3 3 3 2 2 2 2 2 2 2 - - - - - |
+| - - - - 3 3 3 3 3 2 2 2 2 2 2 2 1 - - - - |
+| - - - - 3 3 3 3 3 - - - 2 2 2 1 1 - - - - |
+| - - - 3 3 3 3 3 - - - - - 1 1 1 1 1 - - - |
+| - - - 3 3 3 3 - - - - - - - 1 1 1 1 - - - |
+| - - - 3 3 3 3 - - - - - - - 1 1 1 1 - - - |
+| - - - 3 3 3 3 - - - - - - - 4 4 4 4 - - - |
+| - - - 3 3 3 3 3 - - - - - 4 4 4 4 4 - - - |
+| - - - - 3 3 4 4 4 - - - 4 4 4 4 4 - - - - |
+| - - - - 3 4 4 4 4 4 4 4 4 4 4 4 4 - - - - |
+| - - - - - 4 4 4 4 4 4 4 4 4 4 4 - - - - - |
+| - - - - - - 4 4 4 4 4 4 4 4 4 - - - - - - |
+| - - - - - - - - 4 4 4 4 4 - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
+| - - - - - - - - - - - - - - - - - - - - - |
++-------------------------------------------+</pre>
+</blockquote>
+<p>That looks a lot more like a pie chart.</p>
+<h4>Part 4: doing the fancy work</h4>
+<p>We will now add (in one big step):</p>
+<ul>
+<li>Stretching along the X-axis.</li>
+<li>Condensing the spaces.</li>
+<li>Coloring for the pie parts.</li>
+<li>A legend.</li>
+</ul>
+<p>The text in <strong>bold</strong> is the original query, and is the only thing you need to change in order to create your own pie charts.</p>
+<blockquote>
+<pre>SELECT
+  group_concat(
+    IF(round(sqrt(pow(col_number/@stretch-0.5-(@size-1)/2, 2) + pow(row_number-(@size-1)/2, 2))) BETWEEN @radius*2/3 AND @radius,
+    (SELECT SUBSTRING(@colors, name_order, 1) FROM
+      (
+      SELECT
+        name_order,
+        name_column,
+        value_column,
+        accumulating_value,
+        accumulating_value/@accumulating_value AS accumulating_value_ratio,
+        @aggregated_data := CONCAT(@aggregated_data, name_column, ': ', value_column, ' (', ROUND(100*value_column/@accumulating_value), '%)', '|') AS aggregated_name_column,
+        2*PI()*accumulating_value/@accumulating_value AS accumulating_value_radians
+      FROM (
+        SELECT
+          name_column,
+          value_column,
+          @name_order := @name_order+1 AS name_order,
+          @accumulating_value := @accumulating_value+value_column AS accumulating_value
+        FROM (
+          <strong>SELECT name AS name_column, value AS value_column FROM sample_values2 LIMIT 4</strong>
+          ) select_values,
+          (SELECT @name_order := 0) select_name_order,
+          (SELECT @accumulating_value := 0) select_accumulating_value,
+          (SELECT @aggregated_data := '') select_aggregated_name_column
+        ) select_accumulating_values
+      ) select_for_radians
+    WHERE accumulating_value_radians &gt;= radians LIMIT 1
+    ), ' ')
+    order by col_number separator '') as pie
+FROM (
+  SELECT
+    t1.value AS col_number,
+    t2.value AS row_number,
+    @dx := (t1.value/@stretch - (@size-1)/2) AS dx,
+    @dy := ((@size-1)/2 - t2.value) AS dy,
+    @abs_radians := IF(@dx = 0, PI()/2, (atan(abs(@dy/@dx)))) AS abs_radians,
+    CASE
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &gt;= 0 THEN @abs_radians
+      WHEN SIGN(@dy) &gt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()-@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &lt;= 0 THEN PI()+@abs_radians
+      WHEN SIGN(@dy) &lt;= 0 AND SIGN(@dx) &gt;= 0 THEN 2*PI()-@abs_radians
+    END AS radians
+  FROM
+    tinyint_asc t1,
+    tinyint_asc t2,
+    (select @size := 23) sel_size,
+    (select @radius := (@size/2 - 1)) sel_radius,
+    (select @stretch := 4) sel_stretch,
+    (select @colors := '#;o:X"@+-=123456789abcdef') sel_colors
+  WHERE
+    t1.value &lt; @size*@stretch
+    AND t2.value &lt; @size) select_combinations
+  GROUP BY row_number
+UNION ALL
+  SELECT
+    CONCAT(
+      REPEAT(SUBSTRING(@colors, value, 1), 2),
+      '  ',
+      SUBSTRING_INDEX(SUBSTRING_INDEX(@aggregated_data, '|', value), '|', -1)
+    )
+  FROM
+    tinyint_asc
+  WHERE
+    value BETWEEN 1 AND @name_order
+;
++----------------------------------------------------------------------------------------------+
+| pie                                                                                          |
++----------------------------------------------------------------------------------------------+
+|                                                                                              |
+|                                   ;;;;;;;;;;;;;;;;;;;;;;;;;                                  |
+|                          oooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;                         |
+|                    ooooooooooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;                   |
+|                oooooooooooooooooooo;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;               |
+|             oooooooooooooooooooooooo                     ;;;;;;;;;;;;;;;;;;;;;###            |
+|           oooooooooooooooooooo                                 ;;;;;;;;;###########          |
+|         oooooooooooooooooo                                         ##################        |
+|       ooooooooooooooooo                                               #################      |
+|      ooooooooooooooooo                                                 #################     |
+|      oooooooooooooooo                                                   ################     |
+|     oooooooooooooooo                                                     ################    |
+|      oooooooooooooooo                                                   ::::::::::::::::     |
+|      ooooooooooooooooo                                                 :::::::::::::::::     |
+|       ooooooooooooooooo                                               :::::::::::::::::      |
+|         oooooooooooooo::::                                         ::::::::::::::::::        |
+|           ooooooo:::::::::::::                                 ::::::::::::::::::::          |
+|             ::::::::::::::::::::::::                     ::::::::::::::::::::::::            |
+|                :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::               |
+|                    :::::::::::::::::::::::::::::::::::::::::::::::::::::::                   |
+|                          :::::::::::::::::::::::::::::::::::::::::::                         |
+|                                   :::::::::::::::::::::::::                                  |
+|                                                                                              |
+| ##  red: 1 (10%)                                                                             |
+| ;;  blue: 2 (20%)                                                                            |
+| oo  orange: 3 (30%)                                                                          |
+| ::  white: 4 (40%)                                                                           |
++----------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>Making the legend is by itself an interesting hack: aggregating an unknown number of rows using a session user variable, then splitting it again. Of course, this works well if we only have a small number of rows (values), as we expect in our case.</p>
+<h4>Showcase</h4>
+<p>OK. Why? <em>Why?</em></p>
+<p>Here are three charts I hope will convince the skeptic reader:</p>
+<p><em>Given the <strong>sakila</strong> database, list the 8 largest tables (size in KB):</em></p>
+<blockquote>
+<pre>+------------------------------------------------------------------------------+
+| pie_chart                                                                    |
++------------------------------------------------------------------------------+
+|                                                                              |
+|                            #######################                           |
+|                    #######################################                   |
+|               #################################################              |
+|            ##################                   ##################           |
+|         ###############                               ###############        |
+|        ;;###########                                     #############       |
+|      ;;;;;;;;;;;;;                                         #############     |
+|      ;;;;;;;;;;;;                                           ############     |
+|     ;;;;;;;;;;;;;                                           #############    |
+|      ;;;;;;;;;;;;                                           @@@@@@@@@@@@     |
+|      ;;;;;;;;;;;;;                                         """""""""""""     |
+|        ;;;;;;;;;;;;;                                     XX"""""""""""       |
+|         ;;;;;;;;;;;;;;;                               XXXXXXXXXXXXX""        |
+|            ;;;;;;;;;;;;;;;;;;                   ::::::::::XXXXXXXX           |
+|               ;;;;;;;;;;;;;;;;;;;;;;;;;;oooooooooo::::::::::::X              |
+|                    ;;;;;;;;;;;;;;;;;;;;;;ooooooooooo::::::                   |
+|                            ;;;;;;;;;;;;;;ooooooooo                           |
+|                                                                              |
+| ##  rental: 2850816 (43%)                                                    |
+| ;;  payment: 2228224 (34%)                                                   |
+| oo  inventory: 376832 (6%)                                                   |
+| ::  film_text: 325440 (5%)                                                   |
+| XX  film: 278528 (4%)                                                        |
+| ""  film_actor: 278528 (4%)                                                  |
+| @@  customer: 131072 (2%)                                                    |
+| ++  staff: 98304 (1%)                                                        |
++------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p><em>How much disk space does each storage engine consume (sum table size per engine)?</em></p>
+<blockquote>
+<pre>+------------------------------------------------------------------------------+
+| pie_chart                                                                    |
++------------------------------------------------------------------------------+
+|                                                                              |
+|                            #######################                           |
+|                    #######################################                   |
+|               #################################################              |
+|            ##################                   ##################           |
+|         ###############                               ###############        |
+|        #############                                     #############       |
+|      #############                                         #############     |
+|      ############                                           ############     |
+|     #############                                           #############    |
+|      ############                                           oooooooooooo     |
+|      #############                                         ;;;;;;;;;;;oo     |
+|        #############                                     ;;;;;;;;;;;;;       |
+|         ###############                               ;;;;;;;;;;;;;;;        |
+|            ##################                   #;;;;;;;;;;;;;;;;;           |
+|               #####################################;;;;;;;;;;;;              |
+|                    ###################################;;;;                   |
+|                            #######################                           |
+|                                                                              |
+| ##  InnoDB: 1908732 (84%)                                                    |
+| ;;  MyISAM: 284074 (12%)                                                     |
+| oo  ARCHIVE: 84276 (4%)                                                      |
++------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p><em>What were the most popular DMLs during the last 10 seconds?</em></p>
+<blockquote>
+<pre>+------------------------------------------------------------------------------+
+| pie_chart                                                                    |
++------------------------------------------------------------------------------+
+|                                                                              |
+|                            #######################                           |
+|                    #######################################                   |
+|               #################################################              |
+|            ##################                   ##################           |
+|         ###############                               ###############        |
+|        #############                                     #############       |
+|      #############                                         #############     |
+|      ############                                           ############     |
+|     #############                                           #############    |
+|      ############                                           oooo::::::::     |
+|      #############                                         ooooooooooooo     |
+|        #############                                     ooooooooooooo       |
+|         ###############                               ooooooooooooooo        |
+|            #################;                   ;;;;;;;;;ooooooooo           |
+|               #############;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;oo              |
+|                    ######;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;                   |
+|                            ;;;;;;;;;;;;;;;;;;;;;;;                           |
+|                                                                              |
+| ##  com_select: 1876 (69%)                                                   |
+| ;;  com_insert: 514 (19%)                                                    |
+| oo  com_delete: 277 (10%)                                                    |
+| ::  com_update: 63 (2%)                                                      |
++------------------------------------------------------------------------------+</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>ASCII graphics always look funny; some would say the same about <em>top</em>, <em>wget</em>,  <em>cal</em>, etc. (should I even mention <em>lynx</em>?)</p>
+<p>I think it is possible to do most common charting with SQL: I&#8217;ve already shown how to do horizontal graphs and pie charts. Multi-column bar charts can also be worked out. These are not meant as a permanent solution; but it&#8217;s good to be able to visualize some values without having to install Nagios (along with <em>apache</em>, <em>php</em>, drivers, etc.), or otherwise exporting table, copying to desktop machines, loading into OpenOffice impress, generating graphs.</p>
+<p>Sometimes you just need an immediate overlook. This is where I find SQL charting to be useful.</p>
+<p>Sure, there are Perl and Python solutions for that; that&#8217;s easily achieved as well. But doing it from with the MySQL client gives, in my opinion, a level of confidence: you&#8217;ll always be able to produce the graph; <em>perl-DBD-MySQL</em> or no <em>perl-DBD-MySQL</em>; Linux or Windows.</p>
+<p>Besides, it was fun doing it.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql-pie-chart/feed</wfw:commentRss>
+		<slash:comments>80</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1093</post-id>	</item>
+	</channel>
+</rss>

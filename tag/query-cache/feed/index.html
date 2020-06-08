@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Query Cache &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/query-cache/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 02 Feb 2011 08:15:11 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>On generating unique IDs using LAST_INSERT_ID() and other tools</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools#comments</comments>
+				<pubDate>Wed, 02 Feb 2011 06:50:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[NoSQL]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[Query Cache]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3283</guid>
+				<description><![CDATA[There&#8217;s a trick for using LAST_INSERT_ID() to generate sequences in MySQL. Quoting from the Manual: Create a table to hold the sequence counter and initialize it: mysql&#62; CREATE TABLE sequence (id INT NOT NULL); mysql&#62; INSERT INTO sequence VALUES (0); Use the table to generate sequence numbers like this: mysql&#62; UPDATE sequence SET id=LAST_INSERT_ID(id+1); mysql&#62; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s a <a href="http://dev.mysql.com/doc/refman/5.1/en/information-functions.html#function_last-insert-id">trick</a> for using <strong>LAST_INSERT_ID()</strong> to generate sequences in MySQL. Quoting from the Manual:</p>
+<blockquote>
+<ol type="1">
+<li>Create a table to hold the sequence counter and initialize               it:
+<pre>mysql&gt; <strong><code>CREATE TABLE sequence (id INT NOT NULL);</code></strong>
+mysql&gt; <strong><code>INSERT INTO sequence VALUES (0);</code></strong>
+</pre>
+</li>
+<li>Use the table to generate sequence numbers like this:
+<pre>mysql&gt; <strong><code>UPDATE sequence SET id=LAST_INSERT_ID(id+1);</code></strong>
+mysql&gt; <strong><code>SELECT LAST_INSERT_ID();</code></strong>
+</pre>
+</li>
+</ol>
+</blockquote>
+<p>This trick calls for trouble.</p>
+<h4>Contention</h4>
+<p>A customer was using this trick to generate unique session IDs for his JBoss sessions. These IDs would eventually be written back to the database in the form of log events. Business go well, and one day the customer adds three new JBoss servers (doubling the amount of webapps). All of a sudden, nothing works quite as it used to. All kinds of queries take long seconds to complete; load average becomes very high.<span id="more-3283"></span></p>
+<p>A short investigation reveals that a very slight load is enough to make for an accumulation of sequence-UPDATE queries. Dozens of them are active at any given time, waiting for long seconds.</p>
+<p>InnoDB or MyISAM both make for poor response times. No wonder! Everyone&#8217;s contending for one lock.</p>
+<h4>Not just one</h4>
+<p>Other queries seem to hang as well. Why?</p>
+<p>It is easy to forget or let go unnoticed that there are quite a few global locks involved with each query. If query cache is activated, then any query must pass through that cache, holding the query cache mutex. There&#8217;s a global mutex on MyISAM&#8217;s key cache. There&#8217;s one on InnoDB&#8217;s buffer pool (see multiple buffer pools in InnoDB 5.5), albeit less of an overhead. And there&#8217;s the table cache.</p>
+<p>When table cache is enabled, any completed query attempts to return file handles to the cache. Any new query attempts to retrieve handles from the cache. While writing to the cache (extracting, adding), the cache is locked. When everyone&#8217;s busy doing the sequence-UPDATE, table cache lock is being abused. Other queries are unable to find the time to squire the lock and get on with their business.</p>
+<h4>What can be done?</h4>
+<p>One could try and increase the <strong>table_open_cache</strong> value. That may help to some extent, and for limited time. But the more requests are made, the quicker the problem surfaces again. When, in fact, <em>reducing</em> the <strong>table_open_cache</strong> to zero (well, minimum value is <strong>1</strong>) can make for a great impact. If there&#8217;s nothing to fight for, everyone just get by on their own.</p>
+<p>I know the following is not a scientific explanation, but it hits me as a good comparison: when my daughter brings a friend over, and there&#8217;s a couple of toys, both are happy. A third friend makes for a fight: <em>&#8220;I saw it first! She took it from me! I was holding it!&#8221;</em>. Any parent knows the ultimate solution to this kind of fight: take away the toys, and have them find something else to enjoy doing. OK, sorry for this unscientific display, I had to share my daily stress.</p>
+<p>When no table cache is available, a query will go on opening the table by itself, and will not attempt to return the file handle back to the cache. The file handle will simply be destroyed. Now, usually this is not desired. Caching is good. But in our customer&#8217;s case, the cost of not using a table cache was minified by the cost of having everyone fight for the sequence table. Reducing the table cache made for an immediate relaxation of the database, with observable poorer responsiveness on peak times, however way better than with large table cache.</p>
+<h4>Other tools?</h4>
+<p>I don&#8217;t consider the above to be a good solution. It&#8217;s just a temporary hack.</p>
+<p>I actually don&#8217;t like the <strong>LAST_INSERT_ID()</strong> trick. Moreover, I don&#8217;t see that it&#8217;s the database&#8217;s job to provide with unique IDs. Let it do relational stuff. If generating IDs is too intensive, let someone else do it.</p>
+<p>NoSQL solutions provide such a service. <a href="http://memcached.org/">Memcached</a>, <a href="http://redis.io/">redis</a>, <a href="http://www.mongodb.org/">MongoDB</a> (and probably more) all provide with increment functions. Check them out.</p>
+<h4>Application level solutions</h4>
+<p>I actually use an application level solution to generate unique IDs. I mean, there&#8217;s always <strong>GUID()</strong>, but it&#8217;s result is just too long. Take a look at the following Java code:</p>
+<blockquote>
+<pre>public class Utils {
+  private static long lastUniqueNumber = 0;
+
+  public static synchronized long uniqueNumber() {
+    long unique = System.currentTimeMillis();
+    if (unique &lt;= lastUniqueNumber)
+      unique = lastUniqueNumber + 1;
+    lastUniqueNumber = unique;
+    return unique;
+  }
+}</pre>
+</blockquote>
+<p>Within a Java application this above method returns with unique IDs, up to 1000 per second on average (and it can perform way more than 1000 times per second).</p>
+<p>On consequential executions of applications on the same machine one would still expect unique values due to the time-related nature of values. However, computer time changes. It&#8217;s possible that <strong>System.currentTimeMillis()</strong> would return a value already used in the past.</p>
+<p>And, what about two processes running on the same machine at the same time? Or on different machine?</p>
+<p>Which is why I use the following combination to generate my unique IDs:</p>
+<ul>
+<li>Server ID (much like MySQL&#8217;s server_id parameter). this could be the last byte in the server&#8217;s IP address, or just 4 or 5 bits if not too many players are expected.</li>
+<li>Process ID (plain old <em>pid</em>) which I pass to the Java runtime in the form of system properties. Any two processes running on the same machine are assured to have different IDs. Two consequently spawned processes will have different IDs. The time it would take to cycle the process IDs is way more than would make for a &#8220;time glitch&#8221; problem as described above</li>
+<li>Current time in milliseconds.</li>
+</ul>
+<p>If you have to have everything withing 64 bit (BIGINT) then you&#8217;ll have to do bit manipulation, and drop some of the MSB on the milliseconds so as to overwrite with server &amp; process IDs.</p>
+<p>If you are willing to have your IDs unique in the bounds of a given time frame (so, for example, a month from now you wouldn&#8217;t mind reusing old IDs), then the problem is significantly easier. You may just use &#8220;day of month&#8221; and &#8220;millis since day start&#8221; and save those precious bits.</p>
+<h4>Still other?</h4>
+<p>Please share your solutions below!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3283</post-id>	</item>
+		<item>
+		<title>Using memcached functions for MySQL; an automated alternative to Query Cache</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache#comments</comments>
+				<pubDate>Mon, 15 Dec 2008 05:56:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Query Cache]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=89</guid>
+				<description><![CDATA[There&#8217;s a lot of buzz around memcached. memcached is widely used, and has clients for many programming languages and platforms. TangentOrg have developed a memcached client in the form of MySQL UDFs (User Defined Functions). I wish to discuss the memcached functions for MySQL: if and how they should be used. Disclaimer: I do not [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s a lot of buzz around memcached. memcached is widely used, and has clients for many programming languages and platforms. <a href="http://tangent.org/">TangentOrg</a> have developed a memcached client in the form of MySQL UDFs (User Defined Functions).</p>
+<p>I wish to discuss the memcached functions for MySQL: if and how they should be used.</p>
+<p>Disclaimer: I do not work with memcached functions for MySQL on a production system; all that is written here reflects my opinion on how things should be done.</p>
+<p>With memcached functions for MySQL, we can do the following:</p>
+<blockquote>
+<pre><strong>SELECT </strong>memc_set('mykey', 'The answer is 42');
+<strong>SELECT </strong>memc_get('mykey');</pre>
+</blockquote>
+<p>(See my previous post on how to <a title="Installing memcached functions for MySQL" href="https://shlomi-noach.github.io/blog/mysql/installing-memcached-functions-for-mysql">install memcached functions for MySQL</a>).</p>
+<h4>In what scenario should we use these functions?</h4>
+<p>I believe memcached is the right tool for the application level. I am less enthusiastic about using it from MySQL. Sure, pushing it down to MySQL centralizes everything. Instead of having all my application code (PHP, Java etc.) access memcached separately, they can all access one single MySQL node, which gets to access memcached. I see two problems with this approach:<span id="more-89"></span></p>
+<ul>
+<li>Doing this adds load on the database. I think the greatest advantage of memcached is that it allows us to alleviate load from the database. By pushing everything into MySQL we counter that benefit. We pay here both for loading the MySQL network and for the CPU consumed by MySQL to do the job. In a distributed application which used memcached, every server gets to take some of the load.</li>
+<li>It seems to me as a flawed design. The database should be at an end point, and should not rely on anything except the operating system, file system and network. Sure, there could be applications talking to the database, but the database should be able to work all by itself. By putting memcached <em>behind</em> the database, we make the database dependent upon an external application.</li>
+</ul>
+<h4>How about memcached <em>increments</em>?</h4>
+<p>memcached provides an increment mechanism, which can be used by MySQL to create distinct PRIMARY KEYs, like sequences in other databases. While this seems attractive, this feature fits most into the second point above: it makes MySQL completely dependant on memcached. So if memcached is down, MySQL is unable to generate keys.</p>
+<h4>memcahced invalidation</h4>
+<p>I believe a very good use would be to let MySQL invalidate cached data. Not set or get anything, just invalidate. To explain, let&#8217;s compare with MySQL&#8217;s query cache. I&#8217;ll be using <a title="MySQL's world database setup" href="http://dev.mysql.com/doc/world-setup/en/world-setup.html">MySQL&#8217;s world database</a>.</p>
+<p>It is a known issue with the query cache, that if you change (INSERT/UPDATE/DELETE) data within a certain table, all queries involved with that table are invalidated. Take a look at the following:</p>
+<blockquote>
+<pre><strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';
+<strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';
+<strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';</pre>
+</blockquote>
+<p>The UPDATE does not affect the results for the SELECT query. Nevertheless, the second SELECT does not return from the query cache, since it&#8217;s invalidated by the UPDATE.</p>
+<p>memcached can be used to solve this problem in a programmatic way. Let&#8217;s look at a short python program:<strong> memcached_test.py</strong>. What is does (see blue highlighted rows) is connect to memcached; connect to MySQL, and try to get the results for following from memcached:</p>
+<blockquote>
+<pre><strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';
+<strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='CHE';</pre>
+</blockquote>
+<p>If these results are in memcached, they are returned immediately. If not, they are retrieved from MySQL, then inserted into memcached. The results for &#8216;CHE&#8217; are under the &#8216;City:CHE&#8217; key, and &#8216;BLZ&#8217; is under &#8216;City:BLZ&#8217;.</p>
+<blockquote>
+<pre><strong>import </strong>MySQLdb
+<strong>import </strong>memcache
+
+<strong>def </strong>select_cities_by_country(country_code):
+	key = <span style="color: #993300;"><strong>"City:"</strong></span>+country_code
+	<span style="color: #3366ff;">cities = memcache_client.get(key)</span>
+	<strong>if </strong>cities:
+		found_in_memcached = <strong>True</strong>
+	<strong>else</strong>:
+		cursor = conn.cursor()
+		cursor.execute(<span style="color: #993300;"><strong>"""
+			SELECT Name, CountryCode,
+			Population FROM City
+			WHERE CountryCode=%s"""</strong></span>,
+				country_code)
+		<span style="color: #3366ff;">cities = cursor.fetchall()</span>
+		<span style="color: #3366ff;">memcache_client.set(key, cities, 100)</span>
+		cursor.close()
+		found_in_memcached = <strong>False</strong>
+	<strong>for </strong>row <strong>in </strong>cities:
+		print <span style="color: #993300;"><strong>"%s, %s: %d"</strong></span> % (row[0], row[1], row[2])
+	print <span style="color: #993300;"><strong>"%s found in memcached? %s\n"</strong></span> % (
+                country_code, found_in_memcached)
+
+conn = <strong>None</strong>
+<strong>try</strong>:
+	<strong>try</strong>:
+		conn = MySQLdb.connect(
+			host=<span style="color: #993300;"><strong>"localhost"</strong></span>,
+                        user=<span style="color: #993300;"><strong>"myuser"</strong></span>,
+			passwd=<span style="color: #993300;"><strong>"mypassword"</strong></span>,
+			unix_socket=<span style="color: #993300;"><strong>"/tmp/mysql.sock"</strong></span>,
+                        db=<span style="color: #993300;"><strong>"world"</strong></span>)
+		memcache_client = memcache.Client([<span style="color: #993300;"><strong>"127.0.0.1:11211"</strong></span>])
+
+		select_cities_by_country(<span style="color: #993300;"><strong>"BLZ"</strong></span>);
+		select_cities_by_country(<span style="color: #993300;"><strong>"CHE"</strong></span>);
+	<strong>except </strong>Exception, err:
+		print err
+<strong>finally</strong>:
+	<strong>if </strong>conn:
+		conn.close()</pre>
+</blockquote>
+<p>Let&#8217;s run this program. This is a first time run, so obviously nothing is in memcached:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <strong>False</strong>
+
+Zurich, CHE: 336800
+Geneve, CHE: 173500
+Basel, CHE: 166700
+Bern, CHE: 122700
+Lausanne, CHE: 114500
+<strong>CHE </strong>found in memcached? <strong>False</strong></pre>
+</blockquote>
+<p>Immediately executed again, we get results from memcached:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <strong>True</strong>
+
+Zurich, CHE: 336800
+Geneve, CHE: 173500
+Basel, CHE: 166700
+Bern, CHE: 122700
+Lausanne, CHE: 114500
+<strong>CHE </strong>found in memcached? <strong>True</strong></pre>
+</blockquote>
+<p>We are going to execute the following query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';</pre>
+</blockquote>
+<p>But nothing as yet will invalidate our memcached values. Let&#8217;s set up TRIGGERs on the City table:</p>
+<blockquote>
+<pre><strong>DELIMITER </strong>$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AI $$
+<strong>CREATE TRIGGER</strong> City_AI <strong>AFTER INSERT ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>NEW</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AU $$
+<strong>CREATE TRIGGER</strong> City_AU <strong>AFTER UPDATE ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>OLD</strong>.CountryCode)) <strong>INTO </strong>@discard;
+  <strong>SELECT </strong>memc_delete(<strong>CONCAT</strong>('City:',<strong>NEW</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AD $$
+<strong>CREATE TRIGGER</strong> City_AD <strong>AFTER DELETE ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>OLD</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DELIMITER </strong>;</pre>
+</blockquote>
+<p>These triggers will cause any change to a city invalidates all cities in the same country. Naive? Far less than MySQL&#8217;s query cache. Let&#8217;s put this to the test:</p>
+<blockquote>
+<pre>mysql&gt; <strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';
+Query OK, 5 rows affected (0.01 sec)
+Rows matched: 5  Changed: 5  Warnings: 0</pre>
+</blockquote>
+<p>And run out python program one last time:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <span style="color: #339966;"><strong>True</strong></span>
+
+Zurich, CHE: 336801
+Geneve, CHE: 173501
+Basel, CHE: 166701
+Bern, CHE: 122701
+Lausanne, CHE: 114501
+<strong>CHE </strong>found in memcached? <span style="color: #339966;"><strong>False</strong></span></pre>
+</blockquote>
+<p>Right! The &#8216;CHE&#8217; values were invalidated, and could not be found in memcaches. &#8216;BLZ&#8217;, however, wasn&#8217;t disturbed.</p>
+<p>We can further improve our invalidation mechanism to check only for changes for desired columns. This will require some more code in our triggers.</p>
+<h4>Notes</h4>
+<p>The triggers themselves pose a performance penalty on our code. It is assumed that SELECTs are more important here, or else we would not use caching at all. At any case, the example provided here has not been benchmarked, and its value can only be estimated in your real life situation.</p>
+<h4>Conclusion</h4>
+<p>I believe invalidation is the most interesting part of memcached functions for MySQL. It makes the most sense:</p>
+<ul>
+<li>No data passes between MySQL and memcached.</li>
+<li>The application isn&#8217;t even aware that MySQL is talking to memcached. MySQL does everything internally using triggers.</li>
+<li>MySQL does not depend on memcached. If memcached goes away, the triggers will simply have no effect. It is still possible that due to temporary network failure, an invalidation is skipped. But memcached supports us by adding a timeout for cached values, so we have some kind of &#8220;backup plan&#8221;.</li>
+</ul>
+<p>Please share below your insights and real life experience with memcached functions for MySQL.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">89</post-id>	</item>
+	</channel>
+</rss>

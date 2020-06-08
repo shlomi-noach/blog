@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>golang &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/golang/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 04 Jan 2018 11:37:10 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Implementing non re-entrant functions in Golang</title>
+		<link>https://shlomi-noach.github.io/blog/golang/implementing-non-re-entrant-functions-in-golang</link>
+				<comments>https://shlomi-noach.github.io/blog/golang/implementing-non-re-entrant-functions-in-golang#respond</comments>
+				<pubDate>Thu, 04 Jan 2018 11:34:13 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[golang]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7820</guid>
+				<description><![CDATA[A non re-entrant function is a function that could only be executing once at any point in time, regardless of how many times it is being invoked and by how many goroutines. This post illustrates blocking non re-entrant functions and yielding non re-entrant functions implementations in golang. A use case A service is polling for [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>A non re-entrant function is a function that could only be executing once at any point in time, regardless of how many times it is being invoked and by how many goroutines.</p>
+<p>This post illustrates <em>blocking</em> non re-entrant functions and <em>yielding</em> non re-entrant functions implementations in <code>golang</code>.</p>
+<h3>A use case</h3>
+<p>A service is polling for some conditions, monitoring some statuses once per second. We want each status to be checked independently of others without blocking. An implementation might look like:</p>
+<pre>func main() {
+    tick := time.Tick(time.Second)
+    go func() {
+        for range tick {
+            go CheckSomeStatus()
+            go CheckAnotherStatus()
+        }
+    }()
+}
+</pre>
+<p>We choose to run each status check in its own goroutine so that <code>CheckAnotherStatus()</code> doesn&#8217;t wait upon <code>CheckSomeStatus()</code> to complete.</p>
+<p>Each of these checks typically take a very short amount of time, and much less than a second. What happens, though, if <code>CheckAnotherStatus()</code> itself takes more than one second to run? Perhaps there&#8217;s an unexpected network or disk latency affecting the execution time of the check.</p>
+<p>Does it make sense for the function to be executed twice at the same time? If not, we want it to be non re-entrant.<span id="more-7820"></span></p>
+<h3>Blocking, non-reentrant functions</h3>
+<p>The simple way to prevent a function from operating multiple times concurrently is using a <code>sync.Mutex</code>.</p>
+<p>Assuming we only care about calling this function from the loop above, we can implement the lock from outside the function:</p>
+<pre>import (
+    "sync"
+    "time"
+)
+
+func main() {
+    tick := time.Tick(time.Second)
+    var mu sync.Mutex
+    go func() {
+        for range tick {
+            go CheckSomeStatus()
+            go func() {
+                mu.Lock()
+                defer mu.Unlock()
+                CheckAnotherStatus()
+            }()
+        }
+    }()
+}
+</pre>
+<p>The above ensures <code>CheckAnotherStatus()</code> is not executed by multiple iterations of our loop concurrently. Any subsequent iterations of the loop whilst a previous execution of <code>CheckAnotherStatus()</code> is still running, will be blocked by the mutex.</p>
+<p>The <em>blocking</em> solution has the following properties:</p>
+<ul>
+<li>It ensures as many `CheckAnotherStatus()` invocations as the number of loop iterations.</li>
+<li>Assuming one execution of `CheckAnotherStatus()` stalls, subsequent iterations make for a pileup of requests to invoke same function.</li>
+</ul>
+<h3>Yielding, non re-entrant functions</h3>
+<p>In our status check story, it may not make sense for some 10 subsequent calls to pile up. One the stalled <code>CheckAnotherStatus()</code> execution completes, all 10 calls suddenly execute, sequentially, and possibly all complete within the next second, making for 10 identical checks at that same second.</p>
+<p>Another solution would be to <em>yield</em>. A <em>yielding</em> solution will:</p>
+<ul>
+<li>Abort execution of `CheckAnotherStatus()` if it is already being executed.</li>
+<li>Will run <em>at most</em> one execution of `CheckAnotherStatus()` per second.</li>
+<li>May in effect run less `CheckAnotherStatus()` invocations than the number of loop iterations.</li>
+</ul>
+<p>The solution is achieved via:</p>
+<pre>import (
+    "sync/atomic"
+    "time"
+)
+
+func main() {
+    tick := time.Tick(time.Second)
+    var reentranceFlag int64
+    go func() {
+        for range tick {
+            go CheckSomeStatus()
+            go func() {
+                if atomic.CompareAndSwapInt64(&amp;reentranceFlag, 0, 1) {
+                    defer atomic.StoreInt64(&amp;reentranceFlag, 0)
+                } else {
+                    return
+                }
+                CheckAnotherStatus()
+            }()
+        }
+    }()
+}
+</pre>
+<p><code>atomic.CompareAndSwapInt64(&amp;amp;reentranceFlag, 0, 1)</code> will return <code>true</code> only when <code>reentranceFlag == 0</code>, and will atomically set it to <code>1</code>. In such case, entry is allowed and the function can be executed. <code>reentranceFlag</code> is kept at <code>1</code> until <code>CheckAnotherStatus()</code> completes, at which time it is reset. When <code>CompareAndSwapInt64(...)</code> returns <code>false</code> that means <code>reentranceFlag != 0</code>, meaning the function is already being executing by another goroutine. The code yields and silently exits the function.</p>
+<p>We have chosen to implement the non re-entrant code outside the function in question; we could have implemented it within the function itself. Also, I have a thing for <code>int64</code>. An <code>int32</code> will of course suffice.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/golang/implementing-non-re-entrant-functions-in-golang/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7820</post-id>	</item>
+		<item>
+		<title>Observations on the hashicorp/raft library, and notes on RDBMS</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms#comments</comments>
+				<pubDate>Tue, 20 Jun 2017 04:05:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[freno]]></category>
+		<category><![CDATA[golang]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7717</guid>
+				<description><![CDATA[The hashicorp/raft library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s Consul. I&#8217;ve had the opportunity to work with this library a couple projects, namely freno and orchestrator. Here are a few observations on working with this library: TL;DR on Raft: a group communication protocol; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The <a href="https://github.com/hashicorp/raft">hashicorp/raft</a> library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s <a href="https://github.com/hashicorp/consul">Consul</a>.</p>
+<p>I&#8217;ve had the opportunity to work with this library a couple projects, namely <a href="https://github.com/github/freno">freno</a> and <a href="https://github.com/github/orchestrator/pull/183/">orchestrator</a>. Here are a few observations on working with this library:</p>
+<ul>
+<li>TL;DR on Raft: a group communication protocol; multiple nodes communicate, elect a leader. A leader leads a <em>consensus</em> (any subgroup of more than half the nodes of the original group, or hopefully all of them). Nodes may leave and rejoin, and will remain consistent with consensus.</li>
+<li>The hashicorp/raft library is an implementation of the Raft protocol. There are <a href="https://raft.github.io/#implementations">other implementations</a>, and different implementations support different features.</li>
+<li>The most basic premise is leader election. This is pretty straightforward to implement; you set up nodes to communicate to each other, and they elect a leader. You may query for the leader identity via <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Leader">Leader()</a>, <a href="https://godoc.org/github.com/hashicorp/raft#Raft.VerifyLeader">VerifyLeader()</a>, or observing <a href="https://godoc.org/github.com/hashicorp/raft#Raft.LeaderCh">LeaderCh</a>.</li>
+<li>You have no control over the identity of the leader. You cannot &#8220;prefer&#8221; one node to be the leader. You cannot <em>grab</em> leadership from an elected leader, and you cannot demote a leader unless by killing it.</li>
+<li>The next premise is gossip, sending messages between the raft nodes. With <code>hashicorp/raft</code>, only the leader may send messages to the group. This is done via the <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Apply">Apply()</a> function.</li>
+<li>Messages are nothing but blobs. Your app encodes the messages into <code>[]byte</code> and ships it via raft. Receiving ends need to decode the bytes into a meaningful message.</li>
+<li>You will check the result of Apply(), an <a href="https://godoc.org/github.com/hashicorp/raft#ApplyFuture">ApplyFuture</a>. The call to <a href="https://godoc.org/github.com/hashicorp/raft#Future">Error()</a> will wait for consensus.</li>
+<li>Just what is a message consensus? It&#8217;s a guarantee that the consensus of nodes has received and registered the message.</li>
+<li>Messages form the raft log.</li>
+<li>Messages are guaranteed to be handled in-order across all nodes.</li>
+<li>The leader is satisfied when the followers receive the messages/log, but it cares not for their interpretation of the log.</li>
+<li>The leader does not collect the output, or return value, of the followers applying of the log.</li>
+<li>Consequently, your followers may not abort the message. They may not cast an opinion. They must adhere to the instruction received from the leader.</li>
+<li><code>hashicorp/raft</code> uses either an <a href="http://github.com/hashicorp/raft-mdb">LMDB-based</a> store or <a href="https://github.com/boltdb/bolt">BoltDB</a> for persisting your messages. Both are transactional stores.</li>
+<li>Messages are expected to be idempotent: a node that, say, happens to restart, will request to join back the consensus (or to form a consensus with some other node). To do that, it will have to reapply historical messages that it may have applied in the past.</li>
+<li>Number of messages (log entries) will grow infinitely. Snapshots are taken so as to truncate the log history. You will implement the snapshot dump &amp; load.</li>
+<li>A snapshot includes the log index up to which it covers.</li>
+<li>Upon startup, your node will look for the most recent snapshot. It will read it, then resume replication from the aforementioned log index.</li>
+<li><code>hashicorp/raft</code> provides a file-system based snapshot implementation.</li>
+</ul>
+<p>One of my use cases is completely satisfied with the existing implementations of <code>BoltDB</code> and of the filesystem snapshot.</p>
+<p>However in another (<code>orchestrator</code>), my app stores its state in a relational backend. To that effect, I&#8217;ve modified the logstore and snapshot store. I&#8217;m using either MySQL or <code>sqlite</code> as backend stores for my app. How does that affect my <code>raft</code> use?<span id="more-7717"></span></p>
+<ul>
+<li>My backend RDBMS is the de-facto state of my <code>orchestrator</code> app. Anything written to this DB is persisted and durable.</li>
+<li>When <code>orchestrator</code> applies a raft log/message, it runs some app logic which ends with a write to the backend DB. At that time, the raft log is effectively not required anymore to persist. I care not for the history of logs.</li>
+<li>Moreover, I care not for snapshotting. To elaborate, I care not for snapshot data. My backend RDBMS <em>is the snapshot data</em>.</li>
+<li>Since I&#8217;m running a RDBMS, I find <code>BoltDB</code> to be wasteful, an additional transaction store on top a transaction store I already have.</li>
+<li>Likewise, the filesystem snapshots are yet another form of store.</li>
+<li>Log Store (including Stable Store) are <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_store.go">easily re-implemented</a> on top of RDBMS. The log is a classic relational entity.</li>
+<li>Snapshot is <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_snapshot.go">also implemented</a> on top of RDBMS,  however I only care for the snapshot metadata (what log entry is covered by a snapshot) and completely discard storing/loading snapshot <em>state</em> or <em>content</em>.</li>
+<li>With all these in place, I have a single entity that defines:
+<ul>
+<li>What my data looks like</li>
+<li>Where my node fares in the group gossip</li>
+</ul>
+</li>
+<li>A single RDBMS restore returns a dataset that will catch up with raft log correctly. However my restore window is limited by the number of snapshots I store and their frequency.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7717</post-id>	</item>
+		<item>
+		<title>Forking Golang repositories on GitHub and managing the import path</title>
+		<link>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path</link>
+				<comments>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path#comments</comments>
+				<pubDate>Mon, 23 Nov 2015 12:22:34 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[golang]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7506</guid>
+				<description><![CDATA[Problem: there&#8217;s an awesome Golang project on GitHub which you want to fork. You want to develop &#38; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything. A couple solutions offered below. First, though, let&#8217;s get some names. A sample case, the problem at hand There&#8217;s an [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Problem: there&#8217;s an awesome Golang project on GitHub which you want to fork. You want to develop &amp; collaborate on that fork, but the golang import path, in your source code, still references the original path, breaking everything.</p>
+<p>A couple solutions offered below. First, though, let&#8217;s get some names.</p>
+<h3>A sample case, the problem at hand</h3>
+<p>There&#8217;s an awesome tool on <strong><em>http://github.com/awsome-org/tool</em></strong>. You successfully fork it onto <strong><em>http://github.com/awesome-you/tool</em></strong>.</p>
+<p>You want to collaborate on <strong><em>http://github.com/awesome-you/tool</em></strong>; you wish to pull, commit &amp; push. Maybe you want to send pull requests to the origin.</p>
+<p>The following is commonly found throughout <strong>.go</strong> files in the repository:</p>
+<blockquote>
+<pre>import (
+    "github.com/awesome-org/tool/config"
+    "github.com/awesome-org/tool/driver"
+    "github.com/awesome-org/tool/net"
+    "github.com/awesome-org/tool/util"
+)</pre>
+</blockquote>
+<p>If you:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p><em>golang</em> creates your <strong>$GOPATH/src/github.com/awesome-you/tool/</strong>, which is awesome. However, as you resolve dependencies via</p>
+<blockquote>
+<pre>cd $GOPATH/src/github.com/awesome-you/tool/ ; go get ./...</pre>
+</blockquote>
+<p><em>golang</em> digs into the source code, finds references to <strong>github.com/awesome-org/tool/config</strong>, <strong>github.com/awesome-org/tool/driver</strong> etc, and fetches <em>those</em> from <strong>http://github.com/awsome-org/tool</strong> and onto <strong>$GOPATH/src/github.com/awesome-org/tool/</strong>, which is not awesome. You actually have two copies of the code, one from your fork, one from the origin, and your own fork will be largely ignored as it mostly points back to the origin.</p>
+<h3>A bad solution</h3>
+<p>The dirty, bad solution would be for you to go over the source code and replace <strong>&#8220;github.com/awesome-org/tool&#8221;</strong> entries with <strong>&#8220;github.com/awesome-you/tool&#8221;</strong>. It is bad for two reasons:</p>
+<ul>
+<li>You will not be able to further pull changes from upstream</li>
+<li>You will not be able to pull-request and push your own changes upstream</li>
+</ul>
+<p><span id="more-7506"></span>When I say &#8220;You will not be able&#8221; I mean &#8220;in a reasonable, developer-friendly manner&#8221;. The code will be incompatible with upstream and you have effectively detached your code. You will need to keep editing and re-editing those entries anytime you wish to pull/push upstream.</p>
+<h3>Solution #1: add remote</h3>
+<p>Described in <a href="http://blog.campoy.cat/2014/03/github-and-go-forking-pull-requests-and.html">GitHub and Go: forking, pull requests, and go-getting</a>, follow these procedures:</p>
+<blockquote>
+<pre>go get http://github.com/awesome-org/tool
+git remote add <strong>awesome-you-fork</strong> http://github.com/awesome-you/tool</pre>
+</blockquote>
+<p>You&#8217;re adding your repository as <a href="http://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes">remote</a>. You will from now on need to explicitly:</p>
+<blockquote>
+<pre>git pull --rebase <strong>awesome-you-fork</strong>
+git push <strong>awesome-you-fork</strong></pre>
+</blockquote>
+<p>If you forget to add the <strong>&#8220;awesome-you-fork&#8221;</strong> argument, you are pulling and pushing from upstream.</p>
+<h3>Solution #2: cheat &#8220;go get&#8221;, DIY</h3>
+<p>The problem began with the <strong>go get</strong> command, which copied the URI path onto <strong>$GOPATH/src</strong>. However <strong>go get</strong> implicitly issues a git clone, and we can do the same ourselves. We will dirty our hands just once, and then benefit from an ambiguous-less environment.</p>
+<p>We will now create our git repository in the name of <strong>awesome-org</strong> but with the contents of <strong>awesome-you</strong>:</p>
+<blockquote>
+<pre>cd $GOPATH
+mkdir -p {src,bin,pkg}
+mkdir -p <strong>src/github.com/awesome-org/</strong>
+cd src/github.com/awesome-org/
+git clone git@github.com:<strong>awesome-you/tool.git</strong> # OR: git clone https://github.com/<strong>awesome-you/tool.git</strong>
+cd tool/
+go get ./...</pre>
+</blockquote>
+<p>The <strong>mkdir -p {src,bin,pkg}</strong> is there just in case you do not have anything setup in your <strong>$GOPATH</strong>. We then create the repository path under the name of <strong>awesome-org</strong>, but once inside clone from <strong>awesome-you</strong>.</p>
+<p>The source code&#8217;s import path fits your directory layout now, but as you push/pull you are only speaking to your own <strong>awesome-you</strong> repository.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/development/forking-golang-repositories-on-github-and-managing-the-import-path/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7506</post-id>	</item>
+	</channel>
+</rss>

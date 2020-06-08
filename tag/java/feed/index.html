@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Java &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/java/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 11 Mar 2010 12:13:51 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Proper SQL table alias use conventions</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/proper-sql-table-alias-use-conventions</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/proper-sql-table-alias-use-conventions#comments</comments>
+				<pubDate>Thu, 11 Mar 2010 07:10:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Java]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2156</guid>
+				<description><![CDATA[After seeing quite some SQL statements over the years, something is bugging me: there is no consistent convention as for how to write an SQL query. I&#8217;m going to leave formatting, upper/lower-case issues aside, and discuss a small part of the SQL syntax: table aliases. Looking at three different queries, I will describe what I [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>After seeing quite some SQL statements over the years, something is bugging me: there is no consistent convention as for how to write an SQL query.</p>
+<p>I&#8217;m going to leave formatting, upper/lower-case issues aside, and discuss a small part of the SQL syntax: table aliases. Looking at three different queries, I will describe what I find to be problematic table alias use.</p>
+<p>Using the <a href="http://dev.mysql.com/doc/sakila/en/sakila.html">sakila</a> database, take a look at the following queries:<span id="more-2156"></span></p>
+<h4>Query #1</h4>
+<blockquote>
+<pre><strong>SELECT</strong>
+ R.rental_date, C.customer_id, C.first_name, C.last_name
+<strong>FROM</strong>
+ rental R
+ <strong>JOIN</strong> customer C <strong>USING</strong> (customer_id)
+<strong>WHERE</strong>
+ R.rental_date &gt;= DATE('2005-10-01')
+ <strong>AND</strong> C.store_id=1;
+</pre>
+</blockquote>
+<p>The above looks for film rentals done in a specific store (store #<strong>1</strong>), as of Oct. 1st, 2005.</p>
+<h4>Query #2</h4>
+<blockquote>
+<pre><strong>SELECT</strong>
+ F.title, C.name
+<strong>FROM</strong>
+ film <strong>AS</strong> F
+ <strong>JOIN</strong> film_category <strong>AS</strong> S <strong>ON</strong> (F.film_id = S.film_id)
+ <strong>JOIN</strong> category <strong>AS</strong> C <strong>ON</strong> (S.category_id = C.category_id)
+<strong>WHERE</strong> F.length &gt; 180;</pre>
+</blockquote>
+<p>The above lists the title and category for all films longer than three hours.</p>
+<h4>Query #3</h4>
+<blockquote>
+<pre><strong>SELECT</strong> c.customer_id, c.last_name
+<strong>FROM</strong>
+  customer c
+  <strong>INNER JOIN</strong> address a ON (c.address_id = a.address_id)
+  <strong>INNER JOIN</strong> (
+    <strong>SELECT</strong>
+      c.city_id
+    <strong>FROM</strong>
+      city AS c
+      <strong>JOIN</strong> country s <strong>ON</strong> (c.country_id = s.country_id)
+    <strong>WHERE</strong>
+      s.country <strong>LIKE</strong> 'F%'
+  ) s1 <strong>USING</strong> (city_id)
+<strong>WHERE</strong>
+  create_date &gt;= DATE('2005-10-01');
+</pre>
+</blockquote>
+<p>The above lists customers created as of Oct. 1st, 2005, and who live in countries starting with an &#8216;F&#8217;. The query could be solved without a subquery, but there&#8217;s a good reason why I made it so.</p>
+<h4>The problems</h4>
+<p>I used very different conventions on any one of the queries, and sometimes within each query. And it&#8217;s common that I see the same on a customer&#8217;s site, what with having many programmers do the SQL coding. Again, I will only discuss the table aliases conventions. I&#8217;ll leaver the rest to the reader.</p>
+<p>Here&#8217;s where I see problems:</p>
+<ul>
+<li>Query <strong>#1</strong>: In itself, it looks fine. <strong>Rental</strong> turns to <strong>R</strong>, <strong>Customer</strong> turns to <strong>C</strong>. I will comment on this slightly later on when I provide my full opinion.</li>
+<li>Query <strong>#2</strong>: So <strong>film</strong> turns to <strong>F</strong>, <strong>category</strong> turns to <strong>C</strong>. What should <strong>film_category</strong> turn into? <em>Out of letters?</em> Let&#8217;s just go for <strong>S</strong>, shall we? But <strong>S</strong> has nothing do with <strong>film_category</strong>. Yet it&#8217;s so commonly seen.</li>
+<li>Query <strong>#2</strong>: We&#8217;re using the <strong>AS</strong> keyword now. We didn&#8217;t use it before.</li>
+<li>Queries <strong>#1</strong>, <strong>#2</strong>: Hold on. Wasn&#8217;t <strong>C</strong> taken for <strong>customer</strong> in Query <strong>#1</strong>? Now, in Query <strong>#2</strong> it stands for <strong>category</strong>? I&#8217;m beginning to get confused.</li>
+<li>Query <strong>#3</strong>: Now aliases are lower case; I was just getting used to them being upper case.</li>
+<li>Query <strong>#3</strong>: But, hey, <strong>c</strong> is back to <strong>customer</strong>!</li>
+<li>Query <strong>#3</strong>: Or, is it? Take a look at the subquery. Theres another <strong>c</strong> in there! This time it&#8217;s <strong>city</strong>! And it&#8217;s perfectly valid syntax. We actually have two identical aliases in the same query.</li>
+<li>Query <strong>#3</strong>: If I could, I would name country with <strong>c</strong> as well. But I can&#8217;t. So why not throw in <strong>s</strong> again?</li>
+<li>Query <strong>#3</strong>: and now I don&#8217;t even bother using the alias when accessing the <strong>create_date</strong>. Well, there&#8217;s no such column in any of the other tables!</li>
+</ul>
+<h4>Proper conventions</h4>
+<p>What I find so disturbing is that whenever I read a complex query, I need to go back and forth, back and forth between table aliases (found everywhere in the query) and their declaration point. Such irregularities make the queries difficult to read.</p>
+<p>Any of the above issues could be justified. But I wish to make some suggestions:</p>
+<ul>
+<li>Decide whether you&#8217;re going for upper or lower case.</li>
+<li>Do not use the same alias twice in your query, even if it&#8217;s valid.</li>
+<li>Aliases do not have to be single character. <strong>film_category</strong> may just as well be <strong>FC</strong>.</li>
+<li>Do not alias something that is hard to interpret. <strong>s</strong> does not stand for <strong>country</strong>.</li>
+<li>Think ahead: use same aliases throughout all your queries, as far as you can. If uniqueness is a problem, make for longer aliases. Use <strong>cust</strong> instead of <strong>c</strong>.</li>
+</ul>
+<p>The above should make for more organized and readable SQL code. Remember: what one programmer finds as a very intuitive alias, is unintuitive to another!</p>
+<h4>My own convention</h4>
+<p>Simple: I <em>only use aliases</em> when using self joins. I am aware that queries are much longer what with long table names. I go farther than that: I prefer fully qualifying questionable columns throughout the query. Yes, it makes the query even longer.</p>
+<p>I know this does not appeal to many. But there&#8217;s no confusion. And it&#8217;s easily searchable. And it&#8217;s consistent. And if properly formatted, as in the above queries, is well readable.</p>
+<p>Now please join me in asking Oracle if they can add multi-line Strings for java, as there are for python.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/proper-sql-table-alias-use-conventions/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2156</post-id>	</item>
+		<item>
+		<title>The DB problem inherent to dynamic web pages</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/the-db-problem-inherent-to-dynamic-web-pages</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/the-db-problem-inherent-to-dynamic-web-pages#comments</comments>
+				<pubDate>Mon, 20 Jul 2009 11:48:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Java]]></category>
+		<category><![CDATA[Web]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=955</guid>
+				<description><![CDATA[When building web sites, a popular demand is a maximum page load time. For example, many would require &#60; 0.5 seconds (or even less) for major pages loading time. Of course, there are numerous factors for page load time: network, caching, web servers, scripting language/code, database access and more. Naturally I want to discuss the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>When building web sites, a popular demand is a maximum page load time.</p>
+<p>For example, many would require &lt; 0.5 seconds (or even less) for major pages loading time. Of course, there are numerous factors for page load time: network, caching, web servers, scripting language/code, database access and more.</p>
+<p>Naturally I want to discuss the use of database access when creating web pages. I&#8217;ll be referring to dynamic web pages, such that are created by common languages as PHP, Java/J2EE, Ruby, ASP(.NET) etc.</p>
+<p>A very common programming style is &#8211; what&#8217;s called in the Java jargon &#8211; using &#8220;scriptlets&#8221; as in the following JSP page:</p>
+<blockquote>
+<pre>&lt;html&gt;
+&lt;body&gt;
+    Time now is &lt;%= new java.util.Date() %&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</blockquote>
+<p>The above replaces the &#8220;<em>&lt;%= new java.util.Date() %&gt;</em>&#8221; part with a text representation of the current time.</p>
+<p>If I were to produce a dynamic content site, say, a WordPress blog, like the one you&#8217;re reading, I would need to generate several dynamic contents: the latest posts, the popular tags, the comments for this post, etc. These are generated by calling upon the database and running some queries. I suppose there&#8217;s nothing new in what I&#8217;ve explained so far.</p>
+<h4>The problem</h4>
+<p>When generating a &#8220;heavyweight&#8221; page, like some online newspaper or bookstore, there may be many queries involved. Are you logged in? Do we have recommendations for you? What are the latest topics? What have you been interested in before? Do you have friends online? What content have you produced on the website?</p>
+<p><span id="more-955"></span>I&#8217;ve recently reviewed a site which generated &gt; 500 queries per single page. I personally thought that was a very high number, but that was a necessity. The problem was: the page took 2 seconds to load.</p>
+<p>Some tuning, rewriting and indexing later, time dropped to 0.6 seconds to load; but that was not fast enough. It was then that we got to a major conclusion:</p>
+<blockquote><p>All database calls are serialized. They need to be parallelized.</p></blockquote>
+<p>Remember that MySQL can only utilize a single thread for the computation of a single query (though more threads can handle IO in the meantime). This leads to only one CPU being used on your standard Linux distribution, for a given web page.</p>
+<p>Really, that sounds just too obvious! But not so easy to achieve when doing &#8220;scriptlets&#8221;. The templating engine parses the scriptlets one by one, executing them in order. In fact, you assume it does so, so that you can rely on the outcome of the previous scriptlet in the next one. In Java, for example, it goes beyond that: a JSP page is rewritten as a normal Java Servlet class, where the &#8220;scriptlets&#8221; become the main code, and the HTML becomes just printing to standard output. So you get linear executing code.</p>
+<p>Even with more sophisticated frameworks, the &#8220;normal&#8221; way of doing things is linear. For example, using the Spring framework, you have Java objects &#8212; controllers &#8212; which are responsible for web pages. You can avoid doing scpriting within your dynamic web pages, and only ask for data provided by those controllers. So, for example, using <a href="http://www.springsource.org/">Spring</a> + <a href="http://velocity.apache.org/">Velocity</a>, a web page could look like this:</p>
+<blockquote>
+<pre>&lt;html&gt;
+&lt;body&gt;
+    Login time as recorded in DB is: ${user.loginTime}
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</blockquote>
+<p>This (usually) translates to calling the <em>getLoginTime()</em> method on a pre-built <em>user</em> object. But just how does this method work?</p>
+<ul>
+<li>Does it do lazy initialization, so that it calls upon the DB to get the answer?</li>
+<li>Did the controller set up the value during some init() method?</li>
+<li>Did the controller set up the value in response to the web page&#8217;s request parameter, parsing them one by one?</li>
+</ul>
+<p>All the above options lead to linear, or serial execution.</p>
+<h4>How to parallelize?</h4>
+<p>Parallelization with web pages is not so simple, and requires understanding of multi threading programming. The programmer needs to be aware of race conditions, deadlocks, starvation issues, etc. (though, to be honest, in dynamic web pages context these do not usually become a real issue). Some programming languages provide good support for multi threaded programming. Java is one such language.</p>
+<p>Let&#8217;s assume, then, that we need to spawn some 10 queries in response to a page request. With Jjava, we can write something like:</p>
+<blockquote>
+<pre>CountDownLatch doneSignal = <strong>new</strong> CountDownLatch(10);
+
+Runnable task1 = <strong>new</strong> Runnable() {
+    <strong>public</strong> <strong>void</strong> run()
+    {
+        user.setLoginTime(<strong>this</strong>.jdbcTemplate.queryForInt("SELECT ... FROM ..."));
+        doneSignal.countDown();
+    }
+} ;
+
+Runnable task2 = <strong>new</strong> Runnable() {
+    <strong>public</strong> <strong>void</strong> run()
+    {
+        headlines = getSimpleJdbcTemplate().query("SELECT * FROM headline WHERE...",
+            <strong>new</strong> ParameterizedRowMapper&lt;Headline&gt;() {
+                <strong>public</strong> Headline mapRow(ResultSet rs, <strong>int</strong> rowNum)
+                {
+                    Headline headline = <strong>new</strong> Headline();
+                    headline.setTitle(rs.getString("title");
+                    headline.setUrl(rs.getString("url");
+                    ...
+                }
+            }
+        doneSignal.countDown();
+    }
+} ;
+
+...
+
+Runnable task10 = <strong>new</strong> Runnable() {
+    ...
+    doneSignal.countDown();
+}
+Executor executor = Executors.newFixedThreadPool(numberOfAvailableProcessors);
+executor.execute(task1);
+...
+executor.execute(task10);
+
+doneSignal.await();
+
+// Now fill in the Model</pre>
+</blockquote>
+<p>The above code is simplified and presented in a way which is more readable. What it says is:</p>
+<ul>
+<li>Let&#8217;s create the 10 tasks, but not execute them: just lay out the commands.</li>
+<li>Each task, upon completion, lets the <strong>CountDownLatch</strong> know it has completed (but remeber we have not executed it yet).</li>
+<li>We create or use a thread pool, using some <em>n</em> threads; <em>n</em> may relate to the number of processors we have.</li>
+<li>We ask the pool to execute all threads. At the discretion of the pool, it will either run them all concurrently, or some sequentially &#8211; depending on how many threads are available.</li>
+<li>We ask the <strong>CountDownLatch</strong> &#8212; a one-time <em>barrier</em> &#8212; to block, until all 10 tasks have notified they&#8217;re done.</li>
+<li>We can now go on and do our stuff.</li>
+</ul>
+<p>Spring has a built in <a href="http://static.springsource.org/spring/docs/2.5.x/reference/scheduling.html#scheduling-task-executor">TaskExecutor</a> mechanism to provide solution similar to the thread pool above.</p>
+<p>I&#8217;m mostly a C/C++/Java programmer; I have no knowledge on how this can be achieved in PHP, Ruby, ASP.NET or other languages. The above code is certainly not the most straightforward to use. I would like to see frameworks provide wrappers for this kind of solution, so as to support the common web developer with parallelization.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/the-db-problem-inherent-to-dynamic-web-pages/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">955</post-id>	</item>
+	</channel>
+</rss>

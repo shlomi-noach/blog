@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>plugin &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/plugin/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 01 Oct 2013 06:50:08 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>On MySQL plugin configuration</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/on-mysql-plugin-configuration</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/on-mysql-plugin-configuration#comments</comments>
+				<pubDate>Tue, 01 Oct 2013 06:50:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[plugin]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6579</guid>
+				<description><![CDATA[MySQL offers plugin API, with which you can add different types of plugins to the server. The API is roughly the same for all plugin types: you implement an init() function, a deinit(); you declare status variables and global variables associated with your plugin, and of course you implement the particular implementation of plugin call. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL offers <a href="http://dev.mysql.com/doc/refman/5.5/en/plugin-api.html">plugin API</a>, with which you can add <a href="http://dev.mysql.com/doc/refman/5.5/en/plugin-types.html">different types</a> of plugins to the server. The API is roughly the same for all plugin types: you implement an init() function, a deinit(); you declare status variables and global variables associated with your plugin, and of course you implement the particular implementation of plugin call.</p>
+<p>I wish to discuss the creation and use of global variables for plugins.</p>
+<p>Consider the following declaration of a global variable in <a href="https://github.com/outbrain/audit_login">audit_login</a>:</p>
+<blockquote>
+<pre>static MYSQL_SYSVAR_BOOL(enabled, plugin_enabled, PLUGIN_VAR_NOCMDARG,
+"enable/disable the plugin's operation, namely writing to file", NULL, NULL, 1);
+
+static struct st_mysql_sys_var * audit_login_sysvars[] = {
+    MYSQL_SYSVAR(enabled),
+    NULL
+};</pre>
+</blockquote>
+<p>The above creates a new global variables called <strong>&#8220;simple_login_audit_enabled&#8221;</strong>: it is composed of the plugin name (known to be <strong>&#8220;simple_login_audit&#8221;</strong> in our example) and declared name (<strong>&#8220;enabled&#8221;</strong>). It is a boolean, defaults to <strong>1</strong>, and is associated with the internal <strong>plugin_enabled</strong> variable.</p>
+<p>Once this variable is declared, you can expect to be able to:<span id="more-6579"></span></p>
+<blockquote>
+<pre>mysql&gt; show global variables like '%audit%';
++----------------------------+-------+
+| Variable_name              | Value |
++----------------------------+-------+
+| simple_login_audit_enabled | ON    |
++----------------------------+-------+
+
+mysql&gt; set global simple_login_audit_enabled := 0;
+Query OK, 0 rows affected (0.00 sec)</pre>
+</blockquote>
+<p>and you can expect using the following in your <strong>my.cnf</strong> file:</p>
+<blockquote>
+<pre>[mysqld]
+...
+simple_login_audit_enabled=1</pre>
+</blockquote>
+<h4>Assuming your server agrees to start</h4>
+<p>Here&#8217;s the catch: the <strong>simple_login_audit_enabled</strong> variable is <em>only recognized as long as the plugin is installed</em>. As you may know, plugins can be loaded upon startup time using an explicit <strong>my.cnf</strong> entry such as:</p>
+<blockquote>
+<pre>plugin_load=audit_login.so</pre>
+</blockquote>
+<p>But you may also, at any given time, <a href="http://dev.mysql.com/doc/refman/5.5/en/install-plugin.html">INSTALL</a> or <a href="http://dev.mysql.com/doc/refman/5.5/en/uninstall-plugin.html">UNINSTALL</a> the plugin dynamically.</p>
+<blockquote>
+<pre>install plugin SIMPLE_LOGIN_AUDIT soname 'audit_login.so';
+uninstall plugin SIMPLE_LOGIN_AUDIT;<code>
+</code></pre>
+</blockquote>
+<p>In fact there are good reasons to do so: you may be upgrading your plugin. You can&#8217;t just throw in the new binary (it&#8217;s a guaranteed crash on next server shutdown). You need to first <strong>UNINSTALL</strong> it; you then put the new binary, and re-<strong>INSTALL</strong>. This works well, and the price is some downtime for your plugin.</p>
+<p>But what happens if you restart the server while your plugin is uninstalled? Yep: the global variable is unrecognised, and your MySQL server refuses to start:</p>
+<blockquote>
+<pre>130919  8:11:30 [ERROR] /usr/bin/mysqld: <strong>unknown variable 'simple_login_audit_enabled=1'</strong>
+130919  8:11:30 [ERROR] <strong>Aborting</strong>
+130919  8:11:30  InnoDB: Starting shutdown...
+130919  8:11:31  InnoDB: Shutdown completed; log sequence number 40185651
+130919  8:11:31 [Note] /usr/bin/mysqld: Shutdown complete</pre>
+</blockquote>
+<p>I did happen on this case a couple times; it is frustrating.</p>
+<h4>What are the alternatives?</h4>
+<p>So adding variables to my.cnf may prevent MySQL from starting. In my dictionary, this spells <strong>&#8220;NO GO&#8221;</strong>.</p>
+<p>With <strong>audit_login</strong> I chose to (additionally) support an external config file, <strong>audit_login.cnf</strong>, expected to be found in the <strong>@@datadir</strong>. It is similar in essence to the <strong>master.info</strong> file which is expected by replication. The plugin reads this file (if existing) upon init(), which makes it execute upon server startup or upon <strong>INSTALL PLUGIN</strong>. I can&#8217;t argue that this is the best solution, but it is a solution that does not interfere with anyone. The file is ignored by all and does not disturb the public peace. The plugin does not require it to exist.</p>
+<p>I was hoping to be able to directly read from <strong>my.cnf</strong>, but am unsure if there is a definitive way to do so from within the plugin. I did not go deep into this.</p>
+<h4>What would be best?</h4>
+<p>Hopefully I&#8217;m not missing on anything. But it would be nice to have plugin-dedicated variables in my.cnf which are ignored by the server. These could take the form of:</p>
+<blockquote>
+<pre>[mysql_plugin]
+simple_login_audit_enabled=0</pre>
+</blockquote>
+<p>or similar. It would be the server&#8217;s responsibility to pass these declarations to the plugins, but ignore them itself (or just pass warning).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/on-mysql-plugin-configuration/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6579</post-id>	</item>
+		<item>
+		<title>Introducing audit_login: simple MySQL login logfile based auditing</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/introducing-audit_login-simple-mysql-login-logfile-based-auditing</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/introducing-audit_login-simple-mysql-login-logfile-based-auditing#comments</comments>
+				<pubDate>Tue, 17 Sep 2013 07:24:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[plugin]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6523</guid>
+				<description><![CDATA[audit_login is a simple MySQL login auditing plugin, logging any login or login attempt to log file in JSON format. It seems that audit plugins are all the rage lately&#8230; We&#8217;ve developed out simple plugin a month ago as part of our database securing efforts; by auditing any login or login attempt we could either [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://github.com/outbrain/audit_login">audit_login</a> is a simple MySQL login auditing plugin, logging any login or login attempt to log file in JSON format.</p>
+<p>It seems that audit plugins are <a href="http://serge.frezefond.com/2013/09/news-mariadb-audit-plugin-beta-is-out/">all the rage</a> lately&#8230; We&#8217;ve developed out simple plugin a month ago as part of our database securing efforts; by auditing any login or login attempt we could either intercept or later investigate suspicious logins.</p>
+<p>However we quickly realized there is much more to be gathered by this info.</p>
+<p>In very short, you install this plugin onto your MySQL server, and your server starts writing into a text file called <strong>audit_login.log</strong> entries such as follows:</p>
+<blockquote>
+<pre>{"ts":"2013-09-11 09:11:47","type":"successful_login","myhost":"gromit03","thread":"74153868","user":"web_user","priv_user":"web_user","host":"web-87.localdomain","ip":"10.0.0.87"}
+{"ts":"2013-09-11 09:11:55","type":"failed_login","myhost":"gromit03","thread":"74153869","user":"backup_user","priv_user":"","host":"web-32","ip":"10.0.0.32"}
+{"ts":"2013-09-11 09:11:57","type":"failed_login","myhost":"gromit03","thread":"74153870","user":"backup_user","priv_user":"","host":"web-32","ip":"10.0.0.32"}
+{"ts":"2013-09-11 09:12:48","type":"successful_login","myhost":"gromit03","thread":"74153871","user":"root","priv_user":"root","host":"localhost","ip":"10.0.0.111"}
+{"ts":"2013-09-11 09:13:26","type":"successful_login","myhost":"gromit03","thread":"74153872","user":"web_user","priv_user":"web_user","host":"web-11.localdomain","ip":"10.0.0.11"}
+{"ts":"2013-09-11 09:13:44","type":"successful_login","myhost":"gromit03","thread":"74153873","user":"web_user","priv_user":"web_user","host":"web-40.localdomain","ip":"10.0.0.40"}
+{"ts":"2013-09-11 09:13:51","type":"successful_login","myhost":"gromit03","thread":"74153874","user":"web_user","priv_user":"web_user","host":"web-03.localdomain","ip":"10.0.0.03"}
+{"ts":"2013-09-11 09:14:09","type":"successful_login","myhost":"gromit03","thread":"74153875","user":"web_user","priv_user":"web_user","host":"web-40.localdomain","ip":"10.0.0.40"}
+{"ts":"2013-09-11 10:55:25","type":"successful_login","myhost":"gromit03","thread":"74153876","user":"web_user","priv_user":"web_user","host":"web-87.localdomain","ip":"10.0.0.87"}
+{"ts":"2013-09-11 10:55:59","type":"successful_login","myhost":"gromit03","thread":"74153877","user":"web_user","priv_user":"web_user","host":"web-12.localdomain","ip":"10.0.0.12"}
+{"ts":"2013-09-11 10:55:59","type":"failed_login","myhost":"gromit03","thread":"74153878","user":"(null)","priv_user":"(null)","host":"(null)","ip":"10.0.0.1"}</pre>
+</blockquote>
+<p>In the above your MySQL server is on <strong>gromit03</strong>, and is accepting connections from other hosts; some successful, some not. What kind of information can you gather from the above?</p>
+<ul>
+<li>You can tell how many connections are being created on your server</li>
+<li>Where they came from</li>
+<li>Where <strong>&#8216;root&#8217;</strong> connections come from</li>
+<li>Port scans (see last row) can be identified by no credentials. These don&#8217;t have to be port scans <em>per se</em>; any <strong>telnet localhost 3006</strong> followed by <strong>Ctrl+D</strong> will show the same. Typically these would be either load balancer or monitoring tools checks to see that the <strong>3306</strong> port is active.</li>
+<li>You can tell which accounts connect, and how many times</li>
+<li>And you can infer which accounts are stale and can be dropped &#8212; if an account does not connect within a week&#8217;s time, it&#8217;s probably stale (pick your own timeframe)</li>
+</ul>
+<p>The above is quite interesting on one host; but we have dozens. We&#8217;ve installed this plugin on all our MySQL servers, and we use <a href="http://logstash.net/"><strong>logstash</strong></a> to aggregate them. We aggregate to two destinations:<span id="more-6523"></span></p>
+<ul>
+<li>All logs are being sent over to <strong><a href="http://kibana.org/">kibana</a></strong>, where they are easily searchable via <a href="http://lucene.apache.org/core/">lucene</a> queries</li>
+<li>They are also all aggregated into one CSV formatted logfile, rotating daily; this format makes it easier for me to <strong>grep</strong> and <strong>uniq -c</strong> and generally produce very valuable data by scripting.</li>
+</ul>
+<p>By aggregating the logs from multiple hosts, we are able to gather such insight as:</p>
+<ul>
+<li>How well our load balancers are distributing connections</li>
+<li>How our various applications servers connect on our multiple data centres to our MySQL hosts</li>
+<li>Catching misbehaving apps with hardcoded server IPs</li>
+<li>Catching naughty developers logging into our masters directly (we have more mechanisms now to prevent and audit such cases)</li>
+<li>Identifying differences in behaviour of monitoring tools across our data centres</li>
+<li>etc.</li>
+</ul>
+<h4>Free to use</h4>
+<p>The <strong>audit_login</strong> plugin has been made free to use, open source, licensed under GNU GPL v2. It is <a href="https://github.com/outbrain/audit_login">publicly available in our github repository</a>, where more documentation on build and installation can be found.</p>
+<p>As MySQL plugins go, you must compile your plugin with your particular MySQL version. For you convenience, pre-compiled binaries are <a href="https://github.com/outbrain/audit_login/tree/master/lib">available in the repository</a> (at this time for <strong>5.5.32</strong> and <strong>5.5.21</strong> linux 64 bit; likely to add more)</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/introducing-audit_login-simple-mysql-login-logfile-based-auditing/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6523</post-id>	</item>
+		<item>
+		<title>Thoughts on using MySQL plugins</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/thoughts-on-using-mysql-plugins</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/thoughts-on-using-mysql-plugins#comments</comments>
+				<pubDate>Tue, 03 Apr 2012 11:05:42 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[plugin]]></category>
+		<category><![CDATA[Sphinx]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4769</guid>
+				<description><![CDATA[I&#8217;m giving thoughts on the viability of MySQL plugins. This is due to a particular experience I&#8217;ve had, which is thankfully solved. However, it left some bitter taste in my mouth. MySQL plugins are a tricky business. To create a plugin, you must compile it against the MySQL version you wish the users to use [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m giving thoughts on the viability of MySQL plugins. This is due to a particular experience I&#8217;ve had, which is thankfully solved. However, it left some bitter taste in my mouth.</p>
+<p>MySQL plugins are a tricky business. To create a plugin, you must compile it against the MySQL version you wish the users to use it with. Theoretically, you should compile it against any existing MySQL version, minors as well (I&#8217;m not sure whether it may sometimes or most times work across minor versions).</p>
+<p>But, most important, you must adapt your plugin to major versions.</p>
+<p>Another option for plugin makers, is to actually <em>not</em> recompile it, but rather provide with the source code, and let the end user compile it with her own MySQL version. But here, too, the code must be compatible with whatever changes the new MySQL version may have.</p>
+<h4>And if it doesn&#8217;t compile with the new MySQL version?</h4>
+<p>That&#8217;s what happened to me. The particular case at hand was SphinxSE, a plugin which serves as a bridge between MySQL and a <a href="http://sphinxsearch.com/">Sphinx Search</a> server. I&#8217;ve been using it for years and was happy about it. But, as it happened, it took well over a year for sphinx to compile with MySQL <strong>5,5</strong>. This meant I was unable to upgrade my <strong>5.1</strong> installation to <strong>5.5</strong>, a thing I was aiming to do for quite a while.<span id="more-4769"></span></p>
+<p>Even when fixed, not all features were included, and thankfully I was able to come up with <a href="https://shlomi-noach.github.io/blog/mysql/sphinx-sphinx_snippets-mysql-5-5">my own patch</a>.</p>
+<p>Not complaining about this particular project &#8212; I think Sphinx is <em>awesome</em>, with latest versions providing great features I&#8217;m putting into immediate use.</p>
+<p>However, how much am I willing to rely on 3rd party projects when planning my MySQL upgrades? I&#8217;m now thinking I shouldn&#8217;t.</p>
+<h4>A central repository?</h4>
+<p>MariaDB does a great thing: it provides with several <a href="http://kb.askmonty.org/en/mariadb-versus-mysql-features">additional features</a> over standard MySQL, including a set of plugins. They turn into a debian-like repository, in which they maintain the plugins for their own distribution.</p>
+<p>[<em>Darn!</em> I just realized I should have looked at what they did with Sphinx in their <strong>5.5</strong> distribution! Need to do my monthly mental examination.]</p>
+<p>Anyway, this is something I would like to see outside MariaDB as well: a central repository where plugins are maintained and kept up to the latest releases.</p>
+<p>Thoughts, anyone?</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/thoughts-on-using-mysql-plugins/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4769</post-id>	</item>
+	</channel>
+</rss>

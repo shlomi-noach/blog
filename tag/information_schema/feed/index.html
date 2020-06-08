@@ -1,0 +1,864 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>INFORMATION_SCHEMA &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/information_schema/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 19 Aug 2015 08:00:11 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Baffling 5.7 global/status variables issues, unclean migration path</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path#comments</comments>
+				<pubDate>Fri, 07 Aug 2015 12:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[performance_schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7327</guid>
+				<description><![CDATA[MySQL 5.7 introduces a change in the way we query for global variables and status variables: the INFORMATION_SCHEMA.(GLOBAL&#124;SESSION)_(VARIABLES&#124;STATUS) tables are now deprecated and empty. Instead, we are to use the respective performance_schema.(global&#124;session)_(variables&#124;status) tables. But the change goes farther than that; there is also a security change. Oracle created a pitfall of 2 changes at the same time: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL <strong>5.7</strong> introduces a change in the way we query for global variables and status variables: the <strong>INFORMATION_SCHEMA.(GLOBAL|SESSION)_(VARIABLES|STATUS)</strong> tables are now deprecated and empty. Instead, we are to use the respective <strong>performance_schema.(global|session)_(variables|status)</strong> tables.</p>
+<p>But the change goes farther than that; there is also a security change. Oracle created a pitfall of <strong>2</strong> changes at the same time:</p>
+<ol>
+<li>Variables/status moved to a different table</li>
+<li>Privileges required on said table</li>
+</ol>
+<p>As an example, my non-root user gets:</p>
+<blockquote>
+<pre>mysql&gt; show session variables like 'tx_isolation';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'session_variables'</pre>
+</blockquote>
+<p>Who gets affected by this? Nearly <em>everyone and everything</em>.</p>
+<ul>
+<li>Your Nagios will not be able to read status variables</li>
+<li>Your ORM will not be able to determine session variables</li>
+<li>Your replication user will fail connecting (see <a href="http://datacharmer.blogspot.nl/2015/08/mysql-578-features-bugs-and-rumors.html">this post by Giuseppe</a>)</li>
+<li>And most everyone else.</li>
+</ul>
+<p>The problem with the above is that involves two unrelated changes to your setup, which are not entirely simple to coordinate:</p>
+<ol>
+<li>Change your app code to choose the correct schema (information_schema vs. performance_schema)</li>
+<li><strong>GRANT</strong> the permissions on your database</li>
+</ol>
+<p>Perhaps at this point you still do not consider this to be a problem. You may be thinking: <em>well, let&#8217;s first prepare by creating the GRANTs, and once that is in place, we can, at our leisure, modify the code</em>.</p>
+<p>Not so fast. Can you really that simply create those GRANTs?<span id="more-7327"></span></p>
+<h3>Migration woes</h3>
+<p>How do you migrate to a new MySQL version? You do not reinstall all your servers. You want an easy migration path, and that path is: introduce one or two slaves of a newer version, see that everything works to your satisfaction, slowly upgrade all your other slaves, eventually switchover/upgrade your master.</p>
+<p>This should not be any different for <strong>5.7</strong>. We would like to provision a <strong>5.7</strong> slave in our topologies and just see that everything works. Well, we have, and things don&#8217;t just work. Our Nagios stops working for that <strong>5.7</strong> slave. <em>Orchestrator</em> started complaining (by this time I&#8217;ve <a href="https://github.com/outbrain/orchestrator/releases/tag/v1.4.291">already fixed it</a> to be more tolerant for the <strong>5.7</strong> problems so no crashes here).</p>
+<p>I hope you see the problem by now.</p>
+<blockquote><p>You cannot issue a <strong>GRANT SELECT ON performance_schema.global_variables TO &#8216;&#8230;&#8217;</strong> on your <strong>5.6</strong> master.</p></blockquote>
+<p>The table simply does not exist there, which means the statement will not go to binary logs, which means it will not replicate on your <strong>5.7</strong> slave, which means you will not be able to <strong>SHOW GLOBAL VARIABLES</strong> on your slave, which means everything remains broken.</p>
+<p>Yes, you can issue this directly on your <strong>5.7</strong> slaves. It&#8217;s <em>doable</em>, but <em>undesired</em>. It&#8217;s ugly in terms of automation (and will quite possibly break some assumptions and sanity checks your automation uses); in terms of validity testing. It&#8217;s unfriendly to GTID (make sure to <strong>SET SQL_LOG_BIN=0</strong> before that).</p>
+<h3>WHY in the first place?</h3>
+<p>It seems like a security thing. I&#8217;m not sure whether this was intended. So you prevent a <strong>SHOW GLOBAL VARIABLES</strong> for a normal user. Makes sense. And yet:</p>
+<blockquote>
+<pre>mysql&gt; show global variables like 'hostname';
+ERROR 1142 (42000): SELECT command denied to user 'normal_user'@'my_host' for table 'global_variables'
+
+mysql&gt; select @@global.hostname;
++---------------------+
+| @@global.hostname   |
++---------------------+
+| myhost.mydomain.com |
++---------------------+
+
+mysql&gt; select @@version;
++--------------+
+| @@version    |
++--------------+
+| 5.7.8-rc-log |
++--------------+
+
+</pre>
+</blockquote>
+<p>Seems like I&#8217;m allowed access to that info after all. So it&#8217;s not strictly a security design decision. For status variable, I admit, I don&#8217;t have a similar workaround.</p>
+<h3>Solutions?</h3>
+<p>The following are meant to be solutions, but do not really solve the problem:</p>
+<ul>
+<li><strong>SHOW</strong> commands. <strong>SHOW GLOBAL|SESSION VARIABLES|STATUS</strong> will work properly, and will implicitly know whether to provide the results via <strong>information_schema</strong> or <strong>performance_schema</strong> tables.
+<ul>
+<li>But, aren&#8217;t we meant to be happier with <strong>SELECT</strong> queries? So that I can really do stuff that is smarter than <strong>LIKE &#8216;variable_name%&#8217;</strong>?</li>
+<li>And of course you cannot use <strong>SHOW</strong> in server side cursors. Your stored routines are in a mess now.</li>
+<li>This does not solve the GRANTs problem.</li>
+</ul>
+</li>
+<li><strong><a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_show_compatibility_56">show_compatibility_56</a></strong>: an introduced variable in <strong>5.7</strong>, boolean. It truly is a time-travel-paradox novel in disguise, in multiple respects.
+<ul>
+<li>Documentation introduces it, and says it is deprecated.
+<ul>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>But it actually works in <strong>5.7.8</strong> (latest)
+<ul>
+<li>time-travel-paradox plot thickens</li>
+</ul>
+</li>
+<li>Your automation scripts do not know in advance whether your MySQL has this variable
+<ul>
+<li>Hence <strong>SELECT @@global.show_compatibility_56</strong> will produce an error on <strong>5.6</strong></li>
+<li>But the &#8220;safe&#8221; way of <strong>SHOW GLOBAL VARIABLES LIKE &#8216;show_compatibility_56&#8217;</strong> will fail on a privilege error on <strong>5.7</strong></li>
+<li>time-travel-paradox :O</li>
+</ul>
+</li>
+<li>Actually advised by my colleague Simon J. Mudd, <strong>show_compatibility_56</strong> defaults to <strong>OFF</strong>. I <em>support</em> this line of thought. Or else it&#8217;s <strong>old_passwords=1</strong> all over again.</li>
+<li><strong>show_compatibility_56</strong> doesn&#8217;t solve the GRANTs problem.</li>
+<li>This does not solve any migration path. It just postpones the moment when I will hit the same problem. When I flip the variable from <strong>&#8220;1&#8221;</strong> to <strong>&#8220;0&#8221;</strong>, I&#8217;m back at square one.</li>
+</ul>
+</li>
+</ul>
+<h3>Suggestion</h3>
+<p>I claim security is not the issue, as presented above. I claim Oracle will yet again fall into the trap of no-easy-way-to-migrate-to-GTID in <strong>5.6</strong> if the current solution is unchanged. I claim that there have been too many changes at once. Therefore, I suggest one of the alternative two flows:</p>
+<ol>
+<li><strong>Flow 1</strong>: keep <strong>information_schema</strong>, later migration into <strong>performance_schema</strong>
+<ul>
+<li>In <strong>5.7</strong>, <strong>information_schema</strong> tables should still produce the data.</li>
+<li>No security constraints on <strong>information_schema</strong></li>
+<li>Generate WARNINGs on reading from <strong>information_schema</strong> (&#8220;&#8230;this will be deprecated&#8230;&#8221;)</li>
+<li><strong>performance_schema </strong><em>also available</em>. With security constraints, whatever.</li>
+<li>In <strong>5.8</strong> remove <strong>information_schema</strong> tables; we are left with <strong>performance_schema</strong> only.</li>
+</ul>
+</li>
+<li><strong>Flow 2</strong>: easy migration into <strong>performance_schema</strong>:
+<ul>
+<li>In <strong>5.7</strong>, <strong>performance_schema</strong> tables should not require any special privileges. Any user can read from them.</li>
+<li>Keep <strong>show_compatibility_56 </strong>as it is.</li>
+<li><strong>SHOW</strong> commands choose between <strong>information_schema</strong> or <strong>performance_schema</strong> on their own &#8212; just as things are done now.</li>
+<li>In <strong>5.8</strong>, <strong>performance_schema</strong> tables will require <strong>SELECT</strong> privileges.</li>
+</ul>
+</li>
+</ol>
+<p>As always, I love the work done by the engineers; and I love how they listen to the community.</p>
+<p>Comments are most welcome. Have I missed the simple solution here? Are there even more complications to these features? Thoughts on my suggested two flows?</p>
+<h3>[UPDATE 2015-08-19]</h3>
+<p>Please <a href="http://www.tocker.ca/2015/08/18/a-followup-on-show_compatibility_56.html">see this followup</a> by Morgan Tocker of Oracle.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/baffling-5-7-globalstatus-variables-issues-unclean-migration-path/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7327</post-id>	</item>
+		<item>
+		<title>common_schema &#038; openark-kit in the media: #DBHangOps, OurSQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-openark-kit-in-the-media-dbhangops-oursql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-openark-kit-in-the-media-dbhangops-oursql#respond</comments>
+				<pubDate>Wed, 26 Jun 2013 19:46:57 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[community]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[Speaking]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6393</guid>
+				<description><![CDATA[#DBHangOps I had the pleasure of joining into @DBHangOps today, and speak about common_schema and openark-kit. What was meant to be a 15 minute session turned to be 50 &#8212; sorry, people, I don&#8217;t talk as much at home, but when it comes to my pet projects&#8230; I also realized I was missing on a [&#8230;]]]></description>
+								<content:encoded><![CDATA[<h4>#DBHangOps</h4>
+<p>I had the pleasure of joining into <a href="https://twitter.com/DBHangops">@DBHangOps</a> today, and speak about <a href="https://code.google.com/p/common-schema/">common_schema</a> and <a href="http://code.google.com/p/openarkkit/">openark-kit</a>. What was meant to be a 15 minute session turned to be 50 &#8212; sorry, people, I don&#8217;t talk as much at home, but when it comes to my pet projects&#8230;</p>
+<p>I also realized I was missing on a great event: DBHangOps is a hangout where you can chat and discuss MySQL &amp; related technologies with friends and colleagues, with whom you typically only meet at conferences. I will certainly want to attend future events.</p>
+<p>Thanks to John Cesario and Geoffrey Anderson who invited me to talk, and to the friends and familiar faces who attended; I was happy to talk about my work, and very interested in hearing about how it&#8217;s being put to use. We also had time to discuss <a href="http://www.markleith.co.uk/ps_helper/">ps_helper</a> with no other than Mark Leith!</p>
+<p>The video is <a href="https://twitter.com/DBHangops/status/349965939690835970">available on Twitter/YouTube</a>.</p>
+<h4>OurSQL</h4>
+<p><em>openark-kit</em> has also been <a href="http://technocation.org/content/oursql-episode-143%3A-biblical-tools">featured on the OurSQL podcast</a> by Sheeri &amp; Gerry, who did great coverage of some tools. I will disclose that more is to come; I&#8217;m happy this is in capable hands and look further to hear the next episode!</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-openark-kit-in-the-media-dbhangops-oursql/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6393</post-id>	</item>
+		<item>
+		<title>Hierarchical data in INFORMATION_SCHEMA and derivatives</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/hierarchical-data-in-information_schema-and-derivatives</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/hierarchical-data-in-information_schema-and-derivatives#comments</comments>
+				<pubDate>Tue, 08 Jan 2013 11:19:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5311</guid>
+				<description><![CDATA[Just how often do you encounter hierarchical data? Consider a table with some parent-child relation, like the this classic employee table: CREATE TABLE employee (   employee_id INT UNSIGNED PRIMARY KEY,   employee_name VARCHAR(100),   manager_id INT UNSIGNED,   CONSTRAINT `employee_manager_fk` FOREIGN KEY (manager_id) REFERENCES employee (employee_id) ) engine=innodb ; +-------------+---------------+------------+ &#124; employee_id &#124; employee_name [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Just how often do you encounter hierarchical data? Consider a table with some parent-child relation, like the this classic <strong>employee</strong> table:</p>
+<blockquote>
+<pre>CREATE TABLE employee (
+  employee_id INT UNSIGNED PRIMARY KEY,
+  employee_name VARCHAR(100),
+  manager_id INT UNSIGNED,
+  CONSTRAINT `employee_manager_fk` FOREIGN KEY (manager_id) REFERENCES employee (employee_id)
+) engine=innodb
+;
++-------------+---------------+------------+
+| employee_id | employee_name | manager_id |
++-------------+---------------+------------+
+|           1 | Rachel        |       NULL |
+|           2 | John          |          1 |
+|           3 | Stan          |          1 |
+|           4 | Naomi         |          2 |
++-------------+---------------+------------+</pre>
+</blockquote>
+<p>Questions like <em>&#8220;What is the (nested) list of employees managed by Rachel?&#8221;</em> or <em>&#8220;Get Naomi&#8217;s managers chain of command&#8221;</em> are classical questions. There are sometimes dependencies: if John leaves, does that mean Naomi loses her job, or does she get promoted, or something else? If John and Stan are on sick leave, does Rachel have any reason to come to work?</p>
+<p>Hierarchical data is not limited to a single-table structure. Sometimes it takes a combination of a few tables (it&#8217;s just a <strong>JOIN</strong>) to make out the parent-child relation.</p>
+<p>Hierarchical data is difficult to manage with SQL. This is especially true for MySQL, which does not support the <strong>WITH</strong> recursive query syntax.</p>
+<h4>Where can you find hierarchical data?</h4>
+<p>Even if you do not provide it by yourself, MySQL&#8217;s <strong>INFORMATION_SCHEMA</strong> has some for you. Partly obvious, partly implicit, here are some examples:<span id="more-5311"></span></p>
+<h4>Foreign Keys</h4>
+<p>This is probably the most obvious hierarchical dataset in <strong>INFORMATION_SCHEMA</strong>. The <strong>KEY_COLUMN_USAGE</strong> table lists the table dependencies based on foreign key constraints. It&#8217;s a bit confusing, as it also lists <strong>UNIQUE</strong> constraints, and the complete list of FKs are in <strong>REFERENTIAL_CONSTRAINTS</strong> &#8212; but the latter table does not list the dependencies. You typically want to join both tables to get the complete information.</p>
+<p>So, taking <strong>sakila</strong>&#8216;s DVD rental shop sample,  <strong>film_actor</strong> table depends on <strong>film</strong> as well as on <strong>actor</strong> via foreign keys. <strong>film</strong> can depend on the <strong>category</strong> table, etc. The hierarchies can turn to be very complex, with multiple roots an very deep branches.</p>
+<p>Dependency questions are very clear when speaking of foreign keys: what happens when we delete some <strong>film</strong> record? Does it hold that we also delete all references to that film on <strong>film_actor</strong>? Or do we deny deletion of said film in such case?</p>
+<h4>Redundant Keys</h4>
+<p>The <strong>KEY (col1, col2)</strong> makes the <strong>KEY (col1)</strong> redundant. The latter is not strictly required (though you may wish to keep it for covering index performance reason). The list of <em>dominant-redundant</em> keys makes for hierarchical data. It is typically very shallow (keys can only be redundant within the scope of a single table &#8212; how deep can you get with such small dataset?)</p>
+<p>There is no immediate reference in <strong>INFORMATION_SCHEMA</strong> as for redundant keys, but it can be inferred by self joining the <strong>STATISTICS</strong> table onto itself. It is not immediate, since you need to do some aggregation and check for particular cases. For example, <strong>UNIQUE KEY (col1, col2)</strong> is actually made redundant by <strong>UNIQUE KEY (col1)</strong>, which is just the opposite from our previous example.</p>
+<p><a href="http://code.google.com/p/common-schema">common_schema</a> provides with this implicit information now turned explicit, in the for of the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">redundant_keys</a> view: the <strong>redundant_index_name</strong> and <strong>dominant_index_name</strong> columns make for parent-child relationship.</p>
+<p>Dependency questions are a bit redundant here: the general objective is to <em>not have</em> dependencies. So get rid of redundant keys &#8211; and do so wisely. There&#8217;s a good discussion of index redundancies on <strong>redundant_keys</strong>&#8216;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">documentation</a>.</p>
+<h4>Locked transactions</h4>
+<p>A transaction is locked. It is locked because another transaction holds some locks needed by locked transaction. But this transaction in itself can obtain locks needed by yet other transactions. And so we can get a hierarchy of locked transaction. The &#8220;parent&#8221; is the one blocking the &#8220;child&#8221;.</p>
+<p>Combining InnoDB&#8217;s <strong>INNODB_TRX</strong> &#8211; <strong>INNODB_LOCK_WAITS</strong> &#8211; <strong>INNODB_TRX</strong> tables, we get this information. <em>common_schema</em> provides with this inferred data in the form of <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_locked_transactions.html">innodb_locked_transactions</a>.</p>
+<p>Hierarchies in locked-transactions could be deep, and they can most commonly be <em>wide</em>. A single transaction can lock dozens of others.</p>
+<p>Dependency questions are <em>&#8220;would killing this transaction release all other waiting transactions?&#8221;</em>; <em>&#8220;What is </em>the one<em> transaction I need to kill in order to release the bottleneck?&#8221;</em>; <em>&#8220;Why are these transactions related in the first place? Can I remove this dependency?&#8221;</em>. etc.</p>
+<h4>Locks</h4>
+<p>You can look at the same dataset as above from a different angle. Instead of looking at transaction-lock-transaction, you can look at lock-transaction-lock. Which locks are causing other locks to be held? This is counter-intuitive to our understanding of how things work, but is valid nonetheless.</p>
+<h4>Views</h4>
+<p>A <strong>VIEW</strong> can query a table or another view. It can join multiple views. This hierarchy of view-reading-from-view can turn out to be complex; if not for the human mind then for the optimizer.</p>
+<p>Surprisingly, there is no data in <strong>INFORMATION_SCHEMA</strong>, other than the <strong>CREATE VIEW</strong> clause, to help us out in resolving these dependencies. Even more surprising is MySQL&#8217;s own inability to get clear conclusions itself. The view definition clause is parsed, re-parsed and re-evaluated whenever information on &#8220;parent&#8221; views is required. For example, try to <strong>DESCRIBE</strong> a view. How does MySQL deduce the data types of columns? It dives in head first into the hierarchy, crawls and parses view definitions, till it resolves the answer. The <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> projects uses view hierarchies intensively. It draws powers from the hierarchy and produces some surprising data (<a href="http://code.openark.org/forge/mycheckpoint/documentation/generating-google-charts">charts</a> from raw data, for example). But it also suffers from MySQL indirect inference of views. Checking up a deep-nested <em>mycehckpoint</em> view in <strong>INFORMATION_SCHEMA</strong> makes for a heavyweight dive for MySQL into locks and table handles.</p>
+<p>Dependency questions are <em>&#8220;what is the type of this column?&#8221;</em>, <em>&#8220;are there any <strong>TEMPTABLE</strong> views along the chain of execution? Or are all <strong>MERGE</strong> views?&#8221;</em> and more.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/hierarchical-data-in-information_schema-and-derivatives/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5311</post-id>	</item>
+		<item>
+		<title>Killing InnoDB idle transactions</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/killing-innodb-idle-transactions</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/killing-innodb-idle-transactions#comments</comments>
+				<pubDate>Tue, 04 Dec 2012 12:23:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5422</guid>
+				<description><![CDATA[The issue of terminating long-time idle open InnoDB transaction has been discussed recently by many. I wish to add my share, by proposing a quick and clean solution via common_schema. common_schema 1.2 provides with the innodb_transactions view, which relies on INNODB_TRX &#8211; one of the InnoDB Plugin views in INFORMATION_SCHEMA &#8211; as well as on [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The issue of terminating long-time idle open InnoDB transaction has been discussed recently by many. I wish to add my share, by proposing a quick and clean solution via <a href="http://code.google.com/p/common-schema/">common_schema</a>.</p>
+<p><em>common_schema <strong>1.2</strong></em> provides with the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/innodb_transactions.html"><strong>innodb_transactions</strong></a> view, which relies on <strong>INNODB_TRX</strong> &#8211; one of the InnoDB Plugin views in <strong>INFORMATION_SCHEMA</strong> &#8211; as well as on <strong>PROCESSLIST</strong>, and so is able to determine with certainty that a transaction has been idle for a long time.</p>
+<p><strong>innodb_transactions</strong> offers us with a <strong>sql_kill_query</strong> column, which produces a <strong>&#8216;KILL QUERY 12345&#8217;</strong> type of value. So we can:</p>
+<blockquote>
+<pre>SELECT <strong>sql_kill_query</strong> FROM <strong>innodb_transactions</strong> WHERE <strong>trx_idle_seconds &gt;= 10; 
+</strong>+-------------------+
+| sql_kill_query    |
++-------------------+
+| KILL QUERY 292509 |
+| KILL QUERY 292475 |
++-------------------+<strong> </strong></pre>
+</blockquote>
+<p><em>common_schema</em>&#8216;s useful <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html"><strong>eval()</strong></a> routine allows us to actually invoke those <strong>KILL</strong> statements, all in a one-liner:</p>
+<blockquote>
+<pre>call <strong>eval</strong>(<span style="color: #003366;">'SELECT <strong>sql_kill_query</strong> FROM innodb_transactions WHERE <strong>trx_idle_seconds &gt;= 10</strong>'</span>);</pre>
+</blockquote>
+<h4>Technical details<span id="more-5422"></span></h4>
+<ul>
+<li><strong>trx_idle_seconds</strong> notes the time, in seconds, the transaction has been idle, or 0 if the transaction is not idle at all.</li>
+<li><strong>sql_kill_query</strong> is a self-generated SQL query which kills the running query, e.g. <strong>&#8216;KILL QUERY 12345&#8217;</strong>.</li>
+<li><strong>eval()</strong> takes a query as text, retrieves the SQL resulting column, and executes it live.</li>
+</ul>
+<h4>Background details</h4>
+<p>The connection between <strong>INNODB_TRX</strong> and <strong>PROCESSLIST</strong> is not synchronous. It is possible that by the time one is querying <strong>INNODB_TRX</strong>, <strong>PROCESSLIST</strong> data may change (e.g. next query is already replacing the one you were considering in <strong>INNODB_TRX</strong>). But in our case it is of little consequence: we are interested in transactions that have been idle for quite some time. Say, <strong>10</strong> seconds. So we are not troubled by having <strong>200</strong> queries per second changing under our hands.</p>
+<p>If the transaction has been asleep for <strong>10</strong> seconds, and we decide to kill it, well, it is possible that just as we kill it it will turn active again. It&#8217;s a risk we take no matter what kind of solution we apply, since there&#8217;s no atomic &#8220;get-status-and-kill&#8221; operation on InnoDB transactions.</p>
+<p>The above solution is manual: one must invoke the query which kills the idle transactions. This is as opposed to a built-in server feature which does the same. Events can used to semi-automate this: one can call upon this query once every <strong>10</strong> seconds, for example.</p>
+<p>See the many related and inspiring solutions below:</p>
+<ul>
+<li><a href="http://mysqlblog.fivefarmers.com/2012/08/28/identifying-and-killing-blocking-transactions-in-innodb/">Identifying and killing blocking transactions in InnoDB</a></li>
+<li><a href="http://www.markleith.co.uk/2011/05/31/finding-and-killing-long-running-innodb-transactions-with-events/">Finding and killing long running InnoDB transactions with Events</a></li>
+<li><a href="http://datacharmer.blogspot.co.il/2008/10/using-event-scheduler-to-purge-process.html">Using the event scheduler to purge the process list</a></li>
+<li><a href="http://www.mysqlperformanceblog.com/2011/03/08/how-to-debug-long-running-transactions-in-mysql/">How to debug long-running transactions in MySQL</a></li>
+<li><a href="http://yoshinorimatsunobu.blogspot.co.il/2011/04/tracking-long-running-transactions-in.html">Tracking long running transactions in MySQL</a></li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/killing-innodb-idle-transactions/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5422</post-id>	</item>
+		<item>
+		<title>How common_schema split()s tables &#8211; internals</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals#comments</comments>
+				<pubDate>Thu, 06 Sep 2012 05:25:07 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[openark kit]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035</guid>
+				<description><![CDATA[This post exposes some of the internals, and the SQL behind QueryScript&#8217;s split. common_schema/QueryScript 1.1 introduces the split statement, which auto-breaks a &#8220;large&#8221; query (one which operates on large tables as a whole or without keys) into smaller queries, and executes them in sequence. This makes for easier transactions, less locks held, potentially (depending on [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post exposes some of the internals, and the SQL behind QueryScript&#8217;s <em>split</em>. <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">common_schema/QueryScript</a> <strong>1.1</strong> introduces the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> statement, which auto-breaks a &#8220;large&#8221; query (one which operates on large tables as a whole or without keys) into smaller queries, and executes them in sequence.</p>
+<p>This makes for easier transactions, less locks held, potentially (depending on the user) more idle time released back to the database. <em>split<strong></strong></em> has similar concepts to <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> and <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archiver</a>, but works differently, and implemented entirely in SQL on server side.</p>
+<p>Take the following statement as example:</p>
+<blockquote>
+<pre><strong>split</strong> (<strong>UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR</strong>)
+  pass;</pre>
+</blockquote>
+<p>It yields with (roughly) the following statements:</p>
+<blockquote>
+<pre>UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '1')) OR ((`inventory`.`inventory_id` = '1'))) AND (((`inventory`.`inventory_id` &lt; '1000')) OR ((`inventory`.`inventory_id` = '1000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '1000'))) AND (((`inventory`.`inventory_id` &lt; '2000')) OR ((`inventory`.`inventory_id` = '2000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '2000'))) AND (((`inventory`.`inventory_id` &lt; '3000')) OR ((`inventory`.`inventory_id` = '3000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '3000'))) AND (((`inventory`.`inventory_id` &lt; '4000')) OR ((`inventory`.`inventory_id` = '4000'))));
+UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`inventory`.`inventory_id` &gt; '4000'))) AND (((`inventory`.`inventory_id` &lt; '4581')) OR ((`inventory`.`inventory_id` = '4581'))));</pre>
+</blockquote>
+<p>(I say &#8220;roughly&#8221; because internally there are user defined variables at play, but for convenience, I verbose the actual values as constants.)</p>
+<h4>How does that work?</h4>
+<p><em>common_schema</em> works on server side. There is no Perl script or anything. It must therefore use server-side operations to:</p>
+<ul>
+<li>Identify table to be split</li>
+<li>Analyze the table in the first place, deciding how to split it</li>
+<li>Analyze the query, deciding on how to rewrite it</li>
+<li>Split the table (logically) into unique and distinct chunks</li>
+<li>Work out the query on each such chunk</li>
+</ul>
+<p>Following is an internal look at how <em>common_schema</em> does all the above.<span id="more-5035"></span></p>
+<h4>Identifying the table</h4>
+<p>When query operates on a single table, <em>split</em> is able to parse the query&#8217;s SQL and find out that table. When multiple tables are involved, <em>split</em> requires user instruction: which table is it that the query should be split by?</p>
+<h4>Analyzing the table</h4>
+<p>Table analysis is done via a <em>similar</em> method to <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/candidate_keys_recommended.html">candidate_keys_recommended</a>. It is almost identical, only it uses <a href="http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html">INFORMATION_SCHEMA optimizations</a> to make the query short and lightweight. Simulating the analysis using <strong>candidate_keys_recommended</strong>, we get:</p>
+<blockquote>
+<pre>mysql&gt; select * from candidate_keys_recommended where table_name='inventory' \G
+*************************** 1. row ***************************
+          table_schema: sakila
+            table_name: inventory
+recommended_index_name: PRIMARY
+          has_nullable: 0
+            is_primary: 1
+ count_column_in_index: 1
+          column_names: inventory_id</pre>
+</blockquote>
+<p>This is cool, simple and very easy to work with: we choose to split the table via the <strong>inventory_id</strong> column, which is conveniently an integer. We&#8217;ll soon see <em>split</em> can handle complex cases as well.</p>
+<h4>Analyzing the query</h4>
+<p>This is done in part via Roland&#8217;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_analysis_routines.html">query_analysis_routines</a>, and in part just parsing the query, looking for <strong>WHERE</strong>,<strong> GROUP BY</strong>, <strong>LIMIT</strong> etc. clauses.</p>
+<p>The nice part is injecting a <strong>WHERE</strong> condition, which didn&#8217;t appear in the original query. That <strong>WHERE</strong> condition is what limits the query to a distinct chunk of rows.</p>
+<h4>Splitting the table</h4>
+<p>With a single <strong>INTEGER PRIMARY KEY</strong> this sounds simple, right? Take rows <strong>1..1,000</strong>, then <strong>1,001..2,000</strong>, then <strong>2,001..3,000</strong> etc.</p>
+<p>Wrong: even with this simple scenario, things are much more complex. Are the numbers successive? What if there are holes? What if there is a <strong>1,000,000</strong> gap between every two numbers? What if there are multiple holes of differing size and frequency?</p>
+<p>And if we have two columns in our <strong>UNIQUE KEY</strong>? What if one of them is textual, not an <strong>INTEGER</strong>, the other a <strong>TIMESTAMP</strong>, not an <strong>INTEGER</strong> either?</p>
+<p><em>split</em> doesn&#8217;t work in that naive way. It makes no assumptions on the density of values. It only requires:</p>
+<ul>
+<li>some <strong>UNIQUE KEY</strong> to work with,</li>
+<li>which has no <strong>NULL</strong> values.</li>
+</ul>
+<p>Given the above, it uses <em>User Defined Variables</em> to setup the chunks. With our single <strong>INTEGER</strong> column, the minimum value is set like this:</p>
+<blockquote>
+<pre>select 
+  inventory_id 
+from 
+  `sakila`.`inventory` 
+order by 
+  inventory_id ASC 
+limit 1  
+into @_split_column_variable_min_1
+;</pre>
+</blockquote>
+<p>This sets the first value of the first chunk. What value terminates this chunk? It is calculated like this:</p>
+<blockquote>
+<pre>select 
+  inventory_id 
+from (
+  select 
+    inventory_id 
+  from 
+    `sakila`.`inventory` 
+  where 
+    (((`inventory`.`inventory_id` &gt; @_split_column_variable_range_start_1)) OR ((`inventory`.`inventory_id` = @_split_column_variable_range_start_1))) and (((`inventory`.`inventory_id` &lt; @_split_column_variable_max_1)) OR ((`inventory`.`inventory_id` = @_split_column_variable_max_1))) 
+  order by 
+    inventory_id ASC limit 1000 
+  ) sel_split_range  
+order by 
+  inventory_id DESC 
+limit 1  
+into @_split_column_variable_range_end_1
+;</pre>
+</blockquote>
+<p>Now there&#8217;s a query you wouldn&#8217;t want to work by hand, now would you?</p>
+<p>The cool part here is that the above works well for any type of column; this doesn&#8217;t have to be an <strong>INTEGER</strong>. Dates, strings etc. are all just fine.</p>
+<p>The above also works well for multiple columns, where the query gets more complicated (see following).</p>
+<h4>Working out the query per chunk</h4>
+<p>This part is the easy one, now that all the hard work is done. We know ho to manipulate the query, we know the lower and upper boundaries of the chunk, so we just fill in the values and execute.</p>
+<h4>Multi-columns keys</h4>
+<p>Consider a similar query on <strong>sakila.film_actor</strong>, where the <strong>PRIMARY KEY</strong> is a compound of two columns:</p>
+<blockquote>
+<pre>split (UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR)
+  throttle 2;</pre>
+</blockquote>
+<p>The chunked queries will look like this:</p>
+<blockquote>
+<pre>UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '1')) OR ((`film_actor`.`actor_id` = '1') AND (`film_actor`.`film_id` &gt; '1')) OR ((`film_actor`.`actor_id` = '1') AND (`film_actor`.`film_id` = '1'))) AND (((`film_actor`.`actor_id` &lt; '39')) OR ((`film_actor`.`actor_id` = '39') AND (`film_actor`.`film_id` &lt; '293')) OR ((`film_actor`.`actor_id` = '39') AND (`film_actor`.`film_id` = '293'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '39')) OR ((`film_actor`.`actor_id` = '39') AND (`film_actor`.`film_id` &gt; '293'))) AND (((`film_actor`.`actor_id` &lt; '76')) OR ((`film_actor`.`actor_id` = '76') AND (`film_actor`.`film_id` &lt; '234')) OR ((`film_actor`.`actor_id` = '76') AND (`film_actor`.`film_id` = '234'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '76')) OR ((`film_actor`.`actor_id` = '76') AND (`film_actor`.`film_id` &gt; '234'))) AND (((`film_actor`.`actor_id` &lt; '110')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` &lt; '513')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` = '513'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '110')) OR ((`film_actor`.`actor_id` = '110') AND (`film_actor`.`film_id` &gt; '513'))) AND (((`film_actor`.`actor_id` &lt; '146')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` &lt; '278')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` = '278'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '146')) OR ((`film_actor`.`actor_id` = '146') AND (`film_actor`.`film_id` &gt; '278'))) AND (((`film_actor`.`actor_id` &lt; '183')) OR ((`film_actor`.`actor_id` = '183') AND (`film_actor`.`film_id` &lt; '862')) OR ((`film_actor`.`actor_id` = '183') AND (`film_actor`.`film_id` = '862'))));
+UPDATE sakila.film_actor SET last_update = last_update + INTERVAL 6 HOUR <strong>WHERE</strong> ((((`film_actor`.`actor_id` &gt; '183')) OR ((`film_actor`.`actor_id` = '183') AND (`film_actor`.`film_id` &gt; '862'))) AND (((`film_actor`.`actor_id` &lt; '200')) OR ((`film_actor`.`actor_id` = '200') AND (`film_actor`.`film_id` &lt; '993')) OR ((`film_actor`.`actor_id` = '200') AND (`film_actor`.`film_id` = '993'))));</pre>
+</blockquote>
+<p>View the complete command to realize just how much more complex each query is, and how much more complex the chunking becomes. Here&#8217;s how I evaluate the chunk&#8217;s &#8220;next range end&#8221; variables:</p>
+<blockquote>
+<pre>select 
+  actor_id, film_id 
+from (
+  select 
+    actor_id, film_id 
+  from 
+    `sakila`.`film_actor` 
+  where 
+    (((`film_actor`.`actor_id` &gt; @_split_column_variable_range_start_1)) OR ((`film_actor`.
+`actor_id` = @_split_column_variable_range_start_1) AND (`film_actor`.`film_id` &gt; @_split_column_variable_range_start_2))) and (((`film_actor`.`actor_id` &lt; @_split_column_variable_max_1)) OR ((`film_actor`.`actor_id` = @_split_column_variable_max_1) AND (`film_actor`.`film_id` &lt; @_split_column_variable_max_2)) OR ((`film_actor`.`actor_id` = @_split_column_variable_max_1) AND (`film_actor`.`film_id` = @_split_column_variable_max_2))) 
+  order by 
+    actor_id ASC, film_id ASC 
+  limit 1000 
+  ) sel_split_range  
+order by 
+  actor_id DESC, film_id DESC 
+limit 1  
+into @_split_column_variable_range_end_1, @_split_column_variable_range_end_2
+;</pre>
+</blockquote>
+<p>By the way, you may recall that everything is done server side. The <strong>WHERE</strong> condition for the chunked queries is in itself generated via SQL statement, and not too much by programmatic logic. Here&#8217;s <em>part</em> of the query which computes the limiting condition:</p>
+<blockquote>
+<pre>  select
+    group_concat('(', partial_comparison, ')' order by n separator ' OR ') as comparison
+  from (
+    select 
+      n,
+      group_concat('(', column_name, ' ', if(is_last, comparison_operator, '='), ' ', variable_name, ')' order by column_order separator ' AND ') as partial_comparison
+    from (
+      select 
+        n, CONCAT(mysql_qualify(split_table_name), '.', mysql_qualify(column_name)) AS column_name,
+        case split_variable_type
+          when 'range_start' then range_start_variable_name
+          when 'range_end' then range_end_variable_name
+          when 'max' then max_variable_name
+        end as variable_name,
+        _split_column_names_table.column_order, _split_column_names_table.column_order = n as is_last 
+      from 
+        numbers, _split_column_names_table 
+      where 
+        n between _split_column_names_table.column_order and num_split_columns 
+      order by n, _split_column_names_table.column_order
+    ) s1
+    group by n
+  ) s2
+  into return_value
+  ;</pre>
+</blockquote>
+<p>There is a lot of complexity to <em>split</em> to make it able to provide with as clean a syntax for the user as possible.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5035</post-id>	</item>
+		<item>
+		<title>Table split(&#8230;) for the masses</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/table-split-for-the-masses</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/table-split-for-the-masses#respond</comments>
+				<pubDate>Wed, 05 Sep 2012 05:04:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5034</guid>
+				<description><![CDATA[(pun intended) common_schema&#8216;s new split statement (see release announcement) auto-splits complex queries over large tables into smaller ones: instead of issuing one huge query, split breaks one&#8217;s query into smaller queries, each working on a different set of rows (a chunk). Thus, it is possible to avoid holding locks for long times, allowing for smaller [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>(pun intended)</p>
+<p><em>common_schema</em>&#8216;s new <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> statement (see <a href="https://shlomi-noach.github.io/blog/mysql/common_schema-1-1-released-split-try-catch-killall-profiling">release announcement</a>) auto-splits complex queries over large tables into smaller ones: instead of issuing one huge query, <em>split</em> breaks one&#8217;s query into smaller queries, each working on a different set of rows (a chunk).</p>
+<p>Thus, it is possible to avoid holding locks for long times, allowing for smaller transactions. It also makes for breathing space for the RDBMS, at times boosting operation speed, and at times prolonging operation speed at will.</p>
+<p>In this post I show how <em>split</em> exposes itself to the user, should the user wish so.</p>
+<p><em>split</em> can manage queries of the following forms:</p>
+<ul>
+<li>DELETE FROM table_name [WHERE]&#8230;</li>
+<li>DELETE FROM table_name USING &lt;multi table syntax&gt; [WHERE]&#8230;</li>
+<li>UPDATE table_name SET &#8230; [WHERE]&#8230;</li>
+<li>UPDATE &lt;multiple tables&gt; SET &#8230; [WHERE]&#8230;</li>
+<li>INSERT INTO some_table SELECT &#8230; FROM &lt;single or multiple tables&gt; [WHERE]&#8230;</li>
+<li>REPLACE INTO some_table SELECT &#8230; FROM &lt;single or multiple tables&gt; [WHERE]&#8230;</li>
+<li>SELECT &#8230; FROM &lt;multiple tables&gt; [WHERE]&#8230;</li>
+</ul>
+<p>The latter being a non-obvious one at first sight.</p>
+<h4>Basically, it&#8217; automatic</h4>
+<p>You just say:</p>
+<blockquote>
+<pre><strong>split</strong> (UPDATE sakila.inventory SET last_update = last_update + INTERVAL 6 HOUR)
+  throttle 2;</pre>
+</blockquote>
+<p>And <em>split</em> identifies <strong>sakila.inventory</strong> as the table which needs to be split, and injects appropriate conditions so as to work on a subset of the rows, in multiple steps.</p>
+<p>By the way, here&#8217;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_execution.html">how to execute a QueryScript code</a> like the above.<span id="more-5034"></span></p>
+<h4>But you can drive in manual mode</h4>
+<p>You can use the following syntax:</p>
+<blockquote>
+<pre><strong>split</strong> (sakila.inventory)
+{
+  -- No action taken, but this block of code
+  -- is executed per chunk of the table.
+  -- I wonder what can be done here?
+}</pre>
+</blockquote>
+<p><em>split</em> provides with <em>magic variables</em>, which you can use in the action block. These are:</p>
+<ul>
+<li><strong>$split_step</strong>: <strong>1</strong>-based loop counter</li>
+<li><strong>$split_rowcount</strong>: number of rows affected in current chunk operation</li>
+<li><strong>$split_total_rowcount</strong>: total number of rows affected during this <em>split</em> statement</li>
+<li><strong>$split_total_elapsed_time</strong>: number of seconds elapsed since beginning of this <em>split</em> operation.</li>
+<li><strong>$split_clause</strong>: <em>the</em> magic variable: the filtering condition limiting rows to current chunk.</li>
+<li><strong>$split_table_schema</strong>: the explicit or inferred schema of split table</li>
+<li><strong>$split_table_name</strong>: the explicit or inferred table being split</li>
+</ul>
+<p>To illustrate, consider the following script:</p>
+<blockquote>
+<pre><strong>split</strong> (sakila.inventory)
+{
+  select <strong>$split_step</strong> as step, <strong>$split_clause</strong> as clause;
+}</pre>
+</blockquote>
+<p>The output is this:</p>
+<blockquote>
+<pre>+------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                                                                    |
++------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|    1 | ((((`inventory`.`inventory_id` &gt; '1')) OR ((`inventory`.`inventory_id` = '1'))) AND (((`inventory`.`inventory_id` &lt; '1000')) OR ((`inventory`.`inventory_id` = '1000')))) |
++------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    2 | ((((`inventory`.`inventory_id` &gt; '1000'))) AND (((`inventory`.`inventory_id` &lt; '2000')) OR ((`inventory`.`inventory_id` = '2000')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    3 | ((((`inventory`.`inventory_id` &gt; '2000'))) AND (((`inventory`.`inventory_id` &lt; '3000')) OR ((`inventory`.`inventory_id` = '3000')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    4 | ((((`inventory`.`inventory_id` &gt; '3000'))) AND (((`inventory`.`inventory_id` &lt; '4000')) OR ((`inventory`.`inventory_id` = '4000')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+| step | clause                                                                                                                               |
++------+--------------------------------------------------------------------------------------------------------------------------------------+
+|    5 | ((((`inventory`.`inventory_id` &gt; '4000'))) AND (((`inventory`.`inventory_id` &lt; '4581')) OR ((`inventory`.`inventory_id` = '4581')))) |
++------+--------------------------------------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>So you can get yourself a nice present: the SQL clause which filters the distinct chunks.</p>
+<h4>A simple demo: what can the user do with &#8220;manual mode&#8221;?</h4>
+<p>Normally, I would expect the user to use the automated version of <em>split</em>. Let it do the hard work! But sometimes, you may wish to take control into your hands.</p>
+<p>Consider an example: I wish to export a table into CSV file, but in chunks. <a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html">pt-archiver</a> does that. But it is also easily achievable with <em>split</em>:</p>
+<blockquote>
+<pre><strong>split</strong> (sakila.inventory) {
+  var <strong>$file_name</strong> := QUOTE(CONCAT('/tmp/inventory_chunk_', <strong>$split_step</strong>, '.csv'));
+  select * from sakila.inventory WHERE <strong>:${split_clause}</strong> INTO OUTFILE <strong>:${file_name}</strong>;
+}</pre>
+</blockquote>
+<p>This script uses the powerful <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_variables.html">variable expansion</a> feature of QueryScript: it extracts the text behind <strong></strong><strong>:${split_clause}</strong> and plants it as part of the query. It does the same for <strong></strong><strong>:${file_name}</strong>, making a variable possible where MySQL would normally disallow one (the <strong>INTO OUTFILE</strong> clause only accepts a constant string).</p>
+<p>What do we get as result?</p>
+<blockquote>
+<pre><strong>bash:/tmp$ ls -s1 inventory_chunk_*</strong>
+32 inventory_chunk_1.csv
+32 inventory_chunk_2.csv
+32 inventory_chunk_3.csv
+32 inventory_chunk_4.csv
+20 inventory_chunk_5.csv</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>During the past months, and even as I developed <em>split</em> for <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a>, I found myself using it more and more for my own purposes. As it evolved I realized how much more simple it makes these complex operations. Heck, it beats <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-chunk-update.html">oak-chunk-update</a> in its ease of use. They both have their place, but <em>split</em> is so much more intuitive and easy to write. And, no external scripts, no package dependencies.</p>
+<p>I suggest that <em>split</em> is a major tool for server side scripting, server maintenance, developer operations. <a href="http://code.google.com/p/common-schema/">Check it out</a>!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/table-split-for-the-masses/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5034</post-id>	</item>
+		<item>
+		<title>Auto caching INFORMATION_SCHEMA tables: seeking input</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/auto-caching-information_schema-tables-seeking-input</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/auto-caching-information_schema-tables-seeking-input#comments</comments>
+				<pubDate>Thu, 08 Mar 2012 18:31:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4761</guid>
+				<description><![CDATA[The short version I have it all working. It&#8217;s kind of magic. But there are issues, and I&#8217;m not sure it should even exist, and am looking for input. The long version In Auto caching tables I presented with a hack which allows getting cached or fresh results via a simple SELECT queries. The drive [&#8230;]]]></description>
+								<content:encoded><![CDATA[<h4>The short version</h4>
+<p>I have it all working. It&#8217;s kind of magic. But there are issues, and I&#8217;m not sure it should even exist, and am looking for input.</p>
+<h4>The long version</h4>
+<p>In <a title="Link to Auto caching tables" href="https://shlomi-noach.github.io/blog/mysql/auto-caching-tables" rel="bookmark">Auto caching tables</a> I presented with a hack which allows getting cached or fresh results via a simple SELECT queries.</p>
+<p>The drive for the above hack was <strong>INFORMATION_SCHEMA</strong> tables. There are two major problems with <strong>INFORMATION_SCHEMA</strong>:</p>
+<ol>
+<li>Queries on schema-oriented tables such as <strong>TABLES</strong>, <strong>COLUMNS</strong>, <strong>STATISTICS</strong>, etc. are heavyweight. How heavyweight? Enough to make a lockdown of your database. Enough to crash down your database in some cases.</li>
+<li>The data is always generated on-the-fly, as you request it. Query the <strong>COLUMNS</strong> table twice, and risk two lockdowns of your database.</li>
+</ol>
+<p>The auto-cache mechanism solves issue <strong>#2</strong>. I have it working, time based. I have an auto-cache table for each of the <strong>INFORMATION_SCHEMA</strong> heavyweight tables. Say, every <strong>30</strong> minutes the cache is invalidated. Throughout those <strong>30</strong> minutes, you get a free pass!</p>
+<p>The auto-cache mechanism also paves the road to solving issue <strong>#1</strong>: since it works by invoking a stored routine, I have better control of the way I read <strong>INFORMATION_SCHEMA</strong>. This, I can take advantage of <a href="http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html">INFORMATION_SCHEMA optimization</a>. It&#8217;s tedious, but not complicated.</p>
+<p>For example, if I wanted to cache the <strong>TABLES</strong> table, I don&#8217;t necessarily read the entire <strong>TABLES</strong> data in one read. Instead, I can iterate the schemata, get a list of table names per schema, then read full row data for these, table by table. The result? Many many more <strong>SELECT</strong>s, but more optimized, and no one-big-lock-it-all query.</p>
+<h4>And the problem is&#8230;</h4>
+<p><span id="more-4761"></span>I have two burning problems.</p>
+<ol>
+<li><strong>INFORMATION_SCHEMA</strong> optimization only works <em>that much</em>. It sometimes does not work. In particular, I&#8217;ve noticed that if you have a view which relies on another view (possibly relying on yet another view), things get out of hand. I author a monitoring tool for MySQL called <a href="http://code.openark.org/forge/mycheckpoint/">mycheckpoint</a>. It uses some fancy techniques for generating aggregated data, HTML and charts, by means of nested views. There are a few views there I can never query for in <strong>COLUMNS</strong>. It just crashes down my server. Repeatedly. And it&#8217;s a good machine with good configuration. Make that <strong>5</strong> machines. They all crash, repeatedly. I just can&#8217;t trust <strong>INFORMATION_SCHEMA</strong>!</li>
+<li>Replication: any caching table is bound to replicate. Does it make any sense to replicate cache for internal metadata? Does it make sense to query for the cached table on slave, to have it answer for <em>master&#8217;</em>s data? With plain old <strong>INFORMATION_SCHEMA</strong>, every server is on its own. Caching kinda works against this. Or is it fair enough, since we would usually expect master/slaves to reflect same schema structure?</li>
+</ol>
+<p>I would feel much better if I could read <strong>SHOW</strong> statements with a <strong>SELECT</strong> query. Though I&#8217;ve found this <a href="https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side">nice hack</a>, it can&#8217;t work from a stored function, only via stored procedure. So it can&#8217;t be used from within a <strong>SELECT</strong> query. I&#8217;ve been banging my head for months now, I think I gave up on this one.</p>
+<p>Any insights are welcome!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/auto-caching-information_schema-tables-seeking-input/feed</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4761</post-id>	</item>
+		<item>
+		<title>INFORMATION_SCHEMA Optimizations: still crashing my servers</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/information_schema-optimizations-still-crashing-my-servers</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/information_schema-optimizations-still-crashing-my-servers#comments</comments>
+				<pubDate>Mon, 12 Dec 2011 07:35:19 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4561</guid>
+				<description><![CDATA[[Update: need to take more breaks: now NOT crashing my servers! See clarifications below] INFORMATION_SCHEMA Optimizations are meant to make your INFORMATION_SCHEMA queries lighter and safer. For example, if you&#8217;re going to query the COLUMNS table for just the columns of a single table, then the following: SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='sakila' AND TABLE_NAME='rental' [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>[Update</strong>: need to take more breaks: now<strong> NOT</strong> crashing my servers! See clarifications below<strong>]</strong></p>
+<p><a href="http://dev.mysql.com/doc/refman/5.1/en/information-schema-optimization.html">INFORMATION_SCHEMA Optimizations</a> are meant to make your <strong>INFORMATION_SCHEMA</strong> queries lighter and safer.</p>
+<p>For example, if you&#8217;re going to query the <strong>COLUMNS</strong> table for just the columns of a single table, then the following:</p>
+<blockquote>
+<pre>SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='sakila' AND TABLE_NAME='rental'</pre>
+</blockquote>
+<p>makes for an optimization: specifying a literal on <strong>TABLE_SCHEMA</strong> avoid scanning the directories of other schemata. Specifying a literal on <strong>TABLE_NAME</strong> avoids checking up on other tables. So it&#8217;s a one-schema-one-table read operation, as opposed to <em>&#8220;first read every single column from all and any single schema and table, then return only those I&#8217;m interested in&#8221;</em>.</p>
+<p>Here&#8217;s the execution plan for the above query:</p>
+<blockquote>
+<pre>*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: COLUMNS
+         type: ALL
+possible_keys: NULL
+          key: TABLE_SCHEMA,TABLE_NAME
+      key_len: NULL
+          ref: NULL
+         rows: NULL
+        Extra: Using where; Open_frm_only; Scanned 0 databases</pre>
+</blockquote>
+<p>What I tried to do is to read the entire <strong>COLUMNS</strong> table, one schema at a time, one table at a time. I&#8217;m good with this taking longer time.</p>
+<p>I have a production system on which reads from <strong>COLUMNS</strong> <em>consistently crash the servers</em>. Well, one read at a time can&#8217;t do harm, right?<span id="more-4561"></span></p>
+<p><del>Unfortunately, as the title of this posts reveals, even sequential read of <strong>COLUMNS</strong> using <strong>INFORMATION_SCHEMA</strong> optimization does not help: a minute into the process and the client lost connection. The server crashed.</del></p>
+<p><del>I was expecting that table locks would be released, buffers released etc. One at a time, there wouldn&#8217;t be a congestion of locks, reads, table cache suffocation etc.</del></p>
+<p><del>Was actually having high hopes for this to succeed. I have to find a way in which <strong>INFORMATION_SCHEMA</strong> tables are not dangerous.</del></p>
+<p>A few hours later, and I have both conclusions and achievements.</p>
+<p>There are indeed memory issues with querying from <strong>INFORMATION_SCHEMA</strong> tables. I&#8217;ve found that <strong>VARCHAR(64)</strong> columns can consume <strong>64K</strong> each: I&#8217;m reading from large tables of more than <strong>1,000</strong> columns each, while monitoring MySQL&#8217;s memory consumption. By dividing the increase in memory by the number of rows resulting from a query I sent, and which was for one single columns, I got an almost exact <strong>64K</strong> value per row.</p>
+<p>So a query on <strong>INFORMATION_SCHEMA</strong> consumes much more memory than it should. The good news is that this memory is released once the query terminates. So there is no leak into the session memory.</p>
+<p>This is combined with a <em>mistake of mine</em> in the way I iterated the tables, such that the problem was amplified: I happened to query much more than I needed, and so got my query&#8217;s memory bloated. That is to say, I used the <strong>INFORMATION_SCHEMA</strong> optimizations only partly right, and so got only part of the savings it could offer me.</p>
+<p>With better pinpointing I&#8217;m now actually able to read from <strong>COLUMNS,</strong> without crashing my servers, <em>consistently</em>.</p>
+<p>I will further look into the <strong>64K</strong> issue. That in itself still drains a lot of memory: on my <a href="http://code.openark.org/forge/mycheckpoint">mycheckpoint</a> schema tables a singe table read means &gt; <strong>64MB</strong> of query memory down the drain.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/information_schema-optimizations-still-crashing-my-servers/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4561</post-id>	</item>
+		<item>
+		<title>More MySQL foreach()</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach#comments</comments>
+				<pubDate>Fri, 02 Dec 2011 13:55:32 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[scripts]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4171</guid>
+				<description><![CDATA[In my previous post I&#8217;ve shown several generic use cases for foreach(), a new scripting functionality introduced in common_schema. In this part I present DBA&#8217;s handy syntax for schema and table operations and maintenance. Confession: while I love INFORMATION_SCHEMA&#8216;s power, I just hate writing queries against it. It&#8217;s just so much typing! Just getting the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In my <a href="https://shlomi-noach.github.io/blog/mysql/mysql-foreach">previous post</a> I&#8217;ve shown several generic use cases for <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/foreach.html"><em>foreach()</em></a>, a new scripting functionality introduced in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>.</p>
+<p>In this part I present DBA&#8217;s handy syntax for schema and table operations and maintenance.</p>
+<p>Confession: while I love <strong>INFORMATION_SCHEMA</strong>&#8216;s power, I just <em>hate</em> writing queries against it. It&#8217;s just so much typing! Just getting the list of tables in a schema makes for this heavy duty query:</p>
+<blockquote>
+<pre>SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='sakila' AND TABLE_TYPE='BASE TABLE';</pre>
+</blockquote>
+<p>When a join is involved this really becomes a nightmare. I think it&#8217;s cumbersome, and as result, many do not remember the names and meaning of columns, making for <em>&#8220;oh, I need to read the manual all over again just to get that query right&#8221;</em>. Anyway, that&#8217;s my opinion.</p>
+<p>A <strong>SHOW TABLES</strong> statement is easier to type, but cannot be integrated into a <strong>SELECT</strong> query (though <a href="https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side">we have a partial solution</a> for that, too), and besides, when filtering out the views, the <strong>SHOW</strong> statement becomes almost as cumbersome as the one on <strong>INFORMATION_SCHEMA</strong>.</p>
+<p>Which is why <em>foreach()</em> offers handy shortcuts to common iterations on schemata and tables, as follows:</p>
+<h4>Use case: iterate all databases</h4>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema'</span>, <span style="color: #003366;">'CREATE TABLE ${schema}.event(event_id INT, msg VARCHAR(128))'</span>);</pre>
+</blockquote>
+<p>In the above we execute a query on each database. Hmmm, maybe not such a good idea to perform this operation on all databases? Let&#8217;s filter them:</p>
+<h4>Use case: iterate databases by name match</h4>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema like wordpress_%'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.wp_posts MODIFY COLUMN comment_author VARCHAR(96) NOT NULL'</span>);</pre>
+</blockquote>
+<p>The above will only iterate my WordPress databases (I have several of these), performing an <strong>ALTER</strong> on <strong>wp_posts</strong> for each of those databases.<span id="more-4171"></span></p>
+<p>I don&#8217;t have to quote the <em>like</em> expression, but I can, if I wish to.</p>
+<p>I can also use a regular expression match:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'schema ~ /^wordpress_[0-9]+$/'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.wp_posts MODIFY COLUMN comment_author VARCHAR(96) NOT NULL'</span>);</pre>
+</blockquote>
+<h4>Use case: iterate tables in a specific schema</h4>
+<p>Time to upgrade our <strong>sakila</strong> tables to InnoDB&#8217;s compressed format. We use <strong>$()</strong>, a synonym for <em>foreach()</em>.</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'table in sakila'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB ROW_FORMAT=COMPRESSED'</span>);</pre>
+</blockquote>
+<p>The above will iterate on tables in <strong>sakila</strong>. I say <em>tables</em>, since it will avoid iterating views (there is still no specific syntax for views iteration). This is done on purpose, as my experience shows there is very little in common between tables and views when it comes to maintenance and operations.</p>
+<h4>Use case: iterate tables by name match</h4>
+<p>Here&#8217;s a interesting scenario: you wish to work on all tables matching some name. The naive approach would be to:</p>
+<blockquote>
+<pre>SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'wp_posts' AND TABLE_TYPE = 'BASE TABLE'</pre>
+</blockquote>
+<p><em><strong>Wait!</strong></em> Are you aware this may bring your server down? This query will open all databases at once, opening all <strong>.frm</strong> files (though thankfully not data files, since we only check for name and type).</p>
+<p>Here&#8217;s a better approach:</p>
+<blockquote>
+<pre>call foreach(<span style="color: #808000;">'table like wp_posts'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB'</span>);</pre>
+</blockquote>
+<p>(There&#8217;s now FULLTEXT to InnoDB, so the above can make sense in the near future!)</p>
+<p>The good part is that <em>foreach()</em> will look for matching tables <em>one database at a time</em>. It will iterate the list of database, then look for matching tables per database, thereby optimizing the query on <strong>INFORMATION_SCHEMA</strong>.</p>
+<p>Here, too, I can use regular expressions:</p>
+<blockquote>
+<pre>call $(<span style="color: #808000;">'table ~ /^wp_.*$/'</span>, <span style="color: #003366;">'ALTER TABLE ${schema}.${table} ENGINE=InnoDB'</span>);</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>This is work in the making, but, as someone who maintains a few productions servers, I&#8217;ve already put it to work.</p>
+<p>I&#8217;m hoping the syntax is easy to comprehend. I know that since I developed it it must be far more intuitive to myself than to others. I&#8217;ve tried to keep close on common syntax and concepts from various programming languages.</p>
+<p>I would like to get as much feedback as possible. I have further ideas and thoughts on the direction <a href="http://code.google.com/p/common-schema/">common_schema</a> is taking, but wish take it in small steps. Your feedback is appreciated!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/more-mysql-foreach/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4171</post-id>	</item>
+		<item>
+		<title>Reading results of SHOW statements, on server side</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side#comments</comments>
+				<pubDate>Fri, 25 Nov 2011 19:39:58 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Hacks]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4138</guid>
+				<description><![CDATA[SHOW statements are show stoppers on server side. While clients can get a SHOW statement as a result set just as any normal SELECT, things are not as such on server side. On server side, that is, from within MySQL itself, one cannot: SELECT `Database` FROM (SHOW DATABASES); One cannot: DECLARE show_cursor CURSOR FOR SHOW [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><strong>SHOW</strong> statements are show stoppers on server side. While clients can get a <a href="http://dev.mysql.com/doc/refman/5.1/en/show.html">SHOW statement</a> as a result set just as any normal <strong>SELECT</strong>, things are not as such on server side.</p>
+<p>On server side, that is, from within MySQL itself, one <em>cannot</em>:</p>
+<blockquote>
+<pre>SELECT `Database` FROM (SHOW DATABASES);</pre>
+</blockquote>
+<p>One <em>cannot</em>:</p>
+<blockquote>
+<pre>DECLARE show_cursor CURSOR FOR SHOW TABLES;</pre>
+</blockquote>
+<p>One <em>cannot</em>:</p>
+<blockquote>
+<pre>SHOW TABLES INTO OUTFILE '/tmp/my_file.txt';</pre>
+</blockquote>
+<p>So it is impossible to get the results with a query; impossible to get the results from a stored routine; impossible to get the results by file reading&#8230;</p>
+<h4>Bwahaha! A hack!</h4>
+<p>For some <strong>SHOW</strong> statements, there is a way around this. I&#8217;ve been banging my head against the wall for weeks now on this. Now I have a partial solution: I&#8217;m able to read <strong>SHOW</strong> output for several <strong>SHOW</strong> statements. Namely, those <strong>SHOW</strong> statements <a href="http://dev.mysql.com/doc/refman/5.1/en/extended-show.html">which allow a LIKE or a WHERE</a> clause.</p>
+<p>For example, most are familiar with the following syntax:</p>
+<blockquote>
+<pre>USE mysql;
+SHOW TABLE STATUS LIKE 'user';</pre>
+</blockquote>
+<p>However not so many know that any <strong>SHOW</strong> statement which accepts <strong>LIKE</strong>, can also accept <strong>WHERE</strong>:<span id="more-4138"></span></p>
+<blockquote>
+<pre>SHOW TABLE STATUS WHERE Name='user'\G
+*************************** 1. row ***************************
+           Name: user
+         Engine: MyISAM
+        Version: 10
+     Row_format: Dynamic
+           Rows: 17
+ Avg_row_length: 69
+    Data_length: 1184
+Max_data_length: 281474976710655
+   Index_length: 2048
+      Data_free: 0
+ Auto_increment: NULL
+    Create_time: 2010-10-03 08:23:48
+    Update_time: 2011-07-30 19:31:00
+     Check_time: NULL
+      Collation: utf8_bin
+       Checksum: NULL
+ Create_options:
+        Comment: Users and global privileges</pre>
+</blockquote>
+<p>It&#8217;s not just about &#8220;<strong>Name</strong>&#8220;. I can filter using any column I like:</p>
+<blockquote>
+<pre>SHOW TABLE STATUS WHERE Rows &gt; 1000;
+SHOW TABLE STATUS WHERE Rows &gt; 1000 AND Index_length &gt; 65536;</pre>
+</blockquote>
+<p>etc.</p>
+<p>If you&#8217;ve been to my talk on <a href="http://www.percona.com/live/london-2011/session/programmatic-queries-things-you-can-code-with-sql/">Programmatic Queries: things you can code with SQL</a>, you have a good guess as for where I&#8217;m taking this.</p>
+<h4>Where there&#8217;s WHERE, there&#8217;s code</h4>
+<p>I can write code within the <strong>WHERE</strong> clause. Specifically, I can work with user defined variables. Shall we cut to the point and provide with an example?</p>
+<blockquote>
+<pre>mysql&gt; SET @databases := '';
+
+mysql&gt; SHOW DATABASES WHERE (@databases := CONCAT(@databases, `Database`, ',')) IS NULL;
+
+mysql&gt; SELECT @databases;
++-------------------------------------------------------------------+
+| @databases                                                        |
++-------------------------------------------------------------------+
+| information_schema,common_schema,mycheckpoint,mysql,sakila,world, |
++-------------------------------------------------------------------+</pre>
+</blockquote>
+<p>Let&#8217;s discuss the above. We:</p>
+<ul>
+<li>Set a user variables called <strong>@databases</strong> to an empty text</li>
+<li>Iterate through the <strong>SHOW DATABASES</strong> rowset. The <strong>WHERE</strong> clause is always <em>false</em> (the expression is in fact <strong>NOT NULL</strong> for all rows), so rows are not printed out, and we get an empty result set (we&#8217;re not really interested in a result set here, since there&#8217;s no way to read it anyhow).</li>
+<li>However we do take care to &#8220;remember&#8221; the value we visit, by concatenating the <strong>`Database`</strong> column value.</li>
+<li>We end up with a delimited string of database names. You&#8217;ll forgive the ending <strong>&#8216;,&#8217;</strong>. This is just a simple example, it is of no importance.</li>
+</ul>
+<h4>Further notes</h4>
+<p>What can we do with the concatenated list of database names? Whatever we want to. We can parse it again, <strong>INSERT</strong> it <strong>INTO</strong> some table, save to file, iterate, what have you!</p>
+<p>We can wrap the above in a stored routine. Alas, not with a stored function, since the <strong>SHOW</strong> command, although returns with an empty result set, does return with a result set, not allowed withing functions.<strong></strong></p>
+<h4>Limitations</h4>
+<ul>
+<li>Sadly, <strong>SHOW SLAVE STATUS</strong>, <strong>SHOW MASTER LOGS</strong> etc., do not support <strong>LIKE</strong> or <strong>WHERE</strong> syntax. Bummer.</li>
+<li>Stored functions, as just mentioned, cannot utilize this hack. Hey, I&#8217;m still working on this!</li>
+</ul>
+<h4>To what use?</h4>
+<p>Originally I wanted to avoid the time &amp; locking it takes for <strong>INFORMATION_SCHEMA</strong> queries, such as on <strong>TABLES</strong>, <strong>COLUMNS</strong>, etc. Ironically, in a few days apart I&#8217;ve found <em>another</em> interesting solution (well, two, actually) to manage reads from <strong>INFORMATION_SCHEMA</strong> with less overhead than in normal use. I&#8217;ll talk about that another time; am about to use this in <a href="http://code.google.com/p/common-schema/" rel="nofollow">common_schema</a>.</p>
+<h4>Further notes</h4>
+<p>I met <a href="http://rpbouman.blogspot.com/">Roland</a> in <a href="http://www.percona.com/live/london-2011/">London</a>, and he liked the solution. As <a href="http://www.mysqlperformanceblog.com/author/baron/">Baron</a> joined, Roland said: &#8220;Baron, do you know Shlomi devised a method to read the output of <strong>SHOW</strong> commands?&#8221;</p>
+<p>And Baron said: &#8220;Without using files? Then a <strong>SHOW</strong> statement can have a <strong>WHERE</strong> clause, in which case you can use a variable&#8221;, and went on looking for his wife.</p>
+<p>And we remained speechless.</p>
+<p>[UPDATE: I&#8217;ve manually changed timestamp of this post due to failure in its aggregation in planet.mysql, being a major source of incoming traffic to this site]</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reading-results-of-show-statements-on-server-side/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4138</post-id>	</item>
+	</channel>
+</rss>

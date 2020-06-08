@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>raft &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/raft/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 03 Aug 2017 13:32:59 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>orchestrator/raft: Pre-Release 3.0</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0#comments</comments>
+				<pubDate>Thu, 03 Aug 2017 08:41:11 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Failover]]></category>
+		<category><![CDATA[High availability]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7740</guid>
+				<description><![CDATA[orchestrator 3.0 Pre-Release is now available. Most notable are Raft consensus, SQLite backend support, orchestrator-client no-binary-required client script. TL;DR You may now set up high availability for orchestrator via raft consensus, without need to set up high availability for orchestrator&#8216;s backend MySQL servers (such as Galera/InnoDB Cluster). In fact, you can run a orchestrator/raft setup [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><code>orchestrator</code> <strong>3.0 Pre-Release</strong> is <a href="https://github.com/github/orchestrator/releases/tag/v3.0.pre-release">now available</a>. Most notable are <strong>Raft</strong> consensus, <strong>SQLite</strong> backend support, <strong>orchestrator-client</strong> no-binary-required client script.</p>
+<h3>TL;DR</h3>
+<p>You may now set up high availability for <code>orchestrator</code> via <code>raft</code> consensus, without need to set up high availability for <code>orchestrator</code>&#8216;s backend MySQL servers (such as Galera/InnoDB Cluster). In fact, you can run a <code>orchestrator/raft</code> setup using embedded <code>SQLite</code> backend DB. Read on.</p>
+<p><code>orchestrator</code> still supports the existing shared backend DB paradigm; nothing dramatic changes if you upgrade to <strong>3.0</strong> and do not configure <code>raft</code>.</p>
+<h3>orchestrator/raft</h3>
+<p><a href="https://raft.github.io/">Raft</a> is a consensus protocol, supporting leader election and consensus across a distributed system.  In an <code>orchestrator/raft</code> setup <code>orchestrator</code> nodes talk to each other via raft protocol, form consensus and elect a leader. Each <code>orchestrator</code> node has its own <em>dedicated</em> backend database. The backend databases do not speak to each other; only the <code>orchestrator</code> nodes speak to each other.</p>
+<p>No MySQL replication setup needed; the backend DBs act as standalone servers. In fact, the backend server doesn&#8217;t have to be MySQL, and <code>SQLite</code> is supported. <code>orchestrator</code> now ships with <code>SQLite</code> embedded, no external dependency needed.<span id="more-7740"></span></p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png"><img class="alignnone size-full wp-image-7743" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png" alt="" width="824" height="326" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft.png 824w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft-300x119.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/orchestrator-ha-raft-768x304.png 768w" sizes="(max-width: 824px) 100vw, 824px" /></a></p></blockquote>
+<p>In a <code>orchestrator/raft</code> setup, all <code>orchestrator</code> nodes talk to each other. One and only one is elected as <em>leader</em>. To become a leader a node must be part of a <em>quorum</em>. On a <code>3</code> node setup, it takes <code>2</code> nodes to form a quorum. On a <code>5</code> node setup, it takes <code>3</code> nodes to form a quorum.</p>
+<p>Only the leader will run failovers. This much is similar to the existing shared-backend DB setup. However in a <code>orchestrator/raft</code> setup each node is independent, and each <code>orchestrator</code> node <em>runs discoveries</em>. This means a MySQL server in your topology will be routinely visited and probed by not one <code>orchestrator</code> node, but by all <code>3</code> (or <code>5</code>, or what have you) nodes in your raft cluster.</p>
+<p>Any communication to <code>orchestrator</code> must take place through the leader. One may not tamper directly with the backend DBs anymore, since the <code>leader</code> is the one authoritative entity to replicate and announce changes to its peer nodes. See <strong>orchestrator-client</strong> section following.</p>
+<p>For details, please refer to the documentation:</p>
+<ul>
+<li><a href="https://github.com/github/orchestrator/blob/master/docs/raft.md">orchestrator/raft: overview</a></li>
+<li><a href="https://github.com/github/orchestrator/blob/master/docs/raft-vs-sync-repl.md">orchestrator/raft vs. shared backend DB setup, comparison</a></li>
+</ul>
+<p>The <code>orchetrator/raft</code> setup comes to solve several issues, the most obvious is high availability for the <code>orchestrator</code> service: in a <code>3</code> node setup any single <code>orchestrator</code> node can go down and <code>orchestrator</code> will reliably continue probing, detecting failures and recovering from failures.</p>
+<ul>
+<li>See all <a href="https://github.com/github/orchestrator/blob/master/docs/high-availability.md">orchestrator high availability solutions</a></li>
+</ul>
+<p>Another issue solve by <code>orchestrator/raft</code> is network isolation, in particularly cross-DC, also refered to as <em>fencing</em>. Some visualization will help describe the issue.</p>
+<p>Consider this 3 data-center replication setup. The master, along with a few replicas, resides on <strong>DC1</strong>. Two additional DCs have intermediate masters, aka local-masters, that relay replication to local replicas.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1.png"><img class="alignnone wp-image-7752 size-medium" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1-300x252.png" alt="" width="300" height="252" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1-300x252.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-1.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>We place <code>3 orchestrator</code> nodes in a <code>raft</code> setup, each in a different DC. Note that traffic between <code>orchestrator</code> nodes is very low, and cross DC latencies still conveniently support the <code>raft</code> communication. Also note that backend DB writes have nothing to do with cross-DC traffic and are unaffected by latencies.</p>
+<p>Consider what happens if DC1 gets network isolated: no traffic in or out DC1</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated.png"><img class="alignnone size-medium wp-image-7755" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-300x249.png" alt="" width="300" height="249" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-300x249.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>Each <code>orchestrator</code> nodes operates independently, and each will see a different state. DC1&#8217;s <code>orchestrator</code> will see all servers in DC2, DC3 as dead, but figure the master itself is fine, along with its local DC1 replicas:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view.png"><img class="alignnone size-medium wp-image-7756" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view-300x248.png" alt="" width="300" height="248" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view-300x248.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc1-view.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>However both <code>orchestrator</code> nodes in DC2 and DC3 will see a different picture: they will see all DC1&#8217;s servers as dead, with local masters in DC2 and DC3 having broken replication:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view.png"><img class="alignnone size-medium wp-image-7757" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view-300x255.png" alt="" width="300" height="255" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view-300x255.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-dc2-dc3-view.png 698w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>Who gets to choose?</p>
+<p>In the <code>orchestrator/raft</code> setup, only the leader runs failovers. The leader must be part of a quorum. Hence the leader will be an <code>orchestrator</code> node in either DC2 or DC3. DC1&#8217;s <code>orchestrator</code> will <em>know</em> it is isolated, that it isn&#8217;t part of the quorum, hence will step down from leadership (that&#8217;s the premise of the <code>raft</code> consensus protocol), hence will not run recoveries.</p>
+<p>There will be no split brain in this scenario. The <code>orchestrator</code> leader, be it in DC2 or DC3, will act to recover and promote a master from within DC2 or DC3. A possible outcome would be:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered.png"><img class="alignnone size-medium wp-image-7758" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered-300x259.png" alt="" width="300" height="259" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered-300x259.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-3dc-dc1-isolated-recovered.png 680w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>What if you only have 2 data centers?</p>
+<p>In such case it is advisable to put two <code>orchestrator</code> nodes, one in each of your DCs, and a <em>third</em> <code>orchestrator</code> node as a mediator, in a 3rd DC, or in a different availability zone. A cloud offering should do well:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator.png"><img class="alignnone size-medium wp-image-7759" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator-300x254.png" alt="" width="300" height="254" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator-300x254.png 300w, https://shlomi-noach.github.io/blog/wp-content/uploads/2017/08/raft-2dc-mediator.png 688w" sizes="(max-width: 300px) 100vw, 300px" /></a></p></blockquote>
+<p>The <code>orchestrator/raft</code> setup plays nice and allows one to <a href="https://github.com/openark/raft/pull/1">nominate</a> a preferred leader.</p>
+<h3>SQLite</h3>
+<p>Suggested and requested by many, is to remove <code>orchestrator</code>&#8216;s own dependency on a MySQL backend. <code>orchestrator</code> now supports a SQLite backend.</p>
+<p><code>SQLite</code> is a transactional, relational, embedded database, and as of <code>3.0</code> it is embedded within <code>orchestrator</code>, no external dependency required.</p>
+<p><code>SQLite</code> doesn&#8217;t replicate, doesn&#8217;t support client/server protocol. As such, it cannot work as a shared database backend. <code>SQLite</code> is only available on:</p>
+<ul>
+<li>A single node setup: good for local dev installations, testing server, CI servers (indeed, <code>SQLite</code> now runs in <code>orchestrator</code>&#8216;s CI)</li>
+<li><code>orchestrator/raft</code> setup, where, as noted above, backend DBs do not communicate with each other in the first place and are each dedicated to their own <code>orchestrator</code> node.</li>
+</ul>
+<p>It should be pointed out that <code>SQLite</code> is a great transactional database, however <code>MySQL</code> is more performant. Load on backend DB is directly (and mostly linearly) affected by the number of probed servers. If you have <code>50</code> servers in your topologies or <code>500</code> servers, that matters. The probing frequency of course also matters for the write frequency on your backend DB. I would suggest if you have thousands of backend servers, to stick with <code>MySQL</code>. If dozens, <code>SQLite</code> should be good to go. In between is a gray zone, and at any case run your own experiments.</p>
+<p>At this time <code>SQLite</code> is configured to commit to file; there is a different setup where <code>SQLite</code> places data in-memory, which makes it faster to execute. Occasional dumps required for durability. <code>orchestrator</code> may support this mode in the future.</p>
+<h3>orchestrator-client</h3>
+<p>You install <code>orchestrator</code> as a service on a few boxes; but then how do you access it from other hosts?</p>
+<ul>
+<li>Either <code>curl</code> the <code>orchestrator</code> API</li>
+<li>Or, as most do, install <code>orchestrator-cli</code> package, which includes the <code>orchestrator</code> binary, everywhere.</li>
+</ul>
+<p>The latter implies:</p>
+<ul>
+<li>Having the <code>orchestrator</code> binary installed everywhere, hence updated everywhere.</li>
+<li>Having the <code>/etc/orchestrator.conf.json</code>deployed everywhere, along with credentials.</li>
+</ul>
+<p>The <code>orchestrator/raft</code> setup does not support running <code>orchestrator</code> in command-line mode. Reason: in this mode <code>orchestrator</code> talks directly to the shared backend DB. There is no shared backend DB in the <code>orchestrator/raft</code> setup, and all communication must go through the leader service. This is a change of paradigm.</p>
+<p>So, back to <code>curl</code>ing the HTTP API. Enter <a href="https://github.com/github/orchestrator/blob/master/docs/orchestrator-client.md"><strong>orchestrator-client</strong></a> which mimics the command line interface, while running <code>curl | jq</code> requests against the HTTP API. <code>orchestrator-client</code>, however, is just a shell script.</p>
+<p><code>orchestrator-client</code> will work well on either <code>orchestrator/raft</code> or on your existing non-raft setups. If you like, you may replace your remote <code>orchestrator</code> installations and your <code>/etc/orchestrator.conf.json</code> deployments with this script. You will need to provide the script with a hint: the <code>$ORCHESTRATOR_API</code> environment variable should be set to point to the <code>orchestrator</code> HTTP API.</p>
+<p>Here&#8217;s the fun part:</p>
+<ul>
+<li>You will either have a proxy on top of your <code>orchestrator</code> service cluster, and you would <code>export ORCHESTRATOR_API=http://my.orchestrator.service/api</code></li>
+<li>Or you will provide <code>orchestrator-client</code> with all <code>orchestrator</code> node identities, as in <code>export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"</code> .<br />
+<code>orchestrator-client</code> will <strong>figure the identity of the leader</strong> and will forward requests to the leader. At least scripting-wise, you will not require a proxy.</li>
+</ul>
+<h3>Status</h3>
+<p><code>orchestrator 3.0</code> is a <strong>Pre-Release</strong>. We are running a mostly-passive <code>orchestrator/raft</code> setup in production. It is mostly-passive in that it is not in charge of failovers yet. Otherwise it probes and analyzes our topologies, as well as runs failure detection. We will continue to improve operational aspects of the <code>orchestrator/raft</code> setup (see <a href="https://github.com/github/orchestrator/issues/246">this issue</a>).</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestratorraft-pre-release-3-0/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7740</post-id>	</item>
+		<item>
+		<title>Observations on the hashicorp/raft library, and notes on RDBMS</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms#comments</comments>
+				<pubDate>Tue, 20 Jun 2017 04:05:39 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[freno]]></category>
+		<category><![CDATA[golang]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[raft]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7717</guid>
+				<description><![CDATA[The hashicorp/raft library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s Consul. I&#8217;ve had the opportunity to work with this library a couple projects, namely freno and orchestrator. Here are a few observations on working with this library: TL;DR on Raft: a group communication protocol; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The <a href="https://github.com/hashicorp/raft">hashicorp/raft</a> library is a Go library to provide consensus via Raft protocol implementation. It is the underlying library behind Hashicorp&#8217;s <a href="https://github.com/hashicorp/consul">Consul</a>.</p>
+<p>I&#8217;ve had the opportunity to work with this library a couple projects, namely <a href="https://github.com/github/freno">freno</a> and <a href="https://github.com/github/orchestrator/pull/183/">orchestrator</a>. Here are a few observations on working with this library:</p>
+<ul>
+<li>TL;DR on Raft: a group communication protocol; multiple nodes communicate, elect a leader. A leader leads a <em>consensus</em> (any subgroup of more than half the nodes of the original group, or hopefully all of them). Nodes may leave and rejoin, and will remain consistent with consensus.</li>
+<li>The hashicorp/raft library is an implementation of the Raft protocol. There are <a href="https://raft.github.io/#implementations">other implementations</a>, and different implementations support different features.</li>
+<li>The most basic premise is leader election. This is pretty straightforward to implement; you set up nodes to communicate to each other, and they elect a leader. You may query for the leader identity via <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Leader">Leader()</a>, <a href="https://godoc.org/github.com/hashicorp/raft#Raft.VerifyLeader">VerifyLeader()</a>, or observing <a href="https://godoc.org/github.com/hashicorp/raft#Raft.LeaderCh">LeaderCh</a>.</li>
+<li>You have no control over the identity of the leader. You cannot &#8220;prefer&#8221; one node to be the leader. You cannot <em>grab</em> leadership from an elected leader, and you cannot demote a leader unless by killing it.</li>
+<li>The next premise is gossip, sending messages between the raft nodes. With <code>hashicorp/raft</code>, only the leader may send messages to the group. This is done via the <a href="https://godoc.org/github.com/hashicorp/raft#Raft.Apply">Apply()</a> function.</li>
+<li>Messages are nothing but blobs. Your app encodes the messages into <code>[]byte</code> and ships it via raft. Receiving ends need to decode the bytes into a meaningful message.</li>
+<li>You will check the result of Apply(), an <a href="https://godoc.org/github.com/hashicorp/raft#ApplyFuture">ApplyFuture</a>. The call to <a href="https://godoc.org/github.com/hashicorp/raft#Future">Error()</a> will wait for consensus.</li>
+<li>Just what is a message consensus? It&#8217;s a guarantee that the consensus of nodes has received and registered the message.</li>
+<li>Messages form the raft log.</li>
+<li>Messages are guaranteed to be handled in-order across all nodes.</li>
+<li>The leader is satisfied when the followers receive the messages/log, but it cares not for their interpretation of the log.</li>
+<li>The leader does not collect the output, or return value, of the followers applying of the log.</li>
+<li>Consequently, your followers may not abort the message. They may not cast an opinion. They must adhere to the instruction received from the leader.</li>
+<li><code>hashicorp/raft</code> uses either an <a href="http://github.com/hashicorp/raft-mdb">LMDB-based</a> store or <a href="https://github.com/boltdb/bolt">BoltDB</a> for persisting your messages. Both are transactional stores.</li>
+<li>Messages are expected to be idempotent: a node that, say, happens to restart, will request to join back the consensus (or to form a consensus with some other node). To do that, it will have to reapply historical messages that it may have applied in the past.</li>
+<li>Number of messages (log entries) will grow infinitely. Snapshots are taken so as to truncate the log history. You will implement the snapshot dump &amp; load.</li>
+<li>A snapshot includes the log index up to which it covers.</li>
+<li>Upon startup, your node will look for the most recent snapshot. It will read it, then resume replication from the aforementioned log index.</li>
+<li><code>hashicorp/raft</code> provides a file-system based snapshot implementation.</li>
+</ul>
+<p>One of my use cases is completely satisfied with the existing implementations of <code>BoltDB</code> and of the filesystem snapshot.</p>
+<p>However in another (<code>orchestrator</code>), my app stores its state in a relational backend. To that effect, I&#8217;ve modified the logstore and snapshot store. I&#8217;m using either MySQL or <code>sqlite</code> as backend stores for my app. How does that affect my <code>raft</code> use?<span id="more-7717"></span></p>
+<ul>
+<li>My backend RDBMS is the de-facto state of my <code>orchestrator</code> app. Anything written to this DB is persisted and durable.</li>
+<li>When <code>orchestrator</code> applies a raft log/message, it runs some app logic which ends with a write to the backend DB. At that time, the raft log is effectively not required anymore to persist. I care not for the history of logs.</li>
+<li>Moreover, I care not for snapshotting. To elaborate, I care not for snapshot data. My backend RDBMS <em>is the snapshot data</em>.</li>
+<li>Since I&#8217;m running a RDBMS, I find <code>BoltDB</code> to be wasteful, an additional transaction store on top a transaction store I already have.</li>
+<li>Likewise, the filesystem snapshots are yet another form of store.</li>
+<li>Log Store (including Stable Store) are <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_store.go">easily re-implemented</a> on top of RDBMS. The log is a classic relational entity.</li>
+<li>Snapshot is <a href="https://github.com/github/orchestrator/blob/222e5b55ee51c89c39b2876c774364baecc01878/go/raft/rel_snapshot.go">also implemented</a> on top of RDBMS,  however I only care for the snapshot metadata (what log entry is covered by a snapshot) and completely discard storing/loading snapshot <em>state</em> or <em>content</em>.</li>
+<li>With all these in place, I have a single entity that defines:
+<ul>
+<li>What my data looks like</li>
+<li>Where my node fares in the group gossip</li>
+</ul>
+</li>
+<li>A single RDBMS restore returns a dataset that will catch up with raft log correctly. However my restore window is limited by the number of snapshots I store and their frequency.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/observations-on-the-hashicorpraft-library-and-notes-on-rdbms/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7717</post-id>	</item>
+	</channel>
+</rss>

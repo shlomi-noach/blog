@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Checking for AUTO_INCREMENT capacity with single query	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 31 Jul 2018 14:36:57 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Using Prometheus to Check for auto_increment Value Exhaustion - Percona Database Performance Blog				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-474676</link>
+		<dc:creator><![CDATA[Using Prometheus to Check for auto_increment Value Exhaustion - Percona Database Performance Blog]]></dc:creator>
+		<pubDate>Tue, 31 Jul 2018 14:36:57 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-474676</guid>
+					<description><![CDATA[[&#8230;] are several ways to check for auto_increment capacity; this is just one of them. But what really matters is how PMM [&#8230;]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] are several ways to check for auto_increment capacity; this is just one of them. But what really matters is how PMM [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: M				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-337813</link>
+		<dc:creator><![CDATA[M]]></dc:creator>
+		<pubDate>Mon, 07 Dec 2015 11:56:57 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-337813</guid>
+					<description><![CDATA[Hi Shlomi,
+
+great 10x for looking into it.And thank you for the great utilities that you have made.
+
+BR
+Martin]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi,</p>
+<p>great 10x for looking into it.And thank you for the great utilities that you have made.</p>
+<p>BR<br />
+Martin</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-337812</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Mon, 07 Dec 2015 11:54:37 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-337812</guid>
+					<description><![CDATA[@Martin,
+
+The answer lies in the strange output you got from your `SHOW CREATE TABLE`. How is it possible you have `AUTO_INCREMENT=18446744073709551615` for an INT column? There is nothing the query can do about this: I suggest reporting this as a bug to MySQL.]]></description>
+		<content:encoded><![CDATA[<p>@Martin,</p>
+<p>The answer lies in the strange output you got from your `SHOW CREATE TABLE`. How is it possible you have `AUTO_INCREMENT=18446744073709551615` for an INT column? There is nothing the query can do about this: I suggest reporting this as a bug to MySQL.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Martin				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-337810</link>
+		<dc:creator><![CDATA[Martin]]></dc:creator>
+		<pubDate>Mon, 07 Dec 2015 11:42:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-337810</guid>
+					<description><![CDATA[Hi Shlomi,
+
+10x for the fast response.Here is the requested information:
+&lt;code&gt;
+mysql&#062; show create table ussd_ubrowser.ubrowser_phone_producers \G;
+*************************** 1. row ***************************
+      Table: ubrowser_phone_producers
+Create Table: CREATE TABLE `ubrowser_phone_producers` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `name` varchar(200) NOT NULL,
+ `ordClmn` int(11) NOT NULL,
+ PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=18446744073709551615 DEFAULT CHARSET=latin1
+1 row in set (0.00 sec)
+
+
+mysql&#062; show table status from ussd_ubrowser  like &#039;ubrowser_phone_producers&#039;  \G;
+*************************** 1. row ***************************
+          Name: ubrowser_phone_producers
+        Engine: MyISAM
+       Version: 10
+    Row_format: Dynamic
+          Rows: 6
+Avg_row_length: 21
+   Data_length: 128
+Max_data_length: 281474976710655
+  Index_length: 2048
+     Data_free: 0
+Auto_increment: 18446744073709551615
+   Create_time: 2013-02-22 20:42:54
+   Update_time: 2013-02-22 20:42:54
+    Check_time: 2015-11-27 14:57:07
+     Collation: latin1_swedish_ci
+      Checksum: NULL
+Create_options:
+       Comment:
+1 row in set (0.01 sec)
+&lt;/code&gt;]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi,</p>
+<p>10x for the fast response.Here is the requested information:<br />
+<code><br />
+mysql&gt; show create table ussd_ubrowser.ubrowser_phone_producers \G;<br />
+*************************** 1. row ***************************<br />
+      Table: ubrowser_phone_producers<br />
+Create Table: CREATE TABLE `ubrowser_phone_producers` (<br />
+ `id` int(11) NOT NULL AUTO_INCREMENT,<br />
+ `name` varchar(200) NOT NULL,<br />
+ `ordClmn` int(11) NOT NULL,<br />
+ PRIMARY KEY (`id`)<br />
+) ENGINE=MyISAM AUTO_INCREMENT=18446744073709551615 DEFAULT CHARSET=latin1<br />
+1 row in set (0.00 sec)</p>
+<p>mysql&gt; show table status from ussd_ubrowser  like 'ubrowser_phone_producers'  \G;<br />
+*************************** 1. row ***************************<br />
+          Name: ubrowser_phone_producers<br />
+        Engine: MyISAM<br />
+       Version: 10<br />
+    Row_format: Dynamic<br />
+          Rows: 6<br />
+Avg_row_length: 21<br />
+   Data_length: 128<br />
+Max_data_length: 281474976710655<br />
+  Index_length: 2048<br />
+     Data_free: 0<br />
+Auto_increment: 18446744073709551615<br />
+   Create_time: 2013-02-22 20:42:54<br />
+   Update_time: 2013-02-22 20:42:54<br />
+    Check_time: 2015-11-27 14:57:07<br />
+     Collation: latin1_swedish_ci<br />
+      Checksum: NULL<br />
+Create_options:<br />
+       Comment:<br />
+1 row in set (0.01 sec)<br />
+</code></p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-337448</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 04 Dec 2015 21:35:16 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-337448</guid>
+					<description><![CDATA[@martin, I guess the answer is &quot;this is a bug&quot; and that I should be casting along the way. But in order to fix it, I would like to see the data you were working on. Nothing special, just the table definition (only PK is of interest) and the current PK value, etc.
+
+Thanks!]]></description>
+		<content:encoded><![CDATA[<p>@martin, I guess the answer is &#8220;this is a bug&#8221; and that I should be casting along the way. But in order to fix it, I would like to see the data you were working on. Nothing special, just the table definition (only PK is of interest) and the current PK value, etc.</p>
+<p>Thanks!</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Martin				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-337397</link>
+		<dc:creator><![CDATA[Martin]]></dc:creator>
+		<pubDate>Fri, 04 Dec 2015 14:02:53 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-337397</guid>
+					<description><![CDATA[Hi 10x for the great article.But I have a question I have a result like this from running this query against one of the DB-s:
+
+&#124; ussd_ubrowser          &#124; ubrowser_phone_producers                 &#124; id                                          &#124; int       &#124; int(11)             &#124;           0 &#124;           2147483647 &#124; 18446744073709551615 &#124;      8589934596.0000 &#124;
+
+How is that possible,the  Signed int to have more than 2147483647  and the output in  AUTO_INCREMENT_RATIO is as seen above 8589934596.The version of MySQL that I use is quite old:
+
+ 5.1.73 64Bit
+
+BR
+Martin]]></description>
+		<content:encoded><![CDATA[<p>Hi 10x for the great article.But I have a question I have a result like this from running this query against one of the DB-s:</p>
+<p>| ussd_ubrowser          | ubrowser_phone_producers                 | id                                          | int       | int(11)             |           0 |           2147483647 | 18446744073709551615 |      8589934596.0000 |</p>
+<p>How is that possible,the  Signed int to have more than 2147483647  and the output in  AUTO_INCREMENT_RATIO is as seen above 8589934596.The version of MySQL that I use is quite old:</p>
+<p> 5.1.73 64Bit</p>
+<p>BR<br />
+Martin</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: common_schema over traditional scripts &#124; code.openark.org				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-147017</link>
+		<dc:creator><![CDATA[common_schema over traditional scripts &#124; code.openark.org]]></dc:creator>
+		<pubDate>Wed, 12 Dec 2012 11:56:30 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-147017</guid>
+					<description><![CDATA[[...] It turns out it takes very little effort to build a query which does the same. In which case it is also easy to build a view which provides the [...]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] It turns out it takes very little effort to build a query which does the same. In which case it is also easy to build a view which provides the [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-36172</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Wed, 06 Apr 2011 16:00:15 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-36172</guid>
+					<description><![CDATA[ORDER BY is on you :)]]></description>
+		<content:encoded><![CDATA[<p>ORDER BY is on you 🙂</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Cédric				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-36169</link>
+		<dc:creator><![CDATA[Cédric]]></dc:creator>
+		<pubDate>Wed, 06 Apr 2011 15:24:50 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-36169</guid>
+					<description><![CDATA[Nice query, just add &quot;ORDER BY 9 DESC&quot; in my case.
+Thx !]]></description>
+		<content:encoded><![CDATA[<p>Nice query, just add &#8220;ORDER BY 9 DESC&#8221; in my case.<br />
+Thx !</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/checking-for-auto_increment-capacity-with-single-query/comment-page-1#comment-36060</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 05 Apr 2011 08:27:42 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3421#comment-36060</guid>
+					<description><![CDATA[@Daniel,
+thanks, updated.]]></description>
+		<content:encoded><![CDATA[<p>@Daniel,<br />
+thanks, updated.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

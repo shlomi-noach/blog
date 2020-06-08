@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+
+	<title>“MySQL High Availability tools” followup, the missing piece: orchestrator – code.openark.org</title>
+<link rel="dns-prefetch" href="//secure.gravatar.com">
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="https://shlomi-noach.github.io/blog/wp-includes/css/dist/block-library/style.min.css" media="all">
+<style id="wp-block-library-inline-css">
+.has-text-align-justify{text-align:justify;}
+</style>
+<link rel="stylesheet" id="wp-polls-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-css.css" media="all">
+<style id="wp-polls-inline-css">
+.wp-polls .pollbar {
+	margin: 1px;
+	font-size: 6px;
+	line-height: 8px;
+	height: 8px;
+	background-image: url('https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/images/default/pollbg.gif');
+	border: 1px solid #c8c8c8;
+}
+
+</style>
+<link rel="stylesheet" id="wpdiscuz-font-awesome-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/font-awesome-5.0.6/css/fontawesome-all.min.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-frontend-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz.css" media="all">
+<link rel="stylesheet" id="wpdiscuz-user-content-css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/css/wpdiscuz-user-content.css" media="all">
+<link rel="stylesheet" id="openark-primer-style-css" href="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/style.css" media="all">
+<link rel="stylesheet" id="wp-markdown-prettify-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/css/prettify.css" media="all">
+<link rel="stylesheet" id="social-logos-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/social-logos/social-logos.min.css" media="all">
+<link rel="stylesheet" id="jetpack_css-css" href="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/css/jetpack.css" media="all">
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery-migrate.min.js"></script>
+
+
+
+
+
+
+
+
+
+            <style>
+                #wpcomm .wc_new_comment{background:#00B38F;}
+                #wpcomm .wc_new_reply{background:#00B38F;}
+                #wpcomm .wc-form-wrapper{ background:none; } /* ->formBGColor */
+                #wpcomm .wpdiscuz-front-actions{background:#F9F9F9;}
+                #wpcomm .wpdiscuz-subscribe-bar{background:#F9F9F9;}
+                #wpcomm select,
+                #wpcomm input[type="text"],
+                #wpcomm input[type="email"],
+                #wpcomm input[type="url"],
+                #wpcomm input[type="date"],
+                #wpcomm input[type="color"]{border:#D9D9D9 1px solid;}
+                #wpcomm .wc-comment .wc-comment-right{background:#FEFEFE;}
+                #wpcomm .wc-reply .wc-comment-right{background:#F8F8F8;}
+                #wpcomm .wc-comment-right .wc-comment-text, 
+                #wpcomm .wc-comment-right .wc-comment-text *{
+                    font-size:14px;
+                }
+                #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-administrator > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-administrator > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-editor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-editor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-contributor > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-contributor > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-subscriber > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-subscriber > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_admin > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_admin > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_check > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_check > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-backwpup_helper > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-backwpup_helper > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-post_author > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-post_author > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }#wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author, #wpcomm .wc-blog-guest > .wc-comment-right .wc-comment-author a{color:#00B38F;}#wpcomm .wc-blog-guest > .wc-comment-left .wc-comment-label{color:#00B38F; border:none; border-bottom: 1px solid #dddddd; }                #wpcomm .wc-comment .wc-comment-left .wc-comment-label{ background: #ffffff;}
+                #wpcomm .wc-comment-left .wc-follow-user{color:#00B38F;}
+                #wpcomm .wc-load-more-submit{border:1px solid #D9D9D9;}
+                #wpcomm .wc-new-loaded-comment > .wc-comment-right{background:#FFFAD6;}
+                #wpcomm .wpdiscuz-subscribe-bar{color:#777;}
+                #wpcomm .wpdiscuz-front-actions .wpdiscuz-sbs-wrap span{color: #777;}
+                #wpcomm .page-numbers{color:#555;border:#555 1px solid;}
+                #wpcomm span.current{background:#555;}
+                #wpcomm .wpdiscuz-readmore{cursor:pointer;color:#00B38F;}
+                #wpcomm .wpdiscuz-textarea-wrap{border:#D9D9D9 1px solid;} .wpd-custom-field .wcf-pasiv-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label {color: #DDDDDD;}
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating:not(:checked) > label:hover,.wpdiscuz-rating:not(:checked) > label:hover ~ label {   }#wpcomm .wpdiscuz-item .wpdiscuz-rating > input ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:not(:checked) ~ label:hover ~ label{color: #FFED85;} 
+                #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover, #wpcomm .wpdiscuz-item .wpdiscuz-rating > label:hover ~ input:checked ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked + label:hover ~ label, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label:hover ~ label, .wpd-custom-field .wcf-active-star, #wpcomm .wpdiscuz-item .wpdiscuz-rating > input:checked ~ label{ color:#FFD700;}
+                #wpcomm .wc-comment-header{border-top: 1px solid #dedede;}
+                #wpcomm .wc-reply .wc-comment-header{border-top: 1px solid #dedede;}
+                /* Buttons */
+                #wpcomm button, 
+                #wpcomm input[type="button"], 
+                #wpcomm input[type="reset"], 
+                #wpcomm input[type="submit"]{ border: 1px solid #555555; color: #FFFFFF; background-color: #555555; }
+                #wpcomm button:hover, 
+                #wpcomm button:focus,
+                #wpcomm input[type="button"]:hover, 
+                #wpcomm input[type="button"]:focus, 
+                #wpcomm input[type="reset"]:hover, 
+                #wpcomm input[type="reset"]:focus, 
+                #wpcomm input[type="submit"]:hover, 
+                #wpcomm input[type="submit"]:focus{ border: 1px solid #333333; background-color: #333333;  }
+                #wpcomm .wpdiscuz-sort-buttons{color:#777777;}
+                #wpcomm .wpdiscuz-sort-button{color:#777777; cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button:hover{color:#00B38F!important;cursor:pointer;}
+                #wpcomm .wpdiscuz-sort-button-active{color:#00B38F!important;cursor:default!important;}
+                #wpcomm .wc-cta-button, 
+                #wpcomm .wc-cta-button-x{color:#777777; }
+                #wpcomm .wc-vote-link.wc-up{color:#999999;}
+                #wpcomm .wc-vote-link.wc-down{color:#999999;}
+                #wpcomm .wc-vote-result{color:#999999;}
+                #wpcomm .wpf-cta{color:#999999; }
+                #wpcomm .wc-comment-link .wc-share-link .wpf-cta{color:#eeeeee;}
+                #wpcomm .wc-footer-left .wc-reply-button{border:1px solid #00B38F!important; color: #00B38F;}
+                #wpcomm .wpf-cta:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-left .wc-reply-button.wc-cta-active, #wpcomm .wc-cta-active{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-cta-button:hover{background:#00B38F!important; color:#FFFFFF;}
+                #wpcomm .wc-footer-right .wc-toggle,
+                #wpcomm .wc-footer-right .wc-toggle a,
+                #wpcomm .wc-footer-right .wc-toggle i{color:#00B38F;}
+                /* STICKY COMMENT HEADER */
+                #wpcomm .wc-sticky-comment.wc-comment .wc-comment-header .wpd-sticky{background: #1ecea8; color: #ffffff; }
+                #wpcomm .wc-closed-comment.wc-comment .wc-comment-header .wpd-closed{background: #aaaaaa; color: #ffffff;}
+                /* PRIVATE COMMENT HEADER */
+                #wpcomm .wc-private-comment.wc-comment .wc-comment-header .wpd-private{background: #999999; color: #ffffff;}
+                /* FOLLOW LINK */
+
+                #wpcomm .wc-follow{color:#777777;}
+                #wpcomm .wc-follow-active{color:#ff7a00;}
+                #wpcomm .wc-follow:hover i,
+                #wpcomm .wc-unfollow:hover i,
+                #wpcomm .wc-follow-active:hover i{color:#00B38F;}
+                                .wpd-wrapper .wpd-list-item.wpd-active{border-top: 3px solid #00B38F;}
+                                .comments-area{width:auto;}
+            </style>
+            <style data-context="foundation-flickity-css">/*! Flickity v2.0.2
+http://flickity.metafizzy.co
+---------------------------------------------- */.flickity-enabled{position:relative}.flickity-enabled:focus{outline:0}.flickity-viewport{overflow:hidden;position:relative;height:100%}.flickity-slider{position:absolute;width:100%;height:100%}.flickity-enabled.is-draggable{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.flickity-enabled.is-draggable .flickity-viewport{cursor:move;cursor:-webkit-grab;cursor:grab}.flickity-enabled.is-draggable .flickity-viewport.is-pointer-down{cursor:-webkit-grabbing;cursor:grabbing}.flickity-prev-next-button{position:absolute;top:50%;width:44px;height:44px;border:none;border-radius:50%;background:#fff;background:hsla(0,0%,100%,.75);cursor:pointer;-webkit-transform:translateY(-50%);transform:translateY(-50%)}.flickity-prev-next-button:hover{background:#fff}.flickity-prev-next-button:focus{outline:0;box-shadow:0 0 0 5px #09f}.flickity-prev-next-button:active{opacity:.6}.flickity-prev-next-button.previous{left:10px}.flickity-prev-next-button.next{right:10px}.flickity-rtl .flickity-prev-next-button.previous{left:auto;right:10px}.flickity-rtl .flickity-prev-next-button.next{right:auto;left:10px}.flickity-prev-next-button:disabled{opacity:.3;cursor:auto}.flickity-prev-next-button svg{position:absolute;left:20%;top:20%;width:60%;height:60%}.flickity-prev-next-button .arrow{fill:#333}.flickity-page-dots{position:absolute;width:100%;bottom:-25px;padding:0;margin:0;list-style:none;text-align:center;line-height:1}.flickity-rtl .flickity-page-dots{direction:rtl}.flickity-page-dots .dot{display:inline-block;width:10px;height:10px;margin:0 8px;background:#333;border-radius:50%;opacity:.25;cursor:pointer}.flickity-page-dots .dot.is-selected{opacity:1}</style><style data-context="foundation-slideout-css">.slideout-menu{position:fixed;left:0;top:0;bottom:0;right:auto;z-index:0;width:256px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}.slideout-menu.pushit-right{left:auto;right:0}.slideout-panel{position:relative;z-index:1;will-change:transform}.slideout-open,.slideout-open .slideout-panel,.slideout-open body{overflow:hidden}.slideout-open .slideout-menu{display:block}.pushit{display:none}</style>
+<link rel="dns-prefetch" href="//v0.wordpress.com">
+
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="“MySQL High Availability tools” followup, the missing piece: orchestrator">
+<meta property="og:url" content="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator">
+<meta property="og:description" content="I read with interest MySQL High Availability tools – Comparing MHA, MRM and ClusterControl by SeveralNines. I thought there was a missing piece in the comparison: orchestrator, and that as re…">
+<meta property="article:published_time" content="2017-04-06T12:56:45+00:00">
+<meta property="article:modified_time" content="2017-04-06T13:08:21+00:00">
+<meta property="og:site_name" content="code.openark.org">
+<meta property="og:image" content="https://s0.wp.com/i/blank.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:text:title" content="“MySQL High Availability tools” followup, the missing piece: orchestrator">
+<meta name="twitter:card" content="summary">
+
+
+<style>.ios7.web-app-mode.has-fixed header{ background-color: rgba(242,101,34,.88);}</style></head>
+
+<body class="post-template-default single single-post postid-7690 single-format-standard no-sidebar">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#primary">Skip to content</a>
+
+	<header id="masthead" class="site-header">
+		<div class="site-branding">
+							<p class="site-title"><a href="https://shlomi-noach.github.io/blog/" rel="home">code.openark.org</a></p>
+								<p class="site-description">Blog by Shlomi Noach</p>
+			
+			<nav id="site-navigation" class="main-navigation">
+				<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false">primary-menu</button>
+				<div class="menu-primary-menu-container"><ul id="menu-primary-menu" class="menu"><li id="menu-item-8109" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8109"><a href="https://shlomi-noach.github.io/blog/archives">archives</a></li>
+<li id="menu-item-8050" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8050"><a href="https://shlomi-noach.github.io/blog/presentations">presentations</a></li>
+<li id="menu-item-8055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-8055"><a href="https://shlomi-noach.github.io/blog/about">about</a></li>
+<li id="menu-item-8071" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8071"><a href="https://github.com/shlomi-noach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a></li>
+<li id="menu-item-8074" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8074"><a href="https://www.linkedin.com/in/shlominoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg></a></li>
+<li id="menu-item-8072" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8072"><a href="https://twitter.com/ShlomiNoach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-1.622 0-3.131-.476-4.402-1.291 1.524.18 3.045-.244 4.252-1.189-1.256-.023-2.317-.854-2.684-1.995.451.086.895.061 1.298-.049-1.381-.278-2.335-1.522-2.304-2.853.388.215.83.344 1.301.359-1.279-.855-1.641-2.544-.889-3.835 1.416 1.738 3.533 2.881 5.92 3.001-.419-1.796.944-3.527 2.799-3.527.825 0 1.572.349 2.096.907.654-.128 1.27-.368 1.824-.697-.215.671-.67 1.233-1.263 1.589.581-.07 1.135-.224 1.649-.453-.384.578-.87 1.084-1.433 1.489z"></path></svg></a></li>
+<li id="menu-item-8073" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-8073"><a href="https://shlomi-noach.github.io/blog/feed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-12.832 20c-1.197 0-2.168-.969-2.168-2.165s.971-2.165 2.168-2.165 2.167.969 2.167 2.165-.97 2.165-2.167 2.165zm5.18 0c-.041-4.029-3.314-7.298-7.348-7.339v-3.207c5.814.041 10.518 4.739 10.561 10.546h-3.213zm5.441 0c-.021-7.063-5.736-12.761-12.789-12.792v-3.208c8.83.031 15.98 7.179 16 16h-3.211z"></path></svg></a></li>
+</ul></div>			</nav>
+		</div>
+	</header>
+
+	<main id="primary" class="site-main">
+
+		
+<article id="post-7690" class="post-7690 post type-post status-publish format-standard hentry category-mysql tag-high-availability tag-orchestrator tag-replication">
+	<header class="entry-header">
+		<h1 class="entry-title">“MySQL High Availability tools” followup, the missing piece: orchestrator</h1>			<div class="entry-meta">
+				<span class="cat-links"><a href="https://shlomi-noach.github.io/blog/category/mysql" rel="category tag">MySQL</a></span><span class="tags-links"><a href="https://shlomi-noach.github.io/blog/tag/high-availability" rel="tag">High availability</a><a href="https://shlomi-noach.github.io/blog/tag/orchestrator" rel="tag">orchestrator</a><a href="https://shlomi-noach.github.io/blog/tag/replication" rel="tag">Replication</a></span><span class="posted-on alignright"><a href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" rel="bookmark"><time class="entry-date published" datetime="2017-04-06T14:56:45+02:00">April 6, 2017</time><time class="updated" datetime="2017-04-06T15:08:21+02:00">April 6, 2017</time></a></span>			</div>
+			</header>
+
+	
+	<div class="entry-content">
+		<p>I read with interest <a href="https://severalnines.com/blog/mysql-high-availability-tools-comparing-mha-mrm-and-clustercontrol">MySQL High Availability tools – Comparing MHA, MRM and ClusterControl</a> by SeveralNines. I thought there was a missing piece in the comparison: <a href="https://github.com/github/orchestrator">orchestrator</a>, and that as result the comparion was missing scope and context.</p>
+<p>I’d like to add my thoughts on topics addressed in the post. I’m by no means an expert on MHA, MRM or ClusterControl, and will mostly focus on how <code>orchestrator</code> tackles high availability issues raised in the post.</p>
+<h3>What this is</h3>
+<p>This is to add insights on the complexity of failovers. Over the duration of three years, I always think I’ve seen it all, and then get hit by yet a new crazy scenario. Doing the right thing automatically is <em>difficult</em>.</p>
+<p>In this post, I’m not trying to convince you to use <code>orchestrator</code> (though I’d be happy if you did). To be very clear, I’m not claiming it is <em>better</em> than any other tool. As always, each tool has pros and cons.</p>
+<p>This post does <em>not</em> claim other tools are not good. Nor that <code>orchestrator</code> has all the answers. At the end of the day, pick the solution that works best for you. I’m happy to use a solution that reliably solves <strong>99%</strong> of the cases as opposed to an unreliable solution that claims to solve <strong>99.99%</strong> of the cases.</p>
+<h3>Quick background</h3>
+<p><code>orchestrator</code> is actively maintained by GitHub. It manages <a href="http://githubengineering.com/orchestrator-github/">automated failovers at GitHub</a>. It manages automated failovers at Booking.com, one of the largest MySQL setups on this planet. It manages automated failovers as part of <a href="http://vitess.io/">Vitess</a>. These are some names I’m free to disclose, and browsing the <a href="https://github.com/github/orchestrator/issues">issues</a> shows a few more users running failovers in production. Otherwise, it is used for topology management and visualization in a large number of companies such as Square, Etsy, Sendgrid, Godaddy and more.</p>
+<p>Let’s now follow one-by-one the observations on the SeveralNines post.<span id="more-7690"></span></p>
+<h3>Flapping</h3>
+<p><code>orchestrator</code> supports an <a href="https://github.com/github/orchestrator/blob/master/docs/topology-recovery.md#blocking-acknowledgements-anti-flapping">anti-flapping mechanism</a>. Once an automated failover kicks off, no additional automated failover will run <em>on the same cluster</em> for the duration of a pre-configured <code><code>RecoveryPeriodBlockSeconds</code></code>.  We, for example, set that time to <strong>1 hour</strong>.</p>
+<p>However, <code>orchestrator</code> also supports <em>acknowledgements</em>. A human (or a bot, for that matter, accessing the API or just running the command line) can <em>acknowledge</em> a failover. Once a failover is acknowledged, the block is removed. The next incident requiring a failover is free to proceed.</p>
+<p>Moreover, a human is always allowed to forcibly invoke a failover (e.g. via <code>orchestrator -c graceful-master-takeover</code> or  <code>orchestrator -c force-master-takeover</code>). In such case, any blocking is ignored and <code>orchestrator</code> immediately kicks in the failover sequence.</p>
+<h3>Lost transactions</h3>
+<p><code>orchestrator</code> does not pull binlog data from the failed master and only works with the data available on the replicas. There is a potential for data loss.</p>
+<p><strong>Note:</strong> There was actually some work into a MHA-like synching of relay logs, and in fact most of it is available right now in <code>orchestrator</code>, synching relaylogs via remote SSH and without agents. See https://github.com/github/orchestrator/issues/45 for some pointers. We looked into this for a couple months but saw some dangers and issues such as non-atomic relay log entries in RBR and others. We chose to put this on-hold, and I advise to not use this functionality in <code>orchestrator</code>.</p>
+<h3>Lost transactions, notes on semi-sync</h3>
+<p>Vitess <a href="https://github.com/outbrain/orchestrator/pull/187">have contributed</a> a semi-sync failover mechanism (<a href="https://github.com/outbrain/orchestrator/issues/156">discussion</a>). So you are using semi-sync? That’s wonderful. You’ve failed over and have greatly reduced the amount of lost data. What happens with your new setup? Will your recovery re-apply semi sync? Vitess’s contribution does just that and makes sure a new relica takes the semi-sync role.</p>
+<h3>Lost transactions, notes on “most up to date replica”</h3>
+<p>There is this fallacy. It has been proven to be a fallacy many time in production, that I’ve witnessed. I’m sure this happened somewhere else in the universe that I haven’t witnessed.</p>
+<p>The fallacy says: “when master fails, we will promote the most up-to-date replica”. The most up-to-date may well be the wrong choice. You may wish to <em>skip and lose</em> the most up-to-date replica. The assumption is a fallacy, because many times <em>our production environment is not sterile.</em></p>
+<p>Consider:</p>
+<ul>
+<li>You’re running <strong>5.6</strong> and wish to experiment/upgrade to <strong>5.7</strong>. You will like upgrade a replica or two, measure their replication capacity, their query latency, etc. You now have a non-sterile topology. When the master fails, <em>you must not promote your 5.7 replica</em> because you will not be able to (or wouldn’t want to take the chance) replicate from that <strong>5.7</strong> onto the rest of your fleet, which is <strong>5.6</strong>.
+<ul>
+<li>We are looking into <strong>5.7</strong> upgrade for a few months now. Most careful places I know likewise take months to run such an upgrade. These are <em>months</em> where your topology is not sterile.</li>
+</ul>
+</li>
+</ul>
+<p>So you’d rather lose the most up-to-date replica than lose the other <strong>10</strong> replicas you have.</p>
+<ul>
+<li>Likewise, you run with <strong>STATEMENT</strong> based replication. You wish to experiment with <strong>ROW</strong> based replication. Your topology is not sterile. You <em>must not</em> upgrade your <strong>ROW</strong> replica, because the rest of the replicas (assuming <code>log_slave_updates</code>) would not be able to replicate.</li>
+</ul>
+<p><code>orchestrator</code> understands all the above and makes the right call. It would promote the replica that would ensure the survival of your fleet, and prefers to lose data.</p>
+<ul>
+<li>You have a special replica with replication filters. More often than desired, this happens. Perhaps you’re splitting out a new sub-cluster, functionally partitioning away some tables. Or you’re running some exporter to Hadoop and only filter specific events. Or… You must not promote that replica.</li>
+</ul>
+<p><code>orchestrator</code> would not promote that replica.</p>
+<p>Let’s look at something crazy now:</p>
+<ul>
+<li>Getting back to the <strong>5.7</strong> upgrade, you have now upgraded <strong>8</strong> out of your <strong>10</strong> replicas to <strong>5.7</strong>. You now <em>do want</em> to promote the <strong>5.7</strong> replica. It’s a matter of how many replicas you’d lose if you promoted _this one_ as opposed to _that one_.</li>
+</ul>
+<p><code>orchestrator</code> makes that calculation. Hey, the same applies for <strong>STATEMENT</strong> and <strong>ROW</strong> based replicas. Or maybe you have <em>both </em><strong>5.7</strong> and <strong>RBR</strong> experiments (tsk tsk tsk, but life is challanging) at the same time. <code>orchestrator</code> will still pick the replica whose promotion will get the majority of your fleet intact.</p>
+<ul>
+<li>The most up-to-date replica is on a different data center.</li>
+</ul>
+<p><code>orchestrator</code> <em>can</em>, but prefer <em>not</em> to promote it. But then, it also supports a <strong>2 step</strong> promotion. If possible, it would first promote that most up-to-date replica from the other DC, then let local DC replicas catch up, then reverse replication and place a local replica <em>on top</em>, making the master on local DC again.</p>
+<p>I cannot stress enough how useful and important this is.</p>
+<p>This conveniently leads us to…</p>
+<h3>Roles</h3>
+<p>Fallacy: <em>using configuration to white-list or black-list servers.</em></p>
+<p>You’d expect to overcome the above <strong>5.7</strong> or <strong>ROW</strong> etc. issues by carefully marking your servers as blacklisted.</p>
+<p>We’ve been there. This works on a setup with <strong>10</strong> servers. I claim this doesn’t scale.</p>
+<p>Again, I wish to be clear: if this works for you, great! Ignore the rest of this section. I suggest that as you grow, this becomes more and more a difficult problem. At the scale of a <strong>100</strong> servers, it’s a serious pain. Examples:</p>
+<ul>
+<li>You <code>set global binlog_format='ROW'</code>. Do you then immediately follow up to reconfigure your HA service to blacklist your server?</li>
+<li>You provision a new box. Do you need to go and reconfigure your HA service, adding the box as white-listed?</li>
+<li>You need to run maintenance on a server. Do you rush to reconfigure HA service?</li>
+</ul>
+<p>You can invest in automating the reconfiguration of servers; I’ve been there as well, to some extent. This is a difficult task on its own.</p>
+<ul>
+<li>You’d use service discovery to assign tags to hosts</li>
+<li>And then <code>puppet</code> would distribute configuration.
+<ul>
+<li>How fast would it do that?</li>
+</ul>
+</li>
+<li>I’m not aware and am happy to learn if any of the mentioned solutions can be reconfigured by <code>consul</code>. You need to do the job yourself.</li>
+</ul>
+<p>Also consider how flexible your tools are: suppose you reconfigure; how easy it is for your tools to <em>reload</em> and pick the new config?</p>
+<ul>
+<li><code>orchestrator</code> does its best, and reloads most configuration live, but even <code>orchestrator</code> has some “read-only” variables.</li>
+</ul>
+<p>How easy it is to restart your HA services? Can you restart them in a rolling fashion, such that at any given point you have HA up and running?</p>
+<ul>
+<li>This is well supported by <code>orchestrator</code></li>
+</ul>
+<p><code>orchestrator</code> recognizes those crazy <strong>5.7</strong> –<strong>ROW-</strong>replication filters topologies by magic. Well, not magic. It just observes the state of the topologies. It learns the state of the topologies, so that at time of crash it has all the info. Its logic is based on that info. It knows and understands replication rules. It computes a good promotion path, taking data centers and configurations into consideration.</p>
+<p>Initially, <code>orchestrator</code> started with blacklists in configuration. They’re still supported. But today it’s more about labels.</p>
+<ul>
+<li>One of your replicas serves as a backup server. It runs extra tasks, or configured differently (no <code>log_slave_updates</code>? Different buffer pool settings?) and is not good to serve as a master. You should not promote that replica.</li>
+</ul>
+<p>Instead of saying “this server is a backup server and should never be promoted” in configuration — (and that’s possible to do!), <code>orchestrator</code> lets you dynamically announce that this server should not be promoted. Such that maybe <strong>10</strong> minutes ago this wasn’t a backup server, but now it is. You can advertise that fact to orchestrator. We do that via:</p>
+<blockquote>
+<pre>orchestrator -c register-candidate -i {::fqdn} --promotion-rule=${promotion_rule}</pre>
+</blockquote>
+<p>where <code>${promotion_rule}</code> is <code>candidate</code>, <code>neutral</code> or <code>must_not</code>. We run this from <code>cron</code>, every couple minutes. How we choose the right rule comes from our service discovery. <code>orchestrator</code> is always up-to-date (up to a couple minutes) at worst of role changes (and urgent role changes get propagated immediately).</p>
+<p>Also, each host can self-declare its role, so that <code>orchestrator</code> discovers the role on discover, as per <code>DetectPromotionRuleQuery</code>. Vitess is known to use this approach, and they contributed the code.</p>
+<h3>Network partitioning</h3>
+<p>First, about general failure detection.</p>
+<p><code>orchestrator</code> uses a holistic approach to detecting failures, and instead of <em>justifying</em> that it is a really good approach, I will <em>testify</em> that it is. <code>orchestrator</code>‘s accuracy in recognizing a failover scenario is very high. Booking.com has <strong>X,000</strong> MySQL servers in production. at that scale, servers and networks break enough that there’s always something breaking. Quoting (with permission) Simon J. Mudd from Booking.com:</p>
+<blockquote><p>We have at least one failure a day which it handles automatically. that’s really neat. people don’t care about dead masters any more.</p></blockquote>
+<p><code>orchestrator</code> looks not only at the master, but at its replicas. If <code>orchestrator</code> can’t see the master, but the replicas are happily running and replicating, then it’s just <code>orchestrator</code> who can’t see the master. But if <code>orchestrator</code> doesn’t see the master`, <strong>and</strong> all the replicas are broken, then there’s a failover scenario.</p>
+<p>With ClusterControl, there seems to be danger of false positives: “…therefore it can take an action if there are network issues between the master and the ClusterControl host.”</p>
+<p>As for fencing:</p>
+<p>MHA uses multiple nodes for detecting the failure. Especially if these nodes run on different DCs, this gives MHA a better view when fencing is involved.</p>
+<p>Last September we gathered at an improvised BoF session on Percona Live Amsterdam. We were looking at observing a failure scenario where fencing is involved.</p>
+<p>We mostly converged onto having multiple observers, such as 3 observers on 3 different data centers, a quorum of which would decide if there’s a failure scenario or not.</p>
+<p>The problem is difficult. If the master is seen by 2 nodes, but all of its replicas are broken, does that make a failure scenario or not? What if a couple replicas are happy but ten others are not?</p>
+<p><code>orchestrator</code> has it on the roadmap to run a quorum based failover decision. My estimation is that it will do the right thing <em>most times</em> and that it would be very difficult to push towards <strong>99.99%</strong>.</p>
+<h3>Integration</h3>
+<p><code>orchestrator</code> provides HTTP API as well as a command line interface. We use those at GitHub, for example, to integrate <code>orchestrator</code> into our chatops. We command <code>orchestrator</code> via chat and get information via chat.</p>
+<p>Or we and others have automated, scheduled jobs, that use the <code>orchestrator</code> command line to rearrange topologies.</p>
+<p>There is no direct integration between <code>orchestrator</code> and other tools. Recently there have been requests to integrate <code>orchestrator</code> with <a href="http://www.proxysql.com/">ProxySQL</a>. I see multiple use cases for that. Plug: in the upcoming <a href="https://www.percona.com/live/17/">Percona Live conference in Santa Clara</a>, René Cannaò and myself will co-present a BoF on potential ProxySQL-orchestrator integration. It will be an open discussion. Please come and share your thoughts! (The talk hasn’t been scheduled yet, I will update this post with the link once it’s scheduled).</p>
+<p>Addressing the issue of <code>read_only</code> as an indicator to master/replica roles, please see the discussion on <a href="https://github.com/sysown/proxysql/issues/789">https://github.com/sysown/proxysql/issues/789</a>. Hint: this isn’t trivial and many times not reliable. It can work in some cases.</p>
+<h3>Conclusion</h3>
+<p>Is it time already? I have much to add; but let’s stay focus on the SeveralNines blog. Addressing the comparison chart at the “Conclusion” section:</p>
+<h4>Replication support</h4>
+<p><code>orchestrator</code> supports failovers on:</p>
+<ul>
+<li>Oracle GTID</li>
+<li>MariaDB GTID</li>
+<li>Pseudo-GTID</li>
+<li>Semi-sync</li>
+<li>Binlog servers</li>
+</ul>
+<p>GTID support is ongoing (<a href="https://github.com/github/orchestrator/issues/78">recent example</a>). Traditionally <code>orchestrator</code> is very focused on Pseudo-GTID.</p>
+<p>I should add: Pseudo-GTID is a thing. It runs, it runs well. Pseudo-GTID provides with almost all the Oracle GTID advantages without actually using GTID, and without GTID limitations. The obvious disclaimer is that Pseudo-GTID has its own limitations, too. But I will leave the PSeudo-GTID preaching for another time, and just note that GitHub and Booking.com both run automated failovers based on Pseudo-GTID.</p>
+<h4>Flapping</h4>
+<p>Time based blocking per cluster, acknowledgements supported; human overrides permitted.</p>
+<h4>Lost transactions</h4>
+<p>No checking for transactions on master</p>
+<h4>Network Partitioning</h4>
+<p>Excellent false positive detection. Seems like other tools like MRM and ClusterControl are following up by adopting the <code>orchestrator</code> approach, and I’m happy for that.</p>
+<h4>Roles</h4>
+<p>State-based automatic detection and decision making; also dynamic roles via advertising; also support for self- declaring roles; also support for configuration based black lists</p>
+<h4>Integration</h4>
+<p>HTTP API, command line interfaces. No direct integration with other products. Looking into ProxySQL with no promises held.</p>
+<h3>Further</h3>
+<blockquote><p>If you use non-GTID replication, MHA is the only option for you</p></blockquote>
+<p>That is incorrect. <code>orchestrator</code> is an excellent choice in my biased opinion. GitHub and Booking.com both run <code>orchestrator</code> automated failovers without using GTIDs.</p>
+<blockquote><p>Only ClusterControl … is flexible enough to handle both types of GTID under one tool</p></blockquote>
+<p>That is incorrect. <code>orchestrator</code> supports both types of GTID. I’m further working towards better and better supports of Oracle GTID.</p>
+<blockquote><p>…this could be very useful if you have a mixed environment while you still would like to use one single tool to ensure high availability of your replication setup</p></blockquote>
+<p>Just to give you an impression: <code>orchestrator</code> works on topologies mixed with Oracle <strong>and</strong> MariaDB servers, normal replication <strong>and</strong> binlog servers, STATEMENT <strong>and</strong> ROW based replication, three major versions in the same cluster (as I recall I’ve seen that; I don’t run this today), and mixed combination of the above. Truly.</p>
+<h3>Finally</h3>
+<p>Use whatever tool works best for you.</p>
+<h3>Oh, and I forgot!</h3>
+<p>Please consider attending my talk, <a href="https://www.percona.com/live/17/sessions/practical-orchestrator">Practical Orchestrator</a>, where I will share practical advice and walkthough on `orchestrator setup.</p>
+<div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-icon-text sd-sharing"><div class="sd-content"><ul><li class="share-twitter"><a rel="nofollow noopener noreferrer" data-shared="sharing-twitter-7690" class="share-twitter sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" target="_blank" title="Click to share on Twitter"><span>Twitter</span></a></li><li class="share-linkedin"><a rel="nofollow noopener noreferrer" data-shared="sharing-linkedin-7690" class="share-linkedin sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" target="_blank" title="Click to share on LinkedIn"><span>LinkedIn</span></a></li><li class="share-jetpack-whatsapp"><a rel="nofollow noopener noreferrer" data-shared="" class="share-jetpack-whatsapp sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" target="_blank" title="Click to share on WhatsApp"><span>WhatsApp</span></a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" target="_blank" title="Click to email this to a friend"><span>Email</span></a></li><li class="share-facebook"><a rel="nofollow noopener noreferrer" data-shared="sharing-facebook-7690" class="share-facebook sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" target="_blank" title="Click to share on Facebook"><span>Facebook</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button share-icon" href="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>	</div>
+
+	<footer class="entry-footer">
+			</footer>
+</article>
+
+	<nav class="navigation post-navigation" role="navigation" aria-label="Posts">
+		<h2 class="screen-reader-text">Post navigation</h2>
+		<div class="nav-links"><div class="nav-previous"><a href="https://shlomi-noach.github.io/blog/mysql/mysql-community-awards-2017-call-for-nominations" rel="prev"><span class="nav-subtitle">Previous:</span> <span class="nav-title">MySQL Community Awards 2017: Call for Nominations!</span></a></div><div class="nav-next"><a href="https://shlomi-noach.github.io/blog/mysql/practical-orchestrator-bof-github-and-other-talks-at-percona-live-2017" rel="next"><span class="nav-subtitle">Next:</span> <span class="nav-title">Practical Orchestrator, BoF, GitHub and other talks at Percona Live 2017</span></a></div></div>
+	</nav>    <div class="wpdiscuz_top_clearing"></div>
+    <div id="comments" class="comments-area"><div id="respond" style="width: 0;height: 0;clear: both;margin: 0;padding: 0;"></div>            <h3 id="wc-comment-header">
+                                    <div class="wpdiscuz-comment-count">
+                        <div class="wpd-cc-value">7</div>
+                        <div class="wpd-cc-arrow"></div>
+                    </div>
+                                Leave a Reply            </h3>
+                    <div id="wpcomm" class="wpdiscuz_unauth wpd-default">
+            <div class="wpdiscuz-form-top-bar">
+                <div class="wpdiscuz-ftb-left">
+                                                            <div id="wc_show_hide_loggedin_username">
+                                            </div>
+                </div>
+                                <div class="wpd-clear"></div>
+            </div>
+
+
+                        <div class="wc_social_plugin_wrapper">
+                            </div>
+                    <div class="wc-form-wrapper wc-main-form-wrapper" id="wc-main-form-wrapper-0_0">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                                        <form class="wc_comm_form wc_main_comm_form" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=40&d=mm&r=g" srcset="http://0.gravatar.com/avatar/?s=80&d=mm&r=g 2x" class="avatar avatar-40 photo avatar-default" height="40" width="40">                                    </div>
+                                
+                                <textarea id="wc-textarea-0_0" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="0_0" name="wpdiscuz_unique_id">
+                </form>
+                    <div class="wpdiscuz-form-bottom-bar">
+                    <div class="wpdiscuz-fbb-left">
+                                                                        <div class="wpdiscuz-stat wpd-stat-threads wpd-tooltip-left">
+                        <i class="fas fa-align-left fa-rotate-180" data-fa-transform="rotate-180"></i><span class="wpd-stat-threads-count">3</span>
+                        <wpdtip>Comment threads</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-replies wpd-tooltip-left">
+                        <i class="far fa-comments"></i><span class="wpd-stat-replies-count">4</span>
+                        <wpdtip>Thread replies</wpdtip>
+                    </div>
+                                                                                        <div class="wpdiscuz-stat wpd-stat-subscribers wpd-tooltip-left">
+                        <i class="fas fa-rss"></i><span>0</span>
+                        <wpdtip>Followers</wpdtip>
+                    </div> 
+                                                                    
+                    <div class="wpdiscuz-stat wpd-stat-reacted wpd-tooltip">
+                        <i class="fas fa-bolt"></i>
+                        <wpdtip>Most reacted comment</wpdtip>
+                    </div>
+                                                                    <div class="wpdiscuz-stat wpd-stat-hot wpd-tooltip">
+                        <i class="fab fa-hotjar"></i>
+                        <wpdtip>Hottest comment thread</wpdtip>
+                    </div>
+                            </div>
+                                        <div class="wpdiscuz-fbb-right">
+                                                        <div class="wpdiscuz-stat wpd-stat-users wpd-tooltip">
+                        <i class="fas fa-user-circle"></i> <span class="wpd-stat-authors-count">4</span>
+                        <wpdtip>Comment authors</wpdtip>
+                    </div>
+                                                                                                            <div class="wpdiscuz-users wpd-tooltip-right">
+                        <img alt="Shlomi Noach" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Shlomi Noach"><img alt="Olu Efunwoye" src="http://0.gravatar.com/avatar/394c96b057a3f56c041b782582bea877?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/394c96b057a3f56c041b782582bea877?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Olu Efunwoye"><img alt="Oluranti Efunwoye" src="http://2.gravatar.com/avatar/b4633f930fd7e8919933e31aac12c8d4?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/b4633f930fd7e8919933e31aac12c8d4?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="Oluranti Efunwoye"><img alt="まえあつ" src="http://2.gravatar.com/avatar/b5aa4f809000b9147289650532e83932?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/b5aa4f809000b9147289650532e83932?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64" title="まえあつ">                        <wpdtip>Recent comment authors</wpdtip>
+                    </div>
+                            </div>
+                <div class="wpd-clear"></div>
+    </div>
+            </div>
+                <div id="wpdiscuz_hidden_secondary_form" style="display: none;">
+                    <div class="wc-form-wrapper wc-secondary-form-wrapper" id="wc-secondary-form-wrapper-wpdiscuzuniqueid" style="display: none;">
+            <div class="wpdiscuz-comment-message" style="display: block;"></div>
+                            <div class="wc-secondary-forms-social-content"></div><div class="clearfix"></div>
+                                        <form class="wc_comm_form wc-secondary-form-wrapper" method="post" enctype="multipart/form-data">
+                    <div class="wc-field-comment">
+                        <div class="wpdiscuz-item wc-field-textarea">
+                            <div class="wpdiscuz-textarea-wrap ">
+
+                                                                                                        <div class="wc-field-avatararea">
+                                        <img alt="avatar" src="http://1.gravatar.com/avatar/?s=48&d=mm&r=g" srcset="http://2.gravatar.com/avatar/?s=96&d=mm&r=g 2x" class="avatar avatar-48 photo avatar-default" height="48" width="48">                                    </div>
+                                
+                                <textarea id="wc-textarea-wpdiscuzuniqueid" placeholder="Join the discussion..." required name="wc_comment" class="wc_comment wpd-field"></textarea>
+                                                                                            </div>
+                        </div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="wc-form-footer" style="display: none;"> 
+                                <div class="wpd-form-row">
+                    <div class="wpd-form-col-left">
+                        <div class="wpdiscuz-item wc_name-wrapper wpd-has-icon">
+                                <div class="wpd-field-icon"><i class="fas fa-user"></i></div>
+                                                <input value="" required="required" class="wc_name wpd-field" type="text" name="wc_name" placeholder="Name*" maxlength="50" pattern=".{3,50}" title="">
+                            </div>
+                        <div class="wpdiscuz-item wc_email-wrapper wpd-has-icon">
+                                    <div class="wpd-field-icon"><i class="fas fa-at"></i></div>
+                                                <input value="" required="required" class="wc_email wpd-field" type="email" name="wc_email" placeholder="Email*">
+                            </div>
+                            <div class="wpdiscuz-item wc_website-wrapper wpd-has-icon">
+                                            <div class="wpd-field-icon"><i class="fas fa-link"></i></div>
+                                        <input value="" class="wc_website wpd-field" type="text" name="wc_website" placeholder="Website">
+                                            </div>
+                        </div>
+                <div class="wpd-form-col-right">
+                            <div class="wc-field-captcha wpdiscuz-item wc_captcha-wrapper">
+                    <div class="wc-bin-captcha">
+                        <i class="fas fa-shield-alt"></i>This comment form is under antispam protection                    </div>
+                </div>
+                        <div class="wc-field-submit">
+                                    <input class="wc_comm_submit wc_not_clicked button alt" type="submit" name="submit" value="Post Comment">
+        </div>
+                </div>
+                    <div class="clearfix"></div>
+        </div>
+                            </div>
+                    <div class="clearfix"></div>
+                    <input type="hidden" class="wpdiscuz_unique_id" value="wpdiscuzuniqueid" name="wpdiscuz_unique_id">
+                </form>
+                        </div>
+                </div>
+        <p class="akismet_comment_form_privacy_notice">This site uses Akismet to reduce spam. <a href="https://akismet.com/privacy/" target="_blank" rel="nofollow noopener">Learn how your comment data is processed</a>.</p>                                   
+
+                                    <div class="wpdiscuz-front-actions">
+                                                    <div class="wpdiscuz-sbs-wrap">
+                                <span><i class="far fa-envelope" aria-hidden="true"></i>  Subscribe  <i class="fas fa-caret-down" aria-hidden="true"></i></span>
+                            </div>
+                                                                        <div class="clearfix"></div>
+                    </div>
+                                                    <div class="wpdiscuz-subscribe-bar wpdiscuz-hidden">
+                                                    <form action="https://shlomi-noach.github.io/blog/wp-admin/admin-ajax.php?action=addSubscription" method="post" id="wpdiscuz-subscribe-form">
+                                <div class="wpdiscuz-subscribe-form-intro">Notify of </div>
+                                <div class="wpdiscuz-subscribe-form-option" style="width:40%;">
+                                    <select class="wpdiscuz_select" name="wpdiscuzSubscriptionType">
+                                                                                    <option value="post">new follow-up comments</option>
+                                                                                                                            <option value="all_comment" disabled>new replies to my comments</option>
+                                                                            </select>
+                                </div>
+                                                                    <div class="wpdiscuz-item wpdiscuz-subscribe-form-email">
+                                        <input class="email" type="email" name="wpdiscuzSubscriptionEmail" required="required" value="" placeholder="Email">
+                                    </div>
+                                                                <div class="wpdiscuz-subscribe-form-button">
+                                    <input id="wpdiscuz_subscription_button" type="submit" value="›" name="wpdiscuz_subscription_button">
+                                </div> 
+                                                                <input type="hidden" id="wpdiscuz_subscribe_form_nonce" name="wpdiscuz_subscribe_form_nonce" value="12fac97726"><input type="hidden" name="_wp_http_referer" value="/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1">                                                                <input type="hidden" value="7690" name="wpdiscuzSubscriptionPostId">
+                            </form>
+                                                <div class="wpdiscuz_clear"></div>
+                                            </div>
+                    
+                                <div id="wcThreadWrapper" class="wc-thread-wrapper">
+                    <div id="wc-comm-394710_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img class="avatar avatar-64 photo" width="64" height="64" src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/img/trackback.png" alt="trackback"></div><div id="comment-394710" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author "><a href="https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover" rel="nofollow" target="_blank">What’s so complicated about a master failover? | code.openark.org</a></div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-394710" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-394710" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>[…] "MySQL High Availability tools" followup, the missing piece: orchestrator […]</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-394710_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-396878_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="まえあつ" src="http://2.gravatar.com/avatar/b5aa4f809000b9147289650532e83932?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/b5aa4f809000b9147289650532e83932?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-396878" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">まえあつ</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-396878" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-396878" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi Shlomi</p>
+<p>Thank you for your article. I read this article and got interested.<br>
+I want to translate this article into Japanese for users in Japan if you are OK.</p>
+<p>Would you mind if I transalte this article?</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-396878_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-396917_396878" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Shlomi Noach" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-396917" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Shlomi Noach</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-396917" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-396917" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi,<br>
+Please feel free to translate. Please share the link to translated article as comment to this post.</p>
+<p>Regards</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-396917_396878" class="wpdiscuz_clear"></div></div><div id="wc-comm-397569_0" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Oluranti Efunwoye" src="http://2.gravatar.com/avatar/b4633f930fd7e8919933e31aac12c8d4?s=64&d=mm&r=g" srcset="http://2.gravatar.com/avatar/b4633f930fd7e8919933e31aac12c8d4?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-397569" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Oluranti Efunwoye</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-397569" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-397569" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Thanks for this post. I am new to orchestrator. Do you have any step by step installation and configuration guide?</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-397569_0" class="wpdiscuz_clear"></div></div><div id="wc-comm-397590_397569" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Shlomi Noach" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-397590" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Shlomi Noach</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-397590" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-397590" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Of course! Please see the extensive documentation: <a href="https://github.com/github/orchestrator/blob/master/docs/toc.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/master/docs/toc.md</a></p>
+<p>configuration: <a href="https://github.com/github/orchestrator/blob/master/docs/configuration.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/master/docs/configuration.md</a><br>
+deployment: <a href="https://github.com/github/orchestrator/blob/master/docs/deployment.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/master/docs/deployment.md</a></p>
+<p>as we speak I’m writing more deployment documentation, in this PR: <a href="https://github.com/github/orchestrator/pull/252" rel="nofollow ugc">https://github.com/github/orchestrator/pull/252</a> ; it will soon be merged, and the following links will soon expire:<br>
+– <a href="https://github.com/github/orchestrator/blob/docs-ops/docs/deployment.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/docs-ops/docs/deployment.md</a><br>
+– <a href="https://github.com/github/orchestrator/blob/docs-ops/docs/deployment-raft.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/docs-ops/docs/deployment-raft.md</a><br>
+– <a href="https://github.com/github/orchestrator/blob/docs-ops/docs/deployment-shared-backend.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/docs-ops/docs/deployment-shared-backend.md</a></p>
+<p>when they expire, you’ll see that <a href="https://github.com/github/orchestrator/blob/master/docs/toc.md" rel="nofollow ugc">https://github.com/github/orchestrator/blob/master/docs/toc.md</a> is updated with these deployments docs.</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-397590_397569" class="wpdiscuz_clear"></div></div><div id="wc-comm-398370_397590" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Olu Efunwoye" src="http://0.gravatar.com/avatar/394c96b057a3f56c041b782582bea877?s=64&d=mm&r=g" srcset="http://0.gravatar.com/avatar/394c96b057a3f56c041b782582bea877?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-398370" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Olu Efunwoye</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-398370" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-398370" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>Hi Shlomi,<br>
+Thanks for your response. I looked all over YouTube but found none, are you planning to release any YouTube step by step guide on installation and configuration by any chance?</p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-398370_397590" class="wpdiscuz_clear"></div></div><div id="wc-comm-398437_398370" class="wc-comment wc-blog-guest wc_comment_level-1"><div class="wc-comment-left "><div class="wpd-xborder"></div><img alt="Shlomi Noach" src="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=64&d=mm&r=g" srcset="http://1.gravatar.com/avatar/168ccec72eee0530b818d44f3fedaacf?s=128&d=mm&r=g 2x" class="avatar avatar-64 photo" height="64" width="64"><div class="wc-blog-guest wc-comment-label"><span>Guest</span></div></div><div id="comment-398437" class="wc-comment-right"><div class="wc-comment-header"><div class="wc-comment-author ">Shlomi Noach</div><div class="wc-comment-link"><div class="wc-share-link wpf-cta wpd-tooltip-right"><i class="fas fa-share-alt" aria-hidden="true" title="Share"></i><wpdtip><a class="wc_tw" target="_blank" href="https://twitter.com/intent/tweet?text=&url=http%3A%2F%2Fcode.openark.org%2Fblog%2Fmysql%2Fmysql-high-availability-tools-followup-the-missing-piece-orchestrator%2Fcomment-page-1%23comment-398437" title="Share On Twitter"><i class="fab fa-twitter wpf-cta" aria-hidden="true"></i></a><a class="wc_go" target="_blank" href="https://plus.google.com/share?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On Google"><i class="fab fa-google wpf-cta" aria-hidden="true"></i></a><a class="wc_vk" target="_blank" href="http://vk.com/share.php?url=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title="Share On VKontakte"><i class="fab fa-vk wpf-cta" aria-hidden="true"></i></a><a class="wc_ok" target="_blank" href="http://www.odnoklassniki.ru/dk?st.cmd=addShare&st.s=1&st._surl=https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator" title=""><i class="fab fa-odnoklassniki wpf-cta" aria-hidden="true"></i></a></wpdtip></div><span class="wc-comment-img-link-wrap"><i class="fas fa-link wc-comment-img-link wpf-cta" data-comment-url="https://shlomi-noach.github.io/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1#comment-398437" aria-hidden="true"></i></span></div><div class="wpdiscuz_clear"></div></div><div class="wc-comment-text"><p>I’m not making any YouTube videos for configuration step-by-step. You may watch my presentation from Percona Live: <a href="https://www.percona.com/live/17/resources/videos?tid=All&combine=practical+orchestrator" rel="nofollow ugc">https://www.percona.com/live/17/resources/videos?tid=All&combine=practical+orchestrator</a></p>
+</div><div class="wc-comment-footer"><div class="wc-footer-left"><span class="wc-vote-link wc-up wc_vote wc_not_clicked"><i class="fas fa-plus wc-vote-img-up"></i><span>Vote Up</span></span><span class="wc-vote-result">0</span><span class="wc-vote-link wc-down wc_vote wc_not_clicked"><i class="fas fa-minus wc-vote-img-down"></i><span>Vote Down</span></span> </div><div class="wc-footer-right"><div class="wc-comment-date"><i class="far fa-clock" aria-hidden="true"></i>2 years ago</div></div><div class="wpdiscuz_clear"></div></div></div><div class="wpdiscuz-comment-message"></div><div id="wpdiscuz_form_anchor-398437_398370" class="wpdiscuz_clear"></div></div>                
+                    <div class="wpdiscuz-comment-pagination">
+                                            </div>
+                </div>
+                <div class="wpdiscuz_clear"></div>
+                                                                                </div>
+        </div>
+        <div id="wpdiscuz-loading-bar" class="wpdiscuz-loading-bar wpdiscuz-loading-bar-unauth"></div>
+        
+	</main>
+
+
+	<footer id="colophon" class="site-footer">
+		<div class="site-info">
+			<a href="https://wordpress.org/">
+				Powered by WordPress			</a>
+			<span class="sep"> | </span>
+				Theme: <a href="http://openark.org">openark-primer</a> by <a href="http://underscores.me/">Underscores.me</a>.		</div>
+	</footer>
+</div>
+
+<a id="wpdUserContentInfoAnchor" style="display:none;" rel="#wpdUserContentInfo" data-wpd-lity>wpDiscuz</a><div id="wpdUserContentInfo" style="overflow:auto;background:#FDFDF6;padding:20px;width:600px;max-width:100%;border-radius:6px;" class="lity-hide"></div>	<div style="display:none">
+	<div class="grofile-hash-map-168ccec72eee0530b818d44f3fedaacf">
+	</div>
+	<div class="grofile-hash-map-394c96b057a3f56c041b782582bea877">
+	</div>
+	<div class="grofile-hash-map-b4633f930fd7e8919933e31aac12c8d4">
+	</div>
+	<div class="grofile-hash-map-b5aa4f809000b9147289650532e83932">
+	</div>
+	</div>
+
+	<script type="text/javascript">
+		window.WPCOM_sharing_counts = {"https:\/\/shlomi-noach.github.io\/blog\/mysql\/mysql-high-availability-tools-followup-the-missing-piece-orchestrator":7690};
+	</script>
+					<div id="sharing_email" style="display: none;">
+		<form action="/blog/mysql/mysql-high-availability-tools-followup-the-missing-piece-orchestrator/comment-page-1" method="post">
+			<label for="target_email">Send to Email Address</label>
+			<input type="email" name="target_email" id="target_email" value="">
+
+			
+				<label for="source_name">Your Name</label>
+				<input type="text" name="source_name" id="source_name" value="">
+
+				<label for="source_email">Your Email Address</label>
+				<input type="email" name="source_email" id="source_email" value="">
+
+						<input type="text" id="jetpack-source_f_name" name="source_f_name" class="input" value="" size="25" autocomplete="off" title="This field is for validation and should not be changed">
+			
+			<img style="float: right; display: none" class="loading" src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/sharedaddy/images/loading.gif" alt="loading" width="16" height="16">
+			<input type="submit" value="Send Email" class="sharing_send">
+			<a rel="nofollow" href="#cancel" class="sharing_cancel" role="button">Cancel</a>
+
+			<div class="errors errors-1" style="display: none;">
+				Post was not sent - check your email addresses!			</div>
+
+			<div class="errors errors-2" style="display: none;">
+				Email check failed, please try again			</div>
+
+			<div class="errors errors-3" style="display: none;">
+				Sorry, your blog cannot share posts by email.			</div>
+		</form>
+	</div>
+<script>
+var pollsL10n = {"ajax_url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","text_wait":"Your last request is still being processed. Please wait a while ...","text_valid":"Please choose a valid poll answer.","text_multiple":"Maximum number of choices allowed: ","show_loading":"1","show_fading":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-polls/polls-js.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/wpdccjs/wpdcc.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/autogrow/jquery.autogrowtextarea.min.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-includes/js/jquery/jquery.form.min.js"></script>
+<script>
+var wpdiscuzAjaxObj = {"url":"https:\/\/shlomi-noach.github.io\/blog\/wp-admin\/admin-ajax.php","customAjaxUrl":"https:\/\/shlomi-noach.github.io\/blog\/wp-content\/plugins\/wpdiscuz\/utils\/ajax\/wpdiscuz-ajax.php","wpdiscuz_options":{"wc_hide_replies_text":"Hide Replies","wc_show_replies_text":"View Replies","wc_msg_required_fields":"Please fill out required fields","wc_invalid_field":"Some of field value is invalid","wc_error_empty_text":"please fill out this field to comment","wc_error_url_text":"url is invalid","wc_error_email_text":"email address is invalid","wc_invalid_captcha":"Invalid Captcha Code","wc_login_to_vote":"You Must Be Logged In To Vote","wc_deny_voting_from_same_ip":"You are not allowed to vote for this comment","wc_self_vote":"You cannot vote for your comment","wc_vote_only_one_time":"You've already voted for this comment","wc_voting_error":"Voting Error","wc_held_for_moderate":"Comment awaiting moderation","wc_comment_edit_not_possible":"Sorry, this comment no longer possible to edit","wc_comment_not_updated":"Sorry, the comment was not updated","wc_comment_not_edited":"You've not made any changes","wc_new_comment_button_text":"new comment","wc_new_comments_button_text":"new comments","wc_new_reply_button_text":"new reply on your comment","wc_new_replies_button_text":"new replies on your comments","wc_msg_input_min_length":"Input is too short","wc_msg_input_max_length":"Input is too long","wc_follow_user":"Follow this user","wc_unfollow_user":"Unfollow this user","wc_follow_success":"You started following this comment author","wc_follow_canceled":"You stopped following this comment author.","wc_follow_email_confirm":"Please check your email and confirm the user following request.","wc_follow_email_confirm_fail":"Sorry, we couldn't send confirmation email.","wc_follow_login_to_follow":"Please login to follow users.","wc_follow_impossible":"We are sorry, but you can't follow this user.","wc_follow_not_added":"Following failed. Please try again later.","is_user_logged_in":false,"commentListLoadType":"0","commentListUpdateType":"0","commentListUpdateTimer":"30","liveUpdateGuests":"1","wc_comment_bg_color":"#FEFEFE","wc_reply_bg_color":"#F8F8F8","wpdiscuzCommentsOrder":"asc","wpdiscuzCommentOrderBy":"comment_date_gmt","commentsVoteOrder":false,"wordpressThreadCommentsDepth":"5","wordpressIsPaginate":"1","commentTextMaxLength":null,"storeCommenterData":100000,"isCaptchaInSession":true,"isGoodbyeCaptchaActive":false,"socialLoginAgreementCheckbox":"1","enableFbLogin":"0","enableFbShare":"0","facebookAppID":"","facebookUseOAuth2":0,"enableGoogleLogin":"0","googleAppID":"","cookiehash":"c616fa5ebd4c9ddc6dc50cbf089ebb1d","isLoadOnlyParentComments":"0","ahk":"ef4t(c4n18s$wj!7(^b9x8#r5pax76x#","enableDropAnimation":1,"isNativeAjaxEnabled":1,"cookieCommentsSorting":"wpdiscuz_comments_sorting","enableLastVisitCookie":0,"version":"5.3.5","wc_post_id":7690,"loadLastCommentId":0,"lastVisitKey":"wpdiscuz_last_visit","isCookiesEnabled":true,"wc_captcha_show_for_guest":"0","wc_captcha_show_for_members":"0","is_email_field_required":"1"}};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz.js"></script>
+<script>
+var wpdiscuzUCObj = {"msgConfirmDeleteComment":"Are you sure you want to delete this comment?","msgConfirmCancelSubscription":"Are you sure you want to cancel this subscription?","msgConfirmCancelFollow":"Are you sure you want to cancel this follow?"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/js/wpdiscuz-user-content.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wpdiscuz/assets/third-party/lity/lity.js"></script>
+<script src="https://secure.gravatar.com/js/gprofiles.js?ver=2020Junaa"></script>
+<script>
+var WPGroHo = {"my_hash":""};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/modules/wpgroho.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/navigation.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/themes/openark-primer/js/skip-link-focus-fix.js"></script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/wp-markdown/js/prettify.min.js"></script>
+<script>
+var sharing_js_options = {"lang":"en","counts":"1","is_stats_active":"1"};
+</script>
+<script src="https://shlomi-noach.github.io/blog/wp-content/plugins/jetpack/_inc/build/sharedaddy/sharing.min.js"></script>
+<script>
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-twitter', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomtwitter', 'menubar=1,resizable=1,width=600,height=350' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-linkedin', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomlinkedin', 'menubar=1,resizable=1,width=580,height=450' );
+				return false;
+			});
+var windowOpen;
+			jQuery( document.body ).on( 'click', 'a.share-facebook', function() {
+				// If there's another sharing window open, close it.
+				if ( 'undefined' !== typeof windowOpen ) {
+					windowOpen.close();
+				}
+				windowOpen = window.open( jQuery( this ).attr( 'href' ), 'wpcomfacebook', 'menubar=1,resizable=1,width=600,height=400' );
+				return false;
+			});
+</script>
+<script type="text/javascript" src="https://stats.wp.com/e-202024.js" async="async" defer></script>
+<script type="text/javascript">
+	_stq = window._stq || [];
+	_stq.push([ 'view', {v:'ext',j:'1:8.2.1',blog:'32412571',post:'7690',tz:'2',srv:'code.openark.org'} ]);
+	_stq.push([ 'clickTrackerInit', '32412571', '7690' ]);
+</script>
+
+</body>
+</html>

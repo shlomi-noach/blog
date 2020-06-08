@@ -1,0 +1,698 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Data Types &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/data-types/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 24 Jan 2013 08:08:40 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Re: MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation#comments</comments>
+				<pubDate>Thu, 24 Jan 2013 08:08:40 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Percona Toolkit]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028</guid>
+				<description><![CDATA[Reading Sheeri&#8217;s MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation, I was baffled at this change of floating point number notation. However, I was also concerned about the final action taken: using &#8220;&#8211;ignore-columns&#8221; to avoid comparing the FLOAT/DOUBLE types. The &#8211;float-precision option for pt-table-checksum currently only uses ROUND() so as to disregard minor [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Reading Sheeri&#8217;s <a href="http://blog.mozilla.org/it/2013/01/17/mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/">MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation</a>, I was baffled at this change of floating point number notation.</p>
+<p>However, I was also concerned about the final action taken: using <strong>&#8220;&#8211;ignore-columns&#8221;</strong> to avoid comparing the <strong>FLOAT</strong>/<strong>DOUBLE</strong> types.</p>
+<p>The <a href="http://www.percona.com/doc/percona-toolkit/2.0/pt-table-checksum.html#cmdoption-pt-table-checksum--float-precision">&#8211;float-precision</a> option for <em>pt-table-checksum</em> currently only uses <strong>ROUND()</strong> so as to disregard minor rounding issues. But it can very easily extend to handle the difference in floating point notation. Consider again the problem:</p>
+<blockquote>
+<pre>mysql&gt; create table tf(f float);
+Query OK, 0 rows affected (0.11 sec)
+
+mysql&gt; insert into tf values(0.0000958084);
+Query OK, 1 row affected (0.04 sec)
+
+mysql-<strong>5.1</strong>&gt; select * from tf;
++-------------+
+| f           |
++-------------+
+| 9.58084e-05 |
++-------------+
+
+mysql-<strong>5.5</strong>&gt; select * from tf;
++--------------+
+| f            |
++--------------+
+| 0.0000958084 |
++--------------+</pre>
+</blockquote>
+<p>How can we normalize the notation?</p>
+<p>Easily: <strong>CAST</strong> it as <strong>DECIMAL</strong>. Consider:<span id="more-6028"></span></p>
+<blockquote>
+<pre>mysql-<strong>5.1</strong>&gt; SELECT f,ROUND(IF(f BETWEEN -1 AND 1, <strong>CAST(f AS DECIMAL(65,30))</strong>, f), 10) as fn from tf;
++-------------+--------------+
+| f           | fn           |
++-------------+--------------+
+| 9.58084e-05 | 0.0000958084 |
++-------------+--------------+
+
+mysql-<strong>5.5</strong>&gt; SELECT f,ROUND(IF(f BETWEEN -1 AND 1, <strong>CAST(f AS DECIMAL(65,30))</strong>, f), 10) as fn from tf;
++--------------+--------------+
+| f            | fn           |
++--------------+--------------+
+| 0.0000958084 | 0.0000958084 |
++--------------+--------------+</pre>
+</blockquote>
+<p>The normalization works well in both cases; also, taking care to only normalize values in the range <strong>[-1, 1]</strong>.</p>
+<p>The change in <em>pt-table-checksum</em>? One line of code:</p>
+<blockquote>
+<pre>         elsif ( $float_precision &amp;&amp; $type =~ m/float|double/ ) {
+            $result = "ROUND($result, $float_precision)";
+         }</pre>
+</blockquote>
+<p>Turns to</p>
+<blockquote>
+<pre>         elsif ( $float_precision &amp;&amp; $type =~ m/float|double/ ) {
+            $result = "ROUND(IF($result BETWEEN -1 AND 1, CAST($result AS DECIMAL(65,30)), $result), $float_precision)";
+         }</pre>
+</blockquote>
+<p>I&#8217;ve just submitted a blueprint, but I would think changing one line of code shouldn&#8217;t wait till next release of Percona Toolkit: one can edit in-place their <strong>/usr/bin/pt-table-checksum</strong> and proceed to validate their database integrity.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6028</post-id>	</item>
+		<item>
+		<title>CHAR and spaces</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/char-and-spaces</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/char-and-spaces#comments</comments>
+				<pubDate>Tue, 12 Jun 2012 05:28:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4528</guid>
+				<description><![CDATA[I know about it, I knew about it all along, but&#8230; it&#8217;s so easy to fall for it; there&#8217;s just so much absurdity! A CHAR type has a known number of characters. For example, the column: CountryCode CHAR(3) CHARSET ascii NOT NULL &#8211; is known to have exactly three characters. These could be &#8216;USA&#8217;, &#8216;FRA&#8217;, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I know about it, I knew about it all along, but&#8230; it&#8217;s so easy to fall for it; there&#8217;s just so much absurdity!</p>
+<p>A <strong>CHAR</strong> type has a known number of characters. For example, the column:</p>
+<blockquote>
+<pre>CountryCode CHAR(3) CHARSET ascii NOT NULL</pre>
+</blockquote>
+<p>&#8211; is known to have exactly three characters. These could be <strong>&#8216;USA&#8217;</strong>, <strong>&#8216;FRA&#8217;</strong>, etc.</p>
+<p>What happens with spaces? A SQL <strong>CHAR</strong> type ignores any trailing spaces; thus, the code <strong>&#8216;GB &#8216;</strong> (the characters <strong>&#8216;G&#8217;</strong>, <strong>&#8216;B&#8217;</strong>, and the space <strong>&#8216; &#8216;</strong>) is interpreted as <strong>&#8216;GB&#8217;</strong>. Trailing spaces are not regarded as part of the text. Want to see some absurdity?</p>
+<blockquote>
+<pre>CREATE TABLE `c_test` (
+  `c` char(1) DEFAULT NULL
+);
+INSERT INTO c_test VALUES ('a');
+INSERT INTO c_test VALUES ('b');
+INSERT INTO c_test VALUES (' ');
+
+SELECT c, LENGTH(c), c = 'a', c = 'b', c = ' ', LENGTH(' ') FROM c_test;
++------+-----------+---------+---------+---------+-------------+
+| c    | LENGTH(c) | c = 'a' | c = 'b' | c = ' ' | LENGTH(' ') |
++------+-----------+---------+---------+---------+-------------+
+| a    |         1 |       1 |       0 |       0 |           1 |
+| b    |         1 |       0 |       1 |       0 |           1 |
+|      |         0 |       0 |       0 |       1 |           1 |
++------+-----------+---------+---------+---------+-------------+</pre>
+</blockquote>
+<p><span id="more-4528"></span>Note that <strong>LENGTH(c)</strong> is zero on third row, but nevertheless it equals the space character (<strong>c = &#8216; &#8216;</strong>). Although, the length of the space character is&#8230; <strong>1</strong> (and this is because the constant <strong>&#8216; &#8216;</strong> is interpreted as <strong>VARCHAR)</strong>.</p>
+<p>To emphasize the absurdity, now take a closer look:</p>
+<blockquote>
+<pre>SELECT c, LENGTH(c), c = ' ', LENGTH(' '), c = '', LENGTH('') FROM c_test;
++------+-----------+---------+-------------+--------+------------+
+| c    | LENGTH(c) | c = ' ' | LENGTH(' ') | c = '' | LENGTH('') |
++------+-----------+---------+-------------+--------+------------+
+| a    |         1 |       0 |           1 |      0 |          0 |
+| b    |         1 |       0 |           1 |      0 |          0 |
+|      |         0 |       1 |           1 |      1 |          0 |
++------+-----------+---------+-------------+--------+------------+</pre>
+</blockquote>
+<p>I add a comparison with the empty string <strong>&#8221;</strong>, and it turns out the space character equals both a space character and the empty string, though their lengths do not agree.</p>
+<p>Now, I usually don&#8217;t bother with <strong>CHAR</strong> types, and prefer the <strong>VARCHAR</strong> or <strong>TEXT</strong> types, but every once in a while I do use it. Most recently, in a stored routine code in <a href="http://code.google.com/p/common-schema">common_schema</a>, I iterate &amp; parse some text. I iterated the text char by char, and declared a local<strong> CHAR(1)</strong> variable to assign iterated value to. It sure bit me when I got to a space character which insisted it was the empty text (indicating end of iteration).</p>
+<p>Of course the immediate and correct solution was to change the local variable&#8217;s type to <strong>VARCHAR(1)</strong> instead. But the time it consumed to find the problem&#8230; Be warned and be aware!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/char-and-spaces/feed</wfw:commentRss>
+		<slash:comments>12</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4528</post-id>	</item>
+		<item>
+		<title>23:59:59 is not the end of the day. No, really!</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/235959-is-not-the-end-of-the-day-no-really</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/235959-is-not-the-end-of-the-day-no-really#comments</comments>
+				<pubDate>Wed, 27 Jul 2011 18:16:00 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3839</guid>
+				<description><![CDATA[How would you check whether some TIMESTAMP column falls within a given day, say July 26th, 2011? This is a question I tend to ask students, and usually I get the same range of answers. Some are wrong; some cannot utilize an index, some are correct, and some are temporarily correct. I wish to take [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>How would you check whether some <strong>TIMESTAMP</strong> column falls within a given day, say <strong>July 26th, 2011</strong>?</p>
+<p>This is a question I tend to ask students, and usually I get the same range of answers. Some are wrong; some cannot utilize an index, some are correct, and some are <em>temporarily correct</em>. I wish to take a closer look at the last. Such an answer looks like this:</p>
+<blockquote>
+<pre>SELECT * FROM some_table WHERE timstamp_column BETWEEN '2011-07-26 00:00:00' AND '2011-07-26 23:59:59'</pre>
+</blockquote>
+<p>Yikes! I get my allergies when I see this one.</p>
+<p>Technically this seems correct. And it seems to work so far for people. There are two things that disturb me:</p>
+<ol>
+<li><strong>&#8217;23:59:59&#8242;</strong> refers to the beginning of the last second of the day. This means a full second is missing in concept. No one would write such a code on a C, Java or PHP application: that would be a newbie&#8217;s mistake. But people feel at ease doing it with SQL</li>
+<p>Of course, this works when timestamps are in a one second resolution. Which leads me to:</p>
+<li>One second resolution is a temporary issue. Already <a href="http://kb.askmonty.org/en/what-is-mariadb-53">MariaDB 5.3</a> presents with microsecond support for NOW() and TIMESTAMP, TIME and DATETIME columns. Sometime in the not-so-far future the standard MySQL distribution will have that, too.</li>
+</ol>
+<p><span id="more-3839"></span>Soon people will start losing data, reporting wrong numbers, perform incorrect aggregations. My advise:</p>
+<blockquote>
+<pre>grep -iR "23:59:59" /path/to/application/code/*</pre>
+</blockquote>
+<p>And get rid of it. A good alternative would be:</p>
+<blockquote>
+<pre>SELECT * FROM some_table WHERE timstamp_column &gt;= DATE('2011-07-26') AND timestamp_column &lt; (DATE('2011-07-26') + INTERVAL 1 DAY)</pre>
+</blockquote>
+<p>(Why use all this INTERVAL stuff? Think <strong>28/29/30/31</strong> days in month and get the answer)</p>
+<p>And do not use <strong>LIKE &#8216;2011-07-26 %&#8217;</strong>. Read <a href="https://shlomi-noach.github.io/blog/mysql/beware-of-implicit-casting">this</a> if you&#8217;re not sure why.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/235959-is-not-the-end-of-the-day-no-really/feed</wfw:commentRss>
+		<slash:comments>13</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3839</post-id>	</item>
+		<item>
+		<title>Announcing common_schema: common views &#038; routines for MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql#comments</comments>
+				<pubDate>Wed, 13 Jul 2011 04:25:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[INFORMATION_SCHEMA]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Schema]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3794</guid>
+				<description><![CDATA[Today I have released common_schema, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server. What does it do? There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &#38; transactions, security, internals&#8230; There are [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Today I have released <a title="common_schema" href="http://code.openark.org/forge/common_schema">common_schema</a>, a utility schema for MySQL which includes many views and functions, and is aimed to be installed on any MySQL server.</p>
+<h4>What does it do?</h4>
+<p>There are views answering for all sorts of useful information: stuff related to schema analysis, data dimensions, monitoring, processes &amp; transactions, security, internals&#8230; There are basic functions answering for common needs.</p>
+<p>Some of the views/routines simply formalize those queries we tend to write over and over again. Others take the place of external tools, answering complex questions via SQL and metadata. Still others help out with SQL generation.</p>
+<p>Here are a few highlights:</p>
+<ul>
+<li>Did you know you can work out <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/global_status_diff_nonzero.html">simple monitoring</a> of your server with a <em>query</em>?  There&#8217;s a view to do that for you.</li>
+<li>How about showing just <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/processlist_top.html">the good parts of the processlist</a>?</li>
+<li>Does your schema have <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/redundant_keys.html">redundant keys</a>?</li>
+<li>Or InnoDB tables with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/no_pk_innodb_tables.html">no PRIMARY KEY</a>?</li>
+<li>Is AUTO_INCREMENT <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/auto_increment_columns.html">running out of space</a>?</li>
+<li>Can I get the SQL statements to <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">generate my FOREIGN KEYs</a>? To drop them?</li>
+<li>And can we finally get <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">SHOW GRANTS for all accounts</a>, and as an <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">SQL query</a>?</li>
+<li>Ever needed a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/general_functions.html#crc64">64 bit CRC function</a>?</li>
+<li>And aren&#8217;t you tired of writing the cumbersome SUBSTRING_INDEX(SUBSTRING_INDEX(str, &#8216;,&#8217;, 3), &#8216;,&#8217;, -1)? <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/string_functions.html#split_token">There&#8217;s an alternative</a>.</li>
+</ul>
+<p>There&#8217;s more. Take a look at the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/introduction.html">common_schema documentation</a> for full listing. And it&#8217;s evolving: I&#8217;ve got quite a few ideas already for future components.</p>
+<p>Some of these views rely on heavyweight INFORMATION_SCHEMA tables. You should be aware of the impact and <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/risks.html">risks</a>.</p>
+<h4>What do I need to install?</h4>
+<p>There&#8217;s no script or executable file. It&#8217;s just a schema. The distribution in an SQL file which generates <em>common_schema</em>. Much like a dump file.</p>
+<h4><span id="more-3794"></span>What are the system requirements?</h4>
+<p>It&#8217;s just between you and your MySQL. There are currently three distribution files, dedicated for different versions of MySQL (and allowing for increased functionality):</p>
+<ul>
+<li><strong>common_schema_mysql_51</strong>: fits all MySQL &gt;= 5.1 distributions</li>
+<li><strong>common_schema_innodb_plugin</strong>: fits MySQL &gt;= 5.1, with InnoDB plugin + INFORMATION_SCHEMA tables enabled</li>
+<li><strong>common_schema_percona_server</strong>: fits Percona Server &gt;= 5.1</li>
+</ul>
+<p>Refer to the <a rel="nofollow" href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/download.html">documentation</a> for more details.</p>
+<h4>What are the terms of use?</h4>
+<p><em>common_schema</em> is released under the <a href="http://www.opensource.org/licenses/bsd-license.php">BSD license</a>.</p>
+<h4>Where can I download it?</h4>
+<p>On the <a href="http://code.google.com/p/common-schema/">common_schema project page</a>. Enjoy it!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/announcing-common_schema-common-views-routines-for-mysql/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3794</post-id>	</item>
+		<item>
+		<title>TIMESTAMP vs. DATETIME, which should I be using?</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/timestamp-vs-datetime-which-should-i-be-using</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/timestamp-vs-datetime-which-should-i-be-using#comments</comments>
+				<pubDate>Sun, 22 May 2011 04:11:47 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3361</guid>
+				<description><![CDATA[They both look the same, have roughly the same use. Nevertheless, they differ in many respects. I&#8217;ll note the difference, and note a few pitfalls and peculiarities. Range TIMESTAMP starts with the epoch, &#8216;1970-01-01 00:00:01&#8217; UTC and ends with &#8216;2038-01-19 03:14:07&#8217; UTC. This is all very nice today, and may actually hold up till our [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>They both look the same, have roughly the same use. Nevertheless, they differ in many respects. I&#8217;ll note the difference, and note a few pitfalls and peculiarities.</p>
+<h4>Range</h4>
+<p><strong>TIMESTAMP</strong> starts with the <a href="http://en.wikipedia.org/wiki/Unix_time">epoch</a>, <strong>&#8216;1970-01-01 00:00:01&#8217;</strong> UTC and ends with <strong>&#8216;2038-01-19 03:14:07&#8217;</strong> UTC. This is all very nice today, and may actually hold up till our retirement, but the younger readers may yet have to deal with the <strong>Bug2K+38</strong><img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/2122.png" alt="™" class="wp-smiley" style="height: 1em; max-height: 1em;" />, certain to arrive.</p>
+<p><strong>DATETIME</strong> starts with <strong>&#8216;1000-01-01 00:00:00&#8217;</strong> and lasts up to <strong>&#8216;9999-12-31 23:59:59&#8217;</strong>. More on that later.</p>
+<p>In respect of range, your current event logs may well use a <strong>TIMESTAMP</strong> value, while your grandfather&#8217;s and granddaughter&#8217;s birth dates may require <strong>DATETIME</strong>.</p>
+<p>In general I would suggest that anything that relates to <em>now</em>, can be a <strong>TIMESTAMP</strong>. A new entry is added? It is added <em>now</em>. It can be represented by a <strong>TIMESTAMP</strong>. Anything has an expiry time of a few minutes, perhaps a few days or a month? You&#8217;ll be safe using it up till late <strong>2037</strong>. Anything else had better use a <strong>DATETIME</strong>. In particular, dates relating to issues such as birth, insurance, the market etc. fall into this category.</p>
+<p><em>History</em>, however, does not even hold up with <strong>DATETIME</strong>. Rome fell long before <strong>MIN(DATETIME)</strong>. You will have to manage your own. Not even <strong>YEAR</strong> will help you out.</p>
+<h4>Storage</h4>
+<p><strong>TIMESTAMP</strong> makes for <strong>4</strong> bytes. <strong>DATETIME</strong> makes for <strong>8</strong> bytes. Now that we have this behind us, let&#8217;s see why.<span id="more-3361"></span></p>
+<h4>Internal representation</h4>
+<p>A <strong>TIMESTAMP</strong> is merely the number of elapsed seconds since the <em>epoch</em>. It is a number. Not only is this a number, it is an incrementing number, and without gaps. Ever ascending. It actually equals the <strong>UNIX_TIMESTAMP()</strong> function.</p>
+<p>A <strong>DATETIME</strong> is more of an oddity. From the manual:</p>
+<blockquote>
+<ul>
+<li><code>DATETIME</code>: Eight bytes:
+<div>
+<ul>
+<li>A four-byte integer packed as               <code>YYYY</code>×10000 +               <code>MM</code>×100 +               <code>DD</code></li>
+<li>A four-byte integer packed as               <code>HH</code>×10000 +               <code>MM</code>×100 +               <code>SS</code></li>
+</ul>
+</div>
+</li>
+</ul>
+</blockquote>
+<p><em>Huh?</em></p>
+<p>There&#8217;s nothing sequential about a <strong>DATETIME</strong>. The value which follows <strong>20110307095159</strong> is <strong>20110307095200</strong>. It&#8217;s like the string representation without any delimiters. See the following (ignore the fraction, it&#8217;s not really there):</p>
+<blockquote>
+<pre>root@mysql-5.1.51&gt; SELECT NOW()+0;
++-----------------------+
+| NOW()+0               |
++-----------------------+
+| 20110307095238.000000 |
++-----------------------+
+</pre>
+</blockquote>
+<p>The implication of this internal representation is that conversions must be made back and forth. When you want to add <strong>5</strong> seconds to a <strong>DATETIME</strong>, MySQL cannot simply add <strong>5</strong> to some number, but must make for a more complicated calculation.</p>
+<h4>Peculiarities</h4>
+<p>Now here&#8217;s a question: why does <strong>DATETIME</strong> start with <strong>&#8216;1000-01-01 00:00:00&#8217;</strong>? Can you provide with a convincing argument? The only argument I can find is hardly convincing.</p>
+<p>Did you ever need to type in a password with your phone? Say, for your Credit Card company, or your Bank? Did you get recorded instructions saying &#8220;<em>You must type six digits. You must not repeat the same digits three successive times</em>&#8220;? That&#8217;s somewhat nice, and probably a good advice. Did you ever get told &#8220;<em>The first digit must not be <strong>0</strong></em>&#8220;? That&#8217;s just <em>stupid</em>. This means we&#8217;re giving up on <strong>100,000</strong> valid passwords, thereby reducing our search space by <strong>10%</strong>!</p>
+<p>I suspect in both cases the reasoning is the same: if you start with a <strong>0</strong>, and we represent it as a number, it won&#8217;t make up for the same number of digits we intended it to.</p>
+<p>In the case of your Credit Card company, there is no excuse. What&#8217;s the problem with padding with zeros till you make those six digits?</p>
+<p>In the case of MySQL&#8217;s <strong>DATETIME</strong>, I can see a weak reasoning. Read <a href="http://dev.mysql.com/doc/refman/5.1/en/datetime.html">this page on the docs</a> to find out that a <strong>DATETIME</strong> can be represented in many forms, and can be automatically deduced from a string in many formats. Both strings <strong>&#8216;110307095100&#8217;</strong> and <strong>&#8216;20110307095100&#8217;</strong> make for the same <strong>DATETIME</strong> value. It is based on the number of characters in your text, that the parsing decides how to act.</p>
+<p>The fact the first year is <strong>1000</strong> makes the number of digits predictable.</p>
+<h4>My thoughts?</h4>
+<p>I don&#8217;t see why I should care about automatically converting texts of different formats to a <strong>DATETIME</strong>. As a programmer, I&#8217;m perfectly content with strict typing. I don&#8217;t mind passing around only texts of the form <strong>&#8216;YYYY-MM-DD HH:MM:SS&#8217;</strong> (or, better yet, passing date objects and letting my connector do the translation). Moreover, I prefer it that way! It makes me feel safer, that I haven&#8217;t passed a wrong text by mistake, to be silently accepted.</p>
+<p>For this reason I don&#8217;t like the idea of losing the ability to use <strong>DATETIME</strong> on <strong>1,000</strong> lost years. As far as I can tell, this is a MySQL specific issue; there is no <strong>ANSI SQL</strong> for <strong>DATETIME</strong>.</p>
+<p>[<strong>UPDATE</strong>:  Sheeri <a href="http://palominodb.com/blog/2011/05/23/datetime-vs-timestamp">notes</a> the biggest difference: <strong>DATETIME</strong> does not support time zones. A good discussion is also available on <a href="http://bit.ly/oursql046">OurSQL</a>]</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/timestamp-vs-datetime-which-should-i-be-using/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3361</post-id>	</item>
+		<item>
+		<title>Implicit casting you don&#8217;t want to see around</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/implicit-casting-you-dont-want-to-see-around</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/implicit-casting-you-dont-want-to-see-around#comments</comments>
+				<pubDate>Wed, 07 Jul 2010 08:53:37 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2344</guid>
+				<description><![CDATA[In Beware of implicit casting, I have outlined the dangers of implicit casting. Here&#8217;s a few more real-world examples I have tackled: Number-String comparisons Much like in programming languages, implicit casting is made to numbers when at least one of the arguments is a number. Thus: The second query consists of pure strings comparison. It [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In <a href="https://shlomi-noach.github.io/blog/mysql/beware-of-implicit-casting">Beware of implicit casting</a>, I have outlined the dangers of implicit casting. Here&#8217;s a few more real-world examples I have tackled:</p>
+<h4>Number-String comparisons</h4>
+<p>Much like in programming languages, implicit casting is made to numbers when at least one of the arguments is a number. Thus:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+mysql&gt; SELECT 3 = '3.0';
++-----------+
+| 3 = '3.0' |
++-----------+
+|         1 |
++-----------+
+1 row in set (0.00 sec)
+
+mysql&gt; SELECT '3' = '3.0';
++-------------+
+| '3' = '3.0' |
++-------------+
+|           0 |
++-------------+
+</pre>
+</blockquote>
+<p>The second query consists of pure strings comparison. It has no way to determine that number comparison should be made.</p>
+<h4>Direct DATE arithmetics</h4>
+<p>The first query <em>seems</em> to work, but is completely incorrect. The second explains why. The third is a total mess.<span id="more-2344"></span></p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+mysql&gt; SELECT DATE('2010-01-01')+3;
++----------------------+
+| DATE('2010-01-01')+3 |
++----------------------+
+|             20100104 |
++----------------------+
+1 row in set (0.00 sec)
+
+mysql&gt; SELECT DATE('2010-01-01')-3;
++----------------------+
+| DATE('2010-01-01')-3 |
++----------------------+
+|             20100098 |
++----------------------+
+1 row in set (0.00 sec)
+
+mysql&gt; SELECT '2010-01-01' - 3;
++------------------+
+| '2010-01-01' - 3 |
++------------------+
+|             2007 |
++------------------+
+1 row in set, 1 warning (0.00 sec)
+</pre>
+</blockquote>
+<h4>Number-String comparisons, big integers</h4>
+<p>Look at the following crazy comparisons:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+mysql&gt; SELECT 1234 = '1234';
++---------------+
+| 1234 = '1234' |
++---------------+
+|             1 |
++---------------+
+
+mysql&gt; SELECT 123456789012345678 = '123456789012345678';
++-------------------------------------------+
+| 123456789012345678 = '123456789012345678' |
++-------------------------------------------+
+|                                         0 |
++-------------------------------------------+
+
+mysql&gt; SELECT 123456789012345678 = '123456789012345677';
++-------------------------------------------+
+| 123456789012345678 = '123456789012345677' |
++-------------------------------------------+
+|                                         1 |
++-------------------------------------------+
+</pre>
+</blockquote>
+<p>The amazing result of the last two comparisons may strike as odd. Actually, it may strike as a bug, and indeed when a customer approached me with this behavior I was at loss for words. But this is <a href="http://dev.mysql.com/doc/refman/5.0/en/type-conversion.html">documented</a>. The manual describes the cases for casting, then states: &#8220;&#8230; In all other cases, the arguments are compared <em>as             floating-point (real) numbers</em>. &#8230;&#8221;</p>
+<h4>Lessons learned:</h4>
+<ul>
+<li>Be careful when comparing strings with floating point values. Matching depends on how both are represented.</li>
+<li>Avoid converting temporal types to strings when doing date manipulation.</li>
+<li>Avoid direct math on temporal types.</li>
+<li>Avoid casting <strong>BIGINT</strong>s represented by strings. Casting will turn out to use <strong>FLOAT</strong>s and may be incorrect.</li>
+</ul>
+<p>Last but not least:</p>
+<ul>
+<li>Use the proper data types for your data&#8217;s representation. When dealing with numbers, use numbers. When dealing with temporal values, use temporal types.</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/implicit-casting-you-dont-want-to-see-around/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2344</post-id>	</item>
+		<item>
+		<title>Choosing MySQL boolean data types</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/choosing-mysql-boolean-data-types</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/choosing-mysql-boolean-data-types#comments</comments>
+				<pubDate>Thu, 03 Jun 2010 05:24:11 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2181</guid>
+				<description><![CDATA[How do you implement True/False columns? There are many ways to do it, each with its own pros and cons. ENUM Create you column as ENUM(&#8216;F&#8217;, &#8216;T&#8217;), or ENUM(&#8216;N&#8217;,&#8217;Y&#8217;) or ENUM(&#8216;0&#8217;, &#8216;1&#8217;). This is the method used in the mysql tables (e.g. mysql.user privileges table). It&#8217;s very simple and intuitive. It truly restricts the values [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>How do you implement <strong>True</strong>/<strong>False</strong> columns?</p>
+<p>There are many ways to do it, each with its own pros and cons.</p>
+<h4>ENUM</h4>
+<p>Create you column as <strong>ENUM(&#8216;F&#8217;, &#8216;T&#8217;)</strong>, or <strong>ENUM(&#8216;N&#8217;,&#8217;Y&#8217;)</strong> or <strong>ENUM(&#8216;0&#8217;, &#8216;1&#8217;)</strong>.</p>
+<p>This is the method used in the <strong>mysql</strong> tables (e.g. <strong>mysql.user</strong> privileges table). It&#8217;s very simple and intuitive. It truly restricts the values to just two options, which serves well. It&#8217;s compact (just one byte).</p>
+<p>A couple disadvantages to this method:</p>
+<ol>
+<li>Enums are represented by numerical values (which is good) and start with <strong>1</strong> instead of <strong>0</strong>. This means <strong>&#8216;F&#8217;</strong> is <strong>1</strong>, and <strong>&#8216;T&#8217;</strong> is <strong>2</strong>, and they both translate to <strong>True</strong> when directly used in a booleanic expression (e.g. <strong>IF(val, &#8216;True&#8217;, &#8216;False&#8217;)</strong> always yields <strong>&#8216;True&#8217;</strong>)</li>
+<li>There&#8217;s no real convention. Is it <strong>&#8216;Y&#8217;/&#8217;N&#8217;</strong>? <strong>&#8216;T&#8217;/&#8217;F&#8217;</strong>? <strong>&#8216;P&#8217;/&#8217;N&#8217;</strong>? <strong>&#8216;1&#8217;/&#8217;0&#8242;</strong>?</li>
+</ol>
+<h4>CHAR(1)</h4>
+<p>Simple again. Proposed values are, as before, <strong>&#8216;F&#8217;</strong>, <strong>&#8216;T&#8217;</strong> etc. This time there&#8217;s no way to limit the range of values. You cannot (in MySQL, unless using triggers) prevent an &#8216;X&#8217;.</p>
+<p>Watch out for the charset! If it&#8217;s <strong>utf8</strong> you pay with 3 bytes instead of just 1. And, again, <strong>&#8216;T&#8217;</strong>, <strong>&#8216;F&#8217;</strong>, <strong>&#8216;Y&#8217;</strong>, <strong>&#8216;N&#8217;</strong> values all evaluate as <strong>True</strong>. It is possible to use the zero-valued character, but it defeats the purpose of using <strong>CHAR</strong>.<span id="more-2181"></span></p>
+<h4>CHAR(0)</h4>
+<p>Many are unaware that it&#8217;s even valid to make this definition. What does it mean? Take a look at the following table:</p>
+<blockquote>
+<pre>CREATE TABLE `t1` (
+ `bval` char(0) DEFAULT NULL
+);
+mysql&gt; INSERT INTO t1 VALUES ('');
+mysql&gt; INSERT INTO t1 VALUES ('');
+mysql&gt; INSERT INTO t1 VALUES (NULL);
+
+mysql&gt; SELECT * FROM t1;
++------+
+| bval |
++------+
+|      |
+|      |
+| NULL |
++------+
+</pre>
+</blockquote>
+<p>NULLable columns cause for an additional storage per row. There&#8217;s one bit per NULLable column which notes down whether the column&#8217;s value is NULL or not. If you only have one NULLable column, you must pay for this bit with 1 byte. If you have two NULLable columns, you still only pay with 1 byte.</p>
+<p>Furthermore:</p>
+<blockquote>
+<pre>mysql&gt; SELECT bval IS NOT NULL FROM t1;
++------------------+
+| bval IS NOT NULL |
++------------------+
+|                1 |
+|                1 |
+|                0 |
++------------------+
+</pre>
+</blockquote>
+<p>So this plays somewhat nicely into booleanic expressions.</p>
+<p>However, this method is unintuitive and confusing. I personally don&#8217;t use it.</p>
+<h4>TINYINT</h4>
+<p>With integer values, we can get down to <strong>0</strong> and <strong>1</strong>. With <strong>TINYINT</strong>, we only pay with 1 byte of storage. As with <strong>CHAR(1)</strong>, we cannot prevent anyone from INSERTing other values. But that doesn&#8217;t really matter, if we&#8217;re willing to accept that 0 evaluates as <strong>False</strong>, and <em>all other values</em> as <strong>True</strong>. In this case, boolean expressions work very well with your column values.</p>
+<h4>BOOL/BOOLEAN</h4>
+<p>These are just synonyms to <strong>TINYINT</strong>. I like to define my boolean values as such. Alas, when issuing a <strong>SHOW CREATE TABLE</strong> the definition is just a normal <strong>TINYINT</strong>. Still, it is clearer to look at if you&#8217;re storing your table schema under your version control.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/choosing-mysql-boolean-data-types/feed</wfw:commentRss>
+		<slash:comments>14</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2181</post-id>	</item>
+		<item>
+		<title>But I DO want MySQL to say &#8220;ERROR&#8221;!</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error#comments</comments>
+				<pubDate>Fri, 12 Mar 2010 04:53:28 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[sql_mode]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2005</guid>
+				<description><![CDATA[MySQL is known for its willingness to accept invalid queries, data values. It can silently commit your transaction, truncate your data. Using GROUP_CONCAT with a small group_concat_max_len setting? Your result will be silently truncated (make sure to check the warnings though). Calling CREATE TEMPORARY TABLE? You get silent commit. Issuing a ROLLBACK on non-transactional involved [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL is known for its willingness to accept invalid queries, data values. It can silently commit your transaction, truncate your data.</p>
+<ul>
+<li>Using <strong>GROUP_CONCAT</strong> with a small <strong>group_concat_max_len</strong> setting? Your result will be silently truncated (make sure to check the warnings though).</li>
+<li>Calling <strong>CREATE <span style="text-decoration: line-through;">TEMPORARY</span> TABLE</strong>? You get <a href="http://www.joinfu.com/2010/03/a-follow-up-on-the-sql-puzzle/">silent commit</a>.</li>
+<li>Issuing a <strong>ROLLBACK</strong> on non-transactional involved engines? Have a warning; no error.</li>
+<li>Using <strong>LOCK IN SHARE MODE</strong> on non transactional tables? Not a problem. Nothing reported.</li>
+<li>Adding a <strong>FOREIGN KEY</strong> on a MyISAM table? Good for you; no action actually taken.</li>
+<li>Inserting <strong>300</strong> to a <strong>TINYINT</strong> column in a relaxed <strong>sql_mode</strong>? Give me <strong>255</strong>, I&#8217;ll silently drop the remaining <strong>45</strong>. I owe you.</li>
+</ul>
+<h4>Warnings and errors</h4>
+<p>It would be nice to:<span id="more-2005"></span></p>
+<ul>
+<li>Have an <strong>auto_propagate_warning_to_error</strong> server variable (global/session/both) which, well, does what it says.</li>
+<li>Have an <strong>i_am_really_not_a_dummy</strong> server variable which implies stricter checks for all the above and prevents you from doing with <em>anything</em> that may be problematic (or rolls back your transactions on your invalid actions).</li>
+</ul>
+<p>Connectors may be nice enough to propagate warnings to errors &#8211; that&#8217;s good. But not enough: since data is already committed in MySQL.</p>
+<p>If I understand correctly, and maybe it&#8217;s just a myth, it all relates to the times where MySQL had interest in a widespread adoption across the internet, in such way that it does not interfere too much with the users (hence leading to the common myth that &#8220;MySQL just works out of the box and does not require me to configure or understand anything&#8221;).</p>
+<p>MySQL is a database system, and is now widespread, and is used by serious companies and products. It is time to stop play nice to everyone and provide with strict integrity &#8212; or, be nice to everyone, just allow me to specify what &#8220;nice&#8221; means for me.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error/feed</wfw:commentRss>
+		<slash:comments>18</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2005</post-id>	</item>
+		<item>
+		<title>Useful temporal functions &#038; queries</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/useful-temporal-functions-queries</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/useful-temporal-functions-queries#respond</comments>
+				<pubDate>Tue, 08 Dec 2009 09:46:24 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[SQL]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1666</guid>
+				<description><![CDATA[Here&#8217;s a complication of some common and useful time &#38; date calculations and equations. Some, though very simple, are often misunderstood, leading to inefficient or incorrect implementations. There are many ways to solve such problems. I&#8217;ll present my favorites. Querying for time difference Given two timestamps: ts1 (older) and ts2 (newer), how much time has [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here&#8217;s a complication of some common and useful time &amp; date calculations and equations. Some, though very simple, are often misunderstood, leading to inefficient or incorrect implementations.</p>
+<p>There are many ways to solve such problems. I&#8217;ll present my favorites.</p>
+<h4>Querying for time difference</h4>
+<p>Given two timestamps: <em>ts1</em> (older) and <em>ts2</em> (newer), how much time has passed between them?</p>
+<p>One can use <strong>TIMEDIFF()</strong> &amp; <strong>DATEDIFF()</strong>, or compare two <strong>UNIX_TIMESTAMP()</strong> values. My personal favorite is to use <strong>TIMESTAMPDIFF()</strong>. Reason being that I&#8217;m usually interested in a specific metric, like the number of hours which have passed, or the number of days, disregarding the smaller minute/second resolution. Which allows one to:</p>
+<blockquote>
+<pre>SELECT TIMESTAMPDIFF(HOUR, ts1, ts2)</pre>
+</blockquote>
+<p>Take, for example:</p>
+<blockquote>
+<pre>SELECT TIMESTAMPDIFF(MONTH, '2008-10-07 00:00:00', '2009-12-06 00:00:00')</pre>
+</blockquote>
+<p>The function correctly identifies the number of days per month, and provides with <strong>13</strong>, being the truncated number of full months.</p>
+<h4>Doing arithmetics</h4>
+<p>One can use <strong>TIMESTAMPADD()</strong>, or <strong>DATE_SUB()</strong>, but, again, when dealing with specific resolutions, I find &#8220;<strong>+ INTERVAL</strong>&#8221; to be the most convenient:</p>
+<blockquote>
+<pre>SELECT ts1 + INTERVAL 10 HOUR</pre>
+</blockquote>
+<p><span id="more-1666"></span>This allows me to only add by a specific unit: <strong>SECOND</strong>, <strong>MINUTE</strong>, <strong>HOUR</strong>, <strong>DAY</strong>, <strong>WEEK</strong>, etc. Many times I find this is exactly what I want.</p>
+<blockquote>
+<pre>SELECT TIMESTAMP('2009-12-06 20:14:52') + INTERVAL 4 WEEK AS ts2;
++---------------------+
+| ts2                 |
++---------------------+
+| 2010-01-03 20:14:52 |
++---------------------+</pre>
+</blockquote>
+<h4>Checking if a timestamp is in a given date</h4>
+<p>This one is very popular, and most poorly treated.</p>
+<p>Say we have a <strong>sales</strong> table, with some <strong>ts</strong> column. We want to SELECT all sales on Dec 25th, 2008. I&#8217;ve seen so many solutions, many in writing. Let&#8217;s look at them:</p>
+<p><em>Wrong:</em></p>
+<blockquote>
+<pre>SELECT * FROM sales WHERE ts BETWEEN '2008-12-25' AND '2008-12-26'</pre>
+</blockquote>
+<p>Why is this wrong? Because <strong>BETWEEN</strong> is inclusive. A sale taking place on &#8216;<strong>2008-12-26 00:00:00</strong>&#8216; will match our condition.</p>
+<p><em>Correct but inefficient:</em></p>
+<blockquote>
+<pre>SELECT * FROM sales WHERE DATE(ts) = DATE('2008-12-25')</pre>
+</blockquote>
+<p>Why is this inefficient? Because a function is used over the <strong>ts</strong> column. This disables use of any index we might have on <strong>ts</strong>, leading to full table scan.</p>
+<p><em>Correct but inefficient:</em></p>
+<blockquote>
+<pre>SELECT * FROM sales WHERE ts LIKE '2008-12-25 %'</pre>
+</blockquote>
+<p>Why is this inefficient? Because a function is used over the <strong>ts</strong> column. Can you see it? It&#8217;s an implicit CAST function, which casts the TIMESTAMP value to a character value, so as to perform a string comparison.</p>
+<p><em>Correct but ugh:</em></p>
+<blockquote>
+<pre>SELECT * FROM sales WHERE ts BETWEEN '2008-12-25 00:00:00' AND '2008-12-25 23:59:59'</pre>
+</blockquote>
+<p>Why is it ugh? Because, well, &#8230;Ugh!</p>
+<p><em>Correct:</em></p>
+<blockquote>
+<pre>SELECT * FROM sales WHERE ts &gt;= DATE('2008-12-25') AND ts &lt; DATE('2008-12-26')</pre>
+</blockquote>
+<p>This allows for indexing to be used properly. The <strong>DATE()</strong> casting is not strictly required here, but is generally safer.</p>
+<h4>Truncating to last midnight</h4>
+<p>Surprisingly, this simple question sees a lot of incorrect solution attempts. The quickest, safest way to get &#8220;last midnight&#8221; is:</p>
+<blockquote>
+<pre>SELECT DATE(ts)</pre>
+</blockquote>
+<p>or, if you like to be stricter:</p>
+<blockquote>
+<pre>SELECT TIMESTAMP(DATE(ts))</pre>
+</blockquote>
+<p>For example:</p>
+<blockquote>
+<pre>SELECT TIMESTAMP(DATE('2009-12-06 20:14:52')) AS midnight;
++---------------------+
+| midnight            |
++---------------------+
+| 2009-12-06 00:00:00 |
++---------------------+</pre>
+</blockquote>
+<h4>Truncating to last round hour</h4>
+<p>Similar to the above, but utilizes arithmetic:</p>
+<blockquote>
+<pre>SELECT DATE(ts) + INTERVAL HOUR(ts) HOUR</pre>
+</blockquote>
+<p>For example:</p>
+<blockquote>
+<pre>SELECT ts, DATE(ts) + INTERVAL HOUR(ts) HOUR FROM sales LIMIT 5;
++---------------------+-----------------------------------+
+| ts                  | DATE(ts) + INTERVAL HOUR(ts) HOUR |
++---------------------+-----------------------------------+
+| 2009-01-05 05:17:00 | 2009-01-05 05:00:00               |
+| 2009-03-09 00:49:00 | 2009-03-09 00:00:00               |
+| 2009-02-20 00:14:00 | 2009-02-20 00:00:00               |
+| 2009-02-14 22:42:00 | 2009-02-14 22:00:00               |
+| 2009-03-14 04:50:00 | 2009-03-14 04:00:00               |
++---------------------+-----------------------------------+</pre>
+</blockquote>
+<h4>Round to closest round hour</h4>
+<p>Taking the classic round() implementation, which states:</p>
+<blockquote>
+<pre>round(x) := int(x + 0.5)</pre>
+</blockquote>
+<p>We write:</p>
+<blockquote>
+<pre>SELECT DATE(ts + INTERVAL 30 MINUTE) + INTERVAL HOUR(ts + INTERVAL 30 MINUTE) HOUR</pre>
+</blockquote>
+<p>Example:</p>
+<blockquote>
+<pre>SELECT ts, DATE(ts + INTERVAL 30 MINUTE) + INTERVAL HOUR(ts + INTERVAL 30 MINUTE) HOUR AS rounded FROM sales ORDER BY HOUR(ts) DESC LIMIT 5;
++---------------------+---------------------+
+| ts                  | rounded             |
++---------------------+---------------------+
+| 2009-03-25 23:54:00 | 2009-03-26 00:00:00 |
+| 2009-03-13 23:45:00 | 2009-03-14 00:00:00 |
+| 2009-01-29 22:53:00 | 2009-01-29 23:00:00 |
+| 2009-01-18 22:22:00 | 2009-01-18 22:00:00 |
+| 2009-01-14 22:16:00 | 2009-01-14 22:00:00 |
++---------------------+---------------------+</pre>
+</blockquote>
+<h4>Count number of midnights between two timestamps, inclusive</h4>
+<p>Given two timestamps, <em>ts1</em> and <em>ts2</em>, what is the number of midnights between them?</p>
+<blockquote>
+<pre>SELECT TIMESTAMPDIFF(DAY, DATE(ts1), ts2) + IF(DATE(ts1) = ts1, 1, 0);</pre>
+</blockquote>
+<p>Example:</p>
+<blockquote>
+<pre>SELECT ts, ts2, TIMESTAMPDIFF(DAY, DATE(ts), ts2) + IF(DATE(ts) = ts, 1, 0) AS number_of_midnights FROM sales LIMIT 10;
++---------------------+---------------------+---------------------+
+| ts                  | ts2                 | number_of_midnights |
++---------------------+---------------------+---------------------+
+| 2009-01-05 05:17:00 | 2009-01-05 19:17:00 |                   0 |
+| 2009-03-09 00:49:00 | 2009-03-11 15:49:00 |                   2 |
+| 2009-02-20 00:14:00 | 2009-02-23 02:14:00 |                   3 |
+| 2009-02-14 22:42:00 | 2009-02-18 07:42:00 |                   4 |
+| 2009-03-14 04:50:00 | 2009-03-17 16:50:00 |                   3 |
+| 2009-02-16 04:01:00 | 2009-02-19 08:01:00 |                   3 |
+| 2009-01-20 05:36:00 | 2009-01-21 08:36:00 |                   1 |
+| 2009-02-07 15:57:00 | 2009-02-07 22:57:00 |                   0 |
+| 2009-02-13 14:59:00 | 2009-02-15 22:59:00 |                   2 |
+| 2009-01-11 03:02:00 | 2009-01-13 11:02:00 |                   2 |
++---------------------+---------------------+---------------------+</pre>
+</blockquote>
+<h4>Further notes</h4>
+<p>A full listing of temporal functions can be found on the <a href="http://dev.mysql.com/doc/refman/5.1/en/date-and-time-functions.html">MySQL documentation</a>. There&#8217;s almost always more than one way to solve a problem. I&#8217;ve seen (and done, in the past) many calculations done on the application side due to lack of familiarity with the available functions.</p>
+<p>Please share your own common solutions below!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/useful-temporal-functions-queries/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1666</post-id>	</item>
+		<item>
+		<title>Character sets: latin1 vs. ascii</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/character-sets-latin1-vs-ascii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/character-sets-latin1-vs-ascii#comments</comments>
+				<pubDate>Wed, 08 Jul 2009 07:39:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Data Types]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=828</guid>
+				<description><![CDATA[Unless specified otherwise, latin1 is the default character set in MySQL. What I usually find in schemes are columns which are either utf8 or latin1. The utf8 columns being those which need to contain multilingual characters (user names, addresses, articles etc.), and latin1 column being all the rest (passwords, digests, email addresses, hard-coded values etc.) [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Unless specified otherwise, <strong>latin1</strong> is the default character set in MySQL.</p>
+<p>What I usually find in schemes are columns which are either <strong>utf8</strong> or <strong>latin1</strong>. The <strong>utf8</strong> columns being those which need to contain multilingual characters (user names, addresses, articles etc.), and <strong>latin1</strong> column being all the rest (passwords, digests, email addresses, hard-coded values etc.)</p>
+<p>I find <strong>latin1</strong> to be improper for such purposes and suggest that <strong>ascii</strong> be used instead. The reason being that <strong>latin1</strong> implies a European text (with swedish collation). It is unclear for an outsider, when finding a <strong>latin1</strong> column, whether it should actually contain West European characters, or is it just being used for ascii text, utilizing the fact that a character in <strong>latin1</strong> only requires 1 byte of storage.<span id="more-828"></span></p>
+<p>Well, this is what the <strong>ascii</strong> character set is for. When I see an <strong>ascii</strong> column, I know for sure no West European characters are allowed; just the plain old a-zA-Z0-9 etc. It is clearer from the schema&#8217;s definition what the stored values should be.</p>
+<h4>A note to MySQL</h4>
+<p>It&#8217;s been long since the Swedish roots of the company have dictated defaults. New instances should default to either <strong>ascii</strong> or  <strong>utf8</strong> (the latter being the most common and space efficient unicode protocol): character sets that are locale-neutral. Really, how many people realize that when they <strong>ORDER BY</strong> a text column, rows are sorted according to Swedish dictionary ordering?</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/character-sets-latin1-vs-ascii/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">828</post-id>	</item>
+	</channel>
+</rss>

@@ -1,0 +1,712 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>common_schema &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/common_schema/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 27 Dec 2016 16:45:41 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Get per-object grants via common_schema</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/get-per-object-grants-via-common_schema</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/get-per-object-grants-via-common_schema#respond</comments>
+				<pubDate>Mon, 29 Sep 2014 11:30:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Security]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7007</guid>
+				<description><![CDATA[Did you know common_schema supports a complete breakdown of all accounts on your database server? It can provide you with the GRANT statements required to set up an account, the REVOKE statements to undo the former, and this can be broken down on a per-object &#38; per-object-type basis. Consider the sql_grants view: Find who has [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Did you know <a href="http://code.google.com/p/common-schema">common_schema</a> supports a complete breakdown of all accounts on your database server? It can provide you with the <strong>GRANT</strong> statements required to set up an account, the <strong>REVOKE</strong> statements to undo the former, and this can be broken down on a per-object &amp; per-object-type basis. Consider the <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_grants.html">sql_grants</a> view:</p>
+<p><em>Find who has privileges on a table called <strong>t</strong></em>:</p>
+<blockquote>
+<pre>select * from <strong>common_schema.sql_grants</strong> where <strong>priv_level_name</strong>='table' and <strong>object_name</strong>='t'\G
+
+           GRANTEE: 'power1'@'localhost'
+              user: power1
+              host: localhost
+        priv_level: `mytst`.`t`
+   priv_level_name: table
+     object_schema: mytst
+       object_name: t
+current_privileges: SELECT
+      IS_GRANTABLE: NO
+         sql_grant: GRANT SELECT ON `mytst`.`t` TO 'power1'@'localhost'
+        sql_revoke: REVOKE SELECT ON `mytst`.`t` FROM 'power1'@'localhost'
+     sql_drop_user: DROP USER 'power1'@'localhost'</pre>
+</blockquote>
+<p>or, <em>who has privileges on the <strong>test</strong> schema</em>:</p>
+<blockquote>
+<pre>select * from common_schema.sql_grants where priv_level_name='schema' and object_name='test' \G
+
+           GRANTEE: 'power1'@'localhost'
+              user: power1
+              host: localhost
+        priv_level: `test`.*
+   priv_level_name: schema
+     object_schema: NULL
+       object_name: test
+current_privileges: ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE
+      IS_GRANTABLE: NO
+         sql_grant: GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* TO 'power1'@'localhost'
+        sql_revoke: REVOKE ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* FROM 'power1'@'localhost'
+     sql_drop_user: DROP USER 'power1'@'localhost'
+
+           GRANTEE: 'test'@'localhost'
+              user: test
+              host: localhost
+        priv_level: `test`.*
+   priv_level_name: schema
+     object_schema: NULL
+       object_name: test
+current_privileges: ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE
+      IS_GRANTABLE: NO
+         sql_grant: GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* TO 'test'@'localhost'
+        sql_revoke: REVOKE ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES, CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES, REFERENCES, SELECT, SHOW VIEW, TRIGGER, UPDATE ON `test`.* FROM 'test'@'localhost'
+     sql_drop_user: DROP USER 'test'@'localhost'
+
+</pre>
+</blockquote>
+<p>In the same manner, you can easily SELECT for all grants that are defined per-table, per-schema, &#8230; <strong>priv_level_name</strong>: is any one of <strong>&#8216;user&#8217;</strong>, <strong>&#8216;schema&#8217;</strong>, <strong>&#8216;table&#8217;</strong>, <strong>&#8216;column&#8217;</strong>, <strong>&#8216;routine&#8217;</strong>.</p>
+<p>The above is a view, which aggregates data from all relevant <strong>INFORMATION_SCHEMA</strong> tables, normalizing and de-normalizing as necessary.</p>
+<p>You might also want to look at <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_show_grants.html">sql_show_grants</a> which provides with a no-breakdown GRANT for all accounts. It&#8217;s like a SHOW ALL GRANTS which doesn&#8217;t exist, plus it&#8217;s SELECTable.</p>
+<p>Also, thanks to <a href="https://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/eval.html">eval()</a>, the above make for executable code. Consider:<span id="more-7007"></span></p>
+<p><em>Revoke any and all specific grants on private_schema.private_table:</em></p>
+<blockquote>
+<pre>call <strong>common_schema.eval</strong>("<strong><span style="color: #808000;">select sql_revoke from sql_grants where object_schema='private_schema' and object_name='private_table'</span></strong>")</pre>
+<p>&nbsp;</p></blockquote>
+<p>It&#8217;s been around for quite a while now. We&#8217;re using it in production extensively. Try it out!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/get-per-object-grants-via-common_schema/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7007</post-id>	</item>
+		<item>
+		<title>Speaking at Percona Live: common_schema, MySQL DevOps</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/speaking-at-perconalive-common_schema-mysql-devops</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/speaking-at-perconalive-common_schema-mysql-devops#respond</comments>
+				<pubDate>Mon, 10 Mar 2014 08:27:42 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[DevOps]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[PerconaLive]]></category>
+		<category><![CDATA[Speaking]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6769</guid>
+				<description><![CDATA[In less than a month I&#8217;ll be giving these two talks at Percona Live: common_schema: DBA&#8217;s framework for MySQL If you are still unfamiliar with common_schema, this will make for a good introduction. I&#8217;ll give you multiple reasons why you would want to use it, and how it would come to immediate use at your [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In less than a month I&#8217;ll be giving these two talks at <a href="https://www.percona.com/live/mysql-conference-2014/">Percona Live</a>:</p>
+<ul>
+<li><a href="https://www.percona.com/live/mysql-conference-2014/sessions/commonschema-dbas-framework-mysql">common_schema: DBA&#8217;s framework for MySQL</a></li>
+</ul>
+<p>If you are still unfamiliar with <a href="http://code.google.com/p/common-schema/">common_schema,</a> this will make for a good introduction. I&#8217;ll give you multiple reasons why you would want to use it, and how it would come to <em>immediate</em> use at your company. I do mean <em>immediate</em>, as in previous <em>common_schema</em> presentations I happened to get feedback emails from attendees within the same or next day letting me know how <em>common_schema</em> solved an insistent problem of theirs or how it exposed an unknown status.</p>
+<p>I&#8217;ll review some useful views &amp; routines, and discuss the ease and power of QueryScript. <em>common_schema</em> is a Swiss-knife of solutions, and all from within your MySQL server.</p>
+<p>I am using <em>common_schema</em> in production on a regular basis, and it happened to be hero of the day in multiple occasions. I&#8217;ll present a couple such cases.</p>
+<p><iframe title="common_schema 2.2: DBA&#039;s framework for MySQL (April 2014)" src="https://www.slideshare.net/slideshow/embed_code/key/izgbQzup8tu7jN" width="427" height="356" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px; max-width: 100%;" allowfullscreen> </iframe> </p>
+<div style="margin-bottom:5px"> <strong> <a href="https://www.slideshare.net/shlominoach/commonschema-22-dbas-framework-for-mysql" title="common_schema 2.2: DBA&#x27;s framework for MySQL (April 2014)" target="_blank">common_schema 2.2: DBA&#x27;s framework for MySQL (April 2014)</a> </strong> from <strong><a href="https://www.slideshare.net/shlominoach" target="_blank">Shlomi Noach</a></strong> </div>
+<ul>
+<li><a href="https://www.percona.com/live/mysql-conference-2014/sessions/mysql-devops-outbrain">MySQL DevOps @ Outbrain</a></li>
+</ul>
+<p>This is a technical talk touching at some cultural issues.</p>
+<p>At <a href="http://www.outbrain.com/about/what-is-outbrain">Outbrain</a>, where I work, we have two blessings: a large group of engineers and a large dataset. We at the infrastructure team, together with the ops team, are responsible for the availability of the data. What we really like is technology which lets the owners of a problem be able to recognize it and take care of it. We want ops guys to do ops, and engineers to do engineering. And we want them to be able to talk to each other and <em>understand</em> each other.</p>
+<p>What tools can you use to increase visibility? To allow sharing of data between the teams? I&#8217;ll share some tools and techniques that allow us to automate deployments, detect a malfunctioning/abusing service, deploy schema changes across dozens of hosts, control data retention, monitor connections, and more.</p>
+<p>We like open source. The tools discussed are mostly open source, or open sourced by Outbrain.</p>
+<p>I&#8217;ll explain why these tools matter, and how they serve the purpose of removing friction between teams, allowing for quick analysis of problems and overall visibility on all things that happen.</p>
+<p><iframe title="MySQL DevOps at Outbrain" src="https://www.slideshare.net/slideshow/embed_code/key/ys7e82mMyh669C" width="427" height="356" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px; max-width: 100%;" allowfullscreen> </iframe> </p>
+<div style="margin-bottom:5px"> <strong> <a href="https://www.slideshare.net/shlominoach/mysql-devops-at-outbrain" title="MySQL DevOps at Outbrain" target="_blank">MySQL DevOps at Outbrain</a> </strong> from <strong><a href="https://www.slideshare.net/shlominoach" target="_blank">Shlomi Noach</a></strong> </div>
+<h4>Do come by!</h4>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/speaking-at-perconalive-common_schema-mysql-devops/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6769</post-id>	</item>
+		<item>
+		<title>Why delegating code to MySQL Stored Routines is poor engineering practice</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice#comments</comments>
+				<pubDate>Thu, 06 Feb 2014 08:32:17 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713</guid>
+				<description><![CDATA[I happen to use stored routines with MySQL. In fact, my open source project common_schema heavily utilizes them. DBA-wise, I think they provide with a lot of power (alas, the ANSI:SQL 2003 syntax feels more like COBOL than a sane programming language, which is why I use QueryScript instead). However I wish to discuss the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I happen to use stored routines with MySQL. In fact, my open source project <a href="http://code.google.com/p/common-schema/">common_schema</a> heavily utilizes them. DBA-wise, I think they provide with a lot of power (alas, the ANSI:SQL 2003 syntax feels more like COBOL than a sane programming language, which is why I use <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html">QueryScript</a> instead).</p>
+<p>However I wish to discuss the use of stored routines as integral part of your application code, which I discourage.</p>
+<p>The common discussion on whether to use or not use stored routines typically revolves around data transfer (with stored routines you transfer less data since it&#8217;s being processed on server side), security (with stored routines you can obfuscate/hide internal datasets, and provide with limited and expected API) and performance (with MySQL this is not what you would expect, as routines are interpreted &amp; their queries re-evaluated, as opposed to other RDBMS you may be used to).</p>
+<p>But I wish to discuss the use of stored routines from an engineering standpoint. The first couple of points I raise are cultural/behavioural.</p>
+<h4>2nd grade citizens</h4>
+<p>Your stored routines are not likely to integrate well with your IDE. While your Java/Scala/PHP/Ruby/whatnot code comfortably lies within your home directory, the stored routines live in their own space: a database container. They&#8217;re not as visible to you as your standard code. Your IDE is unaware of their existence and is unlikely to have the necessary plugin/state of mind to be able to view these.</p>
+<p>This leads to difficulty in maintaining the code. People typically resort to using some SQL-oriented GUI tool such as MySQL Workbench, SequelPro or other, commercial tools. But these tools, while make it easy to edit your routine code, do not integrate (well?) with your source control. I can&#8217;t say I&#8217;ve used all GUI tools; but how many of them will have Git/SVN/Mercurial connectors? How many of them will keep local history changes once you edit a routine? I&#8217;m happy to get introduced to such a tool.</p>
+<p>Even with such integration, you&#8217;re split between two IDEs. And if you&#8217;re the command line enthusiast, well, you can&#8217;t just <strong>svn ci -m &#8220;fixed my stored procedure bug&#8221;</strong>. Your code is simply not in your trunk directory.</p>
+<p>It <em>can</em> be done. You <em>could</em> maintain the entire routine code from within your source tree, and hats off to all those who do it. Most will not. See later on about deployments for more on this.<span id="more-6713"></span></p>
+<h4>Testing</h4>
+<p>While engineers are keen on writing unit tests for every class and method they create, they are less keen on doing the same for stored routines. This is an observation, having seen many instalments. And I can tell you why: your stored routine testing will not integrate well with your JUnit/PHPUnit/&#8230;</p>
+<p>There are testing frameworks for databases, and indeed I hacked my own mini unit testing code with <em>common_schema</em>. But it&#8217;s a <em>different</em> testing framework. You might also have realized by now that testing databases is somewhat different. It <em>can</em> be done, and hats off again to those that implement it as common practice. Many don&#8217;t. Database are often more heavyweight to test. Not all operations done by routines are easily rolled back, which leads to having to rebuild the entire dataset before tests. This in itself leads to longer test periods and a need for multiple test databases so as to allow for concurrent builds.</p>
+<p>How many companies practice both version control and unit testing over their routine code? I believe not many (and am happy to hear about those who do). To be more direct, of all the companies I ever consulted to: <em>I have never seen one that does both</em>.</p>
+<h4>Debugging</h4>
+<p>MySQL stored routines do not have built in debugging capabilities. To debug your routines, you will have to use one of two methods:</p>
+<ul>
+<li>Simulate your routine code (ie mimic their execution on top of some interpreter). There are tools to do that. For me this is a complete NO GO and utterly untrustworthy. You can mimic what you think is how the routine should behave, but never they full behaviour. While developing <em>common_schema</em> I came upon plenty weird behaviour, some of it bugs, that you just can&#8217;t build into your emulation.</li>
+<li>Inject debugging code into your routine code. I do that with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html">RDebug</a>. You can do breakpoints, step into, step out, most of the interesting stuff. Other tools do that as well. It is not the right way to go: you&#8217;re essentially modifying your code, placing more locks, communicating, and losing some functionality. It is a necessary evil solution for a necessary evil programming method&#8230; How good can that be?</li>
+</ul>
+<p>The right way to go would be to have debugging API built into the MySQL server.</p>
+<p>But, wait, that would still be next to worthless, since our discussion is over programming with stored routines: letting your application call upon stored routines in your database. Until the day where I could use my IntelliJ debugger to step from my java method which calls upon a stored procedure, and into the stored procedure itself, debugging your code is completely detached from your stored routine debugging.</p>
+<h4>Refactoring &amp; deploying</h4>
+<p>Say you wanted to add a column to your table: you would go ahead and add it, and perhaps populate it. You would then modify your application code to support this new column, and deploy. Say you wanted to drop a table column. You would first deploy changes to your application code that ignore said column, and once the code is in place you would go and actually make the DROP.</p>
+<p>How do you do the same with a stored routine? Support your routine accepts two parameters, and you wish to add a third?</p>
+<p>There is no support for optional parameters. Your routine either accepts two parameters or three. Your application code will have to provide the exact number of parameters. You will have to deploy <em>both your SQL changes and your application changes at the same time</em>. This is by definition impossible, unless you are OK with a <em>stop the world approach</em>, which is unlikely in production.</p>
+<h4>Code constraints</h4>
+<p>One solution to the above is to create a new routines. Somehow &#8220;overload&#8221; it. But you can&#8217;t overload a stored routine; you&#8217;ll have to create a routine by a new name. This will allow you to slowly and smoothly migrate between the two.</p>
+<p>Ahem, smoothly? How easy is it to find all invocations of a certain routines from your code? It will be typically lie in some String, or within some XML config file. There is no safe &#8220;find references to this procedure&#8221; IDE mechanism. There is no constraint in your IDE that will tell you &#8220;there is no such procedure&#8221; if you misspell the name.</p>
+<h4>Trash bin</h4>
+<p>Suppose you overcame the above. You now have two routines. You need to remember to DROP the old one, right? Will you?</p>
+<p>When presenting <em>common_schema</em>, a common question I ask the audience is as follows:</p>
+<blockquote><p>Suppose I accessed your database and listed the entire set of stored functions and procedures. How many of them are you not even sure are in use anymore? How many of them you think you can DROP, but are too afraid to, and keep them in <em>just in case</em>?</p></blockquote>
+<p>I wouldn&#8217;t commonly ask that question had it not always provides a common nodding and smiling in the audience. People forget to drop their routines, and then forget about them, and are never sure whether they are used (your IDE doesn&#8217;t easily tell you that, remember? Sure, you can grep around; that&#8217;s not what most engineers would do). And those routines pile up to become trash.</p>
+<h4>Data or code?</h4>
+<p>Last but not least: a stored routine is a piece of code, right? Well, as far as the database is concerned, it&#8217;s really a piece of data. It&#8217;s located within a schema. It&#8217;s <em>stored</em>. It is an integral part of your data set: when you back up your <em>data</em>, you&#8217;re most likely to backup the <em>code</em> as well. When you restore, you&#8217;re likely to restore <em>both</em>. There are obvious advantages to that, DB-wise. Or should I say, DBA-wise. Engineering-wise? Does a database-restore operation count as code deployment? We can argue over beer.</p>
+<h4>Final notes</h4>
+<p>Having said all that: yes, I&#8217;m using an occasional stored routine. I see these occasions as a necessary evil, and sometimes it&#8217;s just the correct solution.</p>
+<p>I&#8217;m happy to know what methods have been developed out there to overcome the above, please share; and please feel free to contradict the above.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/feed</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6713</post-id>	</item>
+		<item>
+		<title>common_schema: speaking at Percona Live London, Nov. 2013</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-speaking-at-percona-live-london-nov-2013</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-speaking-at-percona-live-london-nov-2013#comments</comments>
+				<pubDate>Mon, 04 Nov 2013 15:30:50 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[PerconaLive]]></category>
+		<category><![CDATA[Speaking]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6645</guid>
+				<description><![CDATA[In one week&#8217;s time I&#8217;ll be presenting common_schema: DBA&#8217;s framework for MySQL at Percona Live, London. This talk introduces the rich toolset known as common_schema. It is free, open source, extremely useful in solving DBA &#38; developer tasks, and is the next best thing ever invented next to SQL pie charts. I&#8217;ll introduce: Views, with [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>In one week&#8217;s time I&#8217;ll be presenting <a href="http://www.percona.com/live/london-2013/sessions/commonschema-dbas-framework-mysql">common_schema: DBA&#8217;s framework for MySQL</a> at Percona Live, London.</p>
+<p>This talk introduces the rich toolset known as <a href="http://code.google.com/p/common-schema/">common_schema</a>. It is free, open source, extremely useful in solving DBA &amp; developer tasks, and is the next best thing ever invented next to SQL pie charts.</p>
+<p>I&#8217;ll introduce:</p>
+<ul>
+<li>Views, with which you can detect and terminate idle transactions, blocking transactions; roll your range partitions; find duplicate keys; block/unblock accounts; get fine grained privileges per account; find AUTO_ICNREMENT free space; &#8230;</li>
+<li>Routines: do meta executions such as eval(); get query checksums; duplicating accounts; killing suspicious connections; security auditing; parsing JSON data; &#8230;</li>
+<li>QueryScript: if you&#8217;re not using it, you&#8217;re missing on a powerful scripting language tightly integrated with SQL/MySQL. We&#8217;ll see the basic constructs, variables, loops; the more sophisticated MySQL/locks/overhead/danger aware constructs such as foreach &amp; split; throttling, exceptions, it&#8217;s all in there. I&#8217;ll present real scripts that saved the day and challenge you to implement them in another scripting language.</li>
+<li>Briefly introducing rdebug: stored routine debugger and debugging API</li>
+<li>Roadmap (some cool things coming along)<span id="more-6645"></span></li>
+</ul>
+<h4>What this talk isn&#8217;t</h4>
+<p>A tedious &#8220;read the manual aloud&#8221;. Nor is it a comprehensive listing of all functionality. These would be the surest way of sending you to sleep.</p>
+<h4>What this talk is</h4>
+<p>A view into the concepts behind <em>common_schema</em>; the reasons this project has justification to exist; the various problems it solves; and yes, interesting examples. Every single <em>common_schema</em> feature was developed out of real world need.</p>
+<p>I am confident you&#8217;ll find <em>common_schema</em> to have something you need that will improve your work as a developer or a DBA.</p>
+<p>The talk is similar to <a href="https://shlomi-noach.github.io/blog/mysql/speaking-at-percona-live-2013-common_schema-lightning-talks">the one I gave</a> at Santa Clara this April. It is updated with new content following recent developments.</p>
+<p>&nbsp;</p>
+<p><iframe title="common_schema 2.2 DBA&#039;s framework for MySQL" src="https://www.slideshare.net/slideshow/embed_code/key/b9W1uHzh9vrhqL" width="427" height="356" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px; max-width: 100%;" allowfullscreen> </iframe> </p>
+<div style="margin-bottom:5px"> <strong> <a href="https://www.slideshare.net/shlominoach/commonschema-22" title="common_schema 2.2 DBA&#x27;s framework for MySQL" target="_blank">common_schema 2.2 DBA&#x27;s framework for MySQL</a> </strong> from <strong><a href="https://www.slideshare.net/shlominoach" target="_blank">Shlomi Noach</a></strong> </div>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-speaking-at-percona-live-london-nov-2013/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6645</post-id>	</item>
+		<item>
+		<title>Converting an OLAP database to TokuDB, part 3: operational stuff</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff#comments</comments>
+				<pubDate>Mon, 14 Oct 2013 10:03:43 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603</guid>
+				<description><![CDATA[This is the third post in a series of posts describing our experience in migrating a large DWH server to TokuDB (see 1st and 2nd parts). This post discusses operations; namely ALTER TABLE operations in TokuDB. We ran into quite a few use cases by this time that we can shed light on. Quick recap: [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the third post in a series of posts describing our experience in migrating a large DWH server to TokuDB (see <a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1">1st</a> and <a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration">2nd</a> parts). This post discusses operations; namely ALTER TABLE operations in TokuDB. We ran into quite a few use cases by this time that we can shed light on.</p>
+<p>Quick recap: we&#8217;ve altered one of out DWH slaves to TokuDB, with the goal of migrating most of out servers, including the master, to TokuDB.</p>
+<h4>Adding an index</h4>
+<p>Shortly after migrating our server to TokuDB we noticed an unreasonably disproportionate slave lag on our TokuDB slave (red line in chart below) as compared to other slaves.</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2013/09/tokudb-slave-lag.png"><img alt="tokudb-slave-lag" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2013/09/tokudb-slave-lag.png" width="700" height="329" /></a></p></blockquote>
+<p>Quick investigation led to the fact that, coincidentally, a manual heavy-duty operation was just taking place, which updated some year&#8217;s worth of data retroactively. OK, but why so slow on TokuDB? Another quick investigation led to an apples vs. oranges problem: as depicted in <a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1">part 1</a>, our original setup included MONTHly partitioning on our larger tables, whereas we could not do the same in TokuDB, where we settled for YEARly partitioning.</p>
+<p>The heavy-duty operation included a query that was relying on the MONTHly partitioning to do reasonable pruning: a <strong>WHERE</strong> condition on a date column did the right partition pruning; but where on InnoDB that would filter <strong>1</strong> month&#8217;s worth of data, on TokuDB it would filter <strong>1</strong> <em>year</em>.</p>
+<p>Wasn&#8217;t it suggested that TokuDB has online table operations? I decided to give it a shot, and add a proper index on our date column (I actually created a compound index, but irrelevant).</p>
+<p>It took <strong>13</strong> minutes to add an index on a <strong>1GB</strong> TokuDB table (approx. <strong>20GB</strong> InnoDB uncompressed equivalent):</p>
+<ul>
+<li>The <strong>ALTER</strong> was non blocking: table was unlocked at that duration</li>
+<li>The client issuing the <strong>ALTER</strong> <em>was</em> blocked (I thought it would happen completely in the background) &#8212; but who cares?</li>
+<li>I would say <strong>13</strong> minutes is fast</li>
+</ul>
+<p>Not surprisingly adding the index eliminated the problem altogether.</p>
+<h4>Modifying a PRIMARY KEY</h4>
+<p>It was suggested by our DBA that there was a long time standing need to modify our <strong>PRIMARY KEY</strong>. It was impossible to achieve with our InnoDB setup (not enough disk space for the operation, would take weeks to complete if we did have the disk space). Would it be possible to modify our TokuDB tables? On some of our medium-sized tables we issued an <strong>ALTER</strong> of the form:<span id="more-6603"></span></p>
+<blockquote>
+<pre>ALTER TABLE my_table DROP PRIMARY KEY, ADD PRIMARY KEY (c1, c2, c3, ...);</pre>
+</blockquote>
+<p>Time-wise the operation completed in good time. We did note, however, that the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_file_map.html">disk space consumed by the new table</a> was <em>doubled</em>. Was it due to the fact we added two columns to our PK? Did that account for the bloated space? I did not believe so, and decided to rebuild the table:</p>
+<blockquote>
+<pre>OPTIMIZE TABLE my_table</pre>
+</blockquote>
+<p>Nope. Space not reduced. However we were unconvinced and <a href="https://groups.google.com/forum/#!topic/tokudb-user/ow47QY2pcgU">asked</a>. As usual, we got quick response from the Tokutek team; this was a bug: while our original table used the TOKUDB_SMALL row format (high compression), the table rebuild reset it to TOKUDB_FAST (normal compression), which makes for roughly twice the file size. The bug was filed as: <a href="https://github.com/Tokutek/ft-engine/issues/107">alter table operations that rebuild the table lose the original tokudb compression</a>.</p>
+<p>Now, we <em>were</em> altering the <strong>PRIMARY KEY</strong>. We were not expecting an online operation anyhow, and didn&#8217;t mind blocking the table; hence the solution was simple: make sure to spceify the row format:</p>
+<blockquote>
+<pre>ALTER TABLE my_table DROP PRIMARY KEY, ADD PRIMARY KEY (c1, c2, c3, ...) ENGINE=TokuDB ROW_FORMAT=TOKUDB_SMALL;</pre>
+</blockquote>
+<p>This worked in terms of disk space &#8212; but we only later realized it would still make us trouble.</p>
+<h4>Modifying a PRIMARY KEY on our largest table</h4>
+<p>We moved on to our largest table: originally <strong>1TB</strong> InnoDB <strong>COMPRESSED</strong>, worth of <strong>2TB</strong> uncompressed. With TokuDB it went down to <strong>100GB</strong>. Converting this table to TokuDB took about <strong>40</strong> hours, which is just fast. We issued an ALTAR TABLE modifying the PRIMARY KEY as above and waited.</p>
+<p>The operation did not complete after <strong>40</strong> hours. Nor after <strong>3</strong> days. By day <strong>4</strong> we thought we might look into this. Fortunately, TokuDB is friendly on <strong>SHOW PROCESSLIST</strong> and provides you with useful information, such as &#8220;<strong>Fetched about 1234567890 rows, loading data still remains</strong>&#8220;. Yikes! We extrapolated the values to realize it would take <strong>2</strong> <em>weeks</em> to complete! Weekend went by and we decided to find a better way. Again, posting on the tokudb-user group, we got a definitive answer: a table rebuild does not utilize the <em>bulk loader</em> (you really want to be friends with the bulk loader, it&#8217;s the process that loads your data quickly).</p>
+<p>And so we chose to <strong>KILL</strong> the <strong>ALTER</strong> process and go another way; again, <strong>KILL</strong>s are very easy with TokuDB <strong>ALTER</strong> operations: took <strong>3</strong> minutes to abort this week old operation. The alternative operation was:</p>
+<blockquote>
+<pre>CREATE TABLE my_table_New LIKE my_table;
+ALTER TABLE my_table_New DROP PRIMARY KEY, ADD PRIMARY KEY (c1, c2, c3, ...) ENGINE=TokuDB ROW_FORMAT=TOKUDB_SMALL;
+INSERT INTO my_table_New SELECT * FROM my_table;
+RENAME TABLE my_table TO my_table_Old, my_table_New TO my_table;
+DROP TABLE my_table_Old;</pre>
+</blockquote>
+<p>The <strong>INSERT INTO &#8230; SELECT</strong> operation does use the bulk loader when you do it on an empty table. It completed within merely <strong>30</strong> hours. Hurrah!</p>
+<h4>DROPping a TABLE</h4>
+<p>It was an immediate operation to drop our &#8220;Old&#8221; table &#8212; subsecond. Nothing like your InnoDB DROP.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6603</post-id>	</item>
+		<item>
+		<title>Converting an OLAP database to TokuDB, part 2: the process of migration</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration#comments</comments>
+				<pubDate>Mon, 09 Sep 2013 03:29:30 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Percona Toolkit]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6530</guid>
+				<description><![CDATA[This is a second in a series of posts describing our experience in migrating a large DWH server to TokuDB. This post discusses the process of migration itself. As a quick recap (read part 1 here), we have a 2TB compressed InnoDB (4TB uncompressed) based DWH server. Space is running low, and we&#8217;re looking at [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is a second in a series of posts describing our experience in migrating a large DWH server to TokuDB. This post discusses the process of migration itself.</p>
+<p>As a quick recap (<a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1">read part 1 here</a>), we have a <strong>2TB</strong> compressed InnoDB (<strong>4TB</strong> uncompressed) based DWH server. Space is running low, and we&#8217;re looking at TokuDB for answers. Early experiments show that TokuDB&#8217;s compression could make a good impact on disk space usage. I&#8217;m still not discussing performance &#8212; keeping this till later post.</p>
+<p>Those with weak hearts can skip right to the end, where we finally have a complete conversion. You can also peek at the very end to find out how much <strong>4TB</strong> uncompressed InnoDB data is worth in TokuDB. But you might want to read through. The process was not smooth, and not as expected (it&#8217;s a war story thing). Throughout the migration we got a lot of insight on TokuDB&#8217;s behaviour, limitations, conveniences, inconveniences and more.</p>
+<p>Disclosure: I have no personal interests and no company interests; throughout the process we were in touch with Tokutek engineers, getting free, friendly &amp; professional advice and providing with input of our own. Most of this content has already been presented to Tokutek throughout the process. TokuDB is open source and free to use, though commercial license is also available.</p>
+<h4>How do you convert 4TB worth of data to TokuDB?</h4>
+<p>Obviously one table at a time. But we had another restriction: you may recall I took a live slave for the migration process. And we wanted to end the process with a live slave. So the restriction was: keep it replicating!</p>
+<p>How easy would that be? Based on our initial tests, I extrapolated over <strong>20</strong> days of conversion from InnoDB to TokuDB. Even with one table at a time, our largest table was expected to convert in some <strong>12-14</strong> days. Can we retain <strong>14</strong> days of binary logs on a server already running low on disk space? If only I knew then what I know today <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /><span id="more-6530"></span></p>
+<p>I recently claimed (as I recall it was in one of the <a href="https://twitter.com/DBHangops">@DBHangops</a> meetings) I was <em>done</em> with <strong>ALTER TABLE</strong> statements. I would not touch them again: with <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a> and <a href="http://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html">pt-online-schema-change</a> I can get better control of my server (and my sleep). Can I use an online migration tool?</p>
+<p>Fortunately we are using Statement Based Replication on this MySQL topology. This makes for good news, because triggers are activated on slave as it is replicating its master&#8217;s statements. You can run an online migration tool <em>on the slave</em>, while it <em>keeps replicating</em>. This is so cool. I don&#8217;t need to worry too much about binary logs and relay logs. I can take my time with conversion&#8230;</p>
+<p>I chose to use <em>pt-online-schema-change</em>. Why choose Percona&#8217;s tool over my own? Percona&#8217;s tool supports the <strong>&#8211;check-slave-lag</strong> option, which throttles the operation should the server&#8217;s slaves start lagging. Wait, I&#8217;m running the tool <em>on a slave</em>, so what&#8217;s the point? Well, you can cheat and provide <strong>&#8211;check-slave-lag=h=127.0.0.1</strong> so that the tool assumes the localhost is the slave (while it is actually the server being altered); which means it will check <em>on its own slave lag</em> to do the throttling. This works well and is fun to watch.</p>
+<h4>Starting the migration</h4>
+<p>Some of our tables had the <strong>KEY_BLOCK_SIZE</strong> explicitly declared. As I mentioned in previous post, for TokuDB &lt;= <strong>7.0.4</strong> this causes problems by bloating the indexes instead of compressing them (and Tim Callaghan of Tokutek notes this is fixed in next version). <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html">common_schema to the rescue</a>: the <strong>ALTER</strong> statement has to include a <strong>DROP</strong> and recreate of all indexes.</p>
+<p>This is the place to mention our tables are heavily partitioned. This will play a crucial role in the next events. We use RANGE partitions over dates. We have a monthly partitioning scheme on all partitioned tables. And we have partitions to spare: starting a few years back from today (depending on the table) and made until <strong>Dec. 2025</strong> &#8212; making for some <strong>170 &#8211; 200</strong> partitions per table.</p>
+<p>Starting from smallest table (a few rows) and increasing in size, we migrated tables one by one to TokuDB.</p>
+<h4>Party crashers</h4>
+<p>A few party crashers were made obvious right from the start (they are all being addressed by Tokutek as far as I know):</p>
+<ol>
+<li><strong>@@datadir</strong>: all TokuDB files reside in @@datadir. You get a pile of files in the same directory where you would find your ib_logfile*, master.info, etc. files.</li>
+<li>File names: you do not get file names after table names. Instead, you get cryptic names like <strong>./_myschema_sql_7fda_8e73_*</strong>.You would suspect that there is some uniqueness to the <strong>7fda_8e73</strong> thing; that it relates to a single table &#8212; it doesn&#8217;t. Same table get different file names, different tables get similar names &#8212; there&#8217;s not one regular expression to differentiate tables &#8212; and I do know my regexes.</li>
+<li><strong>INFORMATION_SCHEMA.Tokudb_file_map</strong> doesn&#8217;t make it much easier, either. It is meant to tell you about tables to file names mappings. But the tables are not laid out in easy TABLE_SCHEMA, TABLE_NAME columns, but are denormalized themselves, and can be vague and almost ambiguous, to some extent. <em>common_schema</em> to the rescue, its rewritten <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_file_map.html">tokudb_file_map</a> maps your tables to aggregated list of file names, along with shell commands you would typically want to issue.</li>
+</ol>
+<p>But let me emphasize these issues, before you think I&#8217;m just spoiled. TokuDB creates multiple files per table: other than the standard <strong>.frm</strong> file, you get one &#8220;main&#8221; file for each table, and then another file for each index. So it&#8217;s quite possible your table will consist of some <strong>7</strong> files.</p>
+<p>Well, as you may know, MySQL&#8217;s implementation of partitioning is that each partition is made of its own standalone table, hidden from the user (but easily viewable on the filesystem). Now this means a single table with <strong>170</strong> partitions and a few indexes can make for over <strong>1,000</strong> files. That&#8217;s right &#8211; for a single table. We have a few dozens like this.</p>
+<p>Now consider:</p>
+<ul>
+<li>You may need to accommodate thousands or tens of thousands of files in your <strong>@@datadir</strong></li>
+<li>None of which it is easy for you to know who to relate to.</li>
+</ul>
+<p>So <em>common_schema</em>&#8216;s <strong>tokudb_file_map</strong> gives you this crazy list of <strong>1,000</strong> files which make up your single table. This isn&#8217;t too friendly, either.</p>
+<p>I think Tokutek are missing here on one of the greatest advantages they bring to the table. The one thing a DBA want to know when looking at her MySQL&#8217;s filesystem is: how much disk space is used by a schema/table. And this information becomes hard to get. Again, <em>common_schema</em>&#8216;s view will provide you with the script to do it (<strong>du -c &#8230; | tail -1</strong>) &#8212; but you would have to go into MySQL, out to shell&#8230; Bother.</p>
+<h4>Crashes and failures</h4>
+<p>The above did not stop at inconveniences. Soon enough, and while still altering my smaller tables, I would get failures from <strong>pt-online-schema-change</strong>. Checking manually to eliminate the possibility of a bug in Percona&#8217;s tool, I got:</p>
+<blockquote>
+<pre>mysql&gt; alter table my_schema.my_table engine=tokudb row_format=tokudb_small;
+ERROR 1016 (HY000): Can't open file: './my_schema/#sql-80d_2.frm' (errno: 24)</pre>
+</blockquote>
+<p>This would happen again and again and again. What&#8217;s the deal here?</p>
+<p>Let me cut short on this one: we got over <strong>20,000</strong> files in <strong>@@datadir</strong>. And MySQL was unable to open any more files. Mind you, we had:</p>
+<ul>
+<li><strong>open_files_limit</strong>=30000</li>
+<li><strong>open_table_cache</strong>=16000</li>
+<li><strong>table_definition_cache</strong>=3000</li>
+</ul>
+<p>Quite the generous numbers (also backed up by <strong>ulimit</strong>, to be on the safe side; and also note we&#8217;re using <strong>XFS</strong> file system). And yet, open files were an issue. To prove my point, it was possible to <strong>ALTER</strong> a table with a fewer number of partitions. It was then possible to <strong>ALTER</strong> another smaller table without partitions. It was then impossible to alter any additional partitioned table. Once I dropped partitioning for some very small table some room was made and I was again able to <strong>ALTER</strong> a partitioned table&#8230; And this would happen for completely empty tables &#8212; no data involved. We were on some file limit here.</p>
+<p>Another such <strong>ALTER</strong> and the server crashed. This was quite unceremonious. The error log produced nothing; no stack trace. Zit.</p>
+<p>I was fervently querying the <strong>Tokudb_file_map</strong> to get a picture of what&#8217;s going on. I would need to do a self join on the table (as <em>common_schema</em>&#8216;s view does) to get a per-table listing of files. This would occasionally crash the server. I guess I had <strong>3</strong> or <strong>4</strong> such crashes.</p>
+<h4>Recovery</h4>
+<p>On this I feel I&#8217;m quite the veteran here :D. TokuDB recovery works well. As with InnoDB, TokuDB recognize there has been a crash, and before allowing MySQL to open connections it restores to a stable state.</p>
+<h4>ALTER TABLE in TokuDB</h4>
+<p>Here I found two comforting features (the third and fourth yet to be discovered). As indicated above, I did turn to issue a manual ALTER TABLE. What I found was:</p>
+<ol>
+<li>A TokuDB <strong>ALTER TABLE</strong> statement lets you know its progress. This is no little thing! Your <strong>SHOW PROCESSLIST</strong> output shows messages like <strong>&#8220;Fetched about 312724000 rows, loading data still remains&#8221;</strong>, or <strong>&#8220;Loading of data about 66.1% done&#8221;</strong>, or <strong>&#8220;Queried about 33113001 rows, Inserted about 33113000 rows&#8221;</strong>. Cool!</li>
+<li>Even better, the crash I had during the <strong>ALTER TABLE</strong>? I thought that would be the end of it. If you ever had a crash while <strong>ALTER</strong>ing an InnoDB table, you know how it goes: InnoDB will forever complain about some table existing but not listed (or the other way around). And don&#8217;t get me started with <strong>DISCARD TABLESPACE</strong>; when InnoDB decides it is upset about something &#8211; you cannot convince it otherwise.<br />
+Thankfully, TokuDB completely reverted the <strong>ALTER</strong> operation. It removed what temporary files were created (further notes following) and forgot all about it. No complaints, no ghosts. Great! Back to consistency!</li>
+</ol>
+<h4>What do we do now?</h4>
+<p>Throwing my hands up in the air, having worked on this for many days, I thought to myself: OK, I still have this server all to myself. If TokuDB is not going to work out, I have some time to come up with a sharding/commercial solution. Let&#8217;s use up this time and learn something about TokuDB. And I decided to re-create all tables without partitions. My colleague argued that she was not ready to give up on partitioning altogether and we decided to try again with <strong>YEAR</strong>ly partitioing scheme. This would reduce number of files by factor of <strong>12</strong>. Also, <strong>2025</strong> is so far away, we agreed to settle for <strong>2015</strong>. So reducing number of files by factor of <strong>25-30</strong>.</p>
+<p>And this made all the difference in the world. Having reduced number of files made the impact we were hoping for. Suddenly all went well. No crashes, no weird complaints, little proliferation of files in <strong>@@datadir</strong>.</p>
+<h4>ALTER TABLE</h4>
+<p>And I did notice that a manual <strong>ALTER TABLE</strong> went <em>considerably</em> faster than I would expect. And by far faster than the <em>pt-online-schema-change</em> pace. I tried a couple more &#8212; sure thing. <strong>ALTER</strong>ing a table from InnoDB to TokuDB is <em>fast</em>.</p>
+<p>How fast?</p>
+<ul>
+<li>I converted a <strong>47GB</strong> InnoDB COMPRESSED table to TokuDB in <strong>73</strong> minutes. By the way, resulting table size measured <strong>3.4GB</strong>.</li>
+<li>A <strong>330GB</strong> InnoDB COMPRESSED table converted to TokuDB took little over <strong>9</strong> hours. I dare you alter 600GB worth of uncompressed data into InnoDB (COMPRESSED) in less than a few days. It went down to <strong>31GB</strong>.</li>
+<li>And our largest, <strong>1TB COMPRESSED</strong>  table (<strong>2TB</strong> worth of uncompressed data)? There&#8217;s yet another story here.</li>
+</ul>
+<h4>Altering 1 (2 uncomressed) TB of data</h4>
+<p>Here&#8217;s a tip that will save you some exhaustion: <strong>SET tokudb_load_save_space := 1</strong>.</p>
+<p>While <strong>ALTER</strong>ing our largest table, I was concerned to find our disk space was running low. Plenty temporary TokuDB files were created. I assumed these would consume only so much disk space, but to my surprise they accumulated and accumulated&#8230; It turns out for <strong>ALTER</strong>ing a table TokuDB creates the equivalent of the table in temporary files, and only then generates the new table. This means you need to have enough room for your own original table, the equivalent in temporary files, and your new table altogether.</p>
+<p>With great compression that would be nothing. However you&#8217;ll be surprised to learn that by default those temporary files are <em>not compressed</em>. Thus, the <strong>ALTER</strong> operation consumed more than <strong>1.3TB</strong> of disk space in temporary files, until I had no choice and (<strong>36</strong> hours into the operation) had to <strong>KILL</strong> it before it consumed the entire <strong>3TB</strong> of disk space.</p>
+<p>Setting the variable as specified and the next attempt was far more successful: the temporary files were created with same compression algorithm as target table, which left with a lot of free space to work with.</p>
+<p>ALTER time took about <strong>40</strong> hours.</p>
+<h4>Well, what&#8217;s the resulting size?</h4>
+<p>And we were finally done! It took the better part of three weeks to work through all the pitfalls, the <em>pt-online-schems-change</em> attempts, the crashes, the tests, the no-partitions, the <strong>YEAR</strong>ly partitions&#8230; Finally we are with a TokuDB version of our data warehouse.</p>
+<p>Suspension is over. We got from <strong>2TB</strong> of InnoDB <strong>COMPRESSED</strong> (<strong>KEY_BLOCK_SIZE=8</strong>) down to <strong>200GB</strong> of <strong>TokuDB_SMALL</strong> (aka agressive, aka lzma) tables.</p>
+<p>I mean, this is beyond expectations. It is <em>ridiculously</em> small. From <strong>80%</strong> disk space utilization down to <strong>8%</strong> disk space utilization. <em>Absolutely ridiculous!</em></p>
+<h4>Conclusions</h4>
+<ul>
+<li>TokuDB does not play well with many partitions.</li>
+<li>Crashes encountered. Recovery is fine.</li>
+<li>Good <strong>ALTER TABLE</strong> experience</li>
+<li><strong>SET tokudb_load_save_space := 1</strong></li>
+<li>Great compression (<strong>x20</strong> from uncompressed InnoDB; <strong>x10</strong> from KEY_BLOCK_SIZE=8)</li>
+</ul>
+<h4>Next</h4>
+<p>In the following post I&#8217;ll share some observations on how well our newly converted TokuDB slave performs as compared to our equivalent InnoDB slaves; some configuration you might care about; and some things you can do with TokuDB that would be so very painful with InnoDB. Stay tuned!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6530</post-id>	</item>
+		<item>
+		<title>Converting an OLAP database to TokuDB, part 1</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1#comments</comments>
+				<pubDate>Tue, 03 Sep 2013 07:04:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[QueryScript]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6473</guid>
+				<description><![CDATA[This is the first in a series of posts describing my impressions of converting a large OLAP server to TokuDB. There&#8217;s a lot to tell, and the experiment is not yet complete, so this is an ongoing blogging. In this post I will describe the case at hand and out initial reasons for looking at [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is the first in a series of posts describing my impressions of converting a large OLAP server to TokuDB. There&#8217;s a lot to tell, and the experiment is not yet complete, so this is an ongoing blogging. In this post I will describe the case at hand and out initial reasons for looking at TokuDB.</p>
+<p>Disclosure: I have no personal interests and no company interests; we did get friendly, useful and free advice from Tokutek engineers. TokuDB is open source and free to use, though commercial license is also available.</p>
+<h4>The case at hand</h4>
+<p>We have a large and fast growing DWH MySQL setup. This data warehouse is but one component in a larger data setup, which includes Hadoop, Cassandra and more. For online dashboards and most reports, MySQL is our service. We populate this warehouse mainly via Hive/Hadoop. Thus, we have an hourly load of data from Hive, as well as a larger daily load.</p>
+<p>There are some updates on the data, but the majority of writes are just <strong>mysqlimport</strong>s of Hive queries.</p>
+<p>Usage of this database is OLAP: no concurrency issues here; we have some should-be-fast-running queries issued by our dashboards, as well as ok-to-run-longer queries issued for reports.</p>
+<p>Our initial and most burning trouble is with size. Today we use <strong>COMPRESSED</strong> InnoDB tables (<strong>KEY_BLOCK_SIZE</strong> is default, i.e. <strong>8</strong>). Our data volume sums right now at about <strong>2TB</strong>. I happen to know this translates as <strong>4TB</strong> of uncompressed data.</p>
+<p>However growth of data is accelerating. A year ago we would capture a dozen GB per month. Today it is a <strong>100GB</strong> per month, and by the end of this year it may climb to <strong>150GB</strong> per month or more.</p>
+<p>Our data is not sharded. We have a simple replication topology of some <strong>6</strong> servers. Machines are quite generous as detailed following. And yet, we will be running out of resources shortly: disk space (total <strong>2.7TB</strong>) is now running low and is expected to run out in about six months. One of my first tasks in Outbrain is to find a solution to our DWH growth problem. The solution could be sharding; it could be a commercial DWH product; anything that works.<span id="more-6473"></span></p>
+<h4>The approach we experiment with</h4>
+<p>It was at my initial interview that I suggested <a href="http://www.tokutek.com/products/tokudb-for-mysql/">TokuDB</a> might be a good solution, with the primary reason of being so good with compression. And we decided to experiment with this simple (setup-wise) solution of compression. If we could compress the data even by <strong>50%</strong>, that would buy us considerable time. And it&#8217;s the simplest approach as we would need to change nothing at the application side, nor add additional frameworks.</p>
+<p>Of course, we were already using InnoDB <strong>COMPRESSED</strong> tables. How about just improving the compression? And here I thought to myself: we can try <strong>KEY_BLOCK_SIZE=4</strong>, which I know would generally compress by <strong>50%</strong> as compared to <strong>KEY_BLOCK_SIZE=8</strong> (not always, but in many use cases). We&#8217;re already using InnoDB so this isn&#8217;t a new beast; it will be &#8220;more of the same&#8221;. It would work.</p>
+<p>I got myself a dedicated machine: a slave in our production topology I am free to play with. I installed TokuDB <strong>7.0.1</strong>, later upgraded to <strong>7.0.3</strong>, based on MySQL <strong>5.5.30</strong>.</p>
+<p>The machine is a Dell Inc. <strong>PowerEdge R510</strong> machine, with <b>16</b> CPUs @ <b>2.1 GHz</b> and <b>126 GiB</b> RAM, <b>16 GiB</b> Swap. OS is CentOS <strong>5.7</strong>,  kernel <strong>2.6.18</strong>. We have RAID <strong>10</strong> over local <strong>10k</strong> RPM SAS disks (10x<strong>600GB</strong> disks)</p>
+<h4>How to compare InnoDB &amp; TokuDB?</h4>
+<p><strong>2TB</strong> of compressed data (for absolute measurement I consider it to be a <strong>4TB</strong> worth of data) is quite a large setup. How do I do the comparison? I don&#8217;t even have too much disk space here&#8230;</p>
+<p>We have tables of various size. Our largest is in itself <strong>1TB</strong> (<strong>2TB</strong> uncompressed) &#8211; half of the entire volume. The rest ranging <strong>330GB</strong>, <strong>140GB</strong>, <strong>120GB</strong>, <strong>90GB</strong>, <strong>50GB</strong> and below. We have <strong>MONTH</strong>ly partitioning schemes on most tables and obviously on our larger tables.</p>
+<p>For our smaller tables, we could just <strong>CREATE TABLE test_table LIKE small_table</strong>, populating it and comparing compression. However, the really interesting question (and perhaps the only interesting question compression-wise) is how well would our larger (and specifically largest) tables would compress.</p>
+<p>Indeed, for our smaller tables we saw between <strong>20%</strong> to <strong>70%</strong> reduction in size when using stronger InnoDB compression: <strong>KEY_BLOCK_SIZE=4/2/1</strong>. How well would that work on our larger tables? How much slower would it be?</p>
+<p>We know MySQL partitions are implemented by actual <em>independent</em> tables. Our testing approach was: let&#8217;s build a test_table from a one month worth of data (== one single partition) of our largest table. We tested:</p>
+<ul>
+<li>The time it takes to load the entire partition (about <strong>120M</strong> rows, <strong>100GB COMPRESSED</strong> data as seen on <strong>.idb</strong> file)</li>
+<li>The time it would take to load a single day&#8217;s worth of data from Hive/Hadoop (loading real data, as does our nightly import)</li>
+<li>The time it would take for various important <strong>SELECT</strong> query to execute on this data.</li>
+</ul>
+<h4>InnoDB vs. TokuDB comparison</h4>
+<p>In this post I will only describe our impressions of compression size. I have a lot to say about TokuDB vs InnoDB partitioning and queries; this will wait till later post.</p>
+<p>So here goes:</p>
+<table border="0" cellspacing="0">
+<colgroup width="85"></colgroup>
+<colgroup width="155"></colgroup>
+<colgroup width="152"></colgroup>
+<colgroup width="147"></colgroup>
+<colgroup width="141"></colgroup>
+<tbody>
+<tr>
+<td align="LEFT" bgcolor="#E6E6E6" height="31"><b>Engine</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Compression</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Time to Insert 1 month</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Table size (optimized)</b></td>
+<td align="LEFT" bgcolor="#E6E6E6"><b>Time to import 1 day</b></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">InnoDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">8k</td>
+<td align="LEFT" bgcolor="#FFFFCC"><strong>10.5h</strong></td>
+<td align="LEFT" bgcolor="#FFFFCC">58GB</td>
+<td align="LEFT" bgcolor="#FFFFCC"><b>32m</b></td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">InnoDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">4k</td>
+<td align="LEFT" bgcolor="#FFFFCC">48h</td>
+<td align="LEFT" bgcolor="#FFFFCC">33GB</td>
+<td align="LEFT" bgcolor="#FFFFCC">unknown (too long)</td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">TokuDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">quicklz</td>
+<td align="LEFT" bgcolor="#FFFFCC">14h</td>
+<td align="LEFT" bgcolor="#FFFFCC">17GB</td>
+<td align="LEFT" bgcolor="#FFFFCC">40m</td>
+</tr>
+<tr>
+<td align="LEFT" bgcolor="#FFFFCC" height="17">TokuDB</td>
+<td align="LEFT" bgcolor="#FFFFCC">lzma (small/aggresive)</td>
+<td align="LEFT" bgcolor="#FFFFCC">15h</td>
+<td align="LEFT" bgcolor="#FFFFCC"><b>7.5GB</b></td>
+<td align="LEFT" bgcolor="#FFFFCC">42m</td>
+</tr>
+</tbody>
+</table>
+<p>Some comments and insights:</p>
+<ul>
+<li>Each test was performed 3-4 times. There were no significant differences on the various cycles.</li>
+<li>The <strong>1</strong> month insert was done courtesy <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">QueryScript split</a>,  <strong>5,000</strong> rows at a time, no throttling.</li>
+<li>The <strong>1</strong> day import via <em>mysqlimport</em>. There were multiple files imported. Each file is sorted by <strong>PRIMARY KEY ASC</strong>.</li>
+<li>Isn&#8217;t it nice to know that your <strong>100GB</strong> InnoDB table actually fits within <strong>58GB</strong> when rebuilt?</li>
+<li>For InnoDB <strong>flush_logs_at_trx_commit=2</strong>, <strong>flush_method=O_DIRECT</strong>.</li>
+<li>I used default configuration to TokuDB &#8212; touched nothing. More on this in later post.</li>
+<li>InnoDB <strong>4k</strong> was <em>prohibitively</em> slow to load data. It was so slow so as to be unacceptable. For the 1 day load it took <strong>1</strong> hour for a mere <strong>20%</strong> of data to load. <strong>1</strong> hour was already marginal for our requirements; waiting for <strong>5</strong> hours was out of the question. I tested several times, never got to wait for completion. Did I say it would just be &#8220;more of the same&#8221;? <strong>4k</strong> turned to be &#8220;not an option&#8221;.</li>
+<li>I saw almost no difference in load time between the two TokuDB compression formats. Both somewhat (30%) longer than InnoDB to load, but comparable.</li>
+<li>TokuDB compression: nothing short of <em>amazing</em>.</li>
+</ul>
+<p>With InnoDB <strong>4k</strong> being &#8220;not an option&#8221;, and with both TokuDB compressions being similar in load time yet so different in compression size, we are left with the following conclusion: if we want to compress more than our existing 8k (and we have to) &#8211; TokuDB&#8217;s <em>agressive compression</em> (aka small, aka lzma) is our only option.</p>
+<h4>Shameless plug</h4>
+<p><a href="http://code.google.com/p/common-schema/">common_schema</a> turned to be quite the &#8220;save the day&#8221; tool here. Not only did we use it to extract 100GB of data from a large dataset and load it onto our tables, it also helped out in the ALTER process for TokuDB: at this time (&lt;=<strong> 7.0.4</strong>) TokuDB still has a bug with <strong>KEY_BLOCK_SIZE</strong>: when this option is found in table definition, it impacts TokuDB&#8217;s indexes by bloating them. This is how <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html">sql_alter_table_tokudb</a> was born. Hopefully it will be redundant shortly.</p>
+<h4>More to come</h4>
+<p>Was our test fair? Should we have configure TokuDB differently? Is loading via small <strong>5,000</strong> row chunks the right way?</p>
+<p>In the next post I will describe the process of migrating our 4TB worth of data to TokuDB, pitfalls, issues, party crushers, sport spoilers, configuration, recovery, cool behaviour and general advice you should probably want to embrace. At later stage I&#8217;ll describe how our DWH looks after migration. Finally I&#8217;ll share some (ongoing) insights on performance.</p>
+<p>You&#8217;ll probably want to know &#8220;How much is (non compressed) <strong>4TB</strong> of data worth in TokuDB?&#8221; Let&#8217;s keep the suspense <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1/feed</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6473</post-id>	</item>
+		<item>
+		<title>common_schema 2.2: better QueryScript isolation &#038; cleanup; TokuDB; table_rotate, split params</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-2-2-better-queryscript-isolation-tokudb-table_rotate-split-params</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-2-2-better-queryscript-isolation-tokudb-table_rotate-split-params#comments</comments>
+				<pubDate>Tue, 13 Aug 2013 03:39:12 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[QueryScript]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6468</guid>
+				<description><![CDATA[common_schema 2.2 is released. This is shortly after the 2.1 release; it was only meant as bug fixes release but some interesting things came up, leading to new functionality. Highlights of the 2.2 release: Better QueryScript isolation &#38; cleanup: isolation improved across replication topology, cleanup done even on error Added TokuDB related views split with [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://code.google.com/p/common-schema/"><strong>common_schema 2.2</strong></a> is released. This is shortly after the 2.1 release; it was only meant as bug fixes release but some interesting things came up, leading to new functionality.</p>
+<p>Highlights of the <strong>2.2</strong> release:</p>
+<ul>
+<li>Better QueryScript isolation &amp; cleanup: isolation improved across replication topology, cleanup done even on error</li>
+<li>Added <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_views.html">TokuDB related views</a></li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> with &#8220;index&#8221; hint (Ike, this is for you)</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_rotate.html"><strong>table_rotate()</strong></a>: a <em>logrotate</em>-like mechanism for tables</li>
+<li>better throw()</li>
+</ul>
+<p>Drill down:</p>
+<h4>Better QueryScript isolation &amp; cleanup</h4>
+<p><em>common_schema</em> <strong>2.1</strong> introduced persistent tables for QueryScript. This also introduced the problem of isolating concurrent scripts, all reading from and writing to shared tables. In <strong>2.1</strong> isolation was based on session id. However although unique per machine, collisions were possible across replication topology: a script could be issued on master, another on slave (I have such use cases) and both use same (local) session id.</p>
+<p>With 2.2 isolation is based on server_id &amp; session id combination; this is unique across a replication topology.</p>
+<p>Until <strong>2.1</strong>, QueryScript used temporary tables. This meant any error would just break the script, and the tables were left (isolated as they were, and auto-destroyed in time). With persistent tables a script throwing an error meant legacy code piling up. With <em>common_schema</em> <strong>2.2</strong> and on MySQL &gt;= <strong>5.5</strong> all exceptions are caught, cleanup is made, leaving exceptions to be <strong>RESIGNAL</strong>led.</p>
+<h4>TokuDB views</h4>
+<p>A couple TokuDB related views help out in converting to TokuDB and in figuring out tables status on disk:<span id="more-6468"></span></p>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html"><strong>sql_alter_table_tokudb</strong></a> will help you out to generate the complex ALTER statement to TokuDB engine if you happen to used COMPRESSED InnoDB tables with KEY_BLOCK_SIZE specified. The view generates a complex DROP KEYs &amp; ADD KEYs statementl this is due to bug &#8230;</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_file_map.html"><strong>tokudb_file_map</strong></a> simplifies the <strong>INFORMATION_SCHEMA.Tokudb_file_map</strong> table: the original view is not normalized and is difficult to interpret and follow when your table had many indexes or is partitioned (I will write more on this shortly). with <em>common_schema</em>&#8216;s <strong>tokudb_file_map</strong> you get, per table, the list of files representing that table, along with a couple Shell commands to tell you <em>the thing you want to know most</em>: &#8220;what is the size of my TokuDB table on disk?&#8221;</li>
+</ul>
+<h4>split</h4>
+<p>QueryScript&#8217;s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split</strong></a> device now supports the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters">&#8220;<strong>index</strong>&#8221; parameter</a> (or <em>hint</em>), which instructs the split() operation to use an explicitly named index. If used, the index must exist and must be UNIQUE.</p>
+<h4>table_rotate()</h4>
+<p>Rotate your tables a-la logrotate with <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/table_rotate.html"><strong>table_rotate()</strong></a>: generate a new, identical, empty table, version your table, pushing older versions along the line; optionally drop older versions. You get the picture. Got some nice use case behind this on cleaning up a test database.</p>
+<h4>throw()</h4>
+<p>On MySQL &gt;= <strong>5.5</strong> <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/throw.html"><strong>throw()</strong></a> uses SIGNAL. No more weird <em>&#8220;table `Unknown column &#8216;$t&#8217; in &#8216;field list&#8217;` does not exist&#8221;</em> messages. Just plain old:</p>
+<blockquote>
+<pre>ERROR 1054 (42S22): Unknown column '$t' in 'field list'</pre>
+</blockquote>
+<h4>Get it</h4>
+<p><em>common_schema</em> is free and open source. It is licensed under GPL v2. This is where you can <a href="https://code.google.com/p/common-schema/">find and download latest common_schema release</a>.</p>
+<p>Your input is welcome! Please submit your bugs, or otherwise share your experience with <em>common_schema</em>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-2-2-better-queryscript-isolation-tokudb-table_rotate-split-params/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6468</post-id>	</item>
+		<item>
+		<title>common_schema roadmap thoughts</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-roadmap-thoughts</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-roadmap-thoughts#comments</comments>
+				<pubDate>Mon, 22 Jul 2013 12:36:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[community]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[QueryScript]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6435</guid>
+				<description><![CDATA[I&#8217;m happy with common_schema; it is in fact a tool I use myself on an almost daily basis. I&#8217;m also happy to see that it gains traction; which is why I&#8217;m exposing a little bit of my thoughts on general future development. I&#8217;d love to get feedback. Supported versions At this moment, common_schema supports MySQL [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m happy with <strong><a href="https://code.google.com/p/common-schema/">common_schema</a></strong>; it is in fact a tool I use myself on an almost daily basis. I&#8217;m also happy to see that it gains traction; which is why I&#8217;m exposing a little bit of my thoughts on general future development. I&#8217;d love to get feedback.</p>
+<h4>Supported versions</h4>
+<p>At this moment, <em>common_schema</em> supports MySQL &gt;= <strong>5.1</strong>, all variants. This includes <strong>5.5</strong>, <strong>5.6</strong>, MySQL, Percona Server &amp; MariaDB.</p>
+<p><strong>5.1</strong> is today past end of line, and I&#8217;m really missing the <strong>SIGNAL</strong>/<strong>RESIGNAL</strong> syntax that I would like to use; I can do in the meanwhile with version-specific code such as <strong>/*!50500 &#8230; */</strong>. Nevertheless, I&#8217;m wondering whether I will eventually have to:</p>
+<ul>
+<li>Support different branches of <em>common_schema</em> (one that supports <strong>5.1</strong>, one that supports &gt;= <strong>5.5</strong>)</li>
+<li>Stop support for <strong>5.1</strong></li>
+</ul>
+<p>Of course community-wise, the former is preferred; but I have limited resources, so I would like to make a quick poll here:</p>
+Note: There is a poll embedded within this post, please visit the site to participate in this post's poll.
+<p>I&#8217;ll use the poll&#8217;s results as a <em>vague idea of what people use and want</em>. Or please use comments below to sound your voice!</p>
+<h4>rdebug</h4>
+<p>This was a crazy jump at providing a <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html">stored routine debugger and debugging API</a>. From some talk I made I don&#8217;t see this getting traction. For the time being, I don&#8217;t see that I will concentrate my efforts on this. Actually it is almost complete. You can step-into, step-out, step-over, set breakpoints, read variables, modify variables &#8212; it&#8217;s pretty cool.<span id="more-6435"></span></p>
+<p>But someone will eventually have to write a GUI front-end for this (eclipse/IntelliJ/whatever); I know not many will use a command line approach for a debugger. I also know I&#8217;m not going to write the GUI front-end. So the API is there, let&#8217;s see how it rolls.</p>
+<h4>QueryScript</h4>
+<p>I will keep on improving <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script.html"><strong>QueryScript</strong></a>, and in particular split, error handling, and otherwise simplification of common tasks. I have no doubt QueryScript goes the right way: I just see how easy it is to solve complex problems with a QueryScript one-liner. Other bullets on my TODO for QueryScript:</p>
+<ul>
+<li>Script tracking (a semi-debugging mechanism, which allows one to recognize status of script)</li>
+<li>Message passing to scripts (again, a semi-debugger approach)</li>
+<li>Error recovery; ability to resume script from point of failure or point of suspension. I have plenty use cases for that.</li>
+</ul>
+<h4>performance_schema</h4>
+<p>I will most probably include parts of Mark Leith&#8217;s <a href="http://www.markleith.co.uk/ps_helper/"><strong>ps_helper</strong></a>, which is released under <a href="http://www.wtfpl.net/">a permissive license</a>, and otherwise draw ideas from his work. I&#8217;m happy to learn parts of <em>ps_helper</em> were influenced by <em>common_schema</em> itself.</p>
+<h4>Hosting</h4>
+<p><em>common_schema</em> will most probably move out of Google Code; by Jan 2014 there will no longer be a &#8220;Downloads&#8221; section, and I really, <em>really</em>, want there to be a <em>&#8220;Downloads&#8221;</em> section.</p>
+<p>I could go LaunchPad, GitHub, BitBucket (they don&#8217;t have <em>&#8220;Downloads&#8221;</em> sections, either, do they?), other; any advice?</p>
+<h4>World domination</h4>
+<p>Yep. This is still <em>common_schema</em>&#8216;s goal. More seriously, I would want to see it installed on every single MySQL server instance. Then I would control your fate. bwahahaha!</p>
+<p>Even more seriously, if you are a happy user, please do pass the word. I can only blog so much and present so much; there are no financing resources for this project, and I need all the help I can get in promoting <em>common_schema</em>. Thank you!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-roadmap-thoughts/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6435</post-id>	</item>
+		<item>
+		<title>common_schema 2.1 released: advanced &#038; improved split(), persistent script tables, more schema analysis, and (ahem) charts!</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts#comments</comments>
+				<pubDate>Wed, 17 Jul 2013 18:57:06 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[charts]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Development]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[QueryScript]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6398</guid>
+				<description><![CDATA[common_schema 2.1 is released! common_schema is your free &#38; open source companion schema within your MySQL server, providing with a function library, scripting capabilities, powerful routines and ready-to-apply information and recommendations. New and noteworthy in version 2.1: Better QueryScript&#8217;s split() functionality Persistent tables for QueryScript: no long held temporary tables Index creation analysis, further range [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p><a href="https://code.google.com/p/common-schema/"><strong>common_schema 2.1</strong></a> is released! <em>common_schema</em> is your free &amp; open source companion schema within your MySQL server, providing with a function library, scripting capabilities, powerful routines and ready-to-apply information and recommendations.</p>
+<p>New and noteworthy in version <strong>2.1</strong>:</p>
+<ul>
+<li>Better <em>QueryScript&#8217;</em>s <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html"><strong>split()</strong></a> functionality</li>
+<li>Persistent tables for QueryScript: no long held temporary tables</li>
+<li>Index creation analysis, further range partition analysis</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/grant_access.html"><strong>grant_access()</strong></a>: allow everyone to use <em>common_schema</em></li>
+<li>Ascii charts, google charts</li>
+<li><strong>debugged_routines</strong>: show routines with debug code</li>
+</ul>
+<p>Other minor enhancements and bugfixes not listed.</p>
+<p>Here&#8217;s a breakdown of the above:</p>
+<h4>split() enhancements</h4>
+<p><strong><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html">split</a></strong> is one of those parts of <em>common_schema</em> that (should) appeal to every DBA. Break a huge transaction automagically into smaller chunks, and don&#8217;t worry about how it&#8217;s done. If you like, throttle execution, or print progress, or&#8230;</p>
+<p><em>split</em> enhancements include:</p>
+<ul>
+<li>A much better auto-detection-and-selection of the chunking index. <em>split</em> now consults all columns covered by the index, and uses realistic heuristics to decide which <strong>UNIQUE KEY</strong> on your table is best for the chunking process. A couple bugs are solved on the way; <em>split</em> is much smarter now.</li>
+<li>Better support for multi-column chunking keys. You may now utilize the <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/query_script_split.html#parameters"><strong>start</strong>/<strong>stop</strong> parameters</a> even on multi column keys, passing a comma delimited of values for the <em>split</em> operation to start/end with, respectively. Also fixed issue for nonexistent <strong>start/stop</strong> values, which are now valid: <em>split</em> will just keep to the given range.</li>
+<li>split no longer requires a temporary table open through the duration of its operation. See next section.<span id="more-6398"></span></li>
+</ul>
+<h4>Persistent script tables</h4>
+<p>QueryScript used to use several temporary tables for its operation. Thus, a script could hold open two or three temporary tables for the entire execution duration. For long <em>split</em> operations, for example, this could mean hours and days.</p>
+<p>Temporary tables are nice and quick to respond (well, MyISAM tables are, until MySQL <strong>5.7</strong> is out), but make for an inherent problem: stopped slaves must not shut down nor restart when replication has an open temporary table. Why? Well, because the slave forgets about the temporary tables. When it resumes operation, it will not recognize DML issued against those tables it has forgotten. That&#8217;s why <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-prepare-shutdown.html">oak-prepare-shutdown</a> is so good for slaves.</p>
+<p>When temporary tables are short-lived, this is typically not an issue. But if you are not allowed to restart your slave throughout a 24 hour operation, that&#8217;s a limitation.</p>
+<p>As of <strong>2.1</strong>, QueryScript does not require long held temporary tables. In fact, typical scripts do not create <em>any</em> temporary tables. A <em>split</em> operation creates and immediately drops a series of temporary tables. These are dropped even before actual <em>split</em> operation begins. All tables operated on are persistent <strong>InnoDB</strong> tables.</p>
+<p><em>Result</em>: safer script replication. There&#8217;s another nice side effect I may take advantage of in a later release: ability to monitor and control flow of concurrent scripts.</p>
+<h4>Schema analysis</h4>
+<p>Two noteworthy additions to schema analysis views:</p>
+<ul>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table.html"><strong>sql_alter_table</strong></a> now includes the <strong>sql_drop_keys</strong> &amp; <strong>sql_add_keys</strong> columns. For each table, you get the SQL statements to create and drop the existing indexes. I developed this when I hit <a href="https://groups.google.com/d/msg/tokudb-user/hLlHwlp2AL0/nvNlUCzhxAwJ">this problem</a> with TokuDB.</li>
+<li><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_range_partitions.html"><strong>sql_range_partitions</strong></a> now includes the <strong>count_past_partitions</strong> &amp; <strong>count_future_partitions</strong>; when your table is partitioned by some type of time range, these views tell you how many partitions are in the past, and how many are to be written to in the future. This turns useful when you want to rotate or otherwise set a retention policy for your range partitions.</li>
+</ul>
+<h4>grant_access()</h4>
+<p>The <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/grant_access.html"><strong>grant_access()</strong></a> routine <strong>GRANT</strong>s all accounts on your server with <strong>SELECT</strong> &amp; <strong>EXECUTE</strong> privileges on <em>common_schema</em>. This is a quick complementary to the installation process (though you have to invoke it yourself; it&#8217;s up to you).</p>
+<h4>Ascii/google line charts</h4>
+<p>Laugh all you want! And find how cool it is to get (poor man&#8217;s) instant charting like this:</p>
+<blockquote>
+<pre>mysql&gt; call <strong>line_chart</strong>('select ts, com_insert_psec, com_update_psec from mycheckpoint.sv_hour limit 100', 'insert per second, update per second') ;
++---------+------------------------------------------------------------------------------------------------------+
+| y_scale | chart                                                                                                |
++---------+------------------------------------------------------------------------------------------------------+
+| 162     | -#-------------------------------------------------------------------------------------------------- |
+| 152     | ---------------------------------------------------------------------------------------------------- |
+| 143     | ---------------------------------------------------------------------------------------------------- |
+| 134     | ---------------------------------------------------------------------------------------------------- |
+| 124     | ---------------------------------------------------------------------------------------------------- |
+| 115     | ------------------------------------------------------------#--------------------------------------- |
+| 106     | ---------------------------------------------------------------------------------------------------- |
+| 96      | -*-------------------------------------------------------------------------------------------------- |
+| 87      | ---------------------------------#-------------------------#---------------------------------------- |
+| 77      | ---------------------------------------------------------------------------------#------------------ |
+| 68      | ---------------------------------------------------------------------------#------------------------ |
+| 59      | #-------------------------------#------------------------------------------------------------------- |
+| 49      | ---##------#-#-##-#-#--#--###----------------##---------------------------------#-----#---###------- |
+| 40      | --#------#--#-#--#-#-##-##----##--###########--######--------#############-*#-##--####-###---####### |
+| 31      | *-**--#-#-*-**-**------**--**#-****-**-*****-*******-#---#-*------------**---#--*------------------- |
+| 21      | ----*#*#*--*--*--******--**--**----*--*-----*-------**#*#**-************--#-****-******************* |
+| 12      | -----*-*-*--------------------------------------------*-*-----------------*------------------------- |
+|         | v::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::v |
+|         | 2010-10-06 20:00:00                                                              2010-10-10 23:00:00 |
+|         |     # insert per second                                                                              |
+|         |     * update per second                                                                              |
++---------+------------------------------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>You can get the same in <a href="https://developers.google.com/chart/image/">Google Image Charts</a> format. Yes, it&#8217;s deprecated (and has been for a year &#8212; it&#8217;s still working)</p>
+<blockquote>
+<pre>mysql&gt; call <strong>google_line_chart</strong>('select ts, com_insert_psec, com_update_psec from mycheckpoint.sv_hour limit 100', 'insert per second, update per second') \G
+
+google_chart_url: <a href="http://chart.apis.google.com/chart?cht=lc&amp;chs=800x350&amp;chtt=SQL+chart+by+common_schema&amp;chxt=x,y&amp;chxr=1,11.9,161.7&amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|2010-10-06%2020:00:00||||||||||||||||||||||||2010-10-07%2020:00:00|||||||||||||||||||||||||2010-10-08%2021:00:00|||||||||||||||||||||||||2010-10-09%2022:00:00|||||||||||||||||||||||||2010-10-10%2023:00:00&amp;chg=1.010101010,25,1,2,0,0&amp;chco=ff8c00,4682b4&amp;chdl=insert%20per%20second|update%20per%20second&amp;chdlp=b">http://chart.apis.google.com/chart?cht=lc&amp;chs=800x350&amp;chtt=SQL+chart+by+common_schema&amp;chxt=x,y&amp;chxr=1,11.9,161.7&amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|2010-10-06%2020:00:00||||||||||||||||||||||||2010-10-07%2020:00:00|||||||||||||||||||||||||2010-10-08%2021:00:00|||||||||||||||||||||||||2010-10-09%2022:00:00|||||||||||||||||||||||||2010-10-10%2023:00:00&amp;chg=1.010101010,25,1,2,0,0&amp;chco=ff8c00,4682b4&amp;chdl=insert%20per%20second|update%20per%20second&amp;chdlp=b</a></pre>
+</blockquote>
+<p>The above translates into the following image:</p>
+<blockquote><p><a href="http://chart.apis.google.com/chart?cht=lc&amp;chs=800x350&amp;chtt=SQL+chart+by+common_schema&amp;chxt=x,y&amp;chxr=1,11.9,161.7&amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|2010-10-06 20:00:00||||||||||||||||||||||||2010-10-07 20:00:00|||||||||||||||||||||||||2010-10-08 21:00:00|||||||||||||||||||||||||2010-10-09 22:00:00|||||||||||||||||||||||||2010-10-10 23:00:00&amp;chg=1.010101010,25,1,2,0,0&amp;chco=ff8c00,4682b4&amp;chdl=insert per second|update per second&amp;chdlp=b"><img class="aligncenter" alt="" src="http://chart.apis.google.com/chart?cht=lc&amp;chs=800x350&amp;chtt=SQL+chart+by+common_schema&amp;chxt=x,y&amp;chxr=1,11.9,161.7&amp;chd=s:S9NOOGKFGKHQMONPONONNKNONNOOQINMRgLLNMMNNNNNNOONMNNNMHEFFJFfsLLMMMLLMNMMNNDVNIMKPaKLLMOMNNNONNNMMMMM,IiGGFCDBCBGFGGGGGFGGFEFGGGGGHDGGJGGGGGFGGGGGGGGGGGGGFCBCCCEHGGGFFFFFGGGFGGAKFDFFIFFFFFFFFFFFFFFFFFFF&amp;chxs=0,505050,10,0,lt&amp;chxl=0:|2010-10-06 20:00:00||||||||||||||||||||||||2010-10-07 20:00:00|||||||||||||||||||||||||2010-10-08 21:00:00|||||||||||||||||||||||||2010-10-09 22:00:00|||||||||||||||||||||||||2010-10-10 23:00:00&amp;chg=1.010101010,25,1,2,0,0&amp;chco=ff8c00,4682b4&amp;chdl=insert per second|update per second&amp;chdlp=b" width="800" height="350" /></a></p></blockquote>
+<p>Throw you own query in. Make <strong>1st</strong> column your ordering column, <strong>2nd</strong> [, <strong>3rd</strong>&#8230;] value columns. Provide your own legend. Watch it instantly. And laugh all you want.</p>
+<p>Read more about <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/charting_routines.html">common_schema&#8217;s charting routines</a>.</p>
+<h4>debugged_routines</h4>
+<p>The new <strong><a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/debugged_routines.html">debugged_routines</a></strong> view shows you which routines are currently &#8220;<a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug_compile_routine.html">compiled with debug mode</a>&#8220;.</p>
+<p>I will write more on the state of <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/rdebug.html"><strong>rdebug</strong></a> in a future post.</p>
+<h4>Try it, get it</h4>
+<ul>
+<li><em>common_schema</em> <strong>2.1</strong> comes with over <strong>500</strong> tests and fast growing.</li>
+<li>It supports MySQL <strong>5.1</strong>, <strong>5.5</strong>, <strong>5.6</strong>, Percona Server and MariaDB.</li>
+<li>It has superb documentation (may I say so?) with a lot of examples &amp; drill down into edge cases.</li>
+</ul>
+<p>You are <strong><a href="https://code.google.com/p/common-schema/">free to download</a></strong> and use it.</p>
+<p>Your feedback is welcome! Indeed, many of this version&#8217;s improvements originated with community feedback.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/common_schema-2-1-released-advanced-improved-split-persistent-script-tables-more-schema-analysis-and-ahem-charts/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6398</post-id>	</item>
+	</channel>
+</rss>

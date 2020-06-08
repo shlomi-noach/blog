@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Using deep nested replication topologies	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Wed, 22 Oct 2014 05:22:36 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Pseudo GTID &#124; code.openark.org				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies/comment-page-1#comment-283071</link>
+		<dc:creator><![CDATA[Pseudo GTID &#124; code.openark.org]]></dc:creator>
+		<pubDate>Wed, 22 Oct 2014 05:22:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6865#comment-283071</guid>
+					<description><![CDATA[[&#8230;] promotion in complex topologies (with deep nested topologies, be able to move a slave up the hierarchy even if its local master is [&#8230;]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] promotion in complex topologies (with deep nested topologies, be able to move a slave up the hierarchy even if its local master is [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies/comment-page-1#comment-243394</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 03 Jun 2014 03:27:30 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6865#comment-243394</guid>
+					<description><![CDATA[@Jean,
+I did note this: &quot;a local master that is lagging for some internal problem will cause all of its slaves to implicitly lag&quot; as well as &quot;Corruption: if a local master gets corrupted, so do all of its slaves. &quot;.
+
+Like I said, you must be willing to pay this price on occasion. When such thing happens we reseed our lost servers.]]></description>
+		<content:encoded><![CDATA[<p>@Jean,<br />
+I did note this: &#8220;a local master that is lagging for some internal problem will cause all of its slaves to implicitly lag&#8221; as well as &#8220;Corruption: if a local master gets corrupted, so do all of its slaves. &#8220;.</p>
+<p>Like I said, you must be willing to pay this price on occasion. When such thing happens we reseed our lost servers.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Jean-François Gagné				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies/comment-page-1#comment-243326</link>
+		<dc:creator><![CDATA[Jean-François Gagné]]></dc:creator>
+		<pubDate>Mon, 02 Jun 2014 20:30:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6865#comment-243326</guid>
+					<description><![CDATA[Hi Shlomi, you do not talk about the problem of stalling replication on all slaves of an intermediate master if this intermediate master fails.  To my understanding, MHA allows to promote a slave as a new master, but does not reconnect this new master upstream.  To be able to do that, I think you need GTIDs (or maybe you solved this problem in another way).]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi, you do not talk about the problem of stalling replication on all slaves of an intermediate master if this intermediate master fails.  To my understanding, MHA allows to promote a slave as a new master, but does not reconnect this new master upstream.  To be able to do that, I think you need GTIDs (or maybe you solved this problem in another way).</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies/comment-page-1#comment-243255</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Mon, 02 Jun 2014 14:24:38 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6865#comment-243255</guid>
+					<description><![CDATA[@Massimo,
+We&#039;re not using pt-table-checksum on a constant basis. If we do, then it&#039;s of course a slave vs. its direct master.
+
+When we suspect a slave becomes corrupted we destroy it and reseed from a trusted slave.
+
+&quot;Trust&quot; is provided by our application level tests (hourly and daily) which do a lot of cross-referencing and checksuming (again, application-wise) of data. This is not issued against a specific slave but via pool, so every hour a different slave may be picked up.
+The above does not cover every possible slave, since tests run within a certain DC. However the fact is that we don&#039;t get slave corruptions, therefore our trust is high.
+
+On certain occasions we run pt-table-sync on specific dates and times. We might start doing so on a scheduled basis.]]></description>
+		<content:encoded><![CDATA[<p>@Massimo,<br />
+We&#8217;re not using pt-table-checksum on a constant basis. If we do, then it&#8217;s of course a slave vs. its direct master.</p>
+<p>When we suspect a slave becomes corrupted we destroy it and reseed from a trusted slave.</p>
+<p>&#8220;Trust&#8221; is provided by our application level tests (hourly and daily) which do a lot of cross-referencing and checksuming (again, application-wise) of data. This is not issued against a specific slave but via pool, so every hour a different slave may be picked up.<br />
+The above does not cover every possible slave, since tests run within a certain DC. However the fact is that we don&#8217;t get slave corruptions, therefore our trust is high.</p>
+<p>On certain occasions we run pt-table-sync on specific dates and times. We might start doing so on a scheduled basis.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Massimo				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/using-deep-nested-replication-topologies/comment-page-1#comment-243244</link>
+		<dc:creator><![CDATA[Massimo]]></dc:creator>
+		<pubDate>Mon, 02 Jun 2014 13:24:44 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6865#comment-243244</guid>
+					<description><![CDATA[Hi Shlomi, very interesting as usual. I wonder how you menage the pt-table-checksum utility (if used), is the active master be compared to all slaves or do you use some work around in chain for all the slaves on your topology?]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi, very interesting as usual. I wonder how you menage the pt-table-checksum utility (if used), is the active master be compared to all slaves or do you use some work around in chain for all the slaves on your topology?</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

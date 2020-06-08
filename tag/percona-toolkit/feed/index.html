@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Percona Toolkit &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/percona-toolkit/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sat, 10 Dec 2016 09:26:50 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Reading RBR binary logs with pt-query-digest</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest#comments</comments>
+				<pubDate>Mon, 26 Jan 2015 15:50:46 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Analysis]]></category>
+		<category><![CDATA[Percona Toolkit]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[scripts]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7180</guid>
+				<description><![CDATA[For purposes of auditing anything that goes on our servers we&#8217;re looking to parse the binary logs of all servers (masters), as with &#8220;Anemomaster&#8220;. With Row Based Replication this is problematic since pt-query-digest does not support parsing RBR binary logs (true for 2.2.12, latest at this time). I&#8217;ve written a simple script that translates RBR [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>For purposes of auditing anything that goes on our servers we&#8217;re looking to parse the binary logs of all servers (masters), as with &#8220;<a href="https://shlomi-noach.github.io/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow">Anemomaster</a>&#8220;. With Row Based Replication this is problematic since <strong>pt-query-digest</strong> <a href="https://bugs.launchpad.net/percona-toolkit/+bug/1377887">does not support parsing RBR binary logs</a> (true for <strong>2.2.12</strong>, latest at this time).</p>
+<p>I&#8217;ve written a simple script that translates RBR logs to SBR-like logs, with a little bit of cheating. My interest is that <strong>pt-query-digest</strong> is able to capture and count the queries, nothing else. By doing some minimal text manipulation on the binary log I&#8217;m able to now feed it to <strong>pt-query-digest</strong> which seems to be happy.</p>
+<p>The script of course does not parse the binary log directly; furthermore, it requires the binary log to be extracted via:</p>
+<blockquote>
+<pre class="brush: bash; title: ; notranslate">mysqlbinlog --verbose --base64-output=DECODE-ROWS your-mysql-binlog-filemame.000001</pre>
+</blockquote>
+<p>The above adds the interpretation of the RBR entires in the form of (unconventional) statements, commented, and strips out the cryptic RBR text. All that is left is to do a little manipulation on entry headers and uncomment the interpreted queries.</p>
+<p>The script can be found in <a href="https://gist.github.com/shlomi-noach/cc243fd690403e7617e3">my gist repositories</a>. Current version is as follows:<span id="more-7180"></span></p>
+<blockquote>
+<pre class="brush: python; title: ; notranslate">
+#!/usr/bin/python
+#
+# Convert a Row-Based-Replication binary log to Statement-Based-Replication format, cheating a little.
+# This script exists since Percona Toolkit's pt-query-digest cannot digest RBR format. The script
+# generates enough for it to work with.
+# Expecting standard input
+# Expected input is the output of &quot;mysqlbinlog --verbose --base64-output=DECODE-ROWS &lt;binlog_file_name&gt;&quot;
+# For example:
+# $ mysqlbinlog --verbose --base64-output=DECODE-ROWS mysql-bin.000006 | python binlog-rbr-to-sbr.py | pt-query-digest --type=binlog --order-by Query_time:cnt --group-by fingerprint
+#
+
+import fileinput
+
+def convert_rbr_to_pseudo_sbr():
+    inside_rbr_statement = False
+    for line in fileinput.input():
+        line = line.strip()
+        if line.startswith(&quot;#&quot;) and &quot;end_log_pos&quot; in line:
+            for rbr_token in [&quot;Update_rows:&quot;, &quot;Write_rows:&quot;, &quot;Delete_rows:&quot;, &quot;Rows_query:&quot;, &quot;Table_map:&quot;,]:
+                if rbr_token in line:
+                    line = &quot;%s%s&quot; % (line.split(rbr_token)[0], &quot;Query\tthread_id=1\texec_time=0\terror_code=0&quot;)
+        if line.startswith(&quot;### &quot;):
+            inside_rbr_statement = True
+            # The &quot;### &quot; commented rows are the pseudo-statement interpreted by mysqlbinlog's &quot;--verbose&quot;,
+            # and which we will feed into pt-query-digest
+            line = line[4:]
+        else:
+            if inside_rbr_statement:
+                print(&quot;/*!*/;&quot;)
+            inside_rbr_statement = False
+        print(line) 
+
+convert_rbr_to_pseudo_sbr()
+</pre>
+</blockquote>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/reading-rbr-binary-logs-with-pt-query-digest/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7180</post-id>	</item>
+		<item>
+		<title>Converting an OLAP database to TokuDB, part 2: the process of migration</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration#comments</comments>
+				<pubDate>Mon, 09 Sep 2013 03:29:30 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[common_schema]]></category>
+		<category><![CDATA[Percona Toolkit]]></category>
+		<category><![CDATA[TokuDB]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6530</guid>
+				<description><![CDATA[This is a second in a series of posts describing our experience in migrating a large DWH server to TokuDB. This post discusses the process of migration itself. As a quick recap (read part 1 here), we have a 2TB compressed InnoDB (4TB uncompressed) based DWH server. Space is running low, and we&#8217;re looking at [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is a second in a series of posts describing our experience in migrating a large DWH server to TokuDB. This post discusses the process of migration itself.</p>
+<p>As a quick recap (<a href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-1">read part 1 here</a>), we have a <strong>2TB</strong> compressed InnoDB (<strong>4TB</strong> uncompressed) based DWH server. Space is running low, and we&#8217;re looking at TokuDB for answers. Early experiments show that TokuDB&#8217;s compression could make a good impact on disk space usage. I&#8217;m still not discussing performance &#8212; keeping this till later post.</p>
+<p>Those with weak hearts can skip right to the end, where we finally have a complete conversion. You can also peek at the very end to find out how much <strong>4TB</strong> uncompressed InnoDB data is worth in TokuDB. But you might want to read through. The process was not smooth, and not as expected (it&#8217;s a war story thing). Throughout the migration we got a lot of insight on TokuDB&#8217;s behaviour, limitations, conveniences, inconveniences and more.</p>
+<p>Disclosure: I have no personal interests and no company interests; throughout the process we were in touch with Tokutek engineers, getting free, friendly &amp; professional advice and providing with input of our own. Most of this content has already been presented to Tokutek throughout the process. TokuDB is open source and free to use, though commercial license is also available.</p>
+<h4>How do you convert 4TB worth of data to TokuDB?</h4>
+<p>Obviously one table at a time. But we had another restriction: you may recall I took a live slave for the migration process. And we wanted to end the process with a live slave. So the restriction was: keep it replicating!</p>
+<p>How easy would that be? Based on our initial tests, I extrapolated over <strong>20</strong> days of conversion from InnoDB to TokuDB. Even with one table at a time, our largest table was expected to convert in some <strong>12-14</strong> days. Can we retain <strong>14</strong> days of binary logs on a server already running low on disk space? If only I knew then what I know today <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /><span id="more-6530"></span></p>
+<p>I recently claimed (as I recall it was in one of the <a href="https://twitter.com/DBHangops">@DBHangops</a> meetings) I was <em>done</em> with <strong>ALTER TABLE</strong> statements. I would not touch them again: with <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html">oak-online-alter-table</a> and <a href="http://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html">pt-online-schema-change</a> I can get better control of my server (and my sleep). Can I use an online migration tool?</p>
+<p>Fortunately we are using Statement Based Replication on this MySQL topology. This makes for good news, because triggers are activated on slave as it is replicating its master&#8217;s statements. You can run an online migration tool <em>on the slave</em>, while it <em>keeps replicating</em>. This is so cool. I don&#8217;t need to worry too much about binary logs and relay logs. I can take my time with conversion&#8230;</p>
+<p>I chose to use <em>pt-online-schema-change</em>. Why choose Percona&#8217;s tool over my own? Percona&#8217;s tool supports the <strong>&#8211;check-slave-lag</strong> option, which throttles the operation should the server&#8217;s slaves start lagging. Wait, I&#8217;m running the tool <em>on a slave</em>, so what&#8217;s the point? Well, you can cheat and provide <strong>&#8211;check-slave-lag=h=127.0.0.1</strong> so that the tool assumes the localhost is the slave (while it is actually the server being altered); which means it will check <em>on its own slave lag</em> to do the throttling. This works well and is fun to watch.</p>
+<h4>Starting the migration</h4>
+<p>Some of our tables had the <strong>KEY_BLOCK_SIZE</strong> explicitly declared. As I mentioned in previous post, for TokuDB &lt;= <strong>7.0.4</strong> this causes problems by bloating the indexes instead of compressing them (and Tim Callaghan of Tokutek notes this is fixed in next version). <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_alter_table_tokudb.html">common_schema to the rescue</a>: the <strong>ALTER</strong> statement has to include a <strong>DROP</strong> and recreate of all indexes.</p>
+<p>This is the place to mention our tables are heavily partitioned. This will play a crucial role in the next events. We use RANGE partitions over dates. We have a monthly partitioning scheme on all partitioned tables. And we have partitions to spare: starting a few years back from today (depending on the table) and made until <strong>Dec. 2025</strong> &#8212; making for some <strong>170 &#8211; 200</strong> partitions per table.</p>
+<p>Starting from smallest table (a few rows) and increasing in size, we migrated tables one by one to TokuDB.</p>
+<h4>Party crashers</h4>
+<p>A few party crashers were made obvious right from the start (they are all being addressed by Tokutek as far as I know):</p>
+<ol>
+<li><strong>@@datadir</strong>: all TokuDB files reside in @@datadir. You get a pile of files in the same directory where you would find your ib_logfile*, master.info, etc. files.</li>
+<li>File names: you do not get file names after table names. Instead, you get cryptic names like <strong>./_myschema_sql_7fda_8e73_*</strong>.You would suspect that there is some uniqueness to the <strong>7fda_8e73</strong> thing; that it relates to a single table &#8212; it doesn&#8217;t. Same table get different file names, different tables get similar names &#8212; there&#8217;s not one regular expression to differentiate tables &#8212; and I do know my regexes.</li>
+<li><strong>INFORMATION_SCHEMA.Tokudb_file_map</strong> doesn&#8217;t make it much easier, either. It is meant to tell you about tables to file names mappings. But the tables are not laid out in easy TABLE_SCHEMA, TABLE_NAME columns, but are denormalized themselves, and can be vague and almost ambiguous, to some extent. <em>common_schema</em> to the rescue, its rewritten <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/tokudb_file_map.html">tokudb_file_map</a> maps your tables to aggregated list of file names, along with shell commands you would typically want to issue.</li>
+</ol>
+<p>But let me emphasize these issues, before you think I&#8217;m just spoiled. TokuDB creates multiple files per table: other than the standard <strong>.frm</strong> file, you get one &#8220;main&#8221; file for each table, and then another file for each index. So it&#8217;s quite possible your table will consist of some <strong>7</strong> files.</p>
+<p>Well, as you may know, MySQL&#8217;s implementation of partitioning is that each partition is made of its own standalone table, hidden from the user (but easily viewable on the filesystem). Now this means a single table with <strong>170</strong> partitions and a few indexes can make for over <strong>1,000</strong> files. That&#8217;s right &#8211; for a single table. We have a few dozens like this.</p>
+<p>Now consider:</p>
+<ul>
+<li>You may need to accommodate thousands or tens of thousands of files in your <strong>@@datadir</strong></li>
+<li>None of which it is easy for you to know who to relate to.</li>
+</ul>
+<p>So <em>common_schema</em>&#8216;s <strong>tokudb_file_map</strong> gives you this crazy list of <strong>1,000</strong> files which make up your single table. This isn&#8217;t too friendly, either.</p>
+<p>I think Tokutek are missing here on one of the greatest advantages they bring to the table. The one thing a DBA want to know when looking at her MySQL&#8217;s filesystem is: how much disk space is used by a schema/table. And this information becomes hard to get. Again, <em>common_schema</em>&#8216;s view will provide you with the script to do it (<strong>du -c &#8230; | tail -1</strong>) &#8212; but you would have to go into MySQL, out to shell&#8230; Bother.</p>
+<h4>Crashes and failures</h4>
+<p>The above did not stop at inconveniences. Soon enough, and while still altering my smaller tables, I would get failures from <strong>pt-online-schema-change</strong>. Checking manually to eliminate the possibility of a bug in Percona&#8217;s tool, I got:</p>
+<blockquote>
+<pre>mysql&gt; alter table my_schema.my_table engine=tokudb row_format=tokudb_small;
+ERROR 1016 (HY000): Can't open file: './my_schema/#sql-80d_2.frm' (errno: 24)</pre>
+</blockquote>
+<p>This would happen again and again and again. What&#8217;s the deal here?</p>
+<p>Let me cut short on this one: we got over <strong>20,000</strong> files in <strong>@@datadir</strong>. And MySQL was unable to open any more files. Mind you, we had:</p>
+<ul>
+<li><strong>open_files_limit</strong>=30000</li>
+<li><strong>open_table_cache</strong>=16000</li>
+<li><strong>table_definition_cache</strong>=3000</li>
+</ul>
+<p>Quite the generous numbers (also backed up by <strong>ulimit</strong>, to be on the safe side; and also note we&#8217;re using <strong>XFS</strong> file system). And yet, open files were an issue. To prove my point, it was possible to <strong>ALTER</strong> a table with a fewer number of partitions. It was then possible to <strong>ALTER</strong> another smaller table without partitions. It was then impossible to alter any additional partitioned table. Once I dropped partitioning for some very small table some room was made and I was again able to <strong>ALTER</strong> a partitioned table&#8230; And this would happen for completely empty tables &#8212; no data involved. We were on some file limit here.</p>
+<p>Another such <strong>ALTER</strong> and the server crashed. This was quite unceremonious. The error log produced nothing; no stack trace. Zit.</p>
+<p>I was fervently querying the <strong>Tokudb_file_map</strong> to get a picture of what&#8217;s going on. I would need to do a self join on the table (as <em>common_schema</em>&#8216;s view does) to get a per-table listing of files. This would occasionally crash the server. I guess I had <strong>3</strong> or <strong>4</strong> such crashes.</p>
+<h4>Recovery</h4>
+<p>On this I feel I&#8217;m quite the veteran here :D. TokuDB recovery works well. As with InnoDB, TokuDB recognize there has been a crash, and before allowing MySQL to open connections it restores to a stable state.</p>
+<h4>ALTER TABLE in TokuDB</h4>
+<p>Here I found two comforting features (the third and fourth yet to be discovered). As indicated above, I did turn to issue a manual ALTER TABLE. What I found was:</p>
+<ol>
+<li>A TokuDB <strong>ALTER TABLE</strong> statement lets you know its progress. This is no little thing! Your <strong>SHOW PROCESSLIST</strong> output shows messages like <strong>&#8220;Fetched about 312724000 rows, loading data still remains&#8221;</strong>, or <strong>&#8220;Loading of data about 66.1% done&#8221;</strong>, or <strong>&#8220;Queried about 33113001 rows, Inserted about 33113000 rows&#8221;</strong>. Cool!</li>
+<li>Even better, the crash I had during the <strong>ALTER TABLE</strong>? I thought that would be the end of it. If you ever had a crash while <strong>ALTER</strong>ing an InnoDB table, you know how it goes: InnoDB will forever complain about some table existing but not listed (or the other way around). And don&#8217;t get me started with <strong>DISCARD TABLESPACE</strong>; when InnoDB decides it is upset about something &#8211; you cannot convince it otherwise.<br />
+Thankfully, TokuDB completely reverted the <strong>ALTER</strong> operation. It removed what temporary files were created (further notes following) and forgot all about it. No complaints, no ghosts. Great! Back to consistency!</li>
+</ol>
+<h4>What do we do now?</h4>
+<p>Throwing my hands up in the air, having worked on this for many days, I thought to myself: OK, I still have this server all to myself. If TokuDB is not going to work out, I have some time to come up with a sharding/commercial solution. Let&#8217;s use up this time and learn something about TokuDB. And I decided to re-create all tables without partitions. My colleague argued that she was not ready to give up on partitioning altogether and we decided to try again with <strong>YEAR</strong>ly partitioing scheme. This would reduce number of files by factor of <strong>12</strong>. Also, <strong>2025</strong> is so far away, we agreed to settle for <strong>2015</strong>. So reducing number of files by factor of <strong>25-30</strong>.</p>
+<p>And this made all the difference in the world. Having reduced number of files made the impact we were hoping for. Suddenly all went well. No crashes, no weird complaints, little proliferation of files in <strong>@@datadir</strong>.</p>
+<h4>ALTER TABLE</h4>
+<p>And I did notice that a manual <strong>ALTER TABLE</strong> went <em>considerably</em> faster than I would expect. And by far faster than the <em>pt-online-schema-change</em> pace. I tried a couple more &#8212; sure thing. <strong>ALTER</strong>ing a table from InnoDB to TokuDB is <em>fast</em>.</p>
+<p>How fast?</p>
+<ul>
+<li>I converted a <strong>47GB</strong> InnoDB COMPRESSED table to TokuDB in <strong>73</strong> minutes. By the way, resulting table size measured <strong>3.4GB</strong>.</li>
+<li>A <strong>330GB</strong> InnoDB COMPRESSED table converted to TokuDB took little over <strong>9</strong> hours. I dare you alter 600GB worth of uncompressed data into InnoDB (COMPRESSED) in less than a few days. It went down to <strong>31GB</strong>.</li>
+<li>And our largest, <strong>1TB COMPRESSED</strong>  table (<strong>2TB</strong> worth of uncompressed data)? There&#8217;s yet another story here.</li>
+</ul>
+<h4>Altering 1 (2 uncomressed) TB of data</h4>
+<p>Here&#8217;s a tip that will save you some exhaustion: <strong>SET tokudb_load_save_space := 1</strong>.</p>
+<p>While <strong>ALTER</strong>ing our largest table, I was concerned to find our disk space was running low. Plenty temporary TokuDB files were created. I assumed these would consume only so much disk space, but to my surprise they accumulated and accumulated&#8230; It turns out for <strong>ALTER</strong>ing a table TokuDB creates the equivalent of the table in temporary files, and only then generates the new table. This means you need to have enough room for your own original table, the equivalent in temporary files, and your new table altogether.</p>
+<p>With great compression that would be nothing. However you&#8217;ll be surprised to learn that by default those temporary files are <em>not compressed</em>. Thus, the <strong>ALTER</strong> operation consumed more than <strong>1.3TB</strong> of disk space in temporary files, until I had no choice and (<strong>36</strong> hours into the operation) had to <strong>KILL</strong> it before it consumed the entire <strong>3TB</strong> of disk space.</p>
+<p>Setting the variable as specified and the next attempt was far more successful: the temporary files were created with same compression algorithm as target table, which left with a lot of free space to work with.</p>
+<p>ALTER time took about <strong>40</strong> hours.</p>
+<h4>Well, what&#8217;s the resulting size?</h4>
+<p>And we were finally done! It took the better part of three weeks to work through all the pitfalls, the <em>pt-online-schems-change</em> attempts, the crashes, the tests, the no-partitions, the <strong>YEAR</strong>ly partitions&#8230; Finally we are with a TokuDB version of our data warehouse.</p>
+<p>Suspension is over. We got from <strong>2TB</strong> of InnoDB <strong>COMPRESSED</strong> (<strong>KEY_BLOCK_SIZE=8</strong>) down to <strong>200GB</strong> of <strong>TokuDB_SMALL</strong> (aka agressive, aka lzma) tables.</p>
+<p>I mean, this is beyond expectations. It is <em>ridiculously</em> small. From <strong>80%</strong> disk space utilization down to <strong>8%</strong> disk space utilization. <em>Absolutely ridiculous!</em></p>
+<h4>Conclusions</h4>
+<ul>
+<li>TokuDB does not play well with many partitions.</li>
+<li>Crashes encountered. Recovery is fine.</li>
+<li>Good <strong>ALTER TABLE</strong> experience</li>
+<li><strong>SET tokudb_load_save_space := 1</strong></li>
+<li>Great compression (<strong>x20</strong> from uncompressed InnoDB; <strong>x10</strong> from KEY_BLOCK_SIZE=8)</li>
+</ul>
+<h4>Next</h4>
+<p>In the following post I&#8217;ll share some observations on how well our newly converted TokuDB slave performs as compared to our equivalent InnoDB slaves; some configuration you might care about; and some things you can do with TokuDB that would be so very painful with InnoDB. Stay tuned!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-2-the-process-of-migration/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6530</post-id>	</item>
+		<item>
+		<title>Re: MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation#comments</comments>
+				<pubDate>Thu, 24 Jan 2013 08:08:40 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Percona Toolkit]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6028</guid>
+				<description><![CDATA[Reading Sheeri&#8217;s MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation, I was baffled at this change of floating point number notation. However, I was also concerned about the final action taken: using &#8220;&#8211;ignore-columns&#8221; to avoid comparing the FLOAT/DOUBLE types. The &#8211;float-precision option for pt-table-checksum currently only uses ROUND() so as to disregard minor [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Reading Sheeri&#8217;s <a href="http://blog.mozilla.org/it/2013/01/17/mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/">MySQL 5.1 vs. MySQL 5.5: Floats, Doubles, and Scientific Notation</a>, I was baffled at this change of floating point number notation.</p>
+<p>However, I was also concerned about the final action taken: using <strong>&#8220;&#8211;ignore-columns&#8221;</strong> to avoid comparing the <strong>FLOAT</strong>/<strong>DOUBLE</strong> types.</p>
+<p>The <a href="http://www.percona.com/doc/percona-toolkit/2.0/pt-table-checksum.html#cmdoption-pt-table-checksum--float-precision">&#8211;float-precision</a> option for <em>pt-table-checksum</em> currently only uses <strong>ROUND()</strong> so as to disregard minor rounding issues. But it can very easily extend to handle the difference in floating point notation. Consider again the problem:</p>
+<blockquote>
+<pre>mysql&gt; create table tf(f float);
+Query OK, 0 rows affected (0.11 sec)
+
+mysql&gt; insert into tf values(0.0000958084);
+Query OK, 1 row affected (0.04 sec)
+
+mysql-<strong>5.1</strong>&gt; select * from tf;
++-------------+
+| f           |
++-------------+
+| 9.58084e-05 |
++-------------+
+
+mysql-<strong>5.5</strong>&gt; select * from tf;
++--------------+
+| f            |
++--------------+
+| 0.0000958084 |
++--------------+</pre>
+</blockquote>
+<p>How can we normalize the notation?</p>
+<p>Easily: <strong>CAST</strong> it as <strong>DECIMAL</strong>. Consider:<span id="more-6028"></span></p>
+<blockquote>
+<pre>mysql-<strong>5.1</strong>&gt; SELECT f,ROUND(IF(f BETWEEN -1 AND 1, <strong>CAST(f AS DECIMAL(65,30))</strong>, f), 10) as fn from tf;
++-------------+--------------+
+| f           | fn           |
++-------------+--------------+
+| 9.58084e-05 | 0.0000958084 |
++-------------+--------------+
+
+mysql-<strong>5.5</strong>&gt; SELECT f,ROUND(IF(f BETWEEN -1 AND 1, <strong>CAST(f AS DECIMAL(65,30))</strong>, f), 10) as fn from tf;
++--------------+--------------+
+| f            | fn           |
++--------------+--------------+
+| 0.0000958084 | 0.0000958084 |
++--------------+--------------+</pre>
+</blockquote>
+<p>The normalization works well in both cases; also, taking care to only normalize values in the range <strong>[-1, 1]</strong>.</p>
+<p>The change in <em>pt-table-checksum</em>? One line of code:</p>
+<blockquote>
+<pre>         elsif ( $float_precision &amp;&amp; $type =~ m/float|double/ ) {
+            $result = "ROUND($result, $float_precision)";
+         }</pre>
+</blockquote>
+<p>Turns to</p>
+<blockquote>
+<pre>         elsif ( $float_precision &amp;&amp; $type =~ m/float|double/ ) {
+            $result = "ROUND(IF($result BETWEEN -1 AND 1, CAST($result AS DECIMAL(65,30)), $result), $float_precision)";
+         }</pre>
+</blockquote>
+<p>I&#8217;ve just submitted a blueprint, but I would think changing one line of code shouldn&#8217;t wait till next release of Percona Toolkit: one can edit in-place their <strong>/usr/bin/pt-table-checksum</strong> and proceed to validate their database integrity.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/re-mysql-5-1-vs-mysql-5-5-floats-doubles-and-scientific-notation/feed</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6028</post-id>	</item>
+	</channel>
+</rss>

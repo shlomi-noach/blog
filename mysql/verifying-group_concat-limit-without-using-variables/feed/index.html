@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Verifying GROUP_CONCAT limit without using variables	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 16 Dec 2013 13:16:16 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Mik				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-226186</link>
+		<dc:creator><![CDATA[Mik]]></dc:creator>
+		<pubDate>Mon, 16 Dec 2013 13:16:16 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-226186</guid>
+					<description><![CDATA[Use SUBSTRING_INDEX for GROUP_COCAT result to limit count of grouping items]]></description>
+		<content:encoded><![CDATA[<p>Use SUBSTRING_INDEX for GROUP_COCAT result to limit count of grouping items</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: SQL trick: overcoming GROUP_CONCAT limitation in special cases &#124; code.openark.org				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-15986</link>
+		<dc:creator><![CDATA[SQL trick: overcoming GROUP_CONCAT limitation in special cases &#124; code.openark.org]]></dc:creator>
+		<pubDate>Wed, 21 Jul 2010 13:14:35 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-15986</guid>
+					<description><![CDATA[[...] Verifying GROUP_CONCAT limit without using variables [...]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] Verifying GROUP_CONCAT limit without using variables [&#8230;]</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14651</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 11 Jun 2010 04:58:46 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14651</guid>
+					<description><![CDATA[@Justin,
+
+Yes, I was referring to this type of solution on &quot;...Using a stored function can do the trick...&quot;.
+
+It *is* somewhat evil :)]]></description>
+		<content:encoded><![CDATA[<p>@Justin,</p>
+<p>Yes, I was referring to this type of solution on &#8220;&#8230;Using a stored function can do the trick&#8230;&#8221;.</p>
+<p>It *is* somewhat evil 🙂</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Justin Swanhart				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14642</link>
+		<dc:creator><![CDATA[Justin Swanhart]]></dc:creator>
+		<pubDate>Fri, 11 Jun 2010 02:26:03 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14642</guid>
+					<description><![CDATA[Oh, and you don&#039;t have to call it in group_concat, it can just be a select from dual..  I was just trying to trick MySQL into somehow evaluating the session var change in the same SQL statement, but that doesn&#039;t work.]]></description>
+		<content:encoded><![CDATA[<p>Oh, and you don&#8217;t have to call it in group_concat, it can just be a select from dual..  I was just trying to trick MySQL into somehow evaluating the session var change in the same SQL statement, but that doesn&#8217;t work.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Justin Swanhart				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14641</link>
+		<dc:creator><![CDATA[Justin Swanhart]]></dc:creator>
+		<pubDate>Fri, 11 Jun 2010 02:24:15 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14641</guid>
+					<description><![CDATA[It is kind of (well especially, perhaps) evil, but you could create a stored function that sets the session variables.  Then instruct users to select from a view that invokes that SP before they select from any other views.
+
+DELIMITER ;;
+DROP FUNCTION IF EXISTS test.set_gc_len;;
+
+CREATE FUNCTION test.set_gc_len (
+)
+RETURNS TINYTEXT
+NO SQL
+BEGIN
+  SET SESSION group_concat_max_len=65535;
+  RETURN &#039;&#039;;
+END
+;;
+
+DELIMITER ;
+
+
+CREATE VIEW `test`.`z1` AS select group_concat(`test`.`set_gc_len`() separator &#039;,&#039;) AS `group_concat(test.set_gc_len())`,(char_length(group_concat(repeat(&#039;0&#039;,32768) separator &#039;,&#039;)) &#062;= 32768) AS `group_concat_max_len_is_long_enough`;
+
+-- this first call to the view increases the max GC len
+mysql&#062; select * from test.z1\G
+*************************** 1. row ***************************
+    group_concat(test.set_gc_len()):
+group_concat_max_len_is_long_enough: 0
+1 row in set, 1 warning (0.00 sec)
+
+mysql&#062; select * from test.z1\G
+*************************** 1. row ***************************
+    group_concat(test.set_gc_len()):
+group_concat_max_len_is_long_enough: 1
+1 row in set (0.01 sec)]]></description>
+		<content:encoded><![CDATA[<p>It is kind of (well especially, perhaps) evil, but you could create a stored function that sets the session variables.  Then instruct users to select from a view that invokes that SP before they select from any other views.</p>
+<p>DELIMITER ;;<br />
+DROP FUNCTION IF EXISTS test.set_gc_len;;</p>
+<p>CREATE FUNCTION test.set_gc_len (<br />
+)<br />
+RETURNS TINYTEXT<br />
+NO SQL<br />
+BEGIN<br />
+  SET SESSION group_concat_max_len=65535;<br />
+  RETURN &#8221;;<br />
+END<br />
+;;</p>
+<p>DELIMITER ;</p>
+<p>CREATE VIEW `test`.`z1` AS select group_concat(`test`.`set_gc_len`() separator &#8216;,&#8217;) AS `group_concat(test.set_gc_len())`,(char_length(group_concat(repeat(&#8216;0&#8217;,32768) separator &#8216;,&#8217;)) &gt;= 32768) AS `group_concat_max_len_is_long_enough`;</p>
+<p>&#8212; this first call to the view increases the max GC len<br />
+mysql&gt; select * from test.z1\G<br />
+*************************** 1. row ***************************<br />
+    group_concat(test.set_gc_len()):<br />
+group_concat_max_len_is_long_enough: 0<br />
+1 row in set, 1 warning (0.00 sec)</p>
+<p>mysql&gt; select * from test.z1\G<br />
+*************************** 1. row ***************************<br />
+    group_concat(test.set_gc_len()):<br />
+group_concat_max_len_is_long_enough: 1<br />
+1 row in set (0.01 sec)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14627</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 10 Jun 2010 17:20:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14627</guid>
+					<description><![CDATA[@Sheeri,
+I figured you might have figured it ;), but there&#039;s more to it.
+The mycheckpoint monitoring tool works in a special way. The whole point of the tool is to create a sophisticated (if I may say so) views hierarchy; such that for getting monitored data (reports, charts, full blown HTML pages) -- you don&#039;t actually use the tool; you just query for the data, e.g.
+SELECT html FROM sv_report_html_brief;
+or
+SELECT report FROM sv_report_human_sample;
+
+So - no tool here. Nowhere to set the session variable. I hastily dropped in the openark-kit. You are correct: I do not have this issue there.]]></description>
+		<content:encoded><![CDATA[<p>@Sheeri,<br />
+I figured you might have figured it ;), but there&#8217;s more to it.<br />
+The mycheckpoint monitoring tool works in a special way. The whole point of the tool is to create a sophisticated (if I may say so) views hierarchy; such that for getting monitored data (reports, charts, full blown HTML pages) &#8212; you don&#8217;t actually use the tool; you just query for the data, e.g.<br />
+SELECT html FROM sv_report_html_brief;<br />
+or<br />
+SELECT report FROM sv_report_human_sample;</p>
+<p>So &#8211; no tool here. Nowhere to set the session variable. I hastily dropped in the openark-kit. You are correct: I do not have this issue there.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Sheeri Cabral				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14624</link>
+		<dc:creator><![CDATA[Sheeri Cabral]]></dc:creator>
+		<pubDate>Thu, 10 Jun 2010 17:11:30 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14624</guid>
+					<description><![CDATA[Shlomi -- I figured it was in those tools.  But if it&#039;s just the tool checking a few things, then setting it *within* the tool will ensure that the tool always has it set appropriately.  I&#039;m talking about setting the *session* variable, not the *global* variable.]]></description>
+		<content:encoded><![CDATA[<p>Shlomi &#8212; I figured it was in those tools.  But if it&#8217;s just the tool checking a few things, then setting it *within* the tool will ensure that the tool always has it set appropriately.  I&#8217;m talking about setting the *session* variable, not the *global* variable.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14622</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 10 Jun 2010 17:07:27 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14622</guid>
+					<description><![CDATA[Hi Sheeri,
+Fair question. Actually, it all comes up by issues I&#039;m having with developing the openark-kit &amp; mycheckpoint, two open source projects I&#039;m working on.
+The problem is, I have no idea who will install these, what their MySQL expertise will be; will they have privileges to change these settings, and so on. 
+I want the tools to handle these cases where the settings are insufficient.
+
+Who knows how the next installation will go? Since the defaults are so low, how can I be sure that the next machine anyone sets up will have a manual setting for group_concat_max_len?
+
+
+As long as the machines are mine, or under my control, yes - I just simple set up the variables as I please.]]></description>
+		<content:encoded><![CDATA[<p>Hi Sheeri,<br />
+Fair question. Actually, it all comes up by issues I&#8217;m having with developing the openark-kit &#038; mycheckpoint, two open source projects I&#8217;m working on.<br />
+The problem is, I have no idea who will install these, what their MySQL expertise will be; will they have privileges to change these settings, and so on.<br />
+I want the tools to handle these cases where the settings are insufficient.</p>
+<p>Who knows how the next installation will go? Since the defaults are so low, how can I be sure that the next machine anyone sets up will have a manual setting for group_concat_max_len?</p>
+<p>As long as the machines are mine, or under my control, yes &#8211; I just simple set up the variables as I please.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Sheeri Cabral				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14617</link>
+		<dc:creator><![CDATA[Sheeri Cabral]]></dc:creator>
+		<pubDate>Thu, 10 Jun 2010 15:56:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14617</guid>
+					<description><![CDATA[Why not just set the group_concat_max_len variable for the session so that you won&#039;t have an issue with the operation no matter what?]]></description>
+		<content:encoded><![CDATA[<p>Why not just set the group_concat_max_len variable for the session so that you won&#8217;t have an issue with the operation no matter what?</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/verifying-group_concat-limit-without-using-variables/comment-page-1#comment-14599</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 10 Jun 2010 08:05:23 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2534#comment-14599</guid>
+					<description><![CDATA[Hi Roland,
+Right, didn&#039;t even mention it... :D
+Only available as of 5.1, while I have a requirement for 5.0 - 5.1.
+
+Thank you for noting this down.]]></description>
+		<content:encoded><![CDATA[<p>Hi Roland,<br />
+Right, didn&#8217;t even mention it&#8230; 😀<br />
+Only available as of 5.1, while I have a requirement for 5.0 &#8211; 5.1.</p>
+<p>Thank you for noting this down.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

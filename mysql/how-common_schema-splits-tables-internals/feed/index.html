@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: How common_schema split()s tables &#8211; internals	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 07 Sep 2012 03:42:46 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/comment-page-1#comment-117697</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Fri, 07 Sep 2012 03:42:46 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035#comment-117697</guid>
+					<description><![CDATA[@Rick,
+
+Thanks. I didn&#039;t feel like you were saying &quot;openark-kit is wrong&quot;, all is cool and I appreciate your comments :)
+
+split() does not work within transaction scope: it breaks a transaction. I have presented the &quot;what it looks like&quot;; but the multiple UPDATE statements do not all run within the same transaction. Thank you for pointing out.
+
+As per OR vs. AND query, I made this one due to inefficiency of MySQL handling compound column comparison, e.g.:
+WHERE (a,b) &gt;= (6,13) AND (a,b) &lt; (19,3)
+
+For some reason MySQL is unable to use an index for the above.
+My tests show good evaluation plans and index usage for such query conditions. I will check for handler_%. Thanks for suggesting this.]]></description>
+		<content:encoded><![CDATA[<p>@Rick,</p>
+<p>Thanks. I didn&#8217;t feel like you were saying &#8220;openark-kit is wrong&#8221;, all is cool and I appreciate your comments 🙂</p>
+<p>split() does not work within transaction scope: it breaks a transaction. I have presented the &#8220;what it looks like&#8221;; but the multiple UPDATE statements do not all run within the same transaction. Thank you for pointing out.</p>
+<p>As per OR vs. AND query, I made this one due to inefficiency of MySQL handling compound column comparison, e.g.:<br />
+WHERE (a,b) >= (6,13) AND (a,b) < (19,3)
+
+For some reason MySQL is unable to use an index for the above.
+My tests show good evaluation plans and index usage for such query conditions. I will check for handler_%. Thanks for suggesting this.
+</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/comment-page-1#comment-117673</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Thu, 06 Sep 2012 22:33:10 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035#comment-117673</guid>
+					<description><![CDATA[This comment may be more important -- It is about the inefficient optimization of OR versus AND (at least in older versions of MySQL.
+
+You have:
+
+WHERE
+((actor_id &#062; 1) OR (actor_id = 1 AND film_id &#062; 1) OR (actor_id = 1 AND film_id = 1))
+AND
+((actor_id &#060; 39) OR (actor_id = 39 AND film_id = 1) AND (film_id &#062;= 1 OR actor_id &#062; 1)
+AND
+(actor_id &#060;= 39) AND (actor_id &#060; 39 OR film_id &#060;= 293)
+
+By playing with De Morgan&#039;s law, I have bubbled ANDs to the top, thereby letting it bound the scan over actor_id BETWEEN 1 and 39.  Within 1 and 39, it still has to further filter down by film_id.
+
+Run EXPLAIN.  Check the delta for VARIABLES LIKE &#039;Handler%&#039;.
+
+(My chunking technique avoids the need to skip over unnecessary film_id values in the main query.)]]></description>
+		<content:encoded><![CDATA[<p>This comment may be more important &#8212; It is about the inefficient optimization of OR versus AND (at least in older versions of MySQL.</p>
+<p>You have:</p>
+<p>WHERE<br />
+((actor_id &gt; 1) OR (actor_id = 1 AND film_id &gt; 1) OR (actor_id = 1 AND film_id = 1))<br />
+AND<br />
+((actor_id &lt; 39) OR (actor_id = 39 AND film_id = 1) AND (film_id &gt;= 1 OR actor_id &gt; 1)<br />
+AND<br />
+(actor_id &lt;= 39) AND (actor_id &lt; 39 OR film_id &lt;= 293)</p>
+<p>By playing with De Morgan&#039;s law, I have bubbled ANDs to the top, thereby letting it bound the scan over actor_id BETWEEN 1 and 39.  Within 1 and 39, it still has to further filter down by film_id.</p>
+<p>Run EXPLAIN.  Check the delta for VARIABLES LIKE &#039;Handler%&#039;.</p>
+<p>(My chunking technique avoids the need to skip over unnecessary film_id values in the main query.)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/comment-page-1#comment-117665</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Thu, 06 Sep 2012 20:41:49 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035#comment-117665</guid>
+					<description><![CDATA[&#062; Your solution (1 column) misses the case where there aren&#039;t 1000 rows. 
+&quot;The devil is in the details.&quot;  Also misses the last chunk.
+
+&#062; unbalanced chunks.
+I don&#039;t see that as a problem.  In &#039;real&#039; cases, I find that the average tends to be over 90% of the requested chunk size (1000).
+
+In extreme cases, some chunks might have only 1 row.
+
+My algorithm does not care how what the ordering is (int, string, etc) done -- because ORDER BY, LIMIT, WHERE ...&#062;... take care of it.
+
+N columns -- the WHERE clause id dynamically created and has a variable number of ANDs in it.
+
+Nothing sacred about 1000.  However, it should not be &quot;too big&quot; if the queries will be replicated -- else other queries will be delayed in the single-threaded replication stream.
+
+I was merely pointing out a different way to &#039;skin the cat&#039;, not saying that openark-kiit is in any way &#039;wrong&#039;.
+
+One thing to add to your UPDATE example (if using InnoDB).  If the set of UPDATEs in wrapped in BEGIN..COMMIT, much of the savings is lost.  Without the transaction, ACID across the set is lost.  It is a tradeoff that the user should be aware of.]]></description>
+		<content:encoded><![CDATA[<p>&gt; Your solution (1 column) misses the case where there aren&#8217;t 1000 rows.<br />
+&#8220;The devil is in the details.&#8221;  Also misses the last chunk.</p>
+<p>&gt; unbalanced chunks.<br />
+I don&#8217;t see that as a problem.  In &#8216;real&#8217; cases, I find that the average tends to be over 90% of the requested chunk size (1000).</p>
+<p>In extreme cases, some chunks might have only 1 row.</p>
+<p>My algorithm does not care how what the ordering is (int, string, etc) done &#8212; because ORDER BY, LIMIT, WHERE &#8230;&gt;&#8230; take care of it.</p>
+<p>N columns &#8212; the WHERE clause id dynamically created and has a variable number of ANDs in it.</p>
+<p>Nothing sacred about 1000.  However, it should not be &#8220;too big&#8221; if the queries will be replicated &#8212; else other queries will be delayed in the single-threaded replication stream.</p>
+<p>I was merely pointing out a different way to &#8216;skin the cat&#8217;, not saying that openark-kiit is in any way &#8216;wrong&#8217;.</p>
+<p>One thing to add to your UPDATE example (if using InnoDB).  If the set of UPDATEs in wrapped in BEGIN..COMMIT, much of the savings is lost.  Without the transaction, ACID across the set is lost.  It is a tradeoff that the user should be aware of.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/comment-page-1#comment-117653</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 06 Sep 2012 17:41:06 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035#comment-117653</guid>
+					<description><![CDATA[@Rick,
+
+Your solution (1 column) misses the case where there aren&#039;t 1000 rows. The LIMIT 1000,1 will return an empty result set.
+
+In the 2-column type, what you are suggesting leads to unbalanced chunks. You will sometimes get 1000 rows, sometimes less, sometimes get many single ones... you have to test beforehand: &quot;does this value have more than 100 rows? Does that one? Does the next one? If they don&#039;t, we aggregate...&quot;.
+
+This is much more work than the way I present, where I use the same technique to detect &quot;the last of the next 1000 rows by order of key&quot;.
+
+Although using a temporary table, the fact we&#039;re only examining 1000 rows makes it small. I&#039;ve been using this technique for over 3 years on production (and so has anyone using the openark-kit, and in particular oak-chunk-update and oak-online-alter-table), and found it to be satisfying. The index is utilized well for looking up the 1000 rows. These are then sorted in reverse order without an index. This solution makes for a consistent algorithm, which does not care about your density, and does not need to diagnose it (avoiding additional lookup SELECTs overhead).
+
+How would you solve a 2-column case where one of the columns is not an integer? A 3-column case? The algorithm used in common_schema &amp; openark-kit doesn&#039;t care. They all work the same way.]]></description>
+		<content:encoded><![CDATA[<p>@Rick,</p>
+<p>Your solution (1 column) misses the case where there aren&#8217;t 1000 rows. The LIMIT 1000,1 will return an empty result set.</p>
+<p>In the 2-column type, what you are suggesting leads to unbalanced chunks. You will sometimes get 1000 rows, sometimes less, sometimes get many single ones&#8230; you have to test beforehand: &#8220;does this value have more than 100 rows? Does that one? Does the next one? If they don&#8217;t, we aggregate&#8230;&#8221;.</p>
+<p>This is much more work than the way I present, where I use the same technique to detect &#8220;the last of the next 1000 rows by order of key&#8221;.</p>
+<p>Although using a temporary table, the fact we&#8217;re only examining 1000 rows makes it small. I&#8217;ve been using this technique for over 3 years on production (and so has anyone using the openark-kit, and in particular oak-chunk-update and oak-online-alter-table), and found it to be satisfying. The index is utilized well for looking up the 1000 rows. These are then sorted in reverse order without an index. This solution makes for a consistent algorithm, which does not care about your density, and does not need to diagnose it (avoiding additional lookup SELECTs overhead).</p>
+<p>How would you solve a 2-column case where one of the columns is not an integer? A 3-column case? The algorithm used in common_schema &#038; openark-kit doesn&#8217;t care. They all work the same way.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/how-common_schema-splits-tables-internals/comment-page-1#comment-117650</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Thu, 06 Sep 2012 17:18:19 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5035#comment-117650</guid>
+					<description><![CDATA[This is, in my opinion, a better way to &#039;chunk&#039; an ID that is not necessarily dense:
+
+$idz = SELECT id FROM tbl WHERE id &#062; $ida LIMIT 1000,1;
+
+Then you proceed to do
+SELECT ... WHERE id &#062;= $ida AND id &#060;= $idz
+
+The first query can (in some situations) operate only in the index, thereby not slogging through all the data.  And it does not need to build a temp table.
+
+In the 2-column case, things get messier.  I prefer to discover which case exists and act accordingly:
+WHERE col1 = 123 AND col2 BETWEEN... -- when 123 has more than 1000 rows.
+WHERE col1 BETWEEN... -- no mention of col2]]></description>
+		<content:encoded><![CDATA[<p>This is, in my opinion, a better way to &#8216;chunk&#8217; an ID that is not necessarily dense:</p>
+<p>$idz = SELECT id FROM tbl WHERE id &gt; $ida LIMIT 1000,1;</p>
+<p>Then you proceed to do<br />
+SELECT &#8230; WHERE id &gt;= $ida AND id &lt;= $idz</p>
+<p>The first query can (in some situations) operate only in the index, thereby not slogging through all the data.  And it does not need to build a temp table.</p>
+<p>In the 2-column case, things get messier.  I prefer to discover which case exists and act accordingly:<br />
+WHERE col1 = 123 AND col2 BETWEEN&#8230; &#8212; when 123 has more than 1000 rows.<br />
+WHERE col1 BETWEEN&#8230; &#8212; no mention of col2</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

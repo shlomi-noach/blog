@@ -1,0 +1,779 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Syntax &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/syntax/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Thu, 21 Feb 2013 12:12:48 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Merging tables with INSERT&#8230;ON DUPLICATE KEY UPDATE</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/merging-tables-with-insert-on-duplicate-key-update</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/merging-tables-with-insert-on-duplicate-key-update#comments</comments>
+				<pubDate>Thu, 21 Feb 2013 12:12:48 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6120</guid>
+				<description><![CDATA[Had a case recently where I had to merge data from two identically structured tables containing nearly identical data. &#8220;Nearly identical&#8221; meaning most table data is identical in both; sometimes a row is missing from one of the tables; sometimes same row (according to PK) appears in both, but some columns are NULL is one [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Had a case recently where I had to merge data from two identically structured tables containing nearly identical data.</p>
+<p>&#8220;Nearly identical&#8221; meaning most table data is identical in both; sometimes a row is missing from one of the tables; sometimes same row (according to PK) appears in both, but some columns are NULL is one tables (while others can be NULL in the second).</p>
+<p>Otherwise no contradicting data: it was not possible for some data to be &#8220;3&#8221; in one table and &#8220;4&#8221; in the other.</p>
+<h4>How do you create a merge of the tables, such that all missing rows are completed, and NULLs replaced by actual values when possible?</h4>
+<p><a href="http://www.percona.com/doc/percona-toolkit/2.1/pt-table-sync.html">pt-table-sync</a> comes to mind: one can do a bidirectional syncing of two tables, and actually stating how to resolve ambiguities (like &#8220;greater value wins&#8221;). Very powerful! An example would be:</p>
+<blockquote>
+<pre>pt-table-sync --bidirectional --conflict-column=a --conflict-comparison=greatest --tables ...</pre>
+</blockquote>
+<p>However I didn&#8217;t actually have any problem with the tables themselves. The two tables were just fine as they were; missing or NULL data does not indicate an error on their part. I wanted to get their merge. <em>pt-table-sync</em> is still up for the job: we can duplicate them, merge on the copy&#8230; But I prefer a query over an external script when possible.</p>
+<h4>INSERT&#8230;ON DUPLICATE KEY UPDATE</h4>
+<p>This <a href="http://dev.mysql.com/doc/refman/5.5/en/insert-on-duplicate.html">MySQL-specific syntax</a> is actually quite powerful. It basically says &#8220;if the insert fails due to unique constraint, you get a chance to update the row causing the failure&#8221;. But it also allows for smart setting of the column via the <strong>VALUES()</strong> clause. Let&#8217;s present some sample data and then see the solution.<span id="more-6120"></span></p>
+<p>Assume the following table definition:</p>
+<blockquote>
+<pre>create table t1 (
+  pkdt datetime,
+  pki int,
+  a int,
+  b int,
+  c int,
+  primary key (pkdt, pki)
+);</pre>
+</blockquote>
+<p>Same structure holds for <strong>t1</strong>, <strong>t2</strong> and <strong>tmerge</strong> &#8212; our target table. Looking at table data we have:</p>
+<blockquote>
+<pre>&gt; select * from t1;
++---------------------+-----+------+------+------+
+| pkdt                | pki | a    | b    | c    |
++---------------------+-----+------+------+------+
+| 2012-01-01 00:00:00 |   1 |    4 |    5 |    6 |
+| 2012-01-02 00:00:00 |   2 | NULL |    5 |    6 |
+| 2012-01-04 00:00:00 |   4 |    4 | NULL | NULL |
+| 2012-01-05 00:00:00 |   5 | NULL |    8 | NULL |
++---------------------+-----+------+------+------+
+
+&gt; select * from t2;
++---------------------+-----+------+------+------+
+| pkdt                | pki | a    | b    | c    |
++---------------------+-----+------+------+------+
+| 2012-01-01 00:00:00 |   1 |    4 | NULL |    6 |
+| 2012-01-03 00:00:00 |   3 |    4 |    5 |    6 |
+| 2012-01-04 00:00:00 |   4 |    4 |    5 |    6 |
+| 2012-01-05 00:00:00 |   5 |    7 | NULL |    9 |
++---------------------+-----+------+------+------+</pre>
+</blockquote>
+<p>We can see a row with <strong>pki=2</strong> appears in <strong>t1</strong> but not in <strong>t2</strong>; a row with <strong>pki=3</strong> appears in <strong>t2</strong> but not in <strong>t2</strong>, and various <strong>NULL</strong>s appear throughout the rows that are shared.</p>
+<p>To get the shared table, we throw in the data from <strong>t1</strong> and <strong>t2</strong> into <strong>tmerge</strong>, in such way that a real value overwrites a <strong>NULL</strong>, like this:</p>
+<blockquote>
+<pre>insert into tmerge select * from t1;
+
+insert into tmerge select * from t2
+on duplicate key update
+  a = <strong>ifnull</strong>(tmerge.a, <strong>values</strong>(a)),
+  b = <strong>ifnull</strong>(tmerge.b, <strong>values</strong>(b)),
+  c = <strong>ifnull</strong>(tmerge.c, <strong>values</strong>(c))
+;</pre>
+</blockquote>
+<p>So even while I&#8217;m inserting values to <strong>tmerge</strong>, I&#8217;m able to check for current value, compared to the value I wish to insert, and have time to make a decision. This is really cool! The result:</p>
+<blockquote>
+<pre>&gt; select * from tmerge;
++---------------------+-----+------+------+------+
+| pkdt                | pki | a    | b    | c    |
++---------------------+-----+------+------+------+
+| 2012-01-01 00:00:00 |   1 |    4 |    5 |    6 |
+| 2012-01-02 00:00:00 |   2 | NULL |    5 |    6 |
+| 2012-01-03 00:00:00 |   3 |    4 |    5 |    6 |
+| 2012-01-04 00:00:00 |   4 |    4 |    5 |    6 |
+| 2012-01-05 00:00:00 |   5 |    7 |    8 |    9 |
++---------------------+-----+------+------+------+</pre>
+</blockquote>
+<p>Just what we wanted: all possible rows inside; real value takes over <strong>NULL</strong> whenever possible.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/merging-tables-with-insert-on-duplicate-key-update/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6120</post-id>	</item>
+		<item>
+		<title>Pop quiz: funny syntax</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/pop-quiz-funny-syntax</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/pop-quiz-funny-syntax#comments</comments>
+				<pubDate>Mon, 05 Nov 2012 18:22:15 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5445</guid>
+				<description><![CDATA[The following questions are of little importance, yet I find them entertaining. I stumbled upon these while developing QueryScript. Can you guess the results of the following statements? Pop quiz 1 SET @x := 7; SELECT ++@x; What is the computation result? What will be the value of @x? Pop quiz 2 SET @ := [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>The following questions are of little importance, yet I find them entertaining. I stumbled upon these while developing QueryScript.</p>
+<p>Can you guess the results of the following statements?</p>
+<h4>Pop quiz 1</h4>
+<blockquote>
+<pre>SET @x := 7;
+SELECT ++@x;</pre>
+</blockquote>
+<p>What is the computation result? What will be the value of <strong>@x</strong>?</p>
+<h4>Pop quiz 2</h4>
+<blockquote>
+<pre>SET @ := 4;
+SELECT @ + @'' + @``</pre>
+</blockquote>
+<p>What is the computation result?</p>
+<h4>Pop quiz 3</h4>
+<blockquote>
+<pre>SET @a := 2;
+SELECT @a = @'a' = @`a`</pre>
+</blockquote>
+<p>Do we get <strong>TRUE</strong> or <strong>FALSE</strong>? When?<span id="more-5445"></span></p>
+<h4>Hints</h4>
+<p>Consider the following queries as hints to the above questions:</p>
+<blockquote>
+<pre>SELECT +++++-@x;
+SELECT @ = @'', @ = @``
+SELECT (@a = @'a') = @`a`</pre>
+</blockquote>
+<h4>Answers</h4>
+<ul>
+<li><strong>Pop quiz 1</strong></li>
+</ul>
+<p style="padding-left: 30px;"><strong>++@x</strong> is interpreted as <strong>+(+(@x))</strong>, which is in turn evaluated as <strong>0+(0+(@x))</strong>. No relation to <strong>C</strong>&#8216;s <strong>++</strong> operator. <strong>@x</strong> is unchanged.</p>
+<ul>
+<li><strong>Pop quiz 2</strong></li>
+</ul>
+<p style="padding-left: 30px;"><strong>@x</strong> is the same as <strong>@&#8217;x&#8217;</strong> and as <strong>@`x`</strong>. What&#8217;s funny is that one is allowed to create the empty-named user defined variable <strong>@&#8221;</strong>. Makes for a weird looking syntax, but nothing special about it. Computation result is <strong>12</strong>.</p>
+<ul>
+<li><strong>Pop quiz 3</strong></li>
+</ul>
+<p style="padding-left: 30px;">We&#8217;ve already established that <strong>@a</strong>, <strong>@&#8217;a&#8217;</strong> and <strong>@`a`</strong> are the same, I just used this notation for adding pepper to the quiz. The real question is whether <strong>2 = 2 = 2</strong> holds true.  It does not. There is no 3-way comparison. All comparisons are in pairs, which is why the expression evaluates as <strong>(2 = 2) = 2</strong>, leading to <strong>1 = 2</strong>, <strong>&#8220;1&#8221;</strong> being the <strong>TRUE</strong> value of <strong>(2 = 2)</strong>. The only value of <strong>@a</strong> for which the expression holds true is <strong>1</strong>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/pop-quiz-funny-syntax/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5445</post-id>	</item>
+		<item>
+		<title>MySQL joins: ON vs. USING vs. Theta-style</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-joins-on-vs-using-vs-theta-style</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-joins-on-vs-using-vs-theta-style#comments</comments>
+				<pubDate>Wed, 11 Jul 2012 04:54:20 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5050</guid>
+				<description><![CDATA[What is the difference between the following three syntaxes? SELECT * FROM film JOIN film_actor ON (film.film_id = film_actor.film_id) SELECT * FROM film JOIN film_actor USING (film_id) SELECT * FROM film, film_actor WHERE film.film_id = film_actor.film_id The difference is mostly syntactic sugar, but with a couple interesting notes. To put names, the first two are [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>What is the difference between the following three syntaxes?</p>
+<blockquote>
+<pre>SELECT * FROM film JOIN film_actor ON (film.film_id = film_actor.film_id)
+SELECT * FROM film JOIN film_actor USING (film_id)
+SELECT * FROM film, film_actor WHERE film.film_id = film_actor.film_id</pre>
+</blockquote>
+<p>The difference is mostly syntactic sugar, but with a couple interesting notes.</p>
+<p>To put names, the first two are called <strong>&#8220;ANSI-style&#8221;</strong> while the third is called <strong>&#8220;Theta-style&#8221;</strong>.</p>
+<h4>Theta style</h4>
+<p>On the <strong>FROM</strong> clause, tables are listed as if with Cartesian products, and the <strong>WHERE</strong> clause specifies how the join should take place.</p>
+<p>This is considered to be the &#8220;old&#8221; style. It is somewhat confusing to read. Consider the following query:<span id="more-5050"></span></p>
+<blockquote>
+<pre><strong>SELECT</strong> * <strong>FROM</strong> film, film_actor <strong>WHERE</strong> film.film_id = film_actor.film_id <strong>AND</strong> actor_id = 17 <strong>AND</strong> film.length &gt; 120</pre>
+</blockquote>
+<p>The above lists films over <strong>120</strong> minutes in length, in which actor <strong>#17</strong> plays. Never mind the results; what about the query? Being just one part of the <strong>WHERE</strong> clause, a one out of three elements in the <strong>AND</strong> expression, the join equation gets lost. It is difficult to find and isolate the terms which make for table joins as opposed to terms which filter out rows. In the above example it is still relatively easy to point out. How about a query with <strong>5</strong> tables and a <strong>20</strong> terms <strong>WHERE</strong> clause?</p>
+<h4>ANSI style: ON</h4>
+<p>With <strong>JOIN</strong> &#8230; <strong>ON</strong>, one separates the join terms from the filtering terms. Rewriting the previous example:</p>
+<blockquote>
+<pre><strong>SELECT</strong> * <strong>FROM</strong> film <strong>JOIN</strong> film_actor <strong>ON</strong> (film.film_id = film_actor.film_id) <strong>WHERE</strong> actor_id = 17 <strong>AND</strong> film.length &gt; 120</pre>
+</blockquote>
+<p>It is quite clear now what belongs to what.</p>
+<p>Note: the parenthesis are not strictly required in the <strong>ON</strong> clause. I personally like to use them: it makes for an even greater distinction between query parts. SQL syntax is such a mess!</p>
+<h4>ANSI style: USING</h4>
+<p>Is the special case where we join tables on columns of the same name, we can make a shortcut and use <strong>USING</strong>:</p>
+<blockquote>
+<pre><strong>SELECT</strong> * <strong>FROM</strong> film <strong>JOIN</strong> film_actor <strong>USING</strong> (film_id) <strong>WHERE</strong> actor_id = 17 <strong>AND</strong> film.length &gt; 120</pre>
+</blockquote>
+<p>This time the parenthesis are required (I&#8217;m not sure why the difference on that part).</p>
+<p>This is mainly a nicety, less words to type, and a resulting prettified query. But also note a couple differences:</p>
+<h4>USING vs. ON</h4>
+<p>The following is valid:</p>
+<blockquote>
+<pre>SELECT film.title, film_id FROM film JOIN film_actor USING (film_id) WHERE actor_id = 17 AND film.length &gt; 120;</pre>
+</blockquote>
+<p>But the following is not:</p>
+<blockquote>
+<pre>SELECT film.title, film_id FROM film JOIN film_actor ON (film.film_id = film_actor.film_id) WHERE actor_id = 17 AND film.length &gt; 120;
+<strong>ERROR 1052 (23000): Column 'film_id' in field list is ambiguous</strong></pre>
+</blockquote>
+<p>Since <strong>USING</strong> &#8220;knows&#8221; the film_id column is shared between both tables, it doesn&#8217;t mind if we ask it without specifying an exact table. It would be the same value anyway!</p>
+<p><strong>ON</strong> is not as smart and requires further clarifications: which table exactly do you want?</p>
+<p>And the above is actually the result of this interesting phenomena: when using <strong>USING</strong>, the column only appears <em>once</em> in the result set:</p>
+<blockquote>
+<pre>SELECT * FROM film JOIN film_actor USING (film_id) WHERE actor_id = 17 AND film.length &gt; 120 LIMIT 1\G
+*************************** 1. row ***************************
+             <strong>film_id</strong>: 96
+               title: BREAKING HOME
+         description: A Beautiful Display of a Secret Agent And a Monkey who must Battle a Sumo Wrestler in An Abandoned Mine Shaft
+        release_year: 2006
+         language_id: 1
+original_language_id: NULL
+     rental_duration: 4
+         rental_rate: 2.99
+              length: 169
+    replacement_cost: 21.99
+              rating: PG-13
+    special_features: Trailers,Commentaries
+         last_update: 2006-02-15 05:03:42
+            actor_id: 17
+         last_update: 2006-02-15 05:05:03</pre>
+</blockquote>
+<p>But joining on <strong>ON</strong>, we get this column <em>twice</em>:</p>
+<blockquote>
+<pre>SELECT * FROM film JOIN film_actor ON film.film_id = film_actor.film_id WHERE actor_id = 17 AND film.length &gt; 120 LIMIT 1\G
+*************************** 1. row ***************************
+             <strong>film_id</strong>: 96
+               title: BREAKING HOME
+         description: A Beautiful Display of a Secret Agent And a Monkey who must Battle a Sumo Wrestler in An Abandoned Mine Shaft
+        release_year: 2006
+         language_id: 1
+original_language_id: NULL
+     rental_duration: 4
+         rental_rate: 2.99
+              length: 169
+    replacement_cost: 21.99
+              rating: PG-13
+    special_features: Trailers,Commentaries
+         last_update: 2006-02-15 05:03:42
+            actor_id: 17
+             <strong>film_id</strong>: 96
+         last_update: 2006-02-15 05:05:03</pre>
+</blockquote>
+<h4>Behind the scenes</h4>
+<p>The news is that MySQL treats all in the exact same way. With the kind help of <strong>EXPLAIN EXTENDED</strong>, we see that:</p>
+<blockquote>
+<pre>EXPLAIN EXTENDED SELECT film.title, film_id FROM film JOIN film_actor <strong>USING</strong> (film_id) WHERE actor_id = 17 AND film.length &gt; 120\G
+*************************** 1. row ***************************
+...
+2 rows in set, 1 warning (0.00 sec)
+
+root@mysql-5.1.51&gt; SHOW WARNINGS\G
+*************************** 1. row ***************************
+  Level: Note
+   Code: 1003
+Message: select `sakila`.`film`.`title` AS `title`,`sakila`.`film`.`film_id` AS `film_id` 
+         from `sakila`.`film` join `sakila`.`film_actor` 
+         where (
+                 <strong>(`sakila`.`film`.`film_id` = `sakila`.`film_actor`.`film_id`)</strong> 
+                 and (`sakila`.`film_actor`.`actor_id` = 17) 
+                 and (`sakila`.`film`.`length` &gt; 120)
+               )</pre>
+</blockquote>
+<p>All queries are translated internally to <em>theta-style</em>.</p>
+<p>This post only discusses inner joins. With outer joins the situation is somewhat different. Read <a href="http://www.mysqldiary.com/mysql-left-join/">this post</a> for more insight.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-joins-on-vs-using-vs-theta-style/feed</wfw:commentRss>
+		<slash:comments>15</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5050</post-id>	</item>
+		<item>
+		<title>Syntax of the day: IS TRUE and IS FALSE</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/syntax-of-the-day-is-true-and-is-false</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/syntax-of-the-day-is-true-and-is-false#comments</comments>
+				<pubDate>Thu, 26 Jan 2012 04:09:23 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4198</guid>
+				<description><![CDATA[What makes for a true statement? We usually test statements using a WHERE clause: SELECT * FROM world.City WHERE Population &#62; 1000000 The &#8220;Population &#62; 1000000&#8221; statement makes for a boolean expression. Using WHERE is just one way of evaluating it. One can also test with IF(): SET @val := 7; SELECT IF(@val &#62; 2, [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>What makes for a <em>true</em> statement?</p>
+<p>We usually test statements using a WHERE clause:</p>
+<blockquote>
+<pre>SELECT * FROM world.City WHERE Population &gt; 1000000</pre>
+</blockquote>
+<p>The <strong>&#8220;Population &gt; 1000000&#8221;</strong> statement makes for a boolean expression. Using <strong>WHERE</strong> is just one way of evaluating it. One can also test with <a href="http://dev.mysql.com/doc/refman/5.1/en/control-flow-functions.html#function_if"><strong>IF()</strong></a>:</p>
+<blockquote>
+<pre>SET @val := 7;
+SELECT IF(@val &gt; 2, 'Yes', 'No')</pre>
+</blockquote>
+<h4>TRUE and FALSE</h4>
+<p>The two are keywords. They also map for the numerals <strong>1</strong> and <strong>0</strong>, as follows:</p>
+<blockquote>
+<pre>mysql&gt; SELECT TRUE, FALSE;
++------+-------+
+| TRUE | FALSE |
++------+-------+
+|    1 |     0 |
++------+-------+</pre>
+</blockquote>
+<p>Like in the <strong>C</strong> programming language, a nonzero value evaluates to a <em>true</em> value. A zero evaluates to <em>false</em>. A NULL evaluates to&#8230; well, NULL. But aside from 3-valued logic, what&#8217;s important in our case is that it is <em>not true</em>.<span id="more-4198"></span></p>
+<p>However, simple value comparison is incorrect:</p>
+<blockquote>
+<pre>mysql&gt; SELECT @val, @val &gt; 3, @val &gt; 3 = TRUE as result;
++------+----------+--------+
+| @val | @val &gt; 3 | result |
++------+----------+--------+
+|    7 |        1 |      1 |
++------+----------+--------+
+
+mysql&gt; SELECT @val, @val = TRUE as result;
++------+--------+
+| @val | result |
++------+--------+
+|    7 |      0 |
++------+--------+</pre>
+</blockquote>
+<p>To test for the truth value of an expression, the correct syntax is by using <strong>IS TRUE</strong>:</p>
+<blockquote>
+<pre>SELECT @val, @val IS TRUE as result;
++------+--------+
+| @val | result |
++------+--------+
+|    7 |      1 |
++------+--------+</pre>
+</blockquote>
+<p>Likewise, one may use <strong>IS FALSE</strong> to test for falsehood. However, if you wish to note <strong>NULL</strong> as a <em>false</em> value this does not work:</p>
+<blockquote>
+<pre>SELECT @empty, @empty IS TRUE, @empty IS FALSE;
++--------+----------------+-----------------+
+| @empty | @empty IS TRUE | @empty IS FALSE |
++--------+----------------+-----------------+
+| NULL   |              0 |               0 |
++--------+----------------+-----------------+</pre>
+</blockquote>
+<p>If you&#8217;re unsure why, you should read more on three-valued logic in SQL. To solve the above, simply use <strong>IS NOT TRUE</strong>:</p>
+<blockquote>
+<pre>SELECT @empty, @empty IS NOT TRUE;
++--------+--------------------+
+| @empty | @empty IS NOT TRUE |
++--------+--------------------+
+| NULL   |                  1 |
++--------+--------------------+</pre>
+</blockquote>
+<p>In summary, use <strong>IS TRUE</strong> and <strong>IS NOT TRUE</strong> so as to normalize truth values into a <strong>0</strong>, <strong>1</strong> value range, <strong>C</strong> style, including handling of <strong>NULL</strong>s.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/syntax-of-the-day-is-true-and-is-false/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4198</post-id>	</item>
+		<item>
+		<title>Quoting text JavaScript/Python style</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/quoting-text-javascriptpython-style</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/quoting-text-javascriptpython-style#comments</comments>
+				<pubDate>Tue, 15 Nov 2011 06:11:37 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4364</guid>
+				<description><![CDATA[Unless your MySQL is configured to use ANSI_QUOTES in sql_mode, you are able to quote your text in one of two forms: using single quotes or double quotes: UPDATE world.Country SET HeadOfState = 'Willy Wonka' WHERE Code='USA' UPDATE world.Country SET HeadOfState = "Willy Wonka" WHERE Code="USA" This makes for JavaScript- or Python-style quoting: you quote [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Unless your MySQL is configured to use <a href="http://dev.mysql.com/doc/refman/5.1/en/server-sql-mode.html#sqlmode_ansi_quotes"><strong>ANSI_QUOTES</strong></a> in <strong>sql_mode</strong>, you are able to quote your text in one of two forms: using single quotes or double quotes:</p>
+<blockquote>
+<pre>UPDATE world.Country SET HeadOfState = <strong>'Willy Wonka'</strong> WHERE Code=<strong>'USA'</strong>
+UPDATE world.Country SET HeadOfState = <strong>"Willy Wonka"</strong> WHERE Code=<strong>"USA"</strong></pre>
+</blockquote>
+<p>This makes for JavaScript- or Python-style quoting: you quote by your needs. Say you have a text which includes single quotes:</p>
+<blockquote><p><em>It is what you read when you don&#8217;t have to that determines what you will be when you can&#8217;t help it.</em> &#8211; Oscar Wilde</p></blockquote>
+<p>You wish to insert this text to some tables. You could go through the trouble of escaping it:</p>
+<blockquote>
+<pre>INSERT INTO quotes (quote, author) VALUES (
+  'It is what you read when you don\'t have to that determines what you will be when you can\'t help it.', 'Oscar Wilde');</pre>
+</blockquote>
+<p>or you could just wrap it in double quotes:</p>
+<blockquote>
+<pre>INSERT INTO quotes (quote, author) VALUES (
+  "It is what you read when you don't have to that determines what you will be when you can't help it.", 'Oscar Wilde');</pre>
+</blockquote>
+<p>I find this useful when using SQL to generate queries. Take, for example, <a href="https://shlomi-noach.github.io/blog/mysql/mysql-eval">eval() for MySQL</a>: the statement:<span id="more-4364"></span></p>
+<blockquote>
+<pre>CALL eval('select concat(\'KILL \',id) from information_schema.processlist where user=\'webuser\'');</pre>
+</blockquote>
+<p>is just so more easily written this way:</p>
+<blockquote>
+<pre>CALL eval("select concat('KILL ',id) from information_schema.processlist where user='webuser'");</pre>
+</blockquote>
+<p>I don&#8217;t suggest one should use this method throughout her application code. Application code works great with auto-escaping string literals. But for the handy DBA or developer, who needs to work some quick queries by hand, this makes for an easier syntax to use.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/quoting-text-javascriptpython-style/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4364</post-id>	</item>
+		<item>
+		<title>MySQL terminology: processes, threads &#038; connections</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-terminology-processes-threads-connections</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-terminology-processes-threads-connections#comments</comments>
+				<pubDate>Wed, 03 Nov 2010 06:38:03 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2465</guid>
+				<description><![CDATA[There&#8217;s some confusion in the MySQL terminology for processes, threads &#38; connections, which I will try to resolve. I can&#8217;t explain the full nature of what processes and threads are; please see Wikipedia [1] [2] for that. But here&#8217;s some basics with regard to MySQL: MySQL server is a single process application. It is multithreaded. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s some confusion in the MySQL terminology for processes, threads &amp; connections, which I will try to resolve. I can&#8217;t explain the full nature of what processes and threads are; please see Wikipedia <a href="http://en.wikipedia.org/wiki/Process_%28computing%29">[1]</a> <a href="http://en.wikipedia.org/wiki/Thread_%28computer_science%29">[2]</a> for that. But here&#8217;s some basics with regard to MySQL:</p>
+<ul>
+<li>MySQL server is a single process application.</li>
+<li>It is multithreaded.</li>
+<li>It (usually) acts as a TCP/IP server, accepting connections.</li>
+<li>Each connection gets a dedicated thread.</li>
+<li>These threads are sometimes named processes, and sometimes they&#8217;re referred to as connections.</li>
+</ul>
+<p>The last part is where confusion arises, so let me discuss again the use of threads and connections in MySQL.</p>
+<p><span id="more-2465"></span>MySQL truly is a single process server. It is multi threaded, in that there are many obvious and less obvious threads comprising the server. Such threads are the InnoDB I/O threads, the DELAYED INSERT thread, etc. Oh, and of course: the connection threads. More on this in a short while.</p>
+<p>On older Linux versions or on glibc-static versions, one may view MySQL as a multi-process server. This is not so: it is merely because threads are mapped to OS processes. For the sake of this discussion this is irrelevant. mysqld is a single process.</p>
+<p>So, every new connection gets its own thread. Assuming no thread pool is in use, every new connection makes for the creation of a new thread, and a disconnect causes for that thread&#8217;s destruction. Hence, there is a 1-1 mapping between connections and active threads. But then, there <em>is</em> a thread pool, which means there can be threads which are not associated with any connection. So, the number of threads is greater than or equal to the number of connections.</p>
+<p>Here&#8217;s where terminology gets confusing. When you want to see what&#8217;s executing on the server, you issue <strong>SHOW PROCESSLIST</strong>:</p>
+<blockquote>
+<pre>mysql&gt; SHOW PROCESSLIST\G
+*************************** 1. row ***************************
+     Id: 4
+   User: root
+   Host: localhost
+     db: mycheckpoint
+Command: Query
+   Time: 0
+  State: NULL
+   Info: SHOW PROCESSLIST
+1 row in set (0.02 sec)</pre>
+</blockquote>
+<p>Perhaps this should have been called SHOW THREADLIST; the acting queries are not really processes.</p>
+<p>OK, so there&#8217;s process #4 which is executing a query. What&#8217;s <em>my</em> process id? Turns out I don&#8217;t have a process id. I do get to have a <strong>CONNECTION_ID()</strong>:</p>
+<blockquote>
+<pre>mysql&gt; SELECT CONNECTION_ID();
++-----------------+
+| CONNECTION_ID() |
++-----------------+
+|               4 |
++-----------------+</pre>
+</blockquote>
+<p>So how many processes or connections are now actually doing anything? We now must check for <strong>&#8216;Threads_running&#8217;</strong>.</p>
+<blockquote>
+<pre>mysql&gt; SHOW GLOBAL STATUS LIKE 'Threads_running';
++-----------------+-------+
+| Variable_name   | Value |
++-----------------+-------+
+| Threads_running | 1     |
++-----------------+-------+</pre>
+</blockquote>
+<p>And so we have <strong>&#8216;Threads_cached&#8217;</strong>, <strong>&#8216;Threads_connected&#8217;</strong> &amp; <strong>&#8216;Max_used_connections&#8217;</strong>.</p>
+<p>Confusing?</p>
+<p>Most of the time one can simply think of processes, threads and connections as 1-1-1 mapped, and not bother with it.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-terminology-processes-threads-connections/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2465</post-id>	</item>
+		<item>
+		<title>SQL: good comments conventions</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/sql-good-comments-conventions</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/sql-good-comments-conventions#comments</comments>
+				<pubDate>Thu, 01 Jul 2010 07:36:32 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[Development]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Coding]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2581</guid>
+				<description><![CDATA[I happened upon a customer who left me in awe and admiration. The reason: excellent comments for their SQL code. I list four major places where SQL comments are helpful. I&#8217;ll use the sakila database. It is originally scarcely commented; I&#8217;ll present it now enhanced with comments, to illustrate. Table definitions The CREATE TABLE statement [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I happened upon a customer who left me in awe and admiration. The reason: excellent comments for their SQL code.</p>
+<p>I list four major places where SQL comments are helpful. I&#8217;ll use the <a href="http://dev.mysql.com/doc/sakila/en/sakila.html">sakila</a> database. It is originally scarcely commented; I&#8217;ll present it now enhanced with comments, to illustrate.</p>
+<h4>Table definitions</h4>
+<p>The <strong>CREATE TABLE</strong> statement allows for a comment, intended to describe the nature of the table:</p>
+<blockquote>
+<pre>CREATE TABLE `film_text` (
+ `film_id` smallint(6) NOT NULL,
+ `title` varchar(255) NOT NULL,
+ `description` text,
+ PRIMARY KEY (`film_id`),
+ FULLTEXT KEY `idx_title_description` (`title`,`description`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 <strong>COMMENT='Reflection of `film`, used for FULLTEXT search.'</strong>
+</pre>
+</blockquote>
+<p>It&#8217;s too bad the comment&#8217;s max length is 60 characters, though. However, it&#8217;s a very powerful field.</p>
+<h4>Column definitions</h4>
+<p>One may comment particular columns:<span id="more-2581"></span></p>
+<blockquote>
+<pre>CREATE TABLE `film` (
+ `film_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
+ `title` varchar(255) NOT NULL,
+ `description` text,
+ `release_year` year(4) DEFAULT NULL,
+ `language_id` tinyint(3) unsigned NOT NULL <strong>COMMENT 'Soundtrack spoken language'</strong>,
+ `original_language_id` tinyint(3) unsigned DEFAULT NULL <strong>COMMENT 'Filmed spoken language'</strong>,
+ `rental_duration` tinyint(3) unsigned NOT NULL DEFAULT '3',
+ `rental_rate` decimal(4,2) NOT NULL DEFAULT '4.99',
+ `length` smallint(5) unsigned DEFAULT NULL,
+ `replacement_cost` decimal(5,2) NOT NULL DEFAULT '19.99',
+  ...
+) ENGINE=InnoDB AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8
+</pre>
+</blockquote>
+<h4>Stored routines definitions</h4>
+<p>Here&#8217;s an original <strong>sakila</strong> procedure, untouched. It is already commented:</p>
+<blockquote>
+<pre>CREATE DEFINER=`root`@`localhost` PROCEDURE `rewards_report`(
+ IN min_monthly_purchases TINYINT UNSIGNED
+ , IN min_dollar_amount_purchased DECIMAL(10,2) UNSIGNED
+ , OUT count_rewardees INT
+)
+ READS SQL DATA
+ <strong>COMMENT 'Provides a customizable report on best customers'</strong>
+BEGIN
+
+ DECLARE last_month_start DATE;
+ DECLARE last_month_end DATE;
+ ...
+</pre>
+</blockquote>
+<h4>SQL queries</h4>
+<p>Last but not least, while not part of the schema, SQL queries define the use of the schema. That is, the schema exists for the sole reason of being able to query it.</p>
+<p>Where did <em>that</em> query come from? Which piece of code issued it? Why? What&#8217;s its purpose?</p>
+<p>Looking at the <strong>PROCESSLIST</strong>, the slow log, etc., it is easier when the queries are commented:</p>
+<blockquote>
+<pre>SELECT
+ <strong>/* List film details along with participating actors */</strong>
+ <strong>/* Issued by analytics module */</strong>
+ film.*,
+ COUNT(*) AS count_actors,
+ GROUP_CONCAT(CONCAT(actor.first_name, ' ', actor.last_name))
+FROM
+ film
+ JOIN film_actor USING(film_id)
+ JOIN actor USING(actor_id)
+GROUP BY film.film_id;
+</pre>
+</blockquote>
+<h4>Conclusion</h4>
+<p>Source code commenting is an important practice, and usually watched out for. SQL &amp; table definitions commenting are often scarce or non-existent. I urge DBAs to adopt a comments coding convention for SQL, and apply it whenever they can.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/sql-good-comments-conventions/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2581</post-id>	</item>
+		<item>
+		<title>Views: better performance with condition pushdown</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/views-better-performance-with-condition-pushdown</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/views-better-performance-with-condition-pushdown#comments</comments>
+				<pubDate>Thu, 20 May 2010 05:17:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Execution plan]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=1328</guid>
+				<description><![CDATA[Justin&#8217;s A workaround for the performance problems of TEMPTABLE views post on mysqlperformanceblog.com reminded me of a solution I once saw on a customer&#8217;s site. The customer was using nested views structure, up to depth of some 8-9 views. There were a lot of aggregations along the way, and even the simplest query resulted with [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Justin&#8217;s <a href="http://www.mysqlperformanceblog.com/2010/05/19/a-workaround-for-the-performance-problems-of-temptable-views/">A workaround for the performance problems of TEMPTABLE views</a> post on <a href="http://www.mysqlperformanceblog.com/">mysqlperformanceblog.com</a> reminded me of a solution I once saw on a customer&#8217;s site.</p>
+<p>The customer was using nested views structure, up to depth of some 8-9 views. There were a lot of aggregations along the way, and even the simplest query resulted with a LOT of subqueries, temporary tables, and vast amounts of data, even if only to return with a couple of rows.</p>
+<p>While we worked to solve this, a developer showed me his own trick. His trick is now impossible to implement, but there&#8217;s a hack around this.</p>
+<p>Let&#8217;s use the world database to illustrate. Look at the following view definition:<span id="more-1328"></span></p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+CREATE
+  ALGORITHM=TEMPTABLE
+VIEW country_languages AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON (Country.CODE = CountryLanguage.CountryCode)
+  GROUP BY
+    Country.CODE;
+</pre>
+</blockquote>
+<p>The view presents with a list of spoken languages per country. The execution plan for querying this view looks like this:</p>
+<blockquote>
+<pre>mysql&gt; EXPLAIN SELECT * FROM country_languages;
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+| id | select_type | table           | type   | possible_keys | key     | key_len | ref                               | rows | Extra                                        |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+|  1 | PRIMARY     | &lt;derived2&gt;      | ALL    | NULL          | NULL    | NULL    | NULL                              |  233 |                                              |
+|  2 | DERIVED     | CountryLanguage | index  | PRIMARY       | PRIMARY | 33      | NULL                              |  984 | Using index; Using temporary; Using filesort |
+|  2 | DERIVED     | Country         | eq_ref | PRIMARY       | PRIMARY | 3       | world.CountryLanguage.CountryCode |    1 |                                              |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+</pre>
+</blockquote>
+<p>And, even if we only want to filter out a single country, we still get the same plan:</p>
+<blockquote>
+<pre>mysql&gt; EXPLAIN SELECT * FROM country_languages WHERE Code='USA';
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+| id | select_type | table           | type   | possible_keys | key     | key_len | ref                               | rows | Extra                                        |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+|  1 | PRIMARY     | &lt;derived2&gt;      | ALL    | NULL          | NULL    | NULL    | NULL                              |  233 | Using where                                  |
+|  2 | DERIVED     | CountryLanguage | index  | PRIMARY       | PRIMARY | 33      | NULL                              |  984 | Using index; Using temporary; Using filesort |
+|  2 | DERIVED     | Country         | eq_ref | PRIMARY       | PRIMARY | 3       | world.CountryLanguage.CountryCode |    1 |                                              |
++----+-------------+-----------------+--------+---------------+---------+---------+-----------------------------------+------+----------------------------------------------+
+</pre>
+</blockquote>
+<p>So, we need to scan the entire country_language and country tables in order to return results for just one row.</p>
+<h4>A non-working solution</h4>
+<p>The solution offered by the developer was this:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+CREATE
+  ALGORITHM=MERGE
+  VIEW country_languages_non_working AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON
+      (Country.CODE = CountryLanguage.CountryCode)
+  WHERE
+    Country.CODE = @country_code
+  GROUP BY Country.CODE;
+</pre>
+</blockquote>
+<p>And follow by:</p>
+<blockquote>
+<pre>mysql&gt; SET @country_code='USA';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; SELECT * FROM country_languages_2;
++------+---------------+----------------------------------------------------------------------------------------------------+
+| CODE | country       | languages                                                                                          |
++------+---------------+----------------------------------------------------------------------------------------------------+
+| USA  | United States | Chinese,English,French,German,Italian,Japanese,Korean,Polish,Portuguese,Spanish,Tagalog,Vietnamese |
++------+---------------+----------------------------------------------------------------------------------------------------+
+</pre>
+</blockquote>
+<p>So, pushdown a <strong>WHERE</strong> condition into the view&#8217;s definition. The session variable @country_code is used to filter rows. In the above simplified code the value is assumed to be set; tweak it as you see fit (using <strong>IFNULL</strong>, for example, or <strong>OR</strong> statements) to allow for full scan in case the variable is undefined.</p>
+<p>This doesn&#8217;t work. It used to work a couple years back; but today you cannot create a view which uses session variables or parameters. It is a restriction imposed by views.</p>
+<h4>A workaround</h4>
+<p>Justin showed a workaround using an additional table. There is another workaround which does not involve tables, but rather stored routines. Now, this is a patch, and an ugly one. It may not work in future versions of MySQL for all I know. But, here it goes:</p>
+<blockquote>
+<pre class="brush: sql; title: ; notranslate">
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` FUNCTION `get_session_country`() RETURNS CHAR(3)
+    NO SQL
+    DETERMINISTIC
+BEGIN
+  RETURN @country_code;
+END $$
+DELIMITER ;
+
+CREATE
+  ALGORITHM=MERGE
+  VIEW country_languages_2 AS
+  SELECT
+    Country.CODE, Country.Name AS country,
+    GROUP_CONCAT(CountryLanguage.Language) AS languages
+  FROM
+    world.Country
+    JOIN world.CountryLanguage ON
+      (Country.CODE = CountryLanguage.CountryCode)
+  WHERE
+    Country.CODE = get_session_country()
+  GROUP BY Country.CODE;
+</pre>
+</blockquote>
+<p>And now:</p>
+<blockquote>
+<pre>mysql&gt; SET @country_code='USA';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; SELECT * FROM country_languages_2;
++------+---------------+----------------------------------------------------------------------------------------------------+
+| CODE | country       | languages                                                                                          |
++------+---------------+----------------------------------------------------------------------------------------------------+
+| USA  | United States | Chinese,English,French,German,Italian,Japanese,Korean,Polish,Portuguese,Spanish,Tagalog,Vietnamese |
++------+---------------+----------------------------------------------------------------------------------------------------+
+1 row in set, 1 warning (0.00 sec)
+
+mysql&gt; EXPLAIN SELECT * FROM country_languages_2;
++----+-------------+-----------------+--------+---------------+---------+---------+------+------+--------------------------+
+| id | select_type | table           | type   | possible_keys | key     | key_len | ref  | rows | Extra                    |
++----+-------------+-----------------+--------+---------------+---------+---------+------+------+--------------------------+
+|  1 | PRIMARY     | &lt;derived2&gt;      | system | NULL          | NULL    | NULL    | NULL |    1 |                          |
+|  2 | DERIVED     | Country         | const  | PRIMARY       | PRIMARY | 3       |      |    1 |                          |
+|  2 | DERIVED     | CountryLanguage | ref    | PRIMARY       | PRIMARY | 3       |      |    8 | Using where; Using index |
++----+-------------+-----------------+--------+---------------+---------+---------+------+------+--------------------------+
+</pre>
+</blockquote>
+<p>Since views are allowed to call stored routines (Justing used this to call upon <strong>CONNECTION_ID()</strong>), and since stored routines can use session variables, we can take advantage and force the view into filtering out irrelevant rows before these accumulate to temporary tables and big joins.</p>
+<p>Back in the customer&#8217;s office, we witnessed, what with their real data and multiple views, a reduction of query times from ~30 minutes to a few seconds.</p>
+<h4>Another kind of use</h4>
+<p>Eventually we worked to make better view definitions and query splitting, resulting in clearer code and fast queries, but this solution plays nicely into another kind of problem:</p>
+<p>Can we force different customers to see different parts of a given table? e.g., only those rows that relate to the customers?</p>
+<p>There can be many solutions: different tables; multiple views (one per customer), stored procedures, what have you. The above provides a solution, and I&#8217;ve seen it in use.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/views-better-performance-with-condition-pushdown/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">1328</post-id>	</item>
+		<item>
+		<title>Discovery of the day: GROUP BY &#8230; DESC</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/discovery-of-the-day-group-by-desc</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/discovery-of-the-day-group-by-desc#comments</comments>
+				<pubDate>Tue, 04 May 2010 09:38:38 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2381</guid>
+				<description><![CDATA[I happened on a query where, by mistake, an was written as And it took me by surprise to realize GROUP BY x DESC is a valid statement. I looked it up: yep! It&#8217;s documented. In MySQL, GROUP BY results are sorted according to the group statement. You can override this by adding ORDER BY [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I happened on a query where, by mistake, an</p>
+<pre class="brush: sql; title: ; notranslate">
+SELECT ... ORDER BY x DESC LIMIT 1
+</pre>
+<p>was written as</p>
+<pre class="brush: sql; title: ; notranslate">
+SELECT ... GROUP BY x DESC LIMIT 1
+</pre>
+<p>And it took me by surprise to realize <strong>GROUP BY x DESC</strong> is a valid statement. I looked it up: yep! It&#8217;s <a href="http://dev.mysql.com/doc/refman/5.0/en/group-by-modifiers.html">documented</a>.</p>
+<p>In MySQL, <strong>GROUP BY</strong> results are sorted according to the group statement. You can override this by adding <strong>ORDER BY NULL</strong> (see <a href="https://shlomi-noach.github.io/blog/mysql/less-known-sql-syntax-and-functions-in-mysql">past post</a>). I wasn&#8217;t aware you can actually control the sort order.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/discovery-of-the-day-group-by-desc/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2381</post-id>	</item>
+		<item>
+		<title>But I DO want MySQL to say &#8220;ERROR&#8221;!</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error#comments</comments>
+				<pubDate>Fri, 12 Mar 2010 04:53:28 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[sql_mode]]></category>
+		<category><![CDATA[Syntax]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2005</guid>
+				<description><![CDATA[MySQL is known for its willingness to accept invalid queries, data values. It can silently commit your transaction, truncate your data. Using GROUP_CONCAT with a small group_concat_max_len setting? Your result will be silently truncated (make sure to check the warnings though). Calling CREATE TEMPORARY TABLE? You get silent commit. Issuing a ROLLBACK on non-transactional involved [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>MySQL is known for its willingness to accept invalid queries, data values. It can silently commit your transaction, truncate your data.</p>
+<ul>
+<li>Using <strong>GROUP_CONCAT</strong> with a small <strong>group_concat_max_len</strong> setting? Your result will be silently truncated (make sure to check the warnings though).</li>
+<li>Calling <strong>CREATE <span style="text-decoration: line-through;">TEMPORARY</span> TABLE</strong>? You get <a href="http://www.joinfu.com/2010/03/a-follow-up-on-the-sql-puzzle/">silent commit</a>.</li>
+<li>Issuing a <strong>ROLLBACK</strong> on non-transactional involved engines? Have a warning; no error.</li>
+<li>Using <strong>LOCK IN SHARE MODE</strong> on non transactional tables? Not a problem. Nothing reported.</li>
+<li>Adding a <strong>FOREIGN KEY</strong> on a MyISAM table? Good for you; no action actually taken.</li>
+<li>Inserting <strong>300</strong> to a <strong>TINYINT</strong> column in a relaxed <strong>sql_mode</strong>? Give me <strong>255</strong>, I&#8217;ll silently drop the remaining <strong>45</strong>. I owe you.</li>
+</ul>
+<h4>Warnings and errors</h4>
+<p>It would be nice to:<span id="more-2005"></span></p>
+<ul>
+<li>Have an <strong>auto_propagate_warning_to_error</strong> server variable (global/session/both) which, well, does what it says.</li>
+<li>Have an <strong>i_am_really_not_a_dummy</strong> server variable which implies stricter checks for all the above and prevents you from doing with <em>anything</em> that may be problematic (or rolls back your transactions on your invalid actions).</li>
+</ul>
+<p>Connectors may be nice enough to propagate warnings to errors &#8211; that&#8217;s good. But not enough: since data is already committed in MySQL.</p>
+<p>If I understand correctly, and maybe it&#8217;s just a myth, it all relates to the times where MySQL had interest in a widespread adoption across the internet, in such way that it does not interfere too much with the users (hence leading to the common myth that &#8220;MySQL just works out of the box and does not require me to configure or understand anything&#8221;).</p>
+<p>MySQL is a database system, and is now widespread, and is used by serious companies and products. It is time to stop play nice to everyone and provide with strict integrity &#8212; or, be nice to everyone, just allow me to specify what &#8220;nice&#8221; means for me.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/but-i-do-want-mysql-to-say-error/feed</wfw:commentRss>
+		<slash:comments>18</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2005</post-id>	</item>
+	</channel>
+</rss>

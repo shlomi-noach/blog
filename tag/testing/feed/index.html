@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>testing &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/testing/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 12 May 2020 07:13:37 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>orchestrator: what&#8217;s new in CI, testing &#038; development</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development#respond</comments>
+				<pubDate>Mon, 11 May 2020 08:01:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[dbdeployer]]></category>
+		<category><![CDATA[docker]]></category>
+		<category><![CDATA[GitHub]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[orchestrator]]></category>
+		<category><![CDATA[testing]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=8077</guid>
+				<description><![CDATA[Recent focus on development &#38; testing yielded with new orchestrator environments and offerings for developers and with increased reliability and trust. This post illustrates the new changes, and see Developers section on the official documentation for more details. Testing In the past four years orchestrator was developed at GitHub, and using GitHub&#8217;s environments for testing. [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Recent focus on development &amp; testing yielded with new <a href="https://github.com/openark/orchestrator">orchestrator</a> environments and offerings for developers and with increased reliability and trust. This post illustrates the new changes, and see <a href="https://github.com/openark/orchestrator/tree/master/docs#developers">Developers</a> section on the official documentation for more details.</p>
+<h2>Testing</h2>
+<p>In the past four years <code>orchestrator</code> was <a href="https://github.blog/2016-12-08-orchestrator-github/">developed at GitHub</a>, and using GitHub&#8217;s environments for <a href="https://github.blog/2017-07-06-mysql-testing-automation-at-github/">testing</a>. This is very useful for testing <code>orchestrator</code>&#8216;s behavior within GitHub, interacting with its internal infrastructure, and validating failover behavior in a production environment. These tests and their results are not visible to the public, though.</p>
+<p>Now that <code>orchestrator</code> is developed <a href="https://shlomi-noach.github.io/blog/mysql/the-state-of-orchestrator-2020-spoiler-healthy">outside GitHub</a> (that is, outside GitHub the <em>company</em>, not GitHub the <em>platform</em>) I wanted to improve on the testing framework, making it visible, accessible and contribute-able to the community. Thankfully, the GitHub platform has much to offer on that front and <code>orchestrator</code> now uses <a href="https://github.com/features/actions">GitHub Actions</a> more heavily for testing.</p>
+<p>GitHub Actions provide a way to run code in a container in the context of the repository. The most common use case is to run CI tests on receiving a Pull Request. Indeed, when GitHub Actions became available, we switched out of Travis CI and into Actions for <code>orchestrator</code>&#8216;s CI.</p>
+<p>Today, <code>orchestrator</code> runs three different tests:</p>
+<ul>
+<li>Build, unit testing, integration testing, code &amp; doc validation</li>
+<li>Upgrade testing</li>
+<li>System testing</li>
+</ul>
+<p>To highlight what each does:<span id="more-8077"></span></p>
+<h3>Build, unit testing, integration testing</h3>
+<p>Based on the original CI (and possibly will split into distinct tests), this CI Action compiles the code, runs unit tests, runs the suite of <a href="https://github.com/openark/orchestrator/tree/master/tests/integration">integration tests</a> (spins up both <code>MySQL</code> and <code>SQLite</code> databases and runs a series of tests on each backend), this CI job is the &#8220;basic&#8221; test to see that the contributed code even makes sense.</p>
+<p>What&#8217;s new in this test is that it now produces an <em>artifact</em>: an <code>orchestrator</code> binary for Linux/amd64. This is again a feature for GitHub Actions; the artifact is kept for a couple months or so per Actions retention policy. <a href="https://github.com/openark/orchestrator/actions/runs/94337568">Here</a>&#8216;s an example; by the time you read this the binary artifact may or may not still be there.</p>
+<p>This means you don&#8217;t actually need a development environment on your laptop to be able to build and <code>orchestrator</code> binary. More on this later.</p>
+<h3>Upgrade testing</h3>
+<p>Until recently not formalized; I&#8217;d test upgrades by deploying them internally at GitHub onto a staging environment. Now upgrades are tested per Pull Request: we spin up a container, deploy <code>orchestrator</code> from <code>master</code> branch using both <code>MySQL</code> and <code>SQLite</code> backends, then checkout the PR branch, and redeploy <code>orchestrator</code> using the existing backends &#8212; this verifies that at least backend-database wise, there&#8217;s not upgrade errors.</p>
+<p>At this time the test only validates the database changes are applicable; in the future this may expand onto more elaborate tests.</p>
+<h3>System testing</h3>
+<p>I&#8217;m most excited about this one. Taking ideas from our approach to <a href="https://shlomi-noach.github.io/blog/mysql/using-dbdeployer-in-ci-tests">testing gh-ost with dbdeployer</a>, I created <a href="https://github.com/openark/orchestrator-ci-env">https://github.com/openark/orchestrator-ci-env</a>, which offers a full blown testing enviroment for <code>orchestrator</code>, including a MySQL replication topology (courtesy <a href="https://www.dbdeployer.com/">dbdeployer</a>), Consul, HAProxy and more.</p>
+<p>This CI testing environment can also serve as a playground in your local docker setup, see shortly.</p>
+<p>The <a href="https://github.com/openark/orchestrator/tree/master/tests/system">system tests suite</a> offers full blown cluster-wide operations such as graceful takeovers, master failovers, errant GTID transaction analysis and recovery and more. The suite utilizes the CI testing environment, breaks it, rebuilds it, validates it&#8230; Expects specific output, expects specific failure messages, specific analysis, specific outcomes.</p>
+<p>As example, with the system tests suite, we can test the behavior of a master failover in a multi-DC, multi-region (obviously simulated) environment, where a server marked as &#8220;candidate&#8221; is lagging behind all others, with strict rules for cross-site/cross-region failovers, and still we wish to see that particular replica get promoted as master. We can test not only the topology aspect of the failover, but also the failover hooks, Consul integration and its effects, etc.</p>
+<h2>Development</h2>
+<p>There&#8217;s now multiple options for developers/contributors to build or just try out <code>orchestrator</code>.</p>
+<h3>Build on GitHub</h3>
+<p>As mentioned earlier, you actually don&#8217;t need a development environment. You can use <code>orchestrator</code> CI to build and generate a Linux/amd64 <code>orchestrator</code> binary, which you can download &amp; deploy as you see fit.</p>
+<p>I&#8217;ve signed up for the GitHub Codespaces beta program, and hope to make that available for <code>orchestrator</code>, as well.</p>
+<h3>Build via Docker</h3>
+<p><code>orchestrator</code> offers various Docker build/run environments, accessible via the <code>script/dock</code> script:</p>
+<ul>
+<li>`script/dock alpine` will build and spawn `orchestrator` on a minimal <code>alpine</code> linux</li>
+<li>`script/dock test` will build and run the same CI tests (unit, integration) as mentioned earlier, but on your own docker environemtn</li>
+<li>`script/dock pkg` will build and generate `.rpm` and `.deb` packages</li>
+</ul>
+<h3>CI environment: the &#8220;full orchestrator experience&#8221;</h3>
+<p>This is the <code>orchestrator</code> amusement park. Run <code>script/dock system</code> to spawn the aforementioned CI environment used in system tests, and on top of that, an <code>orchestrator</code> setup fully integrated with that system.</p>
+<p>So that&#8217;s an <code>orchestrator</code>-MySQL topology-Consul-HAProxy setup, where <code>orchestrator</code> already has the credentials for, and pre-loads the MySQL topology, pre-configured to update Consul upon failover, HAProxy config populated by <code>consul-template</code>, heartbeat injection, and more. It resembles the <a href="https://github.blog/2018-06-20-mysql-high-availability-at-github/">HA setup at GitHub</a>, and in the future I expect to provide alternate setups (on top).</p>
+<p>Once in that docker environment, one can try running relocations, failovers, test <code>orchestrator</code>&#8216;s behavior, etc.</p>
+<h2>Community</h2>
+<p>GitHub recently announced <a href="https://github.blog/2020-05-06-new-from-satellite-2020-github-codespaces-github-discussions-securing-code-in-private-repositories-and-more/#discussions">GitHub Discussions</a> ; think a stackoverflow like place within one&#8217;s repo to ask questions, discuss, vote on answers. It&#8217;s expected to be available this summer. When it does, I&#8217;ll encourage the community to use it instead of today&#8217;s <a href="https://groups.google.com/forum/#!forum/orchestrator-mysql">orchestrator-mysql</a> Google Group and of course the many questions posted as Issues.</p>
+<p>There&#8217;s been a bunch of PRs merged recently, with more to come later on. I&#8217;m grateful for all contributions. Please understand if I&#8217;m still slow to respond.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/orchestrator-whats-new-in-ci-testing-development/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">8077</post-id>	</item>
+		<item>
+		<title>Using dbdeployer in CI tests</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/using-dbdeployer-in-ci-tests</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/using-dbdeployer-in-ci-tests#respond</comments>
+				<pubDate>Tue, 20 Feb 2018 07:29:58 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[dbdeployer]]></category>
+		<category><![CDATA[gh-ost]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Replication]]></category>
+		<category><![CDATA[testing]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7848</guid>
+				<description><![CDATA[I was very pleased when Giuseppe Maxia (aka datacharmer) unveiled dbdeployer in his talk at pre-FOSDEM MySQL day. The announcement came just at the right time. I wish to briefly describe how we use dbdeployer (work in progress). The case for gh-ost A user opened an issue on gh-ost, and the user was using MySQL [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I was very pleased when Giuseppe Maxia (aka <a href="http://datacharmer.blogspot.co.il/">datacharmer</a>) unveiled <a href="https://github.com/datacharmer/dbdeployer">dbdeployer</a> in his talk at <a href="http://lefred.be/content/pre-fosdem-mysql-day-2018-the-schedule/">pre-FOSDEM MySQL day</a>. The announcement came just at the right time. I wish to briefly describe how we use <code>dbdeployer</code> (work in progress).</p>
+<h3>The case for gh-ost</h3>
+<p>A user opened <a href="https://github.com/github/gh-ost/issues/538">an issue</a> on <a href="https://github.com/github/gh-ost"><code>gh-ost</code></a>, and the user was using MySQL <code>5.5</code>. <code>gh-ost</code> is being tested on <code>5.7</code> where the problem does not reproduce. A discussion with Gillian Gunson raised the concern of not testing on all versions. Can we run <code>gh-ost</code> tests for all MySQL/Percona/MariaDB versions? Should we? How easy would it be?</p>
+<h3>gh-ost tests</h3>
+<p><code>gh-ost</code> has three different test types:</p>
+<ul>
+<li>Unit tests: these are plain <code>golang</code> logic tests which are very easy and quick to run.</li>
+<li>Integration tests: the topic of this post, see following. Today these do not run as part of an automated CI testing.</li>
+<li>System tests: putting our production tables to the test, continuously migrating our production data on dedicated replicas, verifying checksums are identical and data is intact, <a href="https://githubengineering.com/mysql-testing-automation-at-github/#schema-migrations">read more</a>.</li>
+</ul>
+<p>Unit tests are already running as part of automated CI (every PR is subjected to those tests). Systems tests are clearly tied to our production servers. What&#8217;s the deal with the integration tests?<span id="more-7848"></span></p>
+<h3>gh-ost integration tests</h3>
+<p>The <code>gh-ost</code> <a href="https://github.com/github/gh-ost/tree/master/localtests">integration tests </a>are a suite of scenarios which verify <code>gh-ost</code>&#8216;s operation is sound. These scenarios are mostly concerned with data types, special <code>alter</code> statements etc. Is converting <code>DATETIME</code> to <code>TIMESTAMP</code> working properly? Are <code>latin1</code> columns being updated correctly? How about renaming a column? Changing a <code>PRIMARY KEY</code>? Column reorder? <code>5.7</code> JSON values? And so on. Each test will recreate the table, run migration, stop replication, check the result, resume replication&#8230;</p>
+<p>The environment for these tests is a master-replica setup, where <code>gh-ost</code> modifies on the table on the replica and can then checksum or compare both the original and the altered <em>ghost</em> table.</p>
+<p>We develop <code>gh-ost</code> internally at GitHub, but it&#8217;s also an open source project. We have our own internal CI environment, but then we also wish the public to have visibility into test failures (so that a user can submit a PR and get a reliable automated feedback). We use <a href="https://travis-ci.org/">Travis CI</a> for the public facing tests.</p>
+<p>To run <code>gh-ost</code>&#8216;s integration tests as described above as part of our CI tests we should be able to:</p>
+<ul>
+<li>Create a master/replica setup in CI.</li>
+<li>Actually, create a master/replica setup in <em>any</em> CI, and namely in Travis CI.</li>
+<li>Actually, create multiple master/replica setups, of varying versions and vendors, in any ci, including both our internal CI and Travis CI.</li>
+</ul>
+<p>I was about to embark on a MySQL Sandbox setup, which I was not keen on. But FOSDEM was around the corner and I had other things to complete beforehand. Lucky me, <code>dbdeplyer</code> stepped in.</p>
+<h3>dbdeployer</h3>
+<p><code>dbdeployer</code> is a rewrite, a replacement to <a href="https://mysqlsandbox.net/">MySQL Sandbox</a>. I&#8217;ve been using MySQL Sandbox for many years, and my laptop is running two sandboxes at this very moment. But MySQL Sandbox has a few limitations or complications:</p>
+<ul>
+<li>Perl. Versions of Perl. Dependencies of packages of Perl. I mean, it&#8217;s fine, we can automate that.</li>
+<li>Command line flag complexity: I always get lost in the complexity of the flags.</li>
+<li>Get it right or prepare for battle: if you deployed something, but not the way you wanted, there&#8217;s sometimes limbo situations where you cannot re-deploy the same sandbox again, or you should start deleting files everywhere.</li>
+<li>Deploy, not remove. Adding a sandbox is one thing. How about removing it?</li>
+</ul>
+<p><code>dbdeployer</code> is a <code>golang</code> rewrite, which solves the dependency problem. It ships as a single binary and nothing more is needed. It is simple to use. While it generates the equivalence of a that of a MySQL Sandbox, it does so with less command line flags and less confusion. There&#8217;s first class handling of the MySQL binaries: you unpack MySQL tarballs, you can list what&#8217;s available. You can then create sandbox environments: replication, standalone, etc. You can then delete those.</p>
+<p>It&#8217;s pretty simple and I have not much more to add &#8212; which is the best thing about it.</p>
+<p>So, with <code>dbdeployer</code> it is easy to create a master/replica. Something like:</p>
+<blockquote>
+<pre>dbdeployer unpack path/to/5.7.21.tar.gz --unpack-version=5.7.21 --sandbox-binary <span class="pl-smi">${PWD}</span>/sandbox/binary
+dbdeployer replication 5.7.21 --nodes 2 --sandbox-binary <span class="pl-smi">${PWD}</span>/sandbox/binary --sandbox-home <span class="pl-smi">${PWD}</span>/sandboxes --gtid --my-cnf-options log_slave_updates --my-cnf-options log_bin --my-cnf-options binlog_format=ROW</pre>
+</blockquote>
+<h3>Where does it all fit in, and what about the MySQL binaries though?</h3>
+<p>So, should <code>dbdeployer</code> be part of the <code>gh-ost</code> repo? And where does one get those MySQL binaries from? Are they to be part of the <code>gh-ost</code> repo? Aren&#8217;t they a few GB to extract?</p>
+<p>Neither <code>dbdeployer</code> nor MySQL binaries should be added to the <code>gh-ost</code> repo. And fortunately, Giuseppe also <a href="https://github.com/datacharmer/mysql-docker-minimal">solved</a> the MySQL binaries problem.</p>
+<p>The scheme I&#8217;m looking at right now is as follows:</p>
+<ul>
+<li>A new public repo, <a href="https://github.com/github/gh-ost-ci-env">gh-ost-ci-env</a> is created. This repo includes:
+<ul>
+<li><code>dbdeployer</code> compiled binaries</li>
+<li>Minimal MySQL tarballs for selected versions. Those tarballs are reasonably small: between `14MB` and `44MB` at this time.</li>
+</ul>
+</li>
+<li><code>gh-ost</code>&#8216;s CI to <code>git clone https://github.com/github/gh-ost-ci-env.git</code> (<a href="https://github.com/github/gh-ost/pull/546/files#diff-d78e7acd07ce8a2aad92026ae10cbec2R7">code</a>)</li>
+<li><code>gh-ost</code>&#8216;s CI to setup a master/replica sandbox (<a href="https://github.com/github/gh-ost/pull/546/files#diff-d78e7acd07ce8a2aad92026ae10cbec2R13">one</a>, <a href="https://github.com/github/gh-ost/pull/546/files#diff-d78e7acd07ce8a2aad92026ae10cbec2R15">two</a>).</li>
+<li><a href="https://github.com/github/gh-ost/pull/546/files#diff-d78e7acd07ce8a2aad92026ae10cbec2R30">Kick the tests</a>.</li>
+</ul>
+<p>The above is a work in progress:</p>
+<ul>
+<li>At this time only runs a single MySQL version.</li>
+<li>There is a known issue where after a test, replication may take time to resume. Currently on slower boxes (such as the Travis CI containers) this leads to failures.</li>
+</ul>
+<p>Another concern I have at this time is build time. For a single MySQL version, it takes some <code>5-7</code> minutes on my local laptop to run all integration tests. It will be faster on our internal CI. It will be considerably <em>slower</em> on Travis CI, I can expect between <code>10m - 15m</code>. Add multiple versions and we&#8217;re looking at a <code>1hr</code> build. Such long build times will affect our development and delivery times, and so we will split them off the main build. I need to consider what the best approach is.</p>
+<p>That&#8217;s all for now. I&#8217;m pretty excited for the potential of <code>dbdeployer</code> and will be looking into incorporating the same for <code>orchestrator</code> CI tests.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/using-dbdeployer-in-ci-tests/feed</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">7848</post-id>	</item>
+	</channel>
+</rss>

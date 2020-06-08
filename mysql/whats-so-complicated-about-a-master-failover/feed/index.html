@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: What&#8217;s so complicated about a master failover?	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 12 Sep 2017 18:29:00 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Shlomi Noach				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover/comment-page-1#comment-401193</link>
+		<dc:creator><![CDATA[Shlomi Noach]]></dc:creator>
+		<pubDate>Tue, 12 Sep 2017 18:29:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7726#comment-401193</guid>
+					<description><![CDATA[@Dane,
+
+Over the course of the past year, we have migrated our MySQL clusters from statement based replication to row based replication, and from 5.6 to 5.7.
+These migrations were gradual. The migration from 5.6 to 5.7 took months of experiments, measurements and testing.
+We slowly added more and more servers, and when we were convinced this would work out we did a marathon of upgrades for the remaining servers.
+orchestrator allows us to concentrate on what we want to do without having to worry about having each upgrade hard coded in some config file to indicate whether the server should or should not participate in a failover path.
+We had a couple cases where we downgraded servers from 5.7 back to 5.6 because we were getting inconsistent metrics. To require each such upgrade/downgrade to be manually followed by a config change would have been quite the hassle.
+
+The thing is, we&#039;re really not a big shop for MySQL. At a little over 100 servers we&#039;re a busy, but not huge shop.
+Previously I worked at Booking.com with X,000 MySQL servers. The mere thought of having anything manual at the single server level was excruciating. We had to have as much automation as possible &quot;or else&quot;.
+
+5.6-5.7, sbr-rbr, special roles (delayed, backup, dev)... those are all real world scenarios.
+
+Your preference is to require homogenous mysql clusters by default. &quot;By default&quot; means a time where &quot;nothing special happens&quot; - and that&#039;s exactly where I see the difference. We almost always have something special happening.
+
+The costs associated with building this complexity into orchestrator are: development time ; code complexity ; behavior complexity.
+
+The failover logic is not &quot;beautiful code&quot;. It is filled with conditions and use cases that make sense in a reality. Some scenarios are yet challenging the orchestrator logic and we need to adapt.
+
+I can share a public statement by Booking.com that the experience a failover every day, and orchestrator does the right thing every day (and sometimes it does not do the best thing, and I&#039;ve seen some crazy scenarios there).
+The assumptions made before orchestrator was in the game were limiting to the deployments, to the hardware, to outage time. 
+
+With orchestrator, and this isn&#039;t a sales pitch, you are more free to choose your preferred topology/technology/setup and just assume orchestrator will deal with it.
+
+Anyway those are my thoughts for the day. Reading the above it really sounds like marketing. Not everything is great &#038; wonderful &#038; pretty, but I think the dynamic approach (as opposed to configuration based approach) is a huge step and a relief to engineers.
+
+Thank you]]></description>
+		<content:encoded><![CDATA[<p>@Dane,</p>
+<p>Over the course of the past year, we have migrated our MySQL clusters from statement based replication to row based replication, and from 5.6 to 5.7.<br />
+These migrations were gradual. The migration from 5.6 to 5.7 took months of experiments, measurements and testing.<br />
+We slowly added more and more servers, and when we were convinced this would work out we did a marathon of upgrades for the remaining servers.<br />
+orchestrator allows us to concentrate on what we want to do without having to worry about having each upgrade hard coded in some config file to indicate whether the server should or should not participate in a failover path.<br />
+We had a couple cases where we downgraded servers from 5.7 back to 5.6 because we were getting inconsistent metrics. To require each such upgrade/downgrade to be manually followed by a config change would have been quite the hassle.</p>
+<p>The thing is, we&#8217;re really not a big shop for MySQL. At a little over 100 servers we&#8217;re a busy, but not huge shop.<br />
+Previously I worked at Booking.com with X,000 MySQL servers. The mere thought of having anything manual at the single server level was excruciating. We had to have as much automation as possible &#8220;or else&#8221;.</p>
+<p>5.6-5.7, sbr-rbr, special roles (delayed, backup, dev)&#8230; those are all real world scenarios.</p>
+<p>Your preference is to require homogenous mysql clusters by default. &#8220;By default&#8221; means a time where &#8220;nothing special happens&#8221; &#8211; and that&#8217;s exactly where I see the difference. We almost always have something special happening.</p>
+<p>The costs associated with building this complexity into orchestrator are: development time ; code complexity ; behavior complexity.</p>
+<p>The failover logic is not &#8220;beautiful code&#8221;. It is filled with conditions and use cases that make sense in a reality. Some scenarios are yet challenging the orchestrator logic and we need to adapt.</p>
+<p>I can share a public statement by Booking.com that the experience a failover every day, and orchestrator does the right thing every day (and sometimes it does not do the best thing, and I&#8217;ve seen some crazy scenarios there).<br />
+The assumptions made before orchestrator was in the game were limiting to the deployments, to the hardware, to outage time. </p>
+<p>With orchestrator, and this isn&#8217;t a sales pitch, you are more free to choose your preferred topology/technology/setup and just assume orchestrator will deal with it.</p>
+<p>Anyway those are my thoughts for the day. Reading the above it really sounds like marketing. Not everything is great &amp; wonderful &amp; pretty, but I think the dynamic approach (as opposed to configuration based approach) is a huge step and a relief to engineers.</p>
+<p>Thank you</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Dane Miller				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover/comment-page-1#comment-401176</link>
+		<dc:creator><![CDATA[Dane Miller]]></dc:creator>
+		<pubDate>Tue, 12 Sep 2017 16:21:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7726#comment-401176</guid>
+					<description><![CDATA[I&#039;m skeptical that automation makes sense for some of the mixed replication setups you describe. Mix of 5.6/5.7, mix of statement/rbr.  Does it make sense to make failover decisions based on majority/quorum concepts for mysql async replication?  I tend to think not, but I suspect I haven&#039;t seen nearly the number of failovers as you.
+
+My preference, and how we operate at my site, is to require homogenous mysql clusters by default.  Any mysql version or replication discrepancies trigger alerts.  That doesn&#039;t mean you can&#039;t run with a mix of hosts/versions/settings, it just means we must explicitly pick a homogenous set of hosts that will participate in automated failover.  The rest will be orphaned after a failover, and require manual cleanup.
+
+Just curious, have you found benefits to automating failover for this genre of complex mixed configuration mysql replication topologies?  Could you share some examples?  Have you experienced any costs associated with building this complexity into orchestrator?
+
+As always, thanks for all your work and posts on orchestrator, ghost, and mysql.  I&#039;m a big fan!
+Dane]]></description>
+		<content:encoded><![CDATA[<p>I&#8217;m skeptical that automation makes sense for some of the mixed replication setups you describe. Mix of 5.6/5.7, mix of statement/rbr.  Does it make sense to make failover decisions based on majority/quorum concepts for mysql async replication?  I tend to think not, but I suspect I haven&#8217;t seen nearly the number of failovers as you.</p>
+<p>My preference, and how we operate at my site, is to require homogenous mysql clusters by default.  Any mysql version or replication discrepancies trigger alerts.  That doesn&#8217;t mean you can&#8217;t run with a mix of hosts/versions/settings, it just means we must explicitly pick a homogenous set of hosts that will participate in automated failover.  The rest will be orphaned after a failover, and require manual cleanup.</p>
+<p>Just curious, have you found benefits to automating failover for this genre of complex mixed configuration mysql replication topologies?  Could you share some examples?  Have you experienced any costs associated with building this complexity into orchestrator?</p>
+<p>As always, thanks for all your work and posts on orchestrator, ghost, and mysql.  I&#8217;m a big fan!<br />
+Dane</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Shlomi Noach				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover/comment-page-1#comment-394717</link>
+		<dc:creator><![CDATA[Shlomi Noach]]></dc:creator>
+		<pubDate>Thu, 29 Jun 2017 17:24:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7726#comment-394717</guid>
+					<description><![CDATA[Hi Rick,
+I hinted at split brain with &quot;A DC is network partitioned...&quot; ; An orchestrator PR to handle split brain is https://github.com/github/orchestrator/pull/183]]></description>
+		<content:encoded><![CDATA[<p>Hi Rick,<br />
+I hinted at split brain with &#8220;A DC is network partitioned&#8230;&#8221; ; An orchestrator PR to handle split brain is <a href="https://github.com/github/orchestrator/pull/183" rel="nofollow ugc">https://github.com/github/orchestrator/pull/183</a></p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/whats-so-complicated-about-a-master-failover/comment-page-1#comment-394712</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Thu, 29 Jun 2017 15:56:00 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=7726#comment-394712</guid>
+					<description><![CDATA[What about &quot;split brain&quot;?]]></description>
+		<content:encoded><![CDATA[<p>What about &#8220;split brain&#8221;?</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

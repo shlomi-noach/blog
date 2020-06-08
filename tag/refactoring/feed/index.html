@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Refactoring &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/refactoring/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sun, 03 Jun 2012 10:12:47 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Getting rid of huge ibdata file, no dump required, part II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii#comments</comments>
+				<pubDate>Wed, 30 May 2012 07:03:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Refactoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4845</guid>
+				<description><![CDATA[This post continues Getting rid of huge ibdata file, no dump required, part I, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing everything at once. In previous part we put aside the issue of foreign keys. We address this issue now. What [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post continues <a href="https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required">Getting rid of huge ibdata file, no dump required, part I</a>, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing <em>everything at once</em>.</p>
+<p>In previous part we put aside the issue of foreign keys. We address this issue now.</p>
+<h4>What if my InnoDB tables have foreign keys?</h4>
+<p>MyISAM does not support them, so you can&#8217;t just <strong>ALTER</strong> an InnoDB table to MyISAM and back into InnoDB, and expect everything to work.</p>
+<p>Alas, this calls for additional steps (i.e. additional <strong>ALTER</strong> commands). However, these still fall well under the concept of <em>&#8220;do it one table at a time, then take time to recover your breath and replication lag&#8221;</em>.</p>
+<h4>Save , drop and restore your Foreign Keys setup</h4>
+<p>You can use <a href="http://code.google.com/p/common-schema/">common_schema</a>&#8216;s  <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">sql_foreign_keys</a> to get the full listing and create definition of your foreign keys. For example, assume we use the <strong>sakila</strong> database:<span id="more-4845"></span></p>
+<blockquote>
+<pre>SELECT create_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila' INTO OUTFILE '/somewhere/safe/create_foreign_keys.sql'</pre>
+</blockquote>
+<p>(replace <strong>TABLE_SCHEMA=&#8217;sakila&#8217;</strong> with whatever you want).</p>
+<p>A sample output would be something like this (<em>note: no semicolon on end of line</em>):</p>
+<blockquote>
+<pre>ALTER TABLE `sakila`.`address` ADD CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `sakila`.`city` (`city_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`city` ADD CONSTRAINT `fk_city_country` FOREIGN KEY (`country_id`) REFERENCES `sakila`.`country` (`country_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+...</pre>
+</blockquote>
+<p>Once the above is in a safe place, you will want to DROP all of your foreign keys. Again, using <em>common_schema</em>:</p>
+<blockquote>
+<pre>SELECT drop_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila';
++-----------------------------------------------------------------------------------+
+| drop_statement                                                                    |
++-----------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` DROP FOREIGN KEY `fk_address_city`                 |
+| ALTER TABLE `sakila`.`city` DROP FOREIGN KEY `fk_city_country`                    |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_address`            |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_store`              |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language`                   |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language_original`          |
+| ...                                                                               |
++-----------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>You don&#8217;t want to issue all these at once: do them one at a time, and wait for your slave to catch up.</p>
+<p>Once this is done, you can move on to the steps described in Part I of this post: converting tables to MyISAM, shutting down, removing InnoDB files, then converting back to InnoDB.</p>
+<p>And then, taking breath again, you must re-import the foreign keys. Use the <strong>ADD CONSTRAINT</strong> commands you have saved earlier on. Again, one at a time, wait for slave to catch up.</p>
+<p>To reiterate, for each table you would take the following steps:</p>
+<ol>
+<li>Make sure the FK definition is safely stored somewhere</li>
+<li>STOP SLAVE</li>
+<li>Drop all table&#8217;s foreign keys: ALTER TABLE &#8230; DROP FOREIGN KEY &#8230;, DROP FOREIGN KEY &#8230;</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ENGINE=MyISAM (*)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(*) Altering to MyISAM drops FK constraints, so the above could actually be done in one step. I&#8217;m cautious and illustrate in two.</p>
+<p>Once all tables are altered, and InnoDB tablespace is removed, restoration is as follows: for each table,</p>
+<ol>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ENGINE=InnoDB [create options]</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ADD CONSTRAINT &#8230;, ADD CONSTRAINT &#8230;(+)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(+) Alas, you can&#8217;t convert to InnoDB and add constraints at the same time&#8230;</p>
+<h4>This is not entirely safe</h4>
+<p>A MyISAM slave to an InnoDB master with foreign keys is a tricky business. It really depends on the type of foreign keys you have and the use you make of them. See <a title="Link to Impact of foreign keys absence on replicating slaves" href="https://shlomi-noach.github.io/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves" rel="bookmark">Impact of foreign keys absence on replicating slaves</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4845</post-id>	</item>
+		<item>
+		<title>Getting rid of huge ibdata file, no dump required</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required#comments</comments>
+				<pubDate>Tue, 22 May 2012 05:33:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Refactoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442</guid>
+				<description><![CDATA[You have been told (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named ibdata1), when moving to innodb_file_per_table, is to do a logical dump of your data, completely erase everything, then import the dump. To quickly reiterate, you can only delete the ibdata1 file when no [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>You <a href="https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file">have</a> been <a href="http://ronaldbradford.com/blog/leveraging-the-innodb-plugin-2011-02-11/">told</a> (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named <strong>ibdata1</strong>), when moving to <strong>innodb_file_per_table</strong>, is to do a logical dump of your data, completely erase everything, then import the dump.</p>
+<p>To quickly reiterate, you can only delete the <strong>ibdata1</strong> file when no InnoDB tables exist. Delete this file with an existing InnoDB table, even a table in its own tablespace, and nothing ever works anymore.</p>
+<h4>The problem with the dump-based solution</h4>
+<p>The impact of doing a logical dump is often overwhelming. Well, the dump may be tolerable, but the restore is much longer. The real pain is that you can&#8217;t do this one table at a time: you have to destroy everything before dropping the <strong>ibdata1</strong> file; you then have to import everything.</p>
+<p>Perhaps the most common scenario is that we do the changes on a slave, so as not to completely shut down our database. This is nice; no one is aware of the shutdown process. However, Huston, we have a problem: we need to make sure we can keep up the binary logs on the master for the duration of the <em>entire process</em>.<span id="more-3442"></span></p>
+<h4>A semi-solution for binary logs</h4>
+<p>You may get by by keeping the <strong>SQL_IO_THREAD</strong> running on the slave while dump is taken (SQL thread is better turned off). If you&#8217;re careful, you could do the same after restarting the database: you should still be able to acquire relay logs. With row based replication becoming more common, the problem of binary logs disk space returns: the logs (rather, log entries) are just so much larger!</p>
+<p>Either way, the process can takes long days, at the end of which your slave is up, but lags for long days behind.</p>
+<h4>Wishful thought: do it one table at a time</h4>
+<p>If we could do it one table at a time, and assuming our dataset is fairly split among several tables (i.e. not all of our <strong>500GB</strong> of data is in one huge table), life would be easier: we could work on a single table, resume replication, let the slave catch up, then do the same for the next table.</p>
+<p>How? Didn&#8217;t we just say one can only drop the <strong>ibdata1</strong> file when no InnoDB tables exist?</p>
+<h4>Solution: do it one table at a time</h4>
+<p>I&#8217;m going to illustrate what seems like a longer procedure. I will later show why it is not, in fact, longer.</p>
+<p>The idea is to first convert all your tables to MyISAM (Yay! A use for MyISAM!). That is, convert your tables one table at a time, using normal <strong>ALTER TABLE t ENGINE=MyISAM</strong>.</p>
+<p>Please let go of the foreign keys issue right now. I will address it later, there&#8217;s a lot to be addressed.</p>
+<p>So, on a slave:</p>
+<ol>
+<li><strong>STOP SLAVE</strong></li>
+<li>One <strong>ALTER TABLE &#8230; ENGINE=MyISAM<br />
+</strong></li>
+<li><strong>START SLAVE</strong> again</li>
+<li>Wait for slave catch up</li>
+<li>GOTO <strong>1</strong></li>
+</ol>
+<p>What do we end up with? A MyISAM only database. What do we do with it? Why, convert it back to InnoDB, of course!</p>
+<p>But, before that, we:</p>
+<ol>
+<li>Shut MySQL down</li>
+<li>Delete <strong>ibdata1</strong> file, <strong>ib_logfile[01]</strong> (i.e. delete all InnoDB files)</li>
+<li>Start MySQL</li>
+</ol>
+<p>A new <strong>ibdata1</strong> file, and new transaction log files will be created. Note: the new ibdata1 file is <em>small</em>. Mission almost accomplished.</p>
+<p>We then:</p>
+<ol>
+<li><strong>STOP SLAVE</strong></li>
+<li>Do one <strong>ALTER TABLE &#8230; ENGINE=InnoDB [ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8 &#8230;]<br />
+</strong></li>
+<li><strong>START SLAVE</strong> again</li>
+<li>Wait for slave catch up</li>
+<li>GOTO <strong>1</strong></li>
+</ol>
+<p>What do we end up with? An InnoDB only database, with true file per table, and a small <strong>ibdata1</strong> file. Space recovered!</p>
+<h4>The advantage of this method</h4>
+<p>The thing is, we resume replication after each table alteration. This means breaking the lag period into many smaller periods. While the <em>total</em> runtime does not reduce, we do reduce the maximum lag time. And this makes for easier recovery: no need to store multitudes of binary logs!</p>
+<h4>So what about the foreign keys?</h4>
+<p>Phew. Continued next post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3442</post-id>	</item>
+	</channel>
+</rss>

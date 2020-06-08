@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Why delegating code to MySQL Stored Routines is poor engineering practice	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 27 Dec 2016 16:45:41 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: Bob Hairgrove				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-252614</link>
+		<dc:creator><![CDATA[Bob Hairgrove]]></dc:creator>
+		<pubDate>Fri, 18 Jul 2014 09:44:34 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-252614</guid>
+					<description><![CDATA[Good article with food for thought! Here are my 2 cents:
+
+Stored procedures are really important for implementing security features IMHO. For example, you can give your MySQL user which logs into the database from a web application just SELECT and EXECUTE privileges. Any CRUD operations will have to go through SP&#039;s running with DEFINER privileges (assuming that the definer has CRUD privileges), but for most adequately normalized schemata, these usually require operations on multiple tables which need to be executed within a transaction as a logical unit. Keeping that logic inside a SP makes application development much simpler IMHO and eliminates the need for CRUD privileges at the table level. SELECT statements can be executed normally by client application code since they are read-only. And since MySQL lacks the ROLE features of Oracle, PostgreSQL et al., you can mimic that by implementing login validation checks within a SP.
+
+And speaking of table-level access, dealing with adding and deleting columns in a table, etc. -- here is where you would find views useful. Views and SP&#039;s provide the best means of implementation and data abstraction.]]></description>
+		<content:encoded><![CDATA[<p>Good article with food for thought! Here are my 2 cents:</p>
+<p>Stored procedures are really important for implementing security features IMHO. For example, you can give your MySQL user which logs into the database from a web application just SELECT and EXECUTE privileges. Any CRUD operations will have to go through SP&#8217;s running with DEFINER privileges (assuming that the definer has CRUD privileges), but for most adequately normalized schemata, these usually require operations on multiple tables which need to be executed within a transaction as a logical unit. Keeping that logic inside a SP makes application development much simpler IMHO and eliminates the need for CRUD privileges at the table level. SELECT statements can be executed normally by client application code since they are read-only. And since MySQL lacks the ROLE features of Oracle, PostgreSQL et al., you can mimic that by implementing login validation checks within a SP.</p>
+<p>And speaking of table-level access, dealing with adding and deleting columns in a table, etc. &#8212; here is where you would find views useful. Views and SP&#8217;s provide the best means of implementation and data abstraction.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Shantanu Oak				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-232430</link>
+		<dc:creator><![CDATA[Shantanu Oak]]></dc:creator>
+		<pubDate>Thu, 06 Mar 2014 13:57:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-232430</guid>
+					<description><![CDATA[PHP has great testing/ debugging tools and cool IDE is available for free. And I still see a lot of sloppy code. For simple tasks I do always insist on procedures. As noted by Bill Karwin I have seen companies where they had a policy that all SQL (MS-SQL) code was mandated to be implemented as stored procedures. I do not agree with such an aggressive view.]]></description>
+		<content:encoded><![CDATA[<p>PHP has great testing/ debugging tools and cool IDE is available for free. And I still see a lot of sloppy code. For simple tasks I do always insist on procedures. As noted by Bill Karwin I have seen companies where they had a policy that all SQL (MS-SQL) code was mandated to be implemented as stored procedures. I do not agree with such an aggressive view.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Daniël van Eeden				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230871</link>
+		<dc:creator><![CDATA[Daniël van Eeden]]></dc:creator>
+		<pubDate>Tue, 11 Feb 2014 20:47:01 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230871</guid>
+					<description><![CDATA[I think Stored routines should be used with care and only in cases which would heavily bennefit from running close to the data or which can&#039;t easily be done otherwise. And also for things which need to be scheduled with the event scheduler.
+
+There are a few other alternatives to SQL/PSM: Using UDFs (also a great way to crash a server!) or something which is ran by a UDF like the V8 UDF from Roland Bouman: http://www.slideshare.net/rpbouman/my-sq-lv8udfs]]></description>
+		<content:encoded><![CDATA[<p>I think Stored routines should be used with care and only in cases which would heavily bennefit from running close to the data or which can&#8217;t easily be done otherwise. And also for things which need to be scheduled with the event scheduler.</p>
+<p>There are a few other alternatives to SQL/PSM: Using UDFs (also a great way to crash a server!) or something which is ran by a UDF like the V8 UDF from Roland Bouman: <a href="http://www.slideshare.net/rpbouman/my-sq-lv8udfs" rel="nofollow ugc">http://www.slideshare.net/rpbouman/my-sq-lv8udfs</a></p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Bill Karwin				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230657</link>
+		<dc:creator><![CDATA[Bill Karwin]]></dc:creator>
+		<pubDate>Sun, 09 Feb 2014 00:15:27 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230657</guid>
+					<description><![CDATA[I have also observed heavy reliance on stored procedures become a bottleneck for performance. 
+
+The environment had many PHP app servers that were mostly idle, while the single database server whose CPU load was pegged.
+
+It turned out the project had a policy that all SQL code was mandated to be implemented as stored procedures. Many of the procedures did dynamic SQL, and had to do complex validation of input parameters against INFORMATION_SCHEMA to assure against SQL injection.
+
+So a disproportionate amount of application load was focused on the single db server, instead of distributed over many app servers where it could be scaled better.]]></description>
+		<content:encoded><![CDATA[<p>I have also observed heavy reliance on stored procedures become a bottleneck for performance. </p>
+<p>The environment had many PHP app servers that were mostly idle, while the single database server whose CPU load was pegged.</p>
+<p>It turned out the project had a policy that all SQL code was mandated to be implemented as stored procedures. Many of the procedures did dynamic SQL, and had to do complex validation of input parameters against INFORMATION_SCHEMA to assure against SQL injection.</p>
+<p>So a disproportionate amount of application load was focused on the single db server, instead of distributed over many app servers where it could be scaled better.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Justin Swanhart				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230507</link>
+		<dc:creator><![CDATA[Justin Swanhart]]></dc:creator>
+		<pubDate>Fri, 07 Feb 2014 01:07:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230507</guid>
+					<description><![CDATA[Mark,
+
+Flexviews does just that.  The logging function checks a session variable and only does the inserts in debug mode to reduce overhead.]]></description>
+		<content:encoded><![CDATA[<p>Mark,</p>
+<p>Flexviews does just that.  The logging function checks a session variable and only does the inserts in debug mode to reduce overhead.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Mark Leith				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230497</link>
+		<dc:creator><![CDATA[Mark Leith]]></dc:creator>
+		<pubDate>Thu, 06 Feb 2014 22:46:03 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230497</guid>
+					<description><![CDATA[For debugging (and even tracing usage pre 5.7 and the new stored program instrumentation that Marc mentions above), I don&#039;t know why more people don&#039;t instrument stored programs like they do applications - add logging.
+
+I&#039;m a great proponent of having the database manage itself for routine tasks, and have written routines that do things like daily partition management, killing long running transactions, etc. (many things like common schema), and have always built logging in to them.
+
+The current &quot;framework&quot; I use is a standard InnoDB table with timestamp, program name, log level (debug, notice, warning, critical) and a string message. A procedure and or function that wraps inserting the messages (takes level, program name and message), and a table that stores the config for each program (name, log level set). Each program fetches it&#039;s own config and then starts to log at the appropriate level depending on the flag. These can range from logging actions taken, to performance debugging (because the logs have a millisecond resolution timestamp).
+
+Now, the extra overhead this might add to performance critical routines may not be insignificant, but you can set it to not log too, and skip most of it (other than config check).
+
+The log table itself is partitioned, and managed with events with a rolling window stored (that log to the log table!)]]></description>
+		<content:encoded><![CDATA[<p>For debugging (and even tracing usage pre 5.7 and the new stored program instrumentation that Marc mentions above), I don&#8217;t know why more people don&#8217;t instrument stored programs like they do applications &#8211; add logging.</p>
+<p>I&#8217;m a great proponent of having the database manage itself for routine tasks, and have written routines that do things like daily partition management, killing long running transactions, etc. (many things like common schema), and have always built logging in to them.</p>
+<p>The current &#8220;framework&#8221; I use is a standard InnoDB table with timestamp, program name, log level (debug, notice, warning, critical) and a string message. A procedure and or function that wraps inserting the messages (takes level, program name and message), and a table that stores the config for each program (name, log level set). Each program fetches it&#8217;s own config and then starts to log at the appropriate level depending on the flag. These can range from logging actions taken, to performance debugging (because the logs have a millisecond resolution timestamp).</p>
+<p>Now, the extra overhead this might add to performance critical routines may not be insignificant, but you can set it to not log too, and skip most of it (other than config check).</p>
+<p>The log table itself is partitioned, and managed with events with a rolling window stored (that log to the log table!)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230469</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 06 Feb 2014 13:02:04 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230469</guid>
+					<description><![CDATA[@Marc,
+LOL, precompile for SQL is hack of the day!
+
+Thanks for the performance_schema pointer. It seems like p_s turns into the answer for the universe.]]></description>
+		<content:encoded><![CDATA[<p>@Marc,<br />
+LOL, precompile for SQL is hack of the day!</p>
+<p>Thanks for the performance_schema pointer. It seems like p_s turns into the answer for the universe.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Marc Alff				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230465</link>
+		<dc:creator><![CDATA[Marc Alff]]></dc:creator>
+		<pubDate>Thu, 06 Feb 2014 11:23:08 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230465</guid>
+					<description><![CDATA[Just a couple of points to notice.
+
+About debugging, one can (agreed, it takes some extra work) add asserts -- yes, assert -- in the stored program logic.
+
+http://stackoverflow.com/questions/9238978/sql-scripts-does-the-equivalent-of-a-define-exist/9276721#9276721
+
+And up vote me while you are at it. Yes, shameless ;)
+
+About the trash bin, the performance schema can help.
+
+SELECT OBJECT_TYPE, OBJECT_SCHEMA, OBJECT_NAME
+FROM events_statements_summary_by_program
+WHERE COUNT_STAR = 0
+
+Regards,
+-- Marc]]></description>
+		<content:encoded><![CDATA[<p>Just a couple of points to notice.</p>
+<p>About debugging, one can (agreed, it takes some extra work) add asserts &#8212; yes, assert &#8212; in the stored program logic.</p>
+<p><a href="http://stackoverflow.com/questions/9238978/sql-scripts-does-the-equivalent-of-a-define-exist/9276721#9276721" rel="nofollow ugc">http://stackoverflow.com/questions/9238978/sql-scripts-does-the-equivalent-of-a-define-exist/9276721#9276721</a></p>
+<p>And up vote me while you are at it. Yes, shameless 😉</p>
+<p>About the trash bin, the performance schema can help.</p>
+<p>SELECT OBJECT_TYPE, OBJECT_SCHEMA, OBJECT_NAME<br />
+FROM events_statements_summary_by_program<br />
+WHERE COUNT_STAR = 0</p>
+<p>Regards,<br />
+&#8212; Marc</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230463</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Thu, 06 Feb 2014 10:41:27 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230463</guid>
+					<description><![CDATA[@gggeek,
+
+Thank you. Good comments; allow me to reply to some:
+
+- &quot;Having used extensively pl/sql in the past, it seems to me that most of these points are either moot or only apply to the particular flavour of stored-procedures available in mysql, but not in other rdbms.&quot; 
+
+-&gt; Exactly so. The title of this post clearly states &quot;MySQL&quot;, and specifically indicates the use of MySQL stored routines.
+
+- Debugging: please suggest &quot;a plethora of tools and techniques to help you do that&quot; *on MySQL* :) 
+
+- &quot;In fact stored routines help shield the app from the db schema implementation, as they expose an API which is closer to the business logic than to storage concerns.&quot;
+
+-&gt; agreed. I mention this in the text: &quot;...security (with stored routines you can obfuscate/hide internal datasets, and provide with limited and expected API)... &quot;
+
+- &quot;When you mention adding a column, you forget to mention that all app code written directly accessing the table must not have a select *, or there are still chances it might break.
+And what about changing the semantics/type of a column or table, or dropping it altogether? Could you do an upgrade-without-stop-the-world when NOT using stored procedures? Would direct-table-access help?&quot;
+
+-&gt; Yes, there are ways to refactor a table without-top-the-world when not using stored procedures. Ironically, I am author of the first such tool for MySQL called &lt;a href=&quot;http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html&quot; rel=&quot;nofollow&quot;&gt;oak-online-alter-table&lt;/a&gt;, later forked by Facebook and re-implemented by Percona, and it uses triggers, which are some form of stored routines in MySQL as you indicated. This solution allows direct table access even while table is being altered.
+
+- &quot;testing: lazy devs do not write tests for their app code, either.&quot;
+
+-&gt; I agree. However, when you throw a developer into an environment that has poor support for testing, as opposed to throwing her into an environment with strong support for testing, where would you expect said developer to be more tests-productive?
+
+- &quot;efficiency. Putting code close to the data gives you order of magnitude improvements over using an ORM in speed of execution and resource consumption&quot;
+
+-&gt; I did in fact mention that; I also stated that this post does not zoom into this.
+
+- multi-app access. Encapsulating data access in an API layer means you can write apps in java, php, c#, without having to reimplement the same data consistency checks and table joins in all of them
+
+-&gt; Absolutely agree. But also to the point of having a single server possibly do the CPU computation that multiple other servers might have done themselves.
+
+- migrating to a different database vendor.
+
+-&gt; Hear here. I have yet to see a large scale database use that is completely abstractized. 
+
+I believe you come from the world of Oracle DB. I am well accustomed to training Oracle or SQL Server DBAs migrating to MySQL. The MySQL stored routines are not nearly as strong or fast as those in Oracle &amp; SQL Server. There is a painful switch such DBAs have to make when switching over to MySQL.
+
+Thanks again]]></description>
+		<content:encoded><![CDATA[<p>@gggeek,</p>
+<p>Thank you. Good comments; allow me to reply to some:</p>
+<p>&#8211; &#8220;Having used extensively pl/sql in the past, it seems to me that most of these points are either moot or only apply to the particular flavour of stored-procedures available in mysql, but not in other rdbms.&#8221; </p>
+<p>-> Exactly so. The title of this post clearly states &#8220;MySQL&#8221;, and specifically indicates the use of MySQL stored routines.</p>
+<p>&#8211; Debugging: please suggest &#8220;a plethora of tools and techniques to help you do that&#8221; *on MySQL* 🙂 </p>
+<p>&#8211; &#8220;In fact stored routines help shield the app from the db schema implementation, as they expose an API which is closer to the business logic than to storage concerns.&#8221;</p>
+<p>-> agreed. I mention this in the text: &#8220;&#8230;security (with stored routines you can obfuscate/hide internal datasets, and provide with limited and expected API)&#8230; &#8221;</p>
+<p>&#8211; &#8220;When you mention adding a column, you forget to mention that all app code written directly accessing the table must not have a select *, or there are still chances it might break.<br />
+And what about changing the semantics/type of a column or table, or dropping it altogether? Could you do an upgrade-without-stop-the-world when NOT using stored procedures? Would direct-table-access help?&#8221;</p>
+<p>-> Yes, there are ways to refactor a table without-top-the-world when not using stored procedures. Ironically, I am author of the first such tool for MySQL called <a href="http://openarkkit.googlecode.com/svn/trunk/openarkkit/doc/html/oak-online-alter-table.html" rel="nofollow">oak-online-alter-table</a>, later forked by Facebook and re-implemented by Percona, and it uses triggers, which are some form of stored routines in MySQL as you indicated. This solution allows direct table access even while table is being altered.</p>
+<p>&#8211; &#8220;testing: lazy devs do not write tests for their app code, either.&#8221;</p>
+<p>-> I agree. However, when you throw a developer into an environment that has poor support for testing, as opposed to throwing her into an environment with strong support for testing, where would you expect said developer to be more tests-productive?</p>
+<p>&#8211; &#8220;efficiency. Putting code close to the data gives you order of magnitude improvements over using an ORM in speed of execution and resource consumption&#8221;</p>
+<p>-> I did in fact mention that; I also stated that this post does not zoom into this.</p>
+<p>&#8211; multi-app access. Encapsulating data access in an API layer means you can write apps in java, php, c#, without having to reimplement the same data consistency checks and table joins in all of them</p>
+<p>-> Absolutely agree. But also to the point of having a single server possibly do the CPU computation that multiple other servers might have done themselves.</p>
+<p>&#8211; migrating to a different database vendor.</p>
+<p>-> Hear here. I have yet to see a large scale database use that is completely abstractized. </p>
+<p>I believe you come from the world of Oracle DB. I am well accustomed to training Oracle or SQL Server DBAs migrating to MySQL. The MySQL stored routines are not nearly as strong or fast as those in Oracle &#038; SQL Server. There is a painful switch such DBAs have to make when switching over to MySQL.</p>
+<p>Thanks again</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: gggeek				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/why-delegating-code-to-mysql-stored-routines-is-poor-engineering-practice/comment-page-1#comment-230462</link>
+		<dc:creator><![CDATA[gggeek]]></dc:creator>
+		<pubDate>Thu, 06 Feb 2014 10:20:28 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6713#comment-230462</guid>
+					<description><![CDATA[ps: not to sound too much like a fanboy / grumpy old fart:
+
+a) big drawback of using stored procs for your whole application: yes, the db-based languages suck big time compared to ruby/php/python
+
+b) I am not against IDEs in general. When coding on Oracle, I always asked my employer to shell out for a license of TOAD before I&#039;d sign the contract]]></description>
+		<content:encoded><![CDATA[<p>ps: not to sound too much like a fanboy / grumpy old fart:</p>
+<p>a) big drawback of using stored procs for your whole application: yes, the db-based languages suck big time compared to ruby/php/python</p>
+<p>b) I am not against IDEs in general. When coding on Oracle, I always asked my employer to shell out for a license of TOAD before I&#8217;d sign the contract</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

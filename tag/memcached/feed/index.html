@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>memcached &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/memcached/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 05 Oct 2012 07:20:20 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>MySQL 5.6 new features: the user&#8217;s perspective</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-5-6-new-features-the-users-perspective</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-5-6-new-features-the-users-perspective#comments</comments>
+				<pubDate>Fri, 05 Oct 2012 07:20:20 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[New Features]]></category>
+		<category><![CDATA[Opinions]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=5573</guid>
+				<description><![CDATA[This is a yet-another compilation of the new MySQL 5.6 feature set. It is not a complete drill down. This list reflects what I believe to be the interesting new features user and usability -wise. For example, I won&#8217;t be listing InnoDB&#8217;s split of kernel mutex. I&#8217;m assuming it can have a great impact on [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is a yet-another compilation of the new MySQL <strong>5.6</strong> feature set. It is not a complete drill down. This list reflects what I believe to be the interesting new features user and usability -wise.</p>
+<p>For example, I won&#8217;t be listing InnoDB&#8217;s split of kernel mutex. I&#8217;m assuming it can have a great impact on overall performance due to reducing lock contention; but usability-wise, this is very internal.</p>
+<p>The complication is an aggregate of the many announcements and other complications published earlier on. See a reference at the end of this post.</p>
+<p>Do note I am not using <strong>5.6</strong> as yet; it is in RC, not GA. I am mostly excited just to write down this list.</p>
+<h4>InnoDB</h4>
+<ul>
+<li>Online <strong>ALTER TABLE</strong>: if there is one major new feature in <strong>5.6</strong> you would want to upgrade for, this would be it. Add columns, drop columns, rename columns, add indexes, drop indexes &#8211; now online, while your <strong>SELECT, INSERT, UPDATE</strong> and <strong>DELETE</strong> statements are running.</li>
+<li>Transportable tablespace files: copy+paste <strong>your_table.ibd</strong> files with <strong>FLUSH TABLE FOR EXPORT</strong> and <strong>ALTER TABLE &#8230; IMPORT TABLESPACE</strong>.</li>
+<li><strong>FULLTEXT</strong>: for many, the one thing holding them back from leaving MyISAM behind. Now available in InnoDB with same syntax as with MyISAM.</li>
+<li>Memcached API: access InnoDB data via memcahced protocol, and skip the SQL interface.</li>
+<li>User defined table location: place your tables in your pre-defined location. Place other tables elsewhere. This is something I&#8217;ve been asked about for ages.</li>
+</ul>
+<h4><span id="more-5573"></span>Replication</h4>
+<ul>
+<li>Global Transaction IDs: I&#8217;m still to fully understand the limitations: MyISAM and temporary tables make a mess; this could be a killer feature when it comes to replication: no more master log file, master log pos, relay master log file, relay log pos, read master log file, read master log pos (if I wake you up at <strong>3:00am</strong>, will you be able to cite the difference?). Just one single unique identifier for each transaction in the binary log, so it&#8217;s much easier for slaves to connect to master, or to switch over to replicate another server.</li>
+<li>Multi threaded slaves: with a thread-per-schema, and assuming complete isolation of schemas</li>
+<li>Delayed replication: a must-have, in my opinion, on any replication topology using <strong>3-4</strong> servers.</li>
+<li>Checksums: verify shipment of binary logs from master to slave by adding a checksum on log entries.</li>
+<li>Crash safe slaves: forget about master.info not syncing to disk. Now using InnoDB for that.</li>
+</ul>
+<h4>Partitioning</h4>
+<ul>
+<li>Partition-to-table, table-to-partition: I&#8217;ve encountered the need for this in the past. In one case, it was the issue of backing up single partitions for archiving, then restoring particular partitions from the past into the existing table. Some Oracle users, upon hearing about the <strong>5.1</strong>, <strong>5.5</strong> partition features, were wondering about this missing feature. Their words: &#8220;MySQL is still in the very early stages of managing partitions. As it grows it will have to include partition-to-table, as well as other already-standard-in-Oracle features&#8221;. They were right.</li>
+<li>Reduced locking: don&#8217;t you hate it when you partition by date, INSERT into the last partition, only to find out you actually acquired locks for <em>all</em> partitions? Hopefully this is gone now (hoping I&#8217;m not wrong on this?)</li>
+<li>Choose partitions in query à la <strong>SELECT * FROM my_table PARTITION (p7)</strong></li>
+</ul>
+<h4>Query Execution Plan</h4>
+<ul>
+<li><strong>EXPLAIN</strong> for <strong>UPDATE, DELETE, INSERT</strong>: pretty sure everyone wanted that.</li>
+<li>Optimizing subqueries (the notorious <strong>WHERE IN (SELECT &#8230;)</strong>): the <em>&#8220;MySQL does WHAT with subqueries?!?!?!&#8221;</em> invoking behavior of subquery execution is now hopefully met. No longer &#8220;execute the subquery for each row in the outer query&#8221;.</li>
+<li>Index merge optimization: this optimization was rare, in my experience. The new improvements are expected to make it more common.</li>
+<li><strong>EXPLAIN FORMAT=JSON</strong>: I like this kind of stuff. The Json format is much more verbose, and shows the tree-structure of the query execution plan. This would make for a great analysis tool for GUI editors!</li>
+</ul>
+<h4>PERFORMANCE_SCHEMA</h4>
+<ul>
+<li>A gazillion more tables. I am yet to drill down into <strong>P_S</strong>. However I can already verify that <strong>5.6</strong> introduces a lot of new tables I&#8217;ve been longing for. Some are actually more fitting in <strong>INFORMATION_SCHEMA</strong>. A lot of new metadata tables. Will write more in the future.</li>
+</ul>
+<p>Some of the above features already exists in earlier releases of Google Patches for MySQL, Percona Server and MariaDB. For example, global transaction IDs and binlog checksums first appeared three and a half years ago in Google Patches, and only now re-created in MySQL. Sometimes the community is far ahead of the MySQL development. But then Oracle does its thing and makes for a great release.</p>
+<p>No doubt the above is an impressive list of enhancements to the server. Some make it a significant step into the &#8220;things are getting serious here&#8221; realm. I can do well with online alter table, auto replication recovery, execution plan improvements, and the many performance boosts not listed here. Not everything will work in all scenarios; but this makes for one release of MySQL I&#8217;m anxious to use.</p>
+<h4>References, chronologically DESC</h4>
+<ul>
+<li><a href="http://mikaelronstrom.blogspot.com/2012/10/my-personal-list-of-new-features-in.html">My personal list of new features in MySQL 5.6 </a>&#8211; Mikael Ronström</li>
+<li><a href="http://svenmysql.blogspot.com/2012/10/failover-and-flexible-replication.html"> Failover and Flexible Replication Topologies in MySQL 5.6 </a>&#8211; Sven</li>
+<li><a href="http://jorgenloland.blogspot.com/2012/10/index-merge-annoyances-fixed-in-mysql-56.html">Index merge annoyances fixed in MySQL 5.6 </a>&#8211; Jørgen Løland</li>
+<li><a href="http://larsthalmann.blogspot.com/2012/10/mysql-connect-2012.html">MySQL Connect 2012 </a>&#8211; Lars Thalmann</li>
+<li><a href="http://lstigile.wordpress.com/2012/09/29/mysqlconnect-auditing-online-ddl-fk-in-cluster-and-more/">MySQLConnect — Auditing, Online DDL, FK in Cluster and More </a>&#8211; Lee Stigile</li>
+<li><a href="http://www.sheeri.com/content/my-thoughts-about-mysql-56">My Thoughts About MySQL 5.6 </a>&#8211; Sheeri K. Cabral</li>
+<li><a href="https://blogs.oracle.com/mysqlinnodb/entry/online_alter_table_in_mysql">Online ALTER TABLE in MySQL 5.6 </a> &#8211; Oracle</li>
+<li><a href="http://dev.mysql.com/tech-resources/articles/mysql-5.6-rc.html"> What&#8217;s New in MySQL 5.6 Release Candidate </a>&#8211; Oracle</li>
+<li><a href="http://www.xaprb.com/blog/2012/08/21/a-summary-of-changes-in-mysql-5-6/">A summary of changes in MySQL 5.6 </a> &#8211; Baron Schwartz</li>
+<li><a href="http://dev.mysql.com/tech-resources/articles/whats-new-in-mysql-5.6.html">What&#8217;s New in MySQL 5.6</a> &#8211; Oracle</li>
+</ul>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-5-6-new-features-the-users-perspective/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">5573</post-id>	</item>
+		<item>
+		<title>On generating unique IDs using LAST_INSERT_ID() and other tools</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools#comments</comments>
+				<pubDate>Wed, 02 Feb 2011 06:50:02 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[NoSQL]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[Query Cache]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3283</guid>
+				<description><![CDATA[There&#8217;s a trick for using LAST_INSERT_ID() to generate sequences in MySQL. Quoting from the Manual: Create a table to hold the sequence counter and initialize it: mysql&#62; CREATE TABLE sequence (id INT NOT NULL); mysql&#62; INSERT INTO sequence VALUES (0); Use the table to generate sequence numbers like this: mysql&#62; UPDATE sequence SET id=LAST_INSERT_ID(id+1); mysql&#62; [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s a <a href="http://dev.mysql.com/doc/refman/5.1/en/information-functions.html#function_last-insert-id">trick</a> for using <strong>LAST_INSERT_ID()</strong> to generate sequences in MySQL. Quoting from the Manual:</p>
+<blockquote>
+<ol type="1">
+<li>Create a table to hold the sequence counter and initialize               it:
+<pre>mysql&gt; <strong><code>CREATE TABLE sequence (id INT NOT NULL);</code></strong>
+mysql&gt; <strong><code>INSERT INTO sequence VALUES (0);</code></strong>
+</pre>
+</li>
+<li>Use the table to generate sequence numbers like this:
+<pre>mysql&gt; <strong><code>UPDATE sequence SET id=LAST_INSERT_ID(id+1);</code></strong>
+mysql&gt; <strong><code>SELECT LAST_INSERT_ID();</code></strong>
+</pre>
+</li>
+</ol>
+</blockquote>
+<p>This trick calls for trouble.</p>
+<h4>Contention</h4>
+<p>A customer was using this trick to generate unique session IDs for his JBoss sessions. These IDs would eventually be written back to the database in the form of log events. Business go well, and one day the customer adds three new JBoss servers (doubling the amount of webapps). All of a sudden, nothing works quite as it used to. All kinds of queries take long seconds to complete; load average becomes very high.<span id="more-3283"></span></p>
+<p>A short investigation reveals that a very slight load is enough to make for an accumulation of sequence-UPDATE queries. Dozens of them are active at any given time, waiting for long seconds.</p>
+<p>InnoDB or MyISAM both make for poor response times. No wonder! Everyone&#8217;s contending for one lock.</p>
+<h4>Not just one</h4>
+<p>Other queries seem to hang as well. Why?</p>
+<p>It is easy to forget or let go unnoticed that there are quite a few global locks involved with each query. If query cache is activated, then any query must pass through that cache, holding the query cache mutex. There&#8217;s a global mutex on MyISAM&#8217;s key cache. There&#8217;s one on InnoDB&#8217;s buffer pool (see multiple buffer pools in InnoDB 5.5), albeit less of an overhead. And there&#8217;s the table cache.</p>
+<p>When table cache is enabled, any completed query attempts to return file handles to the cache. Any new query attempts to retrieve handles from the cache. While writing to the cache (extracting, adding), the cache is locked. When everyone&#8217;s busy doing the sequence-UPDATE, table cache lock is being abused. Other queries are unable to find the time to squire the lock and get on with their business.</p>
+<h4>What can be done?</h4>
+<p>One could try and increase the <strong>table_open_cache</strong> value. That may help to some extent, and for limited time. But the more requests are made, the quicker the problem surfaces again. When, in fact, <em>reducing</em> the <strong>table_open_cache</strong> to zero (well, minimum value is <strong>1</strong>) can make for a great impact. If there&#8217;s nothing to fight for, everyone just get by on their own.</p>
+<p>I know the following is not a scientific explanation, but it hits me as a good comparison: when my daughter brings a friend over, and there&#8217;s a couple of toys, both are happy. A third friend makes for a fight: <em>&#8220;I saw it first! She took it from me! I was holding it!&#8221;</em>. Any parent knows the ultimate solution to this kind of fight: take away the toys, and have them find something else to enjoy doing. OK, sorry for this unscientific display, I had to share my daily stress.</p>
+<p>When no table cache is available, a query will go on opening the table by itself, and will not attempt to return the file handle back to the cache. The file handle will simply be destroyed. Now, usually this is not desired. Caching is good. But in our customer&#8217;s case, the cost of not using a table cache was minified by the cost of having everyone fight for the sequence table. Reducing the table cache made for an immediate relaxation of the database, with observable poorer responsiveness on peak times, however way better than with large table cache.</p>
+<h4>Other tools?</h4>
+<p>I don&#8217;t consider the above to be a good solution. It&#8217;s just a temporary hack.</p>
+<p>I actually don&#8217;t like the <strong>LAST_INSERT_ID()</strong> trick. Moreover, I don&#8217;t see that it&#8217;s the database&#8217;s job to provide with unique IDs. Let it do relational stuff. If generating IDs is too intensive, let someone else do it.</p>
+<p>NoSQL solutions provide such a service. <a href="http://memcached.org/">Memcached</a>, <a href="http://redis.io/">redis</a>, <a href="http://www.mongodb.org/">MongoDB</a> (and probably more) all provide with increment functions. Check them out.</p>
+<h4>Application level solutions</h4>
+<p>I actually use an application level solution to generate unique IDs. I mean, there&#8217;s always <strong>GUID()</strong>, but it&#8217;s result is just too long. Take a look at the following Java code:</p>
+<blockquote>
+<pre>public class Utils {
+  private static long lastUniqueNumber = 0;
+
+  public static synchronized long uniqueNumber() {
+    long unique = System.currentTimeMillis();
+    if (unique &lt;= lastUniqueNumber)
+      unique = lastUniqueNumber + 1;
+    lastUniqueNumber = unique;
+    return unique;
+  }
+}</pre>
+</blockquote>
+<p>Within a Java application this above method returns with unique IDs, up to 1000 per second on average (and it can perform way more than 1000 times per second).</p>
+<p>On consequential executions of applications on the same machine one would still expect unique values due to the time-related nature of values. However, computer time changes. It&#8217;s possible that <strong>System.currentTimeMillis()</strong> would return a value already used in the past.</p>
+<p>And, what about two processes running on the same machine at the same time? Or on different machine?</p>
+<p>Which is why I use the following combination to generate my unique IDs:</p>
+<ul>
+<li>Server ID (much like MySQL&#8217;s server_id parameter). this could be the last byte in the server&#8217;s IP address, or just 4 or 5 bits if not too many players are expected.</li>
+<li>Process ID (plain old <em>pid</em>) which I pass to the Java runtime in the form of system properties. Any two processes running on the same machine are assured to have different IDs. Two consequently spawned processes will have different IDs. The time it would take to cycle the process IDs is way more than would make for a &#8220;time glitch&#8221; problem as described above</li>
+<li>Current time in milliseconds.</li>
+</ul>
+<p>If you have to have everything withing 64 bit (BIGINT) then you&#8217;ll have to do bit manipulation, and drop some of the MSB on the milliseconds so as to overwrite with server &amp; process IDs.</p>
+<p>If you are willing to have your IDs unique in the bounds of a given time frame (so, for example, a month from now you wouldn&#8217;t mind reusing old IDs), then the problem is significantly easier. You may just use &#8220;day of month&#8221; and &#8220;millis since day start&#8221; and save those precious bits.</p>
+<h4>Still other?</h4>
+<p>Please share your solutions below!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/on-generating-unique-ids-using-last_insert_id-and-other-tools/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3283</post-id>	</item>
+		<item>
+		<title>Using memcached functions for MySQL; an automated alternative to Query Cache</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache#comments</comments>
+				<pubDate>Mon, 15 Dec 2008 05:56:14 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[Query Cache]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=89</guid>
+				<description><![CDATA[There&#8217;s a lot of buzz around memcached. memcached is widely used, and has clients for many programming languages and platforms. TangentOrg have developed a memcached client in the form of MySQL UDFs (User Defined Functions). I wish to discuss the memcached functions for MySQL: if and how they should be used. Disclaimer: I do not [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>There&#8217;s a lot of buzz around memcached. memcached is widely used, and has clients for many programming languages and platforms. <a href="http://tangent.org/">TangentOrg</a> have developed a memcached client in the form of MySQL UDFs (User Defined Functions).</p>
+<p>I wish to discuss the memcached functions for MySQL: if and how they should be used.</p>
+<p>Disclaimer: I do not work with memcached functions for MySQL on a production system; all that is written here reflects my opinion on how things should be done.</p>
+<p>With memcached functions for MySQL, we can do the following:</p>
+<blockquote>
+<pre><strong>SELECT </strong>memc_set('mykey', 'The answer is 42');
+<strong>SELECT </strong>memc_get('mykey');</pre>
+</blockquote>
+<p>(See my previous post on how to <a title="Installing memcached functions for MySQL" href="https://shlomi-noach.github.io/blog/mysql/installing-memcached-functions-for-mysql">install memcached functions for MySQL</a>).</p>
+<h4>In what scenario should we use these functions?</h4>
+<p>I believe memcached is the right tool for the application level. I am less enthusiastic about using it from MySQL. Sure, pushing it down to MySQL centralizes everything. Instead of having all my application code (PHP, Java etc.) access memcached separately, they can all access one single MySQL node, which gets to access memcached. I see two problems with this approach:<span id="more-89"></span></p>
+<ul>
+<li>Doing this adds load on the database. I think the greatest advantage of memcached is that it allows us to alleviate load from the database. By pushing everything into MySQL we counter that benefit. We pay here both for loading the MySQL network and for the CPU consumed by MySQL to do the job. In a distributed application which used memcached, every server gets to take some of the load.</li>
+<li>It seems to me as a flawed design. The database should be at an end point, and should not rely on anything except the operating system, file system and network. Sure, there could be applications talking to the database, but the database should be able to work all by itself. By putting memcached <em>behind</em> the database, we make the database dependent upon an external application.</li>
+</ul>
+<h4>How about memcached <em>increments</em>?</h4>
+<p>memcached provides an increment mechanism, which can be used by MySQL to create distinct PRIMARY KEYs, like sequences in other databases. While this seems attractive, this feature fits most into the second point above: it makes MySQL completely dependant on memcached. So if memcached is down, MySQL is unable to generate keys.</p>
+<h4>memcahced invalidation</h4>
+<p>I believe a very good use would be to let MySQL invalidate cached data. Not set or get anything, just invalidate. To explain, let&#8217;s compare with MySQL&#8217;s query cache. I&#8217;ll be using <a title="MySQL's world database setup" href="http://dev.mysql.com/doc/world-setup/en/world-setup.html">MySQL&#8217;s world database</a>.</p>
+<p>It is a known issue with the query cache, that if you change (INSERT/UPDATE/DELETE) data within a certain table, all queries involved with that table are invalidated. Take a look at the following:</p>
+<blockquote>
+<pre><strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';
+<strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';
+<strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';</pre>
+</blockquote>
+<p>The UPDATE does not affect the results for the SELECT query. Nevertheless, the second SELECT does not return from the query cache, since it&#8217;s invalidated by the UPDATE.</p>
+<p>memcached can be used to solve this problem in a programmatic way. Let&#8217;s look at a short python program:<strong> memcached_test.py</strong>. What is does (see blue highlighted rows) is connect to memcached; connect to MySQL, and try to get the results for following from memcached:</p>
+<blockquote>
+<pre><strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='BLZ';
+<strong>SELECT </strong>* <strong>FROM </strong>City <strong>WHERE </strong>CountryCode='CHE';</pre>
+</blockquote>
+<p>If these results are in memcached, they are returned immediately. If not, they are retrieved from MySQL, then inserted into memcached. The results for &#8216;CHE&#8217; are under the &#8216;City:CHE&#8217; key, and &#8216;BLZ&#8217; is under &#8216;City:BLZ&#8217;.</p>
+<blockquote>
+<pre><strong>import </strong>MySQLdb
+<strong>import </strong>memcache
+
+<strong>def </strong>select_cities_by_country(country_code):
+	key = <span style="color: #993300;"><strong>"City:"</strong></span>+country_code
+	<span style="color: #3366ff;">cities = memcache_client.get(key)</span>
+	<strong>if </strong>cities:
+		found_in_memcached = <strong>True</strong>
+	<strong>else</strong>:
+		cursor = conn.cursor()
+		cursor.execute(<span style="color: #993300;"><strong>"""
+			SELECT Name, CountryCode,
+			Population FROM City
+			WHERE CountryCode=%s"""</strong></span>,
+				country_code)
+		<span style="color: #3366ff;">cities = cursor.fetchall()</span>
+		<span style="color: #3366ff;">memcache_client.set(key, cities, 100)</span>
+		cursor.close()
+		found_in_memcached = <strong>False</strong>
+	<strong>for </strong>row <strong>in </strong>cities:
+		print <span style="color: #993300;"><strong>"%s, %s: %d"</strong></span> % (row[0], row[1], row[2])
+	print <span style="color: #993300;"><strong>"%s found in memcached? %s\n"</strong></span> % (
+                country_code, found_in_memcached)
+
+conn = <strong>None</strong>
+<strong>try</strong>:
+	<strong>try</strong>:
+		conn = MySQLdb.connect(
+			host=<span style="color: #993300;"><strong>"localhost"</strong></span>,
+                        user=<span style="color: #993300;"><strong>"myuser"</strong></span>,
+			passwd=<span style="color: #993300;"><strong>"mypassword"</strong></span>,
+			unix_socket=<span style="color: #993300;"><strong>"/tmp/mysql.sock"</strong></span>,
+                        db=<span style="color: #993300;"><strong>"world"</strong></span>)
+		memcache_client = memcache.Client([<span style="color: #993300;"><strong>"127.0.0.1:11211"</strong></span>])
+
+		select_cities_by_country(<span style="color: #993300;"><strong>"BLZ"</strong></span>);
+		select_cities_by_country(<span style="color: #993300;"><strong>"CHE"</strong></span>);
+	<strong>except </strong>Exception, err:
+		print err
+<strong>finally</strong>:
+	<strong>if </strong>conn:
+		conn.close()</pre>
+</blockquote>
+<p>Let&#8217;s run this program. This is a first time run, so obviously nothing is in memcached:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <strong>False</strong>
+
+Zurich, CHE: 336800
+Geneve, CHE: 173500
+Basel, CHE: 166700
+Bern, CHE: 122700
+Lausanne, CHE: 114500
+<strong>CHE </strong>found in memcached? <strong>False</strong></pre>
+</blockquote>
+<p>Immediately executed again, we get results from memcached:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <strong>True</strong>
+
+Zurich, CHE: 336800
+Geneve, CHE: 173500
+Basel, CHE: 166700
+Bern, CHE: 122700
+Lausanne, CHE: 114500
+<strong>CHE </strong>found in memcached? <strong>True</strong></pre>
+</blockquote>
+<p>We are going to execute the following query:</p>
+<blockquote>
+<pre><strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';</pre>
+</blockquote>
+<p>But nothing as yet will invalidate our memcached values. Let&#8217;s set up TRIGGERs on the City table:</p>
+<blockquote>
+<pre><strong>DELIMITER </strong>$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AI $$
+<strong>CREATE TRIGGER</strong> City_AI <strong>AFTER INSERT ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>NEW</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AU $$
+<strong>CREATE TRIGGER</strong> City_AU <strong>AFTER UPDATE ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>OLD</strong>.CountryCode)) <strong>INTO </strong>@discard;
+  <strong>SELECT </strong>memc_delete(<strong>CONCAT</strong>('City:',<strong>NEW</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DROP TRIGGER IF EXISTS</strong> City_AD $$
+<strong>CREATE TRIGGER</strong> City_AD <strong>AFTER DELETE ON</strong> City
+<strong>FOR EACH ROW
+BEGIN
+  SELECT</strong> memc_delete(<strong>CONCAT</strong>('City:',<strong>OLD</strong>.CountryCode)) <strong>INTO </strong>@discard;
+<strong>END</strong>;
+$$
+
+<strong>DELIMITER </strong>;</pre>
+</blockquote>
+<p>These triggers will cause any change to a city invalidates all cities in the same country. Naive? Far less than MySQL&#8217;s query cache. Let&#8217;s put this to the test:</p>
+<blockquote>
+<pre>mysql&gt; <strong>UPDATE </strong>City <strong>SET </strong>Population=Population+1 <strong>WHERE </strong>CountryCode='CHE';
+Query OK, 5 rows affected (0.01 sec)
+Rows matched: 5  Changed: 5  Warnings: 0</pre>
+</blockquote>
+<p>And run out python program one last time:</p>
+<blockquote>
+<pre><strong>$ python memcached_test.py</strong>
+Belize City, BLZ: 55810
+Belmopan, BLZ: 7105
+<strong>BLZ </strong>found in memcached? <span style="color: #339966;"><strong>True</strong></span>
+
+Zurich, CHE: 336801
+Geneve, CHE: 173501
+Basel, CHE: 166701
+Bern, CHE: 122701
+Lausanne, CHE: 114501
+<strong>CHE </strong>found in memcached? <span style="color: #339966;"><strong>False</strong></span></pre>
+</blockquote>
+<p>Right! The &#8216;CHE&#8217; values were invalidated, and could not be found in memcaches. &#8216;BLZ&#8217;, however, wasn&#8217;t disturbed.</p>
+<p>We can further improve our invalidation mechanism to check only for changes for desired columns. This will require some more code in our triggers.</p>
+<h4>Notes</h4>
+<p>The triggers themselves pose a performance penalty on our code. It is assumed that SELECTs are more important here, or else we would not use caching at all. At any case, the example provided here has not been benchmarked, and its value can only be estimated in your real life situation.</p>
+<h4>Conclusion</h4>
+<p>I believe invalidation is the most interesting part of memcached functions for MySQL. It makes the most sense:</p>
+<ul>
+<li>No data passes between MySQL and memcached.</li>
+<li>The application isn&#8217;t even aware that MySQL is talking to memcached. MySQL does everything internally using triggers.</li>
+<li>MySQL does not depend on memcached. If memcached goes away, the triggers will simply have no effect. It is still possible that due to temporary network failure, an invalidation is skipped. But memcached supports us by adding a timeout for cached values, so we have some kind of &#8220;backup plan&#8221;.</li>
+</ul>
+<p>Please share below your insights and real life experience with memcached functions for MySQL.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/using-memcached-functions-for-mysql-an-automated-alternative-to-query-cache/feed</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">89</post-id>	</item>
+		<item>
+		<title>Installing memcached functions for MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/installing-memcached-functions-for-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/installing-memcached-functions-for-mysql#comments</comments>
+				<pubDate>Wed, 10 Dec 2008 07:56:30 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[memcached]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=316</guid>
+				<description><![CDATA[tangent.org provide a memcached client for MySQL, in the form of UDFs. The provided set of functions allow for connecting to a memcached server, putting values in the cache, getting values, invalidating, utilizing increments etc.
+
+The code is not (yet?) available in binary format, so the libraries need to be compiled and installed manually. Following is a quick installation HOWTO for Linux users.]]></description>
+								<content:encoded><![CDATA[<p><a href="http://tangent.org/">tangent.org</a> provide a memcached client for MySQL, in the form of UDFs. The provided set of functions allow for connecting to a memcached server, putting values in the cache, getting values, invalidating, utilizing increments etc.</p>
+<p>The code is not (yet?) available in binary format, so the libraries need to be compiled and installed manually. Following is a quick installation HOWTO for Linux users.<span id="more-316"></span></p>
+<p>I have installed on Ubuntu 8.04, running on an old IBM ThinkPad (600X) which has ~490MB and 10GB of disk space, with a 500MHz who-knows-which Intel processor. Well, that&#8217;s the machine on which I experiment&#8230; The setup I&#8217;ve tested is a single machine setup, with a single memcached instance.</p>
+<h4>memcached</h4>
+<p>To start with, you need to have the <a href="http://www.danga.com/memcached/">memcached</a> daemon installed. Easy enough:</p>
+<blockquote>
+<pre>sudo apt-get install memcached</pre>
+</blockquote>
+<p>That should install memcached and start the daemon, on the default 11211 port (see /etc/memcached.conf)</p>
+<h4>libmemcached</h4>
+<p>Next, memcached functions for MySQL depend on <a href="http://tangent.org/552/libmemcached.html">libmemcached</a>. This one comes with RPM and SRPM builds, but I&#8217;m running on Ubuntu/Debian, which invites trouble: I&#8217;ve tried installing the RPM, but got into dependency hell. I thought I may as well just compile the sources. And so I&#8217;ve downloaded libmemcached-0.25.tar.gz, and went throught the usualy steps:</p>
+<blockquote>
+<pre>tar xzfv libmemcached-0.25.tar.gz
+cd libmemcached-0.25/
+./configure
+make
+sudo make install</pre>
+</blockquote>
+<p>The configure script did give me some trouble, claiming something about invalid struct padding. Running configure with</p>
+<blockquote>
+<pre>bash -x configure</pre>
+</blockquote>
+<p>has shown that I was simply missing the g++ compiler. Once installed, all went well.</p>
+<h4>MySQL</h4>
+<p>We do need to have MySQL up and running, of course. Required version is 5.0 and above. But we also need to have <strong>mysql_config</strong>. This tool does not come with the standard apt-get package for debian/ubuntu. It is available in the develop package, though:</p>
+<blockquote>
+<pre>sudo apt-get install libmysqlclient-dev</pre>
+</blockquote>
+<p>RedHat and derived users can use the <strong>mysql-devel</strong> RPM. I have MySQL installed from binary tarball, so <strong>mysql_config</strong> is already there.</p>
+<h4>More dependencies</h4>
+<p>The README states you need to have the latest <strong>autoconf</strong> tools. <strong>pkg-config</strong> was required.</p>
+<h4>memcached funtions for MySQL</h4>
+<p>Finally, we get to business. Download sources for <a href="http://tangent.org/586/Memcached_Functions_for_MySQL.html">memcached functions to MySQL</a>.</p>
+<blockquote>
+<pre>tar xzfv memcached_functions_mysql-0.7.tar.gz
+cd memcached_functions_mysql-0.7/
+./configure --with-mysql=/usr/local/mysql/bin/mysql_config --libdir=/usr/local/mysql/lib/mysql
+make
+sudo make install</pre>
+</blockquote>
+<p>The parameters to <strong>configure</strong> are the location of <strong>mysql_config</strong>, and the destination into which the libraries are written. Since I&#8217;ve installed my MySQL tarball on <strong>/usr/local/mysql</strong>, my destination is <strong>/usr/local/mysql/lib/mysql</strong>. You may wish to set this one up differently. Once the process is done, see that the libraries have indeed been created there. In particular, you&#8217;re looking for <strong>libmemcached_functions_mysql.so</strong>.</p>
+<p>These libraries need to be found in the library search path. One way of doing so is to add the path to <strong>/etc/ld.so.conf</strong>:</p>
+<blockquote>
+<pre>sudo echo /usr/local/mysql/lib/mysql/ &gt;&gt; /etc/ld.so.conf</pre>
+</blockquote>
+<p>And then update the search path</p>
+<blockquote>
+<pre>sudo ldconfig</pre>
+</blockquote>
+<p>Once this is done, we can install the functions in MySQL. Go to the <strong>memcached_functions_mysql-0.7/</strong> path, and execute:</p>
+<blockquote>
+<pre>mysql -u root -p &lt; sql/install_functions.sql</pre>
+</blockquote>
+<p>This file simply contains the <strong>CREATE FUNCTION</strong> statements for all supplied memcached API.</p>
+<h4>Testing</h4>
+<p>To put our installation to the test, let&#8217;s try setting a value to memcached, then getting it back:</p>
+<blockquote>
+<pre>mysql&gt; SELECT memc_set('mykey', 'Getting this with SELECT means all works well');
++--------------------------------------------------------------------+
+| memc_set('mykey', 'Getting this with SELECT means all works well') |
++--------------------------------------------------------------------+
+|                                                                  0 |
++--------------------------------------------------------------------+
+1 row in set (0.03 sec)
+
+mysql&gt; SELECT memc_get('mykey');
++-----------------------------------------------+
+| memc_get('mykey')                             |
++-----------------------------------------------+
+| Getting this with SELECT means all works well |
++-----------------------------------------------+
+1 row in set (0.00 sec)</pre>
+</blockquote>
+<p>The README file contains examples for all supplied functions. Take a look at the <a title="MySQL docs" href="http://dev.mysql.com/doc/refman/5.0/en/ha-memcached-interfaces-mysqludf.html">MySQL docs</a>, as well.</p>
+<h4>Conclusion</h4>
+<p>It is also nice to see that Java or Python clients are also able to read the value stored with the &#8220;mykey&#8221; key. Well, that&#8217;s the nice thing about memcached: its diversity and compatibility of clients.</p>
+<p>In a future post, I will write about if, why and how I think memcahed functions for MySQL should be used.</p>
+<p>Please share below any insights about installing on other Linux flavours, BSD, Solaris or other operating systems.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/installing-memcached-functions-for-mysql/feed</wfw:commentRss>
+		<slash:comments>13</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">316</post-id>	</item>
+	</channel>
+</rss>

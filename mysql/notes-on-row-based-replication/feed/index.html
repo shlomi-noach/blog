@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Notes on row based replication	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Tue, 22 Oct 2013 19:53:59 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-221589</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 22 Oct 2013 19:53:59 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-221589</guid>
+					<description><![CDATA[@Rhys,
+Very nice; good to know this variable exists.]]></description>
+		<content:encoded><![CDATA[<p>@Rhys,<br />
+Very nice; good to know this variable exists.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rhys				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-221510</link>
+		<dc:creator><![CDATA[Rhys]]></dc:creator>
+		<pubDate>Mon, 21 Oct 2013 16:16:21 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-221510</guid>
+					<description><![CDATA[RE: The limitation / feature mentioned in Forgiveness. There is the slave_exec_mode variable to get around this.
+
+http://dev.mysql.com/doc/refman/5.1/en/replication-rbr-usage.html
+
+Probably not a good idea though.]]></description>
+		<content:encoded><![CDATA[<p>RE: The limitation / feature mentioned in Forgiveness. There is the slave_exec_mode variable to get around this.</p>
+<p><a href="http://dev.mysql.com/doc/refman/5.1/en/replication-rbr-usage.html" rel="nofollow ugc">http://dev.mysql.com/doc/refman/5.1/en/replication-rbr-usage.html</a></p>
+<p>Probably not a good idea though.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-107742</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 17 Jul 2012 05:59:19 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-107742</guid>
+					<description><![CDATA[@Rick,
+afaik there is an internal row_id for InnoDB. I may be wrong on this.]]></description>
+		<content:encoded><![CDATA[<p>@Rick,<br />
+afaik there is an internal row_id for InnoDB. I may be wrong on this.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Rick James				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-107694</link>
+		<dc:creator><![CDATA[Rick James]]></dc:creator>
+		<pubDate>Mon, 16 Jul 2012 22:47:35 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-107694</guid>
+					<description><![CDATA[@James,
+Replication is blocked during a large SBR DELETE.  This is an important reason for chunking big deletes.
+
+@James, etc,
+There is no &quot;row_id&quot; for InnoDB tables.  It depends on the PRIMARY KEY.  If you do not provide such, then one is provided for you.  (And I guess it could &#039;drift&#039;.)
+
+Deleting in batches:
+http://mysql.rjweb.org/doc.php/deletebig
+Usually an ID range is sufficient to be sure the Slave(s) are deleting the same batch.  (There is no way to suppress the warning, even when it is clearly wrong.)
+
+The best way to do a big delete is via DROP PARTITION, if your table can be structured to take advantage of such.  It is instantaneous, atomic, etc.
+
+@XL,
+The shadow table is very efficient, but it can have a flaw -- what if row(s) are INSERTed/DELETEd/UPDATEd during the &#039;copy&#039;?  One solution, albeit clumsy, is a TRIGGER.
+
+@Shlomi,
+Sorry, I guess we hijacked your RBR discussion to talk about DELETEs.]]></description>
+		<content:encoded><![CDATA[<p>@James,<br />
+Replication is blocked during a large SBR DELETE.  This is an important reason for chunking big deletes.</p>
+<p>@James, etc,<br />
+There is no &#8220;row_id&#8221; for InnoDB tables.  It depends on the PRIMARY KEY.  If you do not provide such, then one is provided for you.  (And I guess it could &#8216;drift&#8217;.)</p>
+<p>Deleting in batches:<br />
+<a href="http://mysql.rjweb.org/doc.php/deletebig" rel="nofollow ugc">http://mysql.rjweb.org/doc.php/deletebig</a><br />
+Usually an ID range is sufficient to be sure the Slave(s) are deleting the same batch.  (There is no way to suppress the warning, even when it is clearly wrong.)</p>
+<p>The best way to do a big delete is via DROP PARTITION, if your table can be structured to take advantage of such.  It is instantaneous, atomic, etc.</p>
+<p>@XL,<br />
+The shadow table is very efficient, but it can have a flaw &#8212; what if row(s) are INSERTed/DELETEd/UPDATEd during the &#8216;copy&#8217;?  One solution, albeit clumsy, is a TRIGGER.</p>
+<p>@Shlomi,<br />
+Sorry, I guess we hijacked your RBR discussion to talk about DELETEs.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: XL				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-107629</link>
+		<dc:creator><![CDATA[XL]]></dc:creator>
+		<pubDate>Mon, 16 Jul 2012 17:24:58 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-107629</guid>
+					<description><![CDATA[If one has to delete all rows in a table, then one should use TRUNCATE TABLE. RBR treats this statement as DDL and thus logs it verbatim.
+
+For session tables one often has this situation: delete all but some 1000 of a million rows. This should be implemented as:
+
+create shadow table like the original
+copy rows to keep
+exchange tables by RENAME TABLE
+
+Again this case is handled efficiently on the slave.]]></description>
+		<content:encoded><![CDATA[<p>If one has to delete all rows in a table, then one should use TRUNCATE TABLE. RBR treats this statement as DDL and thus logs it verbatim.</p>
+<p>For session tables one often has this situation: delete all but some 1000 of a million rows. This should be implemented as:</p>
+<p>create shadow table like the original<br />
+copy rows to keep<br />
+exchange tables by RENAME TABLE</p>
+<p>Again this case is handled efficiently on the slave.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Jervin R				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-107348</link>
+		<dc:creator><![CDATA[Jervin R]]></dc:creator>
+		<pubDate>Sun, 15 Jul 2012 02:43:44 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-107348</guid>
+					<description><![CDATA[Of course one also has to note that if you do &#039;DELETE FROM t&#039; on a table with 1m rows it will be 1m events on the slave too - I&#039;ve seen slaves not able to keep up with that and so SESSION based statement format comes in handy or try MIXED :-)]]></description>
+		<content:encoded><![CDATA[<p>Of course one also has to note that if you do &#8216;DELETE FROM t&#8217; on a table with 1m rows it will be 1m events on the slave too &#8211; I&#8217;ve seen slaves not able to keep up with that and so SESSION based statement format comes in handy or try MIXED 🙂</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Cédric				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-106196</link>
+		<dc:creator><![CDATA[Cédric]]></dc:creator>
+		<pubDate>Mon, 09 Jul 2012 10:52:22 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-106196</guid>
+					<description><![CDATA[With RBR, you also need to have stricly the same definition for your columns (data type for exemple)]]></description>
+		<content:encoded><![CDATA[<p>With RBR, you also need to have stricly the same definition for your columns (data type for exemple)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: James Day				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-105289</link>
+		<dc:creator><![CDATA[James Day]]></dc:creator>
+		<pubDate>Wed, 04 Jul 2012 19:56:02 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-105289</guid>
+					<description><![CDATA[Shlomi, I don&#039;t know of anything that would guarantee that the InnoDB row ID on a slave is the same as that of the same logical row on a master. If the slave is created by cloning binary files it will start that way but different ordering of inserts and deletes on master and slave is something that I expect to cause them to rapidly become out of sync. If the slave is created from a mysqldump backup they could start out very different.
+
+There have been suggestions to consider using the InnoDB row ID but those practical difficulties have so far blocked it. For some installations it might be a useful clue that could be rejected if the rest of the row turns out not to match.
+
+Deleting in batches is a good approach. Depending on the application multiple batches can be used. Say very different WHERE clauses so no part of the range can overlap and let one delete block another.
+
+Smaller batches also have the advantage of making it easier for the purge thread to keep up and helping to keep all of the undo log records in the buffer pool, much faster than accumulating a large batch that can then become disk-bound if they have been flushed from the pool.
+
+No concurrency benefit for a slave from multiple batches on the slave at the moment, maybe in the future.]]></description>
+		<content:encoded><![CDATA[<p>Shlomi, I don&#8217;t know of anything that would guarantee that the InnoDB row ID on a slave is the same as that of the same logical row on a master. If the slave is created by cloning binary files it will start that way but different ordering of inserts and deletes on master and slave is something that I expect to cause them to rapidly become out of sync. If the slave is created from a mysqldump backup they could start out very different.</p>
+<p>There have been suggestions to consider using the InnoDB row ID but those practical difficulties have so far blocked it. For some installations it might be a useful clue that could be rejected if the rest of the row turns out not to match.</p>
+<p>Deleting in batches is a good approach. Depending on the application multiple batches can be used. Say very different WHERE clauses so no part of the range can overlap and let one delete block another.</p>
+<p>Smaller batches also have the advantage of making it easier for the purge thread to keep up and helping to keep all of the undo log records in the buffer pool, much faster than accumulating a large batch that can then become disk-bound if they have been flushed from the pool.</p>
+<p>No concurrency benefit for a slave from multiple batches on the slave at the moment, maybe in the future.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-105246</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Wed, 04 Jul 2012 17:23:30 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-105246</guid>
+					<description><![CDATA[@Daniël,
+Thanks
+
+@Robert,
+Thanks - this is an interesting issue since I almost don&#039;t do large DELETEs anymore - when they&#039;re large, I split them into smaller chunks, like 1,000 at a time, and do many steps. This makes for smaller transactions, albeit separate ones.
+It is this very scenario where I see an improvement with RBR.
+
+This is not to say there are no cases where large DELETEs are in place. I&#039;m just not too familiar with these.
+
+At any case I did my best to sound vague and ambiguous in the last paragraph so that no one could blame me for being incorrect ;)]]></description>
+		<content:encoded><![CDATA[<p>@Daniël,<br />
+Thanks</p>
+<p>@Robert,<br />
+Thanks &#8211; this is an interesting issue since I almost don&#8217;t do large DELETEs anymore &#8211; when they&#8217;re large, I split them into smaller chunks, like 1,000 at a time, and do many steps. This makes for smaller transactions, albeit separate ones.<br />
+It is this very scenario where I see an improvement with RBR.</p>
+<p>This is not to say there are no cases where large DELETEs are in place. I&#8217;m just not too familiar with these.</p>
+<p>At any case I did my best to sound vague and ambiguous in the last paragraph so that no one could blame me for being incorrect 😉</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Robert Hodges				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/notes-on-row-based-replication/comment-page-1#comment-105227</link>
+		<dc:creator><![CDATA[Robert Hodges]]></dc:creator>
+		<pubDate>Wed, 04 Jul 2012 16:22:25 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4915#comment-105227</guid>
+					<description><![CDATA[Hi Shlomi!  On your third point it&#039;s not clear that there is always less slave effort.  For instance, running a large DELETE with a WHERE can be more efficient than repeating the DELETE for each row.  This effect is very pronounced on large tables.]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi!  On your third point it&#8217;s not clear that there is always less slave effort.  For instance, running a large DELETE with a WHERE can be more efficient than repeating the DELETE for each row.  This effect is very pronounced on large tables.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>

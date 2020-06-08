@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>Anemometer &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/anemometer/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Fri, 18 Apr 2014 18:02:49 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>&#8220;Anemomaster&#8221;: DML visibility. Your must-do for tomorrow</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow#comments</comments>
+				<pubDate>Fri, 18 Apr 2014 11:15:09 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Anemometer]]></category>
+		<category><![CDATA[DevOps]]></category>
+		<category><![CDATA[Monitoring]]></category>
+		<category><![CDATA[Open Source]]></category>
+		<category><![CDATA[Replication]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6793</guid>
+				<description><![CDATA[Here&#8217;s our take of master DML query monitoring at Outbrain (presented April 2014). It took a half-day to code, implement, automate and deploy, and within the first hour of work we managed to catch multiple ill-doing services and scripts. You might want to try this out for yourself. What&#8217;s this about? What queries do you [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Here&#8217;s our take of master DML query monitoring at <a href="http://www.outbrain.com/">Outbrain</a> (<a href="https://www.percona.com/live/mysql-conference-2014/sessions/mysql-devops-outbrain">presented April 2014</a>). It took a half-day to code, implement, automate and deploy, and within the first hour of work we managed to catch multiple ill-doing services and scripts. You might want to try this out for yourself.</p>
+<h4>What&#8217;s this about?</h4>
+<p>What queries do you monitor on your MySQL servers? Many don&#8217;t monitor queries at all, and only look up slow queries on occasion, using <a href="http://www.percona.com/doc/percona-toolkit/2.2/pt-query-digest.html">pt-query-digest</a>. Some monitor slow queries, where <a href="https://github.com/box/Anemometer/wiki">Anemometer</a> (relying on pt-query-digest) is a very good tool. To the extreme, some monitor TCP traffic on all MySQL servers &#8212; good for you! In between, there&#8217;s a particular type of queries that are of special interest: DML (<strong>INSERT/UPDATE/DELETE</strong>) queries issued against the master.</p>
+<p>They are of particular interest because they are only issued once against the master, yet propagate through replication topology to execute on all slaves. These queries have a direct impact on your slave lag and on your overall replication capacity. I suggest you should be familiar with your DMLs just as you are with your slow queries.</p>
+<p>In particular, we had multiple occasions in the past where all or most slaves started lagging. Frantically we would go to our metrics; yes! We would see a spike in <strong>com_insert</strong>. Someone (some service) was obviously generating more <strong>INSERT</strong>s than usual, at a high rate that the slaves could not keep up with. But, <em>which</em> <strong>INSERT</strong> was that? Blindly, we would look at the binary logs. Well, erm, what are we looking for, exactly?</p>
+<p>Two such occasions convinced us that there should be a solution, but it took some time till it hit us. We were already using <em>Anemometer</em> for monitoring our slow logs. We can do the same for monitoring our binary logs. Thus was born <em>&#8220;Anemomaster&#8221;</em>.</p>
+<p>Quick recap on how Anemometer works: you issue <em>pt-query-digest</em> on your slow logs on all MySQL hosts (we actually first ship the slow logs to a central place where we analyse them; same thing). This is done periodically, and slow logs are then rotated. You throw the output of <em>pt-query-digest</em> to a central database (this is built in with <em>pt-query-digest</em>; it doesn&#8217;t necessarily produce human readable reports). <em>Anemometer</em> would read this central database and visualize the slow queries.</p>
+<h4>Analysing DMLs</h4>
+<p>But then, <em>pt-query-digest</em> doesn&#8217;t only parse slow logs. It can parse binary logs. Instead of asking for total query time, we ask for query count, and on we go to establish the same mechanism, using same <em>pt-query-digest</em> and same <em>Anemometer</em> to store and visualize the DMLs issued on our masters.</p>
+<p>When analysing DMLs we&#8217;re interested in parsing binary logs &#8212; and it makes no sense to do the same on all slaves. All slaves just have same copy of binlog entries as the master produces. It only takes <em>one</em> server to get an accurate picture of the DMLs on your replication topology.</p>
+<p><span id="more-6793"></span></p>
+<p>One server could be the master, and this can indeed be done: just <strong>FLUSH MASTER LOGS</strong>, parse the binary logs with <em>pt-query-digest</em>, and you&#8217;re done. But like others, we tend to look at our masters as tender babies. We care for them, and do not wish to overload them unnecessarily. We chose to get the binlog entries from our slaves, instead. We also chose to get the entries from the relay logs, since these are unaffected by slave performance and as long as network is good, we can expect the relay logs to be <em>very</em> up to date. At any given time we have two slaves that take this role (this is automated and verified). On a <strong>10</strong> minute period we would flush the relay logs on these servers, and analyse whatever relay logs we have not analysed as yet.</p>
+<p>The script below is a slightly modified version of our own, and should work for the standard installation. Modify to fit your own data (in particular, it assumes relay logs are named <strong>mysqld-relay-bin</strong>; <strong>datadir</strong> is specified in <strong>/etc/my.cnf</strong>, and please don&#8217;t ask me how to do this on Windows):</p>
+<blockquote>
+<pre class="brush: bash; title: ; notranslate">
+#!/bin/bash
+
+# 
+# Digest latest relay logs file, write results to &quot;anemomaster&quot;
+#
+# This script can run from any machine; it only needs to execute on a single machine per mysql cluster, but for
+# analysis availability it should execute on at least two hosts per cluster.
+#
+
+DATADIR=`grep datadir /etc/my.cnf|awk -F= '{print $2}'`
+TMPDIR=/tmp
+DIGESTED_RELAY_LOGS_FILE=${DATADIR}/digested_relay_logs.txt
+
+touch $DIGESTED_RELAY_LOGS_FILE
+chown mysql:mysql $DIGESTED_RELAY_LOGS_FILE
+
+hostname=$(hostname)
+
+echo &quot;deleting old relay logs from ${TMPDIR}&quot;
+rm ${TMPDIR}/mysqld-relay-bin.[0-9]*
+
+echo &quot;Getting current relay log files&quot;
+existing_relay_log_files=$(ls -tr ${DATADIR}/mysqld-relay-bin.[0-9]* | head -n -1)
+for existing_relay_log_file in $existing_relay_log_files
+do
+    cp -u $existing_relay_log_file $TMPDIR
+done
+echo &quot;flushing relay logs&quot;
+/usr/bin/mysql -umyself -psecret -e 'flush relay logs\G;' 2&gt;/dev/null
+# sleep because the log file takes some time to disappear
+sleep 1
+
+echo &quot;Getting current relay log files&quot;
+existing_relay_log_files=$(ls -tr ${DATADIR}/mysqld-relay-bin.[0-9]* | head -n -1)
+for existing_relay_log_file in $existing_relay_log_files
+do
+    cp -u $existing_relay_log_file $TMPDIR
+done
+
+cd $TMPDIR
+for relay_log_file in mysqld-relay-bin.[0-9]*
+do
+    # Filter this relay log file, since it's already been digested
+    grep $relay_log_file $DIGESTED_RELAY_LOGS_FILE &amp;&amp; rm $relay_log_file
+done
+
+for relay_log_file in mysqld-relay-bin.[0-9]*
+do
+    echo &quot;digesting $relay_log_file&quot;
+    mysqlbinlog $relay_log_file | /usr/bin/pt-query-digest \
+      --type binlog --order-by Query_time:cnt --group-by fingerprint --limit 100 \
+      --review  P=3306,u=anemomaster,p=secret,h=anemomaster_host,D=anemomaster,t=global_query_review \
+      --history P=3306,u=anemomaster,p=secret,h=anemomaster_host,D=anemomaster,t=global_query_review_history \
+      --filter=&quot; \$event-&gt;{Bytes} = length(\$event-&gt;{arg}) and \$event-&gt;{hostname}=\&quot;$(hostname)\&quot; &quot; \
+      --no-report
+    echo &quot;$relay_log_file&quot; &gt;&gt; $DIGESTED_RELAY_LOGS_FILE
+    rm $relay_log_file
+done
+# make sure the file does not bloat. 20 entries is more than enough.
+tail -n 20 $DIGESTED_RELAY_LOGS_FILE &gt; ${TMPDIR}/DIGESTED_RELAY_LOGS_FILE
+cat ${TMPDIR}/DIGESTED_RELAY_LOGS_FILE &gt; $DIGESTED_RELAY_LOGS_FILE
+echo &quot;done&quot;
+</pre>
+</blockquote>
+<p>As for Anemometer, we patched it to support multiple environments (&#8220;clusters&#8221;) &#8212; but irrelevant to the DML change. If you just want to make it visualize DMLs, here&#8217;s the major configuration changes to <strong>config.inc.php</strong> (marked with <strong>bold</strong>):</p>
+<blockquote>
+<pre class="brush: php; title: ; notranslate">
+$conf['history_defaults'] = array(
+	'output'		=&gt; 'table',
+	'fact-group'	=&gt; 'date',
+	'fact-order'	=&gt; 'date DESC',
+	'fact-limit' =&gt; '90',
+	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-90 day')),
+	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),
+	'table_fields' =&gt; array('date', 'query_time_avg','ts_cnt','Query_time_sum')
+);
+
+$conf['report_defaults'] = array(
+	'fact-group'	=&gt; 'checksum',
+	'fact-order'	=&gt; 'ts_cnt DESC',
+	'fact-limit' =&gt; '20',
+	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-1 day')),
+	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),
+	'table_fields' =&gt; array('checksum','snippet', 'query_time_avg','ts_cnt','Query_time_sum'),
+	'dimension-pivot-hostname_max' =&gt; null,
+	'dimension-pivot-clustername_max' =&gt; null
+);
+
+$conf['graph_defaults'] = array(
+	'fact-group'	=&gt; 'minute_ts',
+	'fact-order'	=&gt; 'minute_ts',
+	'fact-limit' =&gt; '',
+	'dimension-ts_min_start' =&gt; date(&quot;Y-m-d H:i:s&quot;, strtotime( '-7 day')),
+	'dimension-ts_min_end'	=&gt; date(&quot;Y-m-d H:i:s&quot;),
+	'table_fields' =&gt; array('minute_ts'),
+	// hack ... fix is to make query builder select the group and order fields,
+	// then table fields only has to contain the plot_field
+	'plot_field' =&gt; 'ts_cnt',
+);
+</pre>
+</blockquote>
+<p>With a <strong>10</strong> minute rotation &amp; digestion, we are able to analyze near real-time what&#8217;s been done on our masters. If we see a spike in <strong>com_insert/com_update/com_delete</strong>, or just see slave lags, we turn to <em>Anemomaster </em>and within a couple minutes know exactly what service is guilty of abusing our database. We are also working to protect our database against abuse, but that&#8217;s for another discussion.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/anemomaster-dml-visibility-your-must-do-for-tomorrow/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">6793</post-id>	</item>
+	</channel>
+</rss>

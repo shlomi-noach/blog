@@ -1,0 +1,840 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	>
+
+<channel>
+	<title>MyISAM &#8211; code.openark.org</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/tag/myisam/feed" rel="self" type="application/rss+xml" />
+	<link>http://shlomi-noach.github.io/blog/</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Sun, 03 Jun 2012 10:12:47 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+<site xmlns="com-wordpress:feed-additions:1">32412571</site>	<item>
+		<title>Getting rid of huge ibdata file, no dump required, part II</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii#comments</comments>
+				<pubDate>Wed, 30 May 2012 07:03:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Refactoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4845</guid>
+				<description><![CDATA[This post continues Getting rid of huge ibdata file, no dump required, part I, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing everything at once. In previous part we put aside the issue of foreign keys. We address this issue now. What [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This post continues <a href="https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required">Getting rid of huge ibdata file, no dump required, part I</a>, where I describe way of converting your single-tablespace InnoDB database into a file-per-table one, without the pain of exporting and importing <em>everything at once</em>.</p>
+<p>In previous part we put aside the issue of foreign keys. We address this issue now.</p>
+<h4>What if my InnoDB tables have foreign keys?</h4>
+<p>MyISAM does not support them, so you can&#8217;t just <strong>ALTER</strong> an InnoDB table to MyISAM and back into InnoDB, and expect everything to work.</p>
+<p>Alas, this calls for additional steps (i.e. additional <strong>ALTER</strong> commands). However, these still fall well under the concept of <em>&#8220;do it one table at a time, then take time to recover your breath and replication lag&#8221;</em>.</p>
+<h4>Save , drop and restore your Foreign Keys setup</h4>
+<p>You can use <a href="http://code.google.com/p/common-schema/">common_schema</a>&#8216;s  <a href="http://common-schema.googlecode.com/svn/trunk/common_schema/doc/html/sql_foreign_keys.html">sql_foreign_keys</a> to get the full listing and create definition of your foreign keys. For example, assume we use the <strong>sakila</strong> database:<span id="more-4845"></span></p>
+<blockquote>
+<pre>SELECT create_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila' INTO OUTFILE '/somewhere/safe/create_foreign_keys.sql'</pre>
+</blockquote>
+<p>(replace <strong>TABLE_SCHEMA=&#8217;sakila&#8217;</strong> with whatever you want).</p>
+<p>A sample output would be something like this (<em>note: no semicolon on end of line</em>):</p>
+<blockquote>
+<pre>ALTER TABLE `sakila`.`address` ADD CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `sakila`.`city` (`city_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`city` ADD CONSTRAINT `fk_city_country` FOREIGN KEY (`country_id`) REFERENCES `sakila`.`country` (`country_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_address` FOREIGN KEY (`address_id`) REFERENCES `sakila`.`address` (`address_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`customer` ADD CONSTRAINT `fk_customer_store` FOREIGN KEY (`store_id`) REFERENCES `sakila`.`store` (`store_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `sakila`.`film` ADD CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) REFERENCES `sakila`.`language` (`language_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+...</pre>
+</blockquote>
+<p>Once the above is in a safe place, you will want to DROP all of your foreign keys. Again, using <em>common_schema</em>:</p>
+<blockquote>
+<pre>SELECT drop_statement FROM common_schema.sql_foreign_keys WHERE TABLE_SCHEMA='sakila';
++-----------------------------------------------------------------------------------+
+| drop_statement                                                                    |
++-----------------------------------------------------------------------------------+
+| ALTER TABLE `sakila`.`address` DROP FOREIGN KEY `fk_address_city`                 |
+| ALTER TABLE `sakila`.`city` DROP FOREIGN KEY `fk_city_country`                    |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_address`            |
+| ALTER TABLE `sakila`.`customer` DROP FOREIGN KEY `fk_customer_store`              |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language`                   |
+| ALTER TABLE `sakila`.`film` DROP FOREIGN KEY `fk_film_language_original`          |
+| ...                                                                               |
++-----------------------------------------------------------------------------------+</pre>
+</blockquote>
+<p>You don&#8217;t want to issue all these at once: do them one at a time, and wait for your slave to catch up.</p>
+<p>Once this is done, you can move on to the steps described in Part I of this post: converting tables to MyISAM, shutting down, removing InnoDB files, then converting back to InnoDB.</p>
+<p>And then, taking breath again, you must re-import the foreign keys. Use the <strong>ADD CONSTRAINT</strong> commands you have saved earlier on. Again, one at a time, wait for slave to catch up.</p>
+<p>To reiterate, for each table you would take the following steps:</p>
+<ol>
+<li>Make sure the FK definition is safely stored somewhere</li>
+<li>STOP SLAVE</li>
+<li>Drop all table&#8217;s foreign keys: ALTER TABLE &#8230; DROP FOREIGN KEY &#8230;, DROP FOREIGN KEY &#8230;</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ENGINE=MyISAM (*)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(*) Altering to MyISAM drops FK constraints, so the above could actually be done in one step. I&#8217;m cautious and illustrate in two.</p>
+<p>Once all tables are altered, and InnoDB tablespace is removed, restoration is as follows: for each table,</p>
+<ol>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ENGINE=InnoDB [create options]</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+<li>STOP SLAVE</li>
+<li>ALTER TABLE &#8230; ADD CONSTRAINT &#8230;, ADD CONSTRAINT &#8230;(+)</li>
+<li>START SLAVE</li>
+<li>Wait for slave to catch up</li>
+</ol>
+<p>(+) Alas, you can&#8217;t convert to InnoDB and add constraints at the same time&#8230;</p>
+<h4>This is not entirely safe</h4>
+<p>A MyISAM slave to an InnoDB master with foreign keys is a tricky business. It really depends on the type of foreign keys you have and the use you make of them. See <a title="Link to Impact of foreign keys absence on replicating slaves" href="https://shlomi-noach.github.io/blog/mysql/impact-of-foreign-keys-absence-on-replicating-slaves" rel="bookmark">Impact of foreign keys absence on replicating slaves</a>.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required-part-ii/feed</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4845</post-id>	</item>
+		<item>
+		<title>Getting rid of huge ibdata file, no dump required</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required#comments</comments>
+				<pubDate>Tue, 22 May 2012 05:33:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Refactoring]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3442</guid>
+				<description><![CDATA[You have been told (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named ibdata1), when moving to innodb_file_per_table, is to do a logical dump of your data, completely erase everything, then import the dump. To quickly reiterate, you can only delete the ibdata1 file when no [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>You <a href="https://shlomi-noach.github.io/blog/mysql/upgrading-to-barracuda-getting-rid-of-huge-ibdata1-file">have</a> been <a href="http://ronaldbradford.com/blog/leveraging-the-innodb-plugin-2011-02-11/">told</a> (guilty as charged), that the only way to get rid of the huge InnoDB tablespace file (commonly named <strong>ibdata1</strong>), when moving to <strong>innodb_file_per_table</strong>, is to do a logical dump of your data, completely erase everything, then import the dump.</p>
+<p>To quickly reiterate, you can only delete the <strong>ibdata1</strong> file when no InnoDB tables exist. Delete this file with an existing InnoDB table, even a table in its own tablespace, and nothing ever works anymore.</p>
+<h4>The problem with the dump-based solution</h4>
+<p>The impact of doing a logical dump is often overwhelming. Well, the dump may be tolerable, but the restore is much longer. The real pain is that you can&#8217;t do this one table at a time: you have to destroy everything before dropping the <strong>ibdata1</strong> file; you then have to import everything.</p>
+<p>Perhaps the most common scenario is that we do the changes on a slave, so as not to completely shut down our database. This is nice; no one is aware of the shutdown process. However, Huston, we have a problem: we need to make sure we can keep up the binary logs on the master for the duration of the <em>entire process</em>.<span id="more-3442"></span></p>
+<h4>A semi-solution for binary logs</h4>
+<p>You may get by by keeping the <strong>SQL_IO_THREAD</strong> running on the slave while dump is taken (SQL thread is better turned off). If you&#8217;re careful, you could do the same after restarting the database: you should still be able to acquire relay logs. With row based replication becoming more common, the problem of binary logs disk space returns: the logs (rather, log entries) are just so much larger!</p>
+<p>Either way, the process can takes long days, at the end of which your slave is up, but lags for long days behind.</p>
+<h4>Wishful thought: do it one table at a time</h4>
+<p>If we could do it one table at a time, and assuming our dataset is fairly split among several tables (i.e. not all of our <strong>500GB</strong> of data is in one huge table), life would be easier: we could work on a single table, resume replication, let the slave catch up, then do the same for the next table.</p>
+<p>How? Didn&#8217;t we just say one can only drop the <strong>ibdata1</strong> file when no InnoDB tables exist?</p>
+<h4>Solution: do it one table at a time</h4>
+<p>I&#8217;m going to illustrate what seems like a longer procedure. I will later show why it is not, in fact, longer.</p>
+<p>The idea is to first convert all your tables to MyISAM (Yay! A use for MyISAM!). That is, convert your tables one table at a time, using normal <strong>ALTER TABLE t ENGINE=MyISAM</strong>.</p>
+<p>Please let go of the foreign keys issue right now. I will address it later, there&#8217;s a lot to be addressed.</p>
+<p>So, on a slave:</p>
+<ol>
+<li><strong>STOP SLAVE</strong></li>
+<li>One <strong>ALTER TABLE &#8230; ENGINE=MyISAM<br />
+</strong></li>
+<li><strong>START SLAVE</strong> again</li>
+<li>Wait for slave catch up</li>
+<li>GOTO <strong>1</strong></li>
+</ol>
+<p>What do we end up with? A MyISAM only database. What do we do with it? Why, convert it back to InnoDB, of course!</p>
+<p>But, before that, we:</p>
+<ol>
+<li>Shut MySQL down</li>
+<li>Delete <strong>ibdata1</strong> file, <strong>ib_logfile[01]</strong> (i.e. delete all InnoDB files)</li>
+<li>Start MySQL</li>
+</ol>
+<p>A new <strong>ibdata1</strong> file, and new transaction log files will be created. Note: the new ibdata1 file is <em>small</em>. Mission almost accomplished.</p>
+<p>We then:</p>
+<ol>
+<li><strong>STOP SLAVE</strong></li>
+<li>Do one <strong>ALTER TABLE &#8230; ENGINE=InnoDB [ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8 &#8230;]<br />
+</strong></li>
+<li><strong>START SLAVE</strong> again</li>
+<li>Wait for slave catch up</li>
+<li>GOTO <strong>1</strong></li>
+</ol>
+<p>What do we end up with? An InnoDB only database, with true file per table, and a small <strong>ibdata1</strong> file. Space recovered!</p>
+<h4>The advantage of this method</h4>
+<p>The thing is, we resume replication after each table alteration. This means breaking the lag period into many smaller periods. While the <em>total</em> runtime does not reduce, we do reduce the maximum lag time. And this makes for easier recovery: no need to store multitudes of binary logs!</p>
+<h4>So what about the foreign keys?</h4>
+<p>Phew. Continued next post.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/getting-rid-of-huge-ibdata-file-no-dump-required/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3442</post-id>	</item>
+		<item>
+		<title>Auto caching tables</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/auto-caching-tables</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/auto-caching-tables#comments</comments>
+				<pubDate>Tue, 06 Mar 2012 13:18:36 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+		<category><![CDATA[Views]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4353</guid>
+				<description><![CDATA[Is there a way to create a caching table, some sort of a materialized view, such that upon selecting from that table, its data is validated/invalidated? Hint: yes. But to elaborate the point: say I have some table data_table. Can I rewrite all my queries which access data_table to read from some autocache_data_table, but have [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Is there a way to create a caching table, some sort of a materialized view, such that <em>upon selecting</em> from that table, its data is validated/invalidated?</p>
+<p><em>Hint</em>: yes.</p>
+<p>But to elaborate the point: say I have some table <strong>data_table</strong>. Can I rewrite all my queries which access <strong>data_table</strong> to read from some <strong>autocache_data_table</strong>, but have nothing changed in the query itself? No caveats, no additional <strong>WHERE</strong>s, and still have that <strong>autocache_data_table</strong> provide with the correct data, dynamically updated by some rule <em>of our choice</em>?</p>
+<p>And: no <em>crontab</em>, no <em>event scheduler</em>, and no funny triggers on <strong>data_table</strong>? In such way that invalidation/revalidation occurs <em>upon <strong>SELECT</strong></em>?</p>
+<p>Well, yes.</p>
+<p>This post is long, but I suggest you read it through to understand the mechanism, it will be worthwhile.</p>
+<h4>Background</h4>
+<p>The following derives from my long research on how to provide better, faster and <em>safer</em> access to <strong>INFORMATION_SCHEMA</strong> tables. It is however not limited to this exact scenario, and in this post I provide with a simple, general purpose example. I&#8217;ll have more to share about <strong>INFORMATION_SCHEMA</strong> specific solutions shortly.</p>
+<p>I was looking for a server side solution which would not require query changes, apart from directing the query to other tables. Solution has to be supported by all standard MySQL installs; so: no plugins, no special rebuilds.<span id="more-4353"></span></p>
+<h4>Sample data</h4>
+<p>I&#8217;ll explain by walking through the solution. Let&#8217;s begin with some sample table:</p>
+<blockquote>
+<pre>CREATE TABLE sample_data (
+  id INT UNSIGNED NOT NULL PRIMARY KEY,
+  dt DATETIME,
+  msg VARCHAR(128) CHARSET ascii
+);
+
+INSERT INTO sample_data VALUES (1, NOW(), 'sample txt');
+INSERT INTO sample_data VALUES (2, NOW(), 'sample txt');
+INSERT INTO sample_data VALUES (3, NOW(), 'sample txt');
+
+SELECT * FROM sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>In this simplistic example, I wish to create a construct which looks exactly like <strong>sample_data</strong>, but which caches data according to some heuristic. It will, in fact, cache the entire content of <strong>sample_data</strong>.</p>
+<p>That much is not a problem: just create another table to cache the data:</p>
+<blockquote>
+<pre>CREATE TABLE cache_sample_data LIKE sample_data;</pre>
+</blockquote>
+<p>The big question is: how do you make the table invalidate itself while <strong>SELECT</strong>ing from it?</p>
+<p>Here&#8217;s the deal. I&#8217;ll ask for your patience while I draw the outline, and start with failed solutions. By the end, everything will work.</p>
+<h4>Failed attempt: purge rows from the table even while reading it</h4>
+<p>My idea is to create a stored function which purges the <strong>cache_sample_data</strong> table, then fills in with fresh data, according to some heuristic. Something like this:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+CREATE FUNCTION `revalidate_cache_sample_data`() RETURNS tinyint unsigned
+    MODIFIES SQL DATA
+    DETERMINISTIC
+    SQL SECURITY INVOKER
+BEGIN
+  if(rand() &gt; 0.1) then
+    return 0; -- simplistic heuristic
+  end if;
+
+  DELETE FROM cache_sample_data;
+  INSERT INTO cache_sample_data SELECT * FROM sample_data;
+  RETURN 0;
+END $$
+
+DELIMITER ;</pre>
+</blockquote>
+<p>So the function uses some heuristic. It&#8217;s a funny <strong>RAND()</strong> in our case; you will want to check up on time stamps, or some flags, what have you. But this is not the important part here, and I want to keep the focus on the main logic.</p>
+<p>Upon deciding the table needs refreshing, the function purges all rows, then copies everything from <strong>sample_data</strong>. Sounds fair enough?</p>
+<p>Let&#8217;s try and invoke it. Just write some query by hand:</p>
+<blockquote>
+<pre>mysql&gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              <strong>0</strong> |
++--------------------------------+
+
+mysql&gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              <strong>0</strong> |
++--------------------------------+
+
+mysql&gt; SELECT revalidate_cache_sample_data();
++--------------------------------+
+| revalidate_cache_sample_data() |
++--------------------------------+
+|                              <strong>1</strong> |
++--------------------------------+</pre>
+</blockquote>
+<p>First two invocations &#8211; nothing. The third one indicated a revalidation of cache data. Let&#8217;s verify:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM cache_sample_data;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>OK, seems like the function works.</p>
+<p>We now gather some courage, and try combining calling to this function even while SELECTing from the cache table, like this:</p>
+<blockquote>
+<pre>SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>To explain what happens in the above query, consider its <a href="https://shlomi-noach.github.io/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql">programmatic nature</a>: we create a derived table, populated by the function&#8217;s result. That means the function is invoked in order to generate the derived table. The derived table itself must be materialized before the query begins execution, and so it is that we first invoke the function, then make the <strong>SELECT</strong>.</p>
+<p>Don&#8217;t open the champagne yet. While the above paragraph is correct, we are deceived: in this last invocation, the function did <strong>not</strong> attempt a revalidation. The <strong>RAND()</strong> function just didn&#8217;t provide with the right value.</p>
+<p>Let&#8217;s try again:</p>
+<blockquote>
+<pre>SELECT
+  cache_sample_data.*
+FROM
+  cache_sample_data,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
+<strong>ERROR 1442 (HY000): Can't update table 'cache_sample_data' in stored function/trigger because it is already used by statement which invoked this stored function/trigger.</strong></pre>
+</blockquote>
+<p>Aha! Bad news. The MySQL manual says on <a href="http://dev.mysql.com/doc/refman/5.1/en/stored-program-restrictions.html">Restrictions on Stored Programs</a>:</p>
+<blockquote><p>A stored function or trigger cannot modify a table that is already being used (for reading or writing) by the statement that invoked the function or trigger.</p></blockquote>
+<h4>Anyone to the rescue?</h4>
+<p>I was quite upset. Can we not make this work? At sorrow times like these, one reflects back on words of wiser people. What would <a href="http://rpbouman.blogspot.com/">Roland Bouman</a> say on this?</p>
+<p>Oh, yes; he would say: <em>&#8220;we can use a <strong>FEDERATED</strong> table which connect onto itself, thus bypass the above restriction&#8221;</em>.</p>
+<p>Unfortunately, <strong>FEDERATED</strong> is by default disabled nowadays; I cannot rely on its existence. Besides, to use <strong>FEDERATED</strong> one has to fill in passwords and stuff. Definitely not an out-of-the-box solution in this case.</p>
+<p>Few more days gone by. Decided the problem cannot be solved. And then it hit me.</p>
+<h4>MyISAM to the rescue</h4>
+<p><em><strong>MyISAM</strong></em>? Really?</p>
+<p>Yes, and not only <strong>MyISAM</strong>, but also its cousin: it&#8217;s long abandoned cousin, forgotten once <strong>views</strong> and <strong>partitions</strong> came into MySQL. <strong><a href="http://dev.mysql.com/doc/refman/5.1/en/merge-storage-engine.html">MERGE</a></strong>.</p>
+<p><strong>MERGE</strong> reflects the data contained within <strong>MyISAM</strong> tables. Perhaps the most common use for <strong>MERGE</strong> is to work out partitioned-like table of records, with <strong>MyISAM</strong> table-per month, and an overlooking <strong>MERGE</strong> table dynamically adding and removing tables from its view.</p>
+<p>But I intend for <strong>MERGE</strong> a different use: just be an identical reflection of <strong>cache_sample_data</strong>.</p>
+<p>So we must work out the following:</p>
+<blockquote>
+<pre>ALTER TABLE <strong>cache_sample_data</strong> ENGINE=<strong>MyISAM</strong>;
+CREATE TABLE <strong>cache_sample_data_wrapper</strong> LIKE cache_sample_data;
+ALTER TABLE <strong>cache_sample_data_wrapper</strong> ENGINE=<strong>MERGE</strong> <strong>UNION=(cache_sample_data)</strong>;</pre>
+</blockquote>
+<p>I just want to verify the new table is setup correctly:</p>
+<blockquote>
+<pre>mysql&gt; SELECT * FROM cache_sample_data_wrapper;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>Seems fine.</p>
+<p>So the next step is what makes the difference: the two tables are <em>not the same</em>. One <em>relies on the other</em>, but they are distinct. Our function <strong>DELETE</strong>s from and <strong>INSERT</strong>s to <strong>cached_sample_data</strong>, but it does <em>not affect, nor lock</em>, <strong>cache_sample_data_wrapper</strong>.</p>
+<p>We now rewrite our query to read:</p>
+<blockquote>
+<pre>SELECT
+  cache_sample_data_wrapper.*
+FROM
+  <strong>cache_sample_data_wrapper</strong>,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;</pre>
+</blockquote>
+<p>This query is perfectly valid. It works. To illustrate, I do:</p>
+<blockquote>
+<pre>-- Try this a few times till RAND() is lucky:
+
+<strong>TRUNCATE</strong> cache_sample_data;
+
+SELECT
+  cache_sample_data_wrapper.*
+FROM
+  cache_sample_data_wrapper,
+  (SELECT revalidate_cache_sample_data()) AS select_revalidate
+;
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>Whoa! Where did all this data come from? Didn&#8217;t we just <strong>TRUNCATE</strong> the table?</p>
+<p>The query worked. The function re-populated <strong>cache_sample_data</strong>.</p>
+<h4>The final touch</h4>
+<p>Isn&#8217;t the above query just <em>beautiful</em>? I suppose not many will share my opinion. What happened to my declaration that <em>&#8220;the original query need not be changed, apart from querying a different table&#8221;</em>?</p>
+<p>Yes, indeed. It&#8217;s now time for the final touch. There&#8217;s nothing amazing in this step, but we all know the way it is packaged is what makes the sale. We will now use <em>views</em>. We use two of them since a view must not contain a <em>subquery</em> in the <strong>FROM</strong> clause. Here goes:</p>
+<blockquote>
+<pre>CREATE OR REPLACE VIEW <strong>revalidate_cache_sample_data_view</strong> AS
+  SELECT revalidate_cache_sample_data()
+;
+
+CREATE OR REPLACE VIEW <strong>autocache_sample_data</strong> AS
+  SELECT
+    cache_sample_data_wrapper.*
+  FROM
+    cache_sample_data_wrapper,
+    revalidate_cache_sample_data_view
+;</pre>
+</blockquote>
+<p>And finally, we can make a very simple query like this:</p>
+<blockquote>
+<pre>SELECT * FROM <strong>autocache_sample_data</strong>;
+--
+-- <strong><span style="color: #ff9900;">Magic in work now!</span></strong>
+--
++----+---------------------+------------+
+| id | dt                  | msg        |
++----+---------------------+------------+
+|  1 | 2011-11-24 11:01:30 | sample txt |
+|  2 | 2011-11-24 11:01:30 | sample txt |
+|  3 | 2011-11-24 11:01:30 | sample txt |
++----+---------------------+------------+</pre>
+</blockquote>
+<p>Much as we would query the original <strong>sample_data</strong> table.</p>
+<h4>Summary</h4>
+<p>So what have we got? A stored routine, a <strong>MyISAM</strong> table, a <strong>MERGE</strong> table and two views. Quite a lot of constructs just to cache a table! But a beautiful cache access: <em>plain old SQL queries</em>. The flow looks like this:</p>
+<blockquote><p><a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow.png"><img class="alignnone size-full wp-image-4463" title="autocache flow chart" src="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow.png" alt="" width="835" height="625" srcset="https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow.png 835w, https://shlomi-noach.github.io/blog/wp-content/uploads/2011/11/autocache_flow-300x224.png 300w" sizes="(max-width: 835px) 100vw, 835px" /></a></p></blockquote>
+<p>Our cache table is a <strong>MyISAM</strong> table. It can get corrupted, which is bad. But not completely bad: it&#8217;s nothing more than a cache; we can throw away its entire data, and revalidate. We can actually ask the function to revalidate (say, pass a parameter).</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/auto-caching-tables/feed</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4353</post-id>	</item>
+		<item>
+		<title>Self throttling MySQL queries</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries#comments</comments>
+				<pubDate>Tue, 01 Nov 2011 07:55:47 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Hack]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Performance]]></category>
+		<category><![CDATA[SQL]]></category>
+		<category><![CDATA[Stored routines]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=4294</guid>
+				<description><![CDATA[Recap on the problem: A query takes a long time to complete. During this time it makes for a lot of I/O. Query&#8217;s I/O overloads the db, making for other queries run slow. I introduce the notion of self-throttling queries: queries that go to sleep, by themselves, throughout the runtime. The sleep period means the [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Recap on the problem:</p>
+<ul>
+<li>A query takes a long time to complete.</li>
+<li>During this time it makes for a lot of I/O.</li>
+<li>Query&#8217;s I/O overloads the db, making for other queries run slow.</li>
+</ul>
+<p>I introduce the notion of self-throttling queries: queries that go to sleep, by themselves, throughout the runtime. The sleep period means the query does not perform I/O at that time, which then means other queries can have their chance to execute.</p>
+<p>I present two approaches:</p>
+<ul>
+<li>The naive approach: for every <strong>1,000</strong> rows, the query sleep for <strong>1</strong> second</li>
+<li>The factor approach: for every <strong>1,000</strong> rows, the query sleeps for the amount of time it took to iterate those <strong>1,000</strong> rows (effectively doubling the total runtime of the query).<span id="more-4294"></span></li>
+</ul>
+<h4>Sample query</h4>
+<p>We use a simple, single-table scan. No aggregates (which complicate the solution considerably).</p>
+<blockquote>
+<pre>SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental
+;</pre>
+</blockquote>
+<h4>The naive solution</h4>
+<p>We need to know every <strong>1,000</strong> rows. So we need to count the rows. We do that by using a counter, as follows:</p>
+<blockquote>
+<pre>SELECT
+  rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days,
+  @row_counter := @row_counter + 1
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>A thing that bothers me, is that I wasn&#8217;t asking for an additional column. I would like the result set to remain as it were; same result structure. We also want to sleep for <strong>1</strong> second for each <strong>1,000</strong> rows. So we merge the two together along with one of the existing columns, like this:</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    IF(
+      (@row_counter := @row_counter + 1) % 1000 = 0,
+      SLEEP(1), 0
+    ) AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>To remain faithful to <a href="https://shlomi-noach.github.io/blog/mysql/slides-from-my-talk-programmatic-queries-things-you-can-code-with-sql">my slides</a>, I rewrite as follows, and this is <em>the naive solution</em>:</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN <strong>(@row_counter := @row_counter + 1) % 1000 = 0</strong> THEN <strong>SLEEP(1)</strong>
+      ELSE <strong>0</strong>
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter
+;</pre>
+</blockquote>
+<p>The <strong>WHEN</strong> clause always returns <strong>0</strong>, so it does not affect the value of <strong>rental_id</strong>.</p>
+<h4>The factor approach</h4>
+<p>In the factor approach we wish to keep record of query execution, every <strong>1,000</strong> rows. I introduce a nested <strong>WHEN</strong> statement which updates time records. I rely on <strong>SYSDATE()</strong> to return the true time, and on <strong>NOW()</strong> to return query execution start time.</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN <strong>@row_counter % 1000 = 0</strong> THEN
+        CASE
+          WHEN (@time_now := <strong>SYSDATE()</strong>) IS NULL THEN NULL
+          WHEN (@time_diff := (<strong>TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now)</strong>)) IS NULL THEN NULL
+          WHEN <strong>SLEEP(@time_diff)</strong> IS NULL THEN NULL
+          WHEN (@chunk_start_time := <strong>SYSDATE()</strong>) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;</pre>
+</blockquote>
+<h4>Proof</h4>
+<p>How can we prove that the queries do indeed work?</p>
+<p>We can see if the total runtime sums up to the number of sleep calls, in seconds; but how do we know that sleeps do occur at the correct times?</p>
+<p>A solution I offer is to use a stored routines which logs to a MyISAM table (a non transactional table) the exact time (using <strong>SYSDATE()</strong>) and value per row. The following constructs are introduced:</p>
+<blockquote>
+<pre><strong>CREATE TABLE</strong> test.proof(
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dt DATETIME NOT NULL,
+  msg VARCHAR(255)
+) <strong>ENGINE=MyISAM</strong>;
+
+DELIMITER $$
+<strong>CREATE FUNCTION</strong> test.prove_it(message VARCHAR(255)) RETURNS TINYINT
+DETERMINISTIC
+MODIFIES SQL DATA
+BEGIN
+  <strong>INSERT INTO test.proof (dt, msg) VALUES (SYSDATE(), message); RETURN 0;</strong>
+END $$
+DELIMITER ;</pre>
+</blockquote>
+<p>The <strong>prove_it()</strong> function records the immediate time and a message into the MyISAM table, which immediately accepts the write, being non-transactional. It returns with <strong>0</strong>, so we will now embed it within the query. Of course, the function itself incurs some overhead, but it will nevertheless convince you that <strong>SLEEP()</strong>s do occur at the right time!</p>
+<blockquote>
+<pre>SELECT
+  rental_id +
+    CASE
+      WHEN (@row_counter := @row_counter + 1) IS NULL THEN NULL
+      WHEN @row_counter % 1000 = 0 THEN
+        CASE
+          WHEN (@time_now := SYSDATE()) IS NULL THEN NULL
+          WHEN (@time_diff := (TIMESTAMPDIFF(SECOND, @chunk_start_time, @time_now))) IS NULL THEN NULL
+          WHEN SLEEP(@time_diff)<strong> + test.prove_it(CONCAT('will sleep for ', @time_diff, ' seconds'))</strong> IS NULL THEN NULL
+          WHEN (@chunk_start_time := SYSDATE()) IS NULL THEN NULL
+          ELSE 0
+        END
+      ELSE 0
+    END AS rental_id,
+  TIMESTAMPDIFF(DAY, rental_date, return_date) AS rental_days
+FROM
+  sakila.rental,
+  (SELECT @row_counter := 0) sel_row_counter,
+  (SELECT @chunk_start_time := NOW()) sel_chunk_start_time
+;
+
+mysql&gt; SELECT * FROM test.proof;
++----+---------------------+--------------------------+
+| id | dt                  | msg                      |
++----+---------------------+--------------------------+
+|  1 | 2011-11-01 09:22:36 | will sleep for 1 seconds |
+|  2 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  3 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  4 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  5 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  6 | 2011-11-01 09:22:36 | will sleep for 0 seconds |
+|  7 | 2011-11-01 09:22:38 | will sleep for 1 seconds |
+|  8 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+|  9 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 10 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 11 | 2011-11-01 09:22:38 | will sleep for 0 seconds |
+| 12 | 2011-11-01 09:22:40 | will sleep for 1 seconds |
+| 13 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 14 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
+| 15 | 2011-11-01 09:22:40 | will sleep for 0 seconds |
++----+---------------------+--------------------------+</pre>
+</blockquote>
+<p>The above query is actually very fast. Try adding <strong>BENCHMARK(1000,ENCODE(&#8216;hello&#8217;,&#8217;goodbye&#8217;))</strong> to rental_id so as to make it slower, or just use it on a really large table, see what happens (this is what I actually used to make the query run for several seconds in the example above).</p>
+<p>Observant reads will note that the <strong>&#8220;will sleep&#8230;&#8221;</strong> message actually gets written <em>after</em> the <strong>SLEEP()</strong> call. I leave this as it is.</p>
+<p>Another very nice treat of the code is that you don&#8217;t need sub-second resolution for it to work. If you look at the above, we don&#8217;t actually go to sleep every <strong>1,000</strong> rows (<strong>1,000</strong> is just too quick in the query &#8212; perhaps I should have used <strong>10,000</strong> seconds). But we <em>do</em> make it once a second has <em>elapsed</em>. Which means it works correctly <em>on average</em>. Of course, the entire discussion is only of interest when a query executes for a <em>substantial</em> number of seconds, so this is just an anecdote.</p>
+<h4>And the winner is&#8230;</h4>
+<p>Wow, this <a href="https://shlomi-noach.github.io/blog/mysql/contest-for-glory-write-a-self-throttling-mysql-query">contest</a> was anything but popular. <strong><a href="http://marcalff.blogspot.com/">Marc Alff</a></strong> is the obvious winner: he is the <em>only</em> one to suggest a solution <img src="https://s.w.org/images/core/emoji/12.0.0-1/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>But Marc uses a very nice trick: he reads the <strong>PERFORMANCE_SCHEMA</strong>. Now, I&#8217;m not sure how the <strong>PERFORMANCE_SCHEMA</strong> gets updated. I know that the <strong>INFORMATION_SCHEMA.GLOBAL_STATUS</strong> table does not get updated by a query until the query completes (so you cannot expect a change in <strong>innodb_rows_read</strong> throughout the execution of the query). I just didn&#8217;t test it (homework, anyone?). If it does get updated, then we can throttle the query based on InnoDB page reads using a simple query. Otherwise, an access to <strong>/proc/diskstats</strong> is possible, assuming no <em>apparmor</em> or <em>SELinux</em> are blocking us.</p>
+<p>Marc also uses a stored function, which is the <em>clean</em> way of doing it; however I distrust the overhead incurred by s stored routine and prefer my solution (which is, admittedly, not a pretty SQL sight!).</p>
+<p>Happy throttling!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/self-throttling-mysql-queries/feed</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">4294</post-id>	</item>
+		<item>
+		<title>Limiting table disk quota in MySQL</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/limiting-table-disk-quota-in-mysql</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/limiting-table-disk-quota-in-mysql#comments</comments>
+				<pubDate>Mon, 07 Mar 2011 07:08:21 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[File System]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Triggers]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=3359</guid>
+				<description><![CDATA[Question asked by a student: is there a way to limit a table&#8217;s quote on disk? Say, limit a table to 2GB, after which it will refuse to grow? Note that the requirement is that rows are never DELETEd. The table must simply refuse to be updated once it reaches a certain size. There is [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Question asked by a student: is there a way to limit a table&#8217;s quote on disk? Say, limit a table to 2GB, after which it will refuse to grow? Note that the requirement is that rows are never DELETEd. The table must simply refuse to be updated once it reaches a certain size.</p>
+<p>There is no built-in way to limit a table&#8217;s quota on disk. First thing to observe is that MySQL has nothing to do with this. It is entirely up to the storage engine to provide with such functionality. The storage engine is the one to handle data storage: how table and keys are stored on disk. Just consider the difference between MyISAM&#8217;s <strong>.MYD</strong> &amp; <strong>.MYI</strong> to InnoDB&#8217;s shared tablespace <strong>ibdata1</strong> to InnoDB&#8217;s file-per table <strong>.ibd</strong> files.</p>
+<p>The only engine I know of that has a quota is the MEMORY engine: it accepts the <strong>max_heap_table_size</strong>, which limits the size of a single table in memory. Hrmmm&#8230; In memory&#8230;</p>
+<h4>Why limit?</h4>
+<p>I&#8217;m not as yet aware of the specific requirements of said company, but this is not the first time I heard this question.</p>
+<p>The fact is: when MySQL runs out of disk space, it goes with a BOOM. It crashed ungracefully, with binary logs being out of sync, replication being out of sync. To date, and I&#8217;ve seen some cases, InnoDB merely crashes and manages to recover once disk space is salvaged, but I am not certain this is guaranteed to be the case. Anyone?</p>
+<p>And, with MyISAM&#8230;, who knows?</p>
+<p>Rule #1 of MySQL disk usage: <em>don&#8217;t run out of disk space.</em></p>
+<h4>Workarounds</h4>
+<p>I can think of two workarounds, none of which is pretty. The first involves triggers (actually, a few variations for this one), the second involves privileges.<span id="more-3359"></span></p>
+<h4>Triggers</h4>
+<p>The following code (first presented in <a title="Permanent Link to Triggers Use Case Compilation, Part II" rel="bookmark" href="https://shlomi-noach.github.io/blog/mysql/triggers-use-case-compilation-part-ii">Triggers Use Case Compilation, Part II</a>) assumed the DATA_LENGTH and INDEX_LENGTH values in INFORMATION_SCHEMA to be good indicators:</p>
+<blockquote>
+<pre>DROP TABLE IF EXISTS `world`.`logs`;
+CREATE TABLE  `world`.`logs` (
+  `logs_id` int(11) NOT NULL auto_increment,
+  `ts` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
+  `message` varchar(255) character set utf8 NOT NULL,
+  PRIMARY KEY  (`logs_id`)
+) ENGINE=MyISAM;
+
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT DATA_LENGTH+INDEX_LENGTH FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='world' AND TABLE_NAME='LOGS' INTO @estimated_table_size;
+  IF (@estimated_table_size &gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;
+</pre>
+</blockquote>
+<p>Or, you could write your own UDF, e.g. <strong>get_table_file_size(fully_qualified_table_name)</strong> and be more accurate:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT get_table_file_size('world.logs') INTO @table_size;
+  IF (@table_size &gt; 25*1024) THEN
+    SELECT 0 FROM `logs table is full` INTO @error;
+  END IF;
+END $$
+
+DELIMITER ;
+</pre>
+</blockquote>
+<p>(Same should be done for <strong>UPDATE</strong> operations)</p>
+<p>In both workarounds above, triggers are pre-defined. But triggers are performance-killers.</p>
+<p>How about preventing writing to the table only when it&#8217;s truly on the edge? A simple shell script, spawned by a cronjob, could do this well: get the file size of a specific table, and test if it&#8217;s larger than <em>n</em> bytes. If not, the script exits. If the file is indeed too large, the scripts invokes the following on <em>mysql</em>:</p>
+<blockquote>
+<pre>DELIMITER $$
+
+DROP TRIGGER IF EXISTS logs_bi $$
+CREATE TRIGGER logs_bi BEFORE INSERT ON logs
+FOR EACH ROW
+BEGIN
+  SELECT 0 FROM `logs table is full` INTO @error;
+END $$
+
+DELIMITER ;
+</pre>
+</blockquote>
+<p>So, during most of the time, there is no trigger. Only when the external script detects that table is too large, does it create a trigger. The trigger has no logic: it simply raises an error (PS, use <strong>raise</strong> in MySQL <strong>5.5</strong>).</p>
+<h4>Privileges</h4>
+<p>Another way to work around the problem is to use security features. Instead of creating a trigger on the table, <strong>REVOKE</strong> the <strong>INSERT</strong> &amp; <strong>UPDATE</strong> privileges from the appropriate user on that table.</p>
+<p>This may turn out to be a difficult task, since MySQL has no notion of <em>fine grain changes</em>. That is, suppose we have:</p>
+<blockquote>
+<pre>GRANT INSERT, UPDATE, DELETE, SELECT ON mydb.* TO 'webuser'@'%.webdomain'</pre>
+</blockquote>
+<p>If we just do:</p>
+<blockquote>
+<pre>REVOKE SELECT ON mydb.logs FROM 'webuser'@'%.webdomain'</pre>
+</blockquote>
+<p>We get:</p>
+<blockquote>
+<pre>There is no such grant defined for user 'webuser' on host '%.webdomain' on table 'logs'.</pre>
+</blockquote>
+<p>So this requires setting up privileges on the table level in the first place. Plus note that as long as the grants on the database level do allow for INSERTs, you cannot override it on the table level.</p>
+<h4>Other ideas?</h4>
+<p>I never actually implemented table disk quota. I&#8217;m not sure this is a viable solution; but I haven&#8217;t heard all the arguments in favor as yet, so I don&#8217;t want to rule this out.</p>
+<p>Please share below if you are using other means of table size control, other than the trivial cleanup of old records.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/limiting-table-disk-quota-in-mysql/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">3359</post-id>	</item>
+		<item>
+		<title>Personal observation: more migrations from MyISAM to InnoDB</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/personal-observation-more-migrations-from-myisam-to-innodb</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/personal-observation-more-migrations-from-myisam-to-innodb#comments</comments>
+				<pubDate>Wed, 16 Jun 2010 16:43:42 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[Opinions]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2517</guid>
+				<description><![CDATA[I&#8217;m evidencing an increase in the planning, confidence &#38; execution for MyISAM to InnoDB migration. How much can a single consultant observe? I agree Oracle should not go to PR based on my experience. But I find that: More companies are now familiar with InnoDB than there used to. More companies are interested in migration [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I&#8217;m evidencing an increase in the planning, confidence &amp; execution for MyISAM to InnoDB migration.</p>
+<p>How much can a single consultant observe? I agree Oracle should not go to PR based on my experience. But I find that:</p>
+<ul>
+<li>More companies are now familiar with InnoDB than there used to.</li>
+<li>More companies are interested in migration to InnoDB than there used to.</li>
+<li>More companies feel such migration to be safe.</li>
+<li>More companies start up with an InnoDB based solution than with a MyISAM based solution.</li>
+</ul>
+<p>This is the way I see it. No doubt, the Oracle/Sun deal made its impact. The fact that InnoDB is no longer a 3rd party; the fact Oracle invests in InnoDB and no other engine (Falcon is down, no real development on MyISAM); the fact InnoDB is to be the default engine: all these put companies at ease with migration.</p>
+<p><span id="more-2517"></span>I am happy with this change. I believe for most installations InnoDB provides with a clear advantage over MyISAM (though MyISAM has its uses), and this makes for more robust, correct and manageable MySQL instances; the kind that make a DBA&#8217;s life easier and quieter. And it is easier to make customers see the advantages.</p>
+<p>I am not inclined to say <em>&#8220;You should migrate your entire database to InnoDB&#8221;</em>. I don&#8217;t do that a lot. But recently, more customers approach and say <em>&#8220;We were thinking about migrating our entire database to InnoDB, what do you think?&#8221;</em>. What a change of approach.</p>
+<p>And, yes: there are still <em>a lot</em> of companies using MyISAM based databases, who still live happily.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/personal-observation-more-migrations-from-myisam-to-innodb/feed</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2517</post-id>	</item>
+		<item>
+		<title>A MyISAM backup is blocking as read-only, including mysqldump backup</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/a-myisam-backup-is-blocking-as-read-only-including-mysqldump-backup</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/a-myisam-backup-is-blocking-as-read-only-including-mysqldump-backup#comments</comments>
+				<pubDate>Tue, 18 May 2010 17:29:05 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Backup]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=2441</guid>
+				<description><![CDATA[Actually this is (almost) all I wanted to say. This is intentionally posted with all related keywords in title, in the hope that a related search on Google will result with this post on first page. I&#8217;m just still encountering companies who use MyISAM as their storage engine and are unaware that their nightly backup [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>Actually this is (almost) all I wanted to say. This is intentionally posted with all related keywords in title, in the hope that a related search on Google will result with this post on first page.</p>
+<p>I&#8217;m just still encountering companies who use MyISAM as their storage engine and are <em>unaware</em> that their nightly backup actually blocks their application, basically rendering their product unavailable for long minutes to hours on a nightly basis.</p>
+<p>So this is posted as a warning for those who were not aware of this fact.</p>
+<p>There is no hot (non blocking) backup for MyISAM. Closest would be file system snapshot, but even this requires flushing of tables, which may take a while to complete. If you must have a hot backup, then either use replication &#8211; and take the risk of the slave not being in complete sync with the master &#8211; or use another storage engine, i.e. InnoDB.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/a-myisam-backup-is-blocking-as-read-only-including-mysqldump-backup/feed</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">2441</post-id>	</item>
+		<item>
+		<title>The depth of an index: primer</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/the-depth-of-an-index-primer</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/the-depth-of-an-index-primer#comments</comments>
+				<pubDate>Thu, 09 Apr 2009 03:55:08 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Data Types]]></category>
+		<category><![CDATA[Indexing]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=545</guid>
+				<description><![CDATA[InnoDB and MyISAM use B+ and B trees for indexes (InnoDB also has internal hash index). In both these structures, the depth of the index is an important factor. When looking for an indexed row, a search is made on the index, from root to leaves. Assuming the index is not in memory, the depth [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>InnoDB and MyISAM use B+ and B trees for indexes (InnoDB also has internal hash index).</p>
+<p>In both these structures, the depth of the index is an important factor. When looking for an indexed row, a search is made on the index, from root to leaves.</p>
+<p>Assuming the index is not in memory, the depth of the index represents the minimal cost (in I/O operation) for an index based lookup. Of course, most of the time we expect large portions of the indexes to be cached in memory. Even so, the depth of the index is an important factor. The deeper the index is, the worse it performs: there are simply more lookups on index nodes.</p>
+<p>What affects the depth of an index?</p>
+<p>There are quite a few structural issues, but it boils down to two important factors:</p>
+<ol>
+<li>The number of rows in the table: obviously, more rows leads to larger index, larger indexes grow in depth.</li>
+<li>The size of the indexed column(s). An index on an INT column can be expected to be shallower than an index on a CHAR(32) column (on a very small number of rows they may have the same depth, so we&#8217;ll assume a large number of rows).</li>
+</ol>
+<p><span id="more-545"></span>Of course, these two factors also affect the total size of the index, hence its disk usage, but I wish to concentrate on the index depth.</p>
+<p>Let&#8217;s emphasize the second factor. It is best to index shorter columns, if that is possible. It is the reason behind using an index on a VARCHAR&#8217;s prefix (e.g. KEY(email_address(16)). It is also a reason to use INT, instead of BIGINT columns for your primary key, when BIGINT is not required.</p>
+<p>The larger the indexed data type is (or the total size of data types for all columns in a combined index), the less values that can fit in an index node. The less values in a node, the more node splits occur; the more nodes are required to build the index. The less values in the node, the less <em>wide</em> the index tree is. The less wide an index tree is, and the more nodes it has &#8211; the deeper it gets.</p>
+<p>So bigger data types lead to deeper trees. Deeper trees lead to more IO operations on lookup.</p>
+<h4>InnoDB</h4>
+<p>On InnoDB there&#8217;s another issue: all tables are clustered by primary key. Any access to table data requires diving into, or traversing the primary key tree.</p>
+<p>On InnoDB, a secondary index (any index which is not the primary key) does not lead to table data. Instead, the &#8220;data&#8221; in the leaf nodes of a secondary index &#8211; are the primary key values.</p>
+<p>And so, when looking up a value on an InnoDB table using a secondary key, we first search the secondary key to retrieve the primary key value, then go to the primary key tree to retrieve the data.</p>
+<p>This means two index lookups, one of which is always the primary key.</p>
+<p>On InnoDB, it is therefore in particular important to keep the primary key small. Have small data types. Prefer an SMALLINT to INT, if possible. Prefer an INT to BIGINT, if possible. Prefer an integer value over some VARCHAR text.</p>
+<p>With long data types used in an InnoDB primary key, not only is the primary key index bloated (deep), but also every other index gets to be bloated, as the leaf values in all other indexes are those same long data types.</p>
+<h4>MyISAM</h4>
+<p>MyISAM does not use clustered trees, hence the primary key is just a regular unique key. All indexes are created equal and an index lookup only consists of a single index search. Therefore, two indexes do no affect one another, with the exception that they are competing on the same key cache.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/the-depth-of-an-index-primer/feed</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">545</post-id>	</item>
+		<item>
+		<title>LOCK TABLES in MyISAM is NOT a poor man&#8217;s tranactions substitute</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/lock-tables-in-myisam-is-not-a-poor-mans-tranactions-substitute</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/lock-tables-in-myisam-is-not-a-poor-mans-tranactions-substitute#comments</comments>
+				<pubDate>Wed, 18 Mar 2009 07:37:56 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[MyISAM]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=658</guid>
+				<description><![CDATA[I get to hear that a lot: that LOCK TABLES with MyISAM is some sort of replacement for transactions; some model we can work with which gives us &#8216;transactional flavor&#8217;. It isn&#8217;t, and here&#8217;s why. When we speak of a transactional database/engine, we check out its ACID compliance. Let&#8217;s break out the ACID and see [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>I get to hear that a lot: that LOCK TABLES with MyISAM is some sort of replacement for transactions; some model we can work with which gives us &#8216;transactional flavor&#8217;.</p>
+<p>It isn&#8217;t, and here&#8217;s why.</p>
+<p>When we speak of a transactional database/engine, we check out its ACID compliance. Let&#8217;s break out the ACID and see what LOCK TABLES provides us with:</p>
+<ul>
+<li><strong>A</strong>: Atomicity. MyISAM does not provide atomicity.  If we have LOCK TABLES followed by two statements, then closed by UNLOCK TABLES, then it follows that a crash between the two statements will have the first one applied, the second one not not applied. No mechanism ensures an &#8220;all or nothing&#8221; behavior.</li>
+<li><strong>C</strong>: Consistency. An error in a statement would roll back the entire transaction in a transactional database. This won&#8217;t work on MyISAM: every statement is &#8220;committed&#8221; immediately.</li>
+<li><strong>I</strong>: Isolation. Without LCOK TABLES, working with MyISAM resembles using the <strong>read uncommitted</strong>, or <strong>dirty read</strong> isolation level. With LOCK TABLES &#8211; it depends. If you were to use LOCK TABLES &#8230; WRITE on all tables in all statements, you would get the <strong>serializable</strong> isolation level. Actually it would be more than <strong>serializable</strong>. It would be <em>truely serial</em>.</li>
+<li><strong>D</strong>: Durability. Did the INSERT succeed? And did the power went down just after? MyISAM provides not guarantees that the data will be there.</li>
+</ul>
+<p><span id="more-658"></span>So of all ACID properties, the only thing we could get is a <strong>serializable</strong> isolation level, and that, too, only if we used LOCK TABLES &#8230; WRITE  practically everywhere.</p>
+<p>Where does the notion come from, then?</p>
+<p>There&#8217;s one thing which LOCK TABLES does help us with: race conditions. It effectively creates a mutex block. The same effect could be achieved when using GET_LOCK() and RELEASE_LOCK(). Perhaps this is the source of confusion.</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/lock-tables-in-myisam-is-not-a-poor-mans-tranactions-substitute/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">658</post-id>	</item>
+		<item>
+		<title>MySQL User Group Meetings in Israel</title>
+		<link>https://shlomi-noach.github.io/blog/mysql/mysql-user-group-meetings-in-israel</link>
+				<comments>https://shlomi-noach.github.io/blog/mysql/mysql-user-group-meetings-in-israel#comments</comments>
+				<pubDate>Wed, 11 Mar 2009 05:42:18 +0000</pubDate>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+				<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[Configuration]]></category>
+		<category><![CDATA[InnoDB]]></category>
+		<category><![CDATA[MyISAM]]></category>
+		<category><![CDATA[User Group]]></category>
+
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=634</guid>
+				<description><![CDATA[This is a short note that the MySQL User Group Meetings in Israel are established (well, re-established after a very long period). Thanks to Eddy Resnick from Sun Microsystems Israel who has set up the meetings. So far, we&#8217;ve had 2 successful meetings, and we intend to have more! First one was in Sun&#8217;s offices [&#8230;]]]></description>
+								<content:encoded><![CDATA[<p>This is a short note that the MySQL User Group Meetings in Israel are established (well, re-established after a very long period).</p>
+<p>Thanks to Eddy Resnick from Sun Microsystems Israel who has set up the meetings. So far, we&#8217;ve had 2 successful meetings, and we intend to have more! First one was in Sun&#8217;s offices in Herzlia; second one, held last week, was at <a title="Interbit" href="http://interbit.co.il/">Interbit</a> (a MySQL training center) in Ramat Gan. We hope to hold these meetings on a monthly basis, and the next ones are expected to be held at Interbit.</p>
+<p>A new (blessed) law in Israel forbids us from sending invitations for these meetings via email without prior consent of the recepient (this law has passed as means of stopping spam). We do realize there are many users out there who would be interested in these meeting. For those users: please stay tuned to Interbit&#8217;s website, where future meetings will be published &#8211; or just give them a call!</p>
+<p>It was my honor to present a short session, one of three in this last meeting. Other presenters were Erad Deutch, who presented &#8220;MySQL Success Stories&#8221;, and Moshe Kaplan, who presented &#8220;Sharding Solutions&#8221;. I have presented &#8220;MyISAM &amp; InnoDB Tuning Fundamentals&#8221;, where I have layed down the basics behind parameter tuning for these storage engines.</p>
+<p>As per audience request, here&#8217;s the <a href="https://shlomi-noach.github.io/blog/wp-content/uploads/2009/03/innodb_myisam_tuning_fundamentals_share.pdf">presentation</a> in PDF format:</p>
+<p>I intend to give sessions in future meetings, and have already started working on my next one. So please come, it&#8217;s a fun way to pass a nice afternoon. See you there!</p>
+]]></content:encoded>
+							<wfw:commentRss>https://shlomi-noach.github.io/blog/mysql/mysql-user-group-meetings-in-israel/feed</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+						<post-id xmlns="com-wordpress:feed-additions:1">634</post-id>	</item>
+	</channel>
+</rss>

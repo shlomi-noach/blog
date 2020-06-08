@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	xmlns:georss="http://www.georss.org/georss"
+	xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+	
+	>
+<channel>
+	<title>
+	Comments on: Converting an OLAP database to TokuDB, part 3: operational stuff	</title>
+	<atom:link href="https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/feed" rel="self" type="application/rss+xml" />
+	<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff</link>
+	<description>Blog by Shlomi Noach</description>
+	<lastBuildDate>Mon, 28 Jul 2014 19:57:36 +0000</lastBuildDate>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.3.3</generator>
+			<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-256081</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Mon, 28 Jul 2014 19:57:36 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-256081</guid>
+					<description><![CDATA[Hi Matt,
+
+As you say, it&#039;s in production; we&#039;re running a mixed topology of TokuDB and InnoDB. We keep those InnoDB servers to be on the safe side.
+We have two standing bugs, both relate to locking. In one bug we get frequent &quot;lock wait timeout&quot; upon concurrent writes to same table (even though for different areas). On another bug we get mysterious slowness on LOAD DATA INFILE, inconsistent -- just caught one today, and it relates to locks as well.
+
+I should mention we&#039;re still doing YEARly partitioning even though we would really like to do DAYly or MONTHly -- due to open files issue mentioned in previous part.
+
+Other than the above we&#039;re good. I haven&#039;t tested OLTP load, just OLAP (low write concurrency, infrequent big reads)]]></description>
+		<content:encoded><![CDATA[<p>Hi Matt,</p>
+<p>As you say, it&#8217;s in production; we&#8217;re running a mixed topology of TokuDB and InnoDB. We keep those InnoDB servers to be on the safe side.<br />
+We have two standing bugs, both relate to locking. In one bug we get frequent &#8220;lock wait timeout&#8221; upon concurrent writes to same table (even though for different areas). On another bug we get mysterious slowness on LOAD DATA INFILE, inconsistent &#8212; just caught one today, and it relates to locks as well.</p>
+<p>I should mention we&#8217;re still doing YEARly partitioning even though we would really like to do DAYly or MONTHly &#8212; due to open files issue mentioned in previous part.</p>
+<p>Other than the above we&#8217;re good. I haven&#8217;t tested OLTP load, just OLAP (low write concurrency, infrequent big reads)</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Matt Lord				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-256072</link>
+		<dc:creator><![CDATA[Matt Lord]]></dc:creator>
+		<pubDate>Mon, 28 Jul 2014 16:54:59 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-256072</guid>
+					<description><![CDATA[Hi Shlomi! 
+
+I&#039;m wondering how things are going, now that it&#039;s been in production for 6 months or so?
+
+Best Regards]]></description>
+		<content:encoded><![CDATA[<p>Hi Shlomi! </p>
+<p>I&#8217;m wondering how things are going, now that it&#8217;s been in production for 6 months or so?</p>
+<p>Best Regards</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-223592</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Tue, 19 Nov 2013 10:38:14 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-223592</guid>
+					<description><![CDATA[@Eyal,
+File system is not the only issue here. The cleanup of the buffer pool is another major factor. When you DROP a table, the buffer pool locks down until all relevant pages are flushed out. Also see Lazy Drop Table feature in Percona Server.]]></description>
+		<content:encoded><![CDATA[<p>@Eyal,<br />
+File system is not the only issue here. The cleanup of the buffer pool is another major factor. When you DROP a table, the buffer pool locks down until all relevant pages are flushed out. Also see Lazy Drop Table feature in Percona Server.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Eyal Hashai				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-223520</link>
+		<dc:creator><![CDATA[Eyal Hashai]]></dc:creator>
+		<pubDate>Mon, 18 Nov 2013 22:16:09 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-223520</guid>
+					<description><![CDATA[InnoDB DROPs are not an issue with a good filesystem.
+
+Thanks for sharing Shlmoni, I got here after I&#039;ve went through the same process :)]]></description>
+		<content:encoded><![CDATA[<p>InnoDB DROPs are not an issue with a good filesystem.</p>
+<p>Thanks for sharing Shlmoni, I got here after I&#8217;ve went through the same process 🙂</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-221974</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Sun, 27 Oct 2013 10:29:59 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-221974</guid>
+					<description><![CDATA[The &quot;your&quot; thin is an English phrasing. Since neither of us are native English speakers, let&#039;s skip it.]]></description>
+		<content:encoded><![CDATA[<p>The &#8220;your&#8221; thin is an English phrasing. Since neither of us are native English speakers, let&#8217;s skip it.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: shlomi				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-221961</link>
+		<dc:creator><![CDATA[shlomi]]></dc:creator>
+		<pubDate>Sun, 27 Oct 2013 04:11:31 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-221961</guid>
+					<description><![CDATA[@Shantanu,
+Which is the precise reason for these blog posts: sharing my experience so as to promote knowledge. And it is the reason why our experiment is now three months into the works, with probably one more month till we go into production.]]></description>
+		<content:encoded><![CDATA[<p>@Shantanu,<br />
+Which is the precise reason for these blog posts: sharing my experience so as to promote knowledge. And it is the reason why our experiment is now three months into the works, with probably one more month till we go into production.</p>
+]]></content:encoded>
+						</item>
+						<item>
+				<title>
+				By: Shantanu Oak				</title>
+				<link>https://shlomi-noach.github.io/blog/mysql/converting-an-olap-database-to-tokudb-part-3-operational-stuff/comment-page-1#comment-221959</link>
+		<dc:creator><![CDATA[Shantanu Oak]]></dc:creator>
+		<pubDate>Sun, 27 Oct 2013 03:45:24 +0000</pubDate>
+		<guid isPermaLink="false">https://shlomi-noach.github.io/blog/?p=6603#comment-221959</guid>
+					<description><![CDATA[&#062;&#062; Nothing like &quot;your&quot; InnoDB.
+&quot;our&quot; innodb? I can see your are impressed by TokuDB and so do I. 
+But TokuDB is still new to me (or &quot;us&quot;) and has to prove itself to be used in production.]]></description>
+		<content:encoded><![CDATA[<p>&gt;&gt; Nothing like &#8220;your&#8221; InnoDB.<br />
+&#8220;our&#8221; innodb? I can see your are impressed by TokuDB and so do I.<br />
+But TokuDB is still new to me (or &#8220;us&#8221;) and has to prove itself to be used in production.</p>
+]]></content:encoded>
+						</item>
+			</channel>
+</rss>
